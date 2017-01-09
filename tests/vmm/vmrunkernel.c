@@ -34,8 +34,10 @@
 #include <vmm/virtio_lguest_console.h>
 
 #include <vmm/sched.h>
+#include <vmm/net.h>
 #include <sys/eventfd.h>
 #include <sys/uio.h>
+#include <parlib/opts.h>
 
 struct virtual_machine local_vm, *vm = &local_vm;
 
@@ -163,7 +165,6 @@ void vapic_status_dump(FILE *f, void *vapic);
 #define LOCK_PREFIX "lock "
 #define ADDR				BITOP_ADDR(addr)
 static inline int test_and_set_bit(int nr, volatile unsigned long *addr);
-static int default_nic = 1;
 
 pthread_t timerthread_struct;
 
@@ -463,6 +464,82 @@ int smbios(char *smbiostable, void *esegment)
 	return amt;
 }
 
+/* Parse func: given a line of text, it sets any vnet options */
+static void __parse_vnet_opts(char *_line)
+{
+	char *eq, *spc;
+
+	/* Check all bools first */
+	if (!strcmp(_line, "snoop")) {
+		vnet_snoop = TRUE;
+		return;
+	}
+	if (!strcmp(_line, "map_diagnostics")) {
+		vnet_map_diagnostics = TRUE;
+		return;
+	}
+	if (!strcmp(_line, "real_address")) {
+		vnet_real_ip_addrs = TRUE;
+		return;
+	}
+	/* Numeric fields, must have an = */
+	eq = strchr(_line, '=');
+	if (!eq)
+		return;
+	*eq++ = 0;
+	/* Drop spaces before =.  atoi trims any spaces after =. */
+	while ((spc = strrchr(_line, ' ')))
+		*spc = 0;
+	if (!strcmp(_line, "nat_timeout")) {
+		vnet_nat_timeout = atoi(eq);
+		return;
+	}
+}
+
+static void set_vnet_opts(char *net_opts)
+{
+	if (parse_opts_file(net_opts, __parse_vnet_opts))
+		perror("parse opts file");
+}
+
+/* Parse func: given a line of text, it builds any vnet port forwardings. */
+static void __parse_vnet_port_fwds(char *_line)
+{
+	char *tok, *tok_save = 0;
+	char *proto, *host_port, *guest_port;
+
+	tok = strtok_r(_line, ":", &tok_save);
+	if (!tok)
+		return;
+	if (strcmp(tok, "port"))
+		return;
+	tok = strtok_r(NULL, ":", &tok_save);
+	if (!tok) {
+		fprintf(stderr, "%s, port with no proto!", __func__);
+		return;
+	}
+	proto = tok;
+	tok = strtok_r(NULL, ":", &tok_save);
+	if (!tok) {
+		fprintf(stderr, "%s, port with no host port!", __func__);
+		return;
+	}
+	host_port = tok;
+	tok = strtok_r(NULL, ":", &tok_save);
+	if (!tok) {
+		fprintf(stderr, "%s, port with no guest port!", __func__);
+		return;
+	}
+	guest_port = tok;
+	vnet_port_forward(proto, host_port, guest_port);
+}
+
+static void set_vnet_port_fwds(char *net_opts)
+{
+	if (parse_opts_file(net_opts, __parse_vnet_port_fwds))
+		perror("parse opts file");
+}
+
 int main(int argc, char **argv)
 {
 	struct boot_params *bp;
@@ -490,6 +567,7 @@ int main(int argc, char **argv)
 	int option_index;
 	char *smbiostable = NULL;
 	int nptp, npml4, npml3, npml2;
+	char *net_opts = NULL;
 
 	static struct option long_options[] = {
 		{"debug",         no_argument,       0, 'd'},
@@ -503,7 +581,7 @@ int main(int argc, char **argv)
 		{"scp",           no_argument,       0, 's'},
 		{"image_file",    required_argument, 0, 'f'},
 		{"cmdline",       required_argument, 0, 'k'},
-		{"nic",           required_argument, 0, 'n'},
+		{"net",           required_argument, 0, 'n'},
 		{"smbiostable",   required_argument, 0, 't'},
 		{"help",          no_argument,       0, 'h'},
 		{0, 0, 0, 0}
@@ -599,7 +677,7 @@ int main(int argc, char **argv)
 			smbiostable = optarg;
 			break;
 		case 'n':
-			default_nic = strtoull(optarg, 0, 0);
+			net_opts = optarg;
 			break;
 		case 'h':
 		default:
@@ -809,7 +887,10 @@ int main(int argc, char **argv)
 		vm->virtio_mmio_devices[VIRTIO_MMIO_BLOCK_DEV] = &blk_mmio_dev;
 		blk_init_fn(&blk_vqdev, disk_image_file);
 	}
-	net_init_fn(&net_vqdev, default_nic);
+
+	set_vnet_opts(net_opts);
+	vnet_init(vm, &net_vqdev);
+	set_vnet_port_fwds(net_opts);
 
 	/* Set the kernel command line parameters */
 	a += 4096;

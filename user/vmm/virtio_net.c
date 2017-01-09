@@ -32,58 +32,18 @@
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_net.h>
+#include <vmm/net.h>
 #include <parlib/iovec.h>
+#include <iplib/iplib.h>
 
 #define VIRTIO_HEADER_SIZE	12
 
-static int ctlfd;
-static int etherfd;
-static char data_path[128];
-static char clone_path[64];
-
-void net_init_fn(struct virtio_vq_dev *vqdev, int nic)
+void virtio_net_set_mac(struct virtio_vq_dev *vqdev, uint8_t *guest_mac)
 {
-	char type[] = "connect -1";
-	char buf[8];
-	char addr_path[32];
-	char addr_buf[3];
-	int addr_fd;
-	uint8_t addr_bytes;
-	int num_read;
-	int total_read = 0;
-
-	snprintf(addr_path, sizeof(addr_path), "/net/ether%d/addr", nic);
-	addr_fd = open(addr_path, O_RDONLY);
-	if (addr_fd < 0)
-		VIRTIO_DEV_ERRX(vqdev, "Bad addr_fd\n");
-
-	for (int i = 0; i < ETH_ALEN; ++i) {
-		assert(read(addr_fd, addr_buf, 2) == 2);
-		addr_buf[2] = 0;
-		addr_bytes = (uint8_t)(strtol(addr_buf, 0, 16));
-		((struct virtio_net_config *)(vqdev->cfg))->mac[i] = addr_bytes;
-		((struct virtio_net_config *)(vqdev->cfg_d))->mac[i] = addr_bytes;
-	}
-
-	snprintf(clone_path, sizeof(clone_path), "/net/ether%d/clone", nic);
-	ctlfd = open(clone_path, O_RDWR);
-	if (ctlfd < 0)
-		VIRTIO_DEV_ERRX(vqdev, "%s", clone_path);
-
-	do {
-		num_read = read(ctlfd, buf + total_read, sizeof(buf) - total_read);
-		total_read += num_read;
-	} while (num_read > 0);
-
-	etherfd = strtol(buf, 0, 10);
-	if (etherfd < 0)
-		VIRTIO_DEV_ERRX(vqdev, "bad etherfd %d (%s)", etherfd, buf);
-
-	snprintf(data_path, sizeof(data_path),
-	         "/net/ether%d/%d/data", nic, etherfd);
-
-	if (write(ctlfd, type, sizeof(type)) != sizeof(type))
-		VIRTIO_DEV_ERRX(vqdev, "write to ctlfd failed");
+	memcpy(((struct virtio_net_config*)(vqdev->cfg))->mac, guest_mac,
+	       ETH_ADDR_LEN);
+	memcpy(((struct virtio_net_config*)(vqdev->cfg_d))->mac, guest_mac,
+	       ETH_ADDR_LEN);
 }
 
 /* net_receiveq_fn receives packets for the guest through the virtio networking
@@ -97,12 +57,7 @@ void net_receiveq_fn(void *_vq)
 	int num_read;
 	struct iovec *iov;
 	struct virtio_mmio_dev *dev = vq->vqdev->transport_dev;
-	int fd;
 	struct virtio_net_hdr_v1 *net_header;
-
-	fd = open(data_path, O_RDWR);
-	if (fd == -1)
-		VIRTIO_DEV_ERRX(vq->vqdev, "Could not open data file for ether1.");
 
 	if (!vq)
 		VIRTIO_DEV_ERRX(vq->vqdev,
@@ -137,7 +92,7 @@ void net_receiveq_fn(void *_vq)
 		/* For receive the virtio header is in iov[0], so we only want
 		 * the packet to be read into iov[1] and above.
 		 */
-		num_read = readv(fd, iov + 1, ilen - 1);
+		num_read = vnet_receive_packet(iov + 1, ilen - 1);
 		if (num_read < 0) {
 			free(iov);
 			VIRTIO_DEV_ERRX(vq->vqdev,
@@ -171,10 +126,6 @@ void net_transmitq_fn(void *_vq)
 	struct iovec *iov;
 	struct virtio_mmio_dev *dev = vq->vqdev->transport_dev;
 	void *stripped;
-	int fd = open(data_path, O_RDWR);
-
-	if (fd == -1)
-		VIRTIO_DEV_ERRX(vq->vqdev, "Could not open data file for ether1.");
 
 	iov = malloc(vq->qnum_max * sizeof(struct iovec));
 	assert(iov != NULL);
@@ -198,7 +149,7 @@ void net_transmitq_fn(void *_vq)
 		/* Strip off the virtio header (the first 12 bytes), as it is
 		 * not a part of the actual ethernet frame. */
 		iov_strip_bytes(iov, olen, VIRTIO_HEADER_SIZE);
-		writev(fd, iov, olen);
+		vnet_transmit_packet(iov, olen);
 
 		virtio_add_used_desc(vq, head, 0);
 
