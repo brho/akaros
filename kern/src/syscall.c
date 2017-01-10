@@ -683,7 +683,6 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 		printd("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
 	}
 	proc_destroy(p_to_die);
-	/* we only get here if we weren't the one to die */
 	proc_decref(p_to_die);
 	return 0;
 }

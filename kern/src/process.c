@@ -753,14 +753,8 @@ void __proc_run_m(struct proc *p)
  * bypass the routine_kmsg check.  Interrupts should be off when you call this.
  *
  * A note on refcnting: this function will not return, and your proc reference
- * will end up stored in current.  This will make no changes to p's refcnt, so
- * do your accounting such that there is only the +1 for current.  This means if
- * it is already in current (like in the trap return path), don't up it.  If
- * it's already in current and you have another reference (like pid2proc or from
- * an IPI), then down it (which is what happens in __startcore()).  If it's not
- * in current and you have one reference, like proc_run(non_current_p), then
- * also do nothing.  The refcnt for your *p will count for the reference stored
- * in current. */
+ * will be ignored (not decreffed).  It may be incref'd, if cur_proc was not
+ * set.  Pass in an already-accounted-for ref, such as owning_proc. */
 void __proc_startcore(struct proc *p, struct user_context *ctx)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
