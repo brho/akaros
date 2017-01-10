@@ -41,7 +41,7 @@
 #include <ip.h>
 
 extern uint32_t kerndate;
-extern char *eve;
+extern struct username eve;
 
 void mkqid(struct qid *q, int64_t path, uint32_t vers, int type)
 {
@@ -80,7 +80,7 @@ devdir(struct chan *c, struct qid qid, char *n,
 	db->mtime = kerndate;
 	db->length = length;
 	db->uid = user;
-	db->gid = eve;
+	db->gid = eve.name;
 	db->muid = user;
 }
 
@@ -112,7 +112,7 @@ devgen(struct chan *c, char *unused_name, struct dirtab *tab, int ntab,
 	}
 	if (tab->qid.vers == -1)
 		return 0;
-	devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
+	devdir(c, tab->qid, tab->name, tab->length, eve.name, tab->perm, dp);
 	return 1;
 }
 
@@ -323,7 +323,7 @@ devstat(struct chan *c, uint8_t * db, int n,
 						for (elem = p = c->name->s; *p; p++)
 							if (*p == '/')
 								elem = p + 1;
-					devdir(c, c->qid, elem, 0, eve, DMDIR | 0555, &dir);
+					devdir(c, c->qid, elem, 0, eve.name, DMDIR | 0555, &dir);
 					n = convD2M(&dir, db, n);
 					if (n == 0)
 						error(EINVAL, ERROR_FIXME);
@@ -383,7 +383,8 @@ devdirread(struct chan *c, char *d, long n,
 }
 
 /*
- * error(EPERM, ERROR_FIXME) if open permission not granted for up->env->user.
+ * error(EPERM, ERROR_FIXME) if open permission not granted for
+ * current->user.name
  */
 void devpermcheck(char *fileuid, uint32_t perm, int omode)
 {
@@ -394,9 +395,9 @@ void devpermcheck(char *fileuid, uint32_t perm, int omode)
 	return;
 	/* select user, group, or other from the traditional rwxrwxrwx, shifting
 	 * into the upper-most position */
-	if (strcmp(current->user, fileuid) == 0)
+	if (strcmp(current->user.name, fileuid) == 0)
 		perm <<= 0;
-	else if (strcmp(current->user, eve) == 0)
+	else if (iseve())
 		perm <<= 3;
 	else
 		perm <<= 6;

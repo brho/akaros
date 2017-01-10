@@ -57,12 +57,12 @@ static int pcidirgen(struct chan *c, int t, int tbdf, struct dir *dp)
 	case Qpcictl:
 		snprintf(get_cur_genbuf(), GENBUF_SZ, "%d.%d.%dctl",
 		         BUSBNO(tbdf), BUSDNO(tbdf), BUSFNO(tbdf));
-		devdir(c, q, get_cur_genbuf(), 0, eve, 0444, dp);
+		devdir(c, q, get_cur_genbuf(), 0, eve.name, 0444, dp);
 		return 1;
 	case Qpciraw:
 		snprintf(get_cur_genbuf(), GENBUF_SZ, "%d.%d.%draw",
 		         BUSBNO(tbdf), BUSDNO(tbdf), BUSFNO(tbdf));
-		devdir(c, q, get_cur_genbuf(), 128, eve, 0664, dp);
+		devdir(c, q, get_cur_genbuf(), 128, eve.name, 0664, dp);
 		return 1;
 	}
 	return -1;
@@ -82,7 +82,7 @@ pcigen(struct chan *c, char *_1, struct dirtab *_2, int _3, int s,
 			q = (struct qid) {
 				QID(0, Qtopdir), 0, QTDIR};
 			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s", pcidevtab.name);
-			devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
+			devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
 			return 1;
 		}
 		return devgen(c, NULL, topdir, ARRAY_SIZE(topdir), s, dp);
@@ -91,7 +91,7 @@ pcigen(struct chan *c, char *_1, struct dirtab *_2, int _3, int s,
 			q = (struct qid) {
 				QID(0, Qtopdir), 0, QTDIR};
 			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s", pcidevtab.name);
-			devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
+			devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
 			return 1;
 		}
 		STAILQ_FOREACH(p, &pci_devices, all_dev) {

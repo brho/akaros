@@ -259,6 +259,11 @@ void proc_init(void)
 	atomic_init(&num_envs, 0);
 }
 
+void proc_set_username(struct proc *p, char *name)
+{
+	set_username(&p->user, name);
+}
+
 void proc_set_progname(struct proc *p, char *name)
 {
 	if (name == NULL)
@@ -358,6 +363,8 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 		kstrdup(&p->binary_path, parent->binary_path);
 	/* Set the basic status variables. */
 	spinlock_init(&p->proc_lock);
+	memset(p->user.name, 0, sizeof(p->user.name));
+	spinlock_init(&p->user.name_lock);
 	p->exitcode = 1337;	/* so we can see processes killed by the kernel */
 	if (parent) {
 		p->ppid = parent->pid;

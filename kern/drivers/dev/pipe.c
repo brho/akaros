@@ -125,7 +125,7 @@ static struct chan *pipeattach(char *spec)
 	if (p->pipedir == 0)
 		error(ENOMEM, ERROR_FIXME);
 	memmove(p->pipedir, pipedir, sizeof(pipedir));
-	kstrdup(&p->user, current->user);
+	kstrdup(&p->user, current->user.name);
 	kref_init(&p->ref, pipe_release, 1);
 	qlock_init(&p->qlock);
 
@@ -162,7 +162,7 @@ pipegen(struct chan *c, char *unused,
 	Pipe *p;
 
 	if (i == DEVDOTDOT) {
-		devdir(c, c->qid, devname(), 0, eve, 0555, dp);
+		devdir(c, c->qid, devname(), 0, eve.name, 0555, dp);
 		return 1;
 	}
 	i++;	/* skip . */
@@ -185,7 +185,7 @@ pipegen(struct chan *c, char *unused,
 	qid.path = NETQID(id, tab->qid.path);
 	qid.vers = 0;
 	qid.type = QTFILE;
-	devdir(c, qid, tab->name, len, eve, tab->perm, dp);
+	devdir(c, qid, tab->name, len, eve.name, tab->perm, dp);
 	return 1;
 }
 
@@ -229,20 +229,20 @@ static int pipestat(struct chan *c, uint8_t * db, int n)
 	switch (type) {
 		case Qdir:
 		case Qctl:
-			devdir(c, c->qid, tab[type].name, tab[type].length, eve,
+			devdir(c, c->qid, tab[type].name, tab[type].length, eve.name,
 			       tab[type].perm, &dir);
 			break;
 		case Qdata0:
 			perm = tab[1].perm;
 			perm |= qreadable(p->q[0]) ? DMREADABLE : 0;
 			perm |= qwritable(p->q[1]) ? DMWRITABLE : 0;
-			devdir(c, c->qid, tab[1].name, qlen(p->q[0]), eve, perm, &dir);
+			devdir(c, c->qid, tab[1].name, qlen(p->q[0]), eve.name, perm, &dir);
 			break;
 		case Qdata1:
 			perm = tab[2].perm;
 			perm |= qreadable(p->q[1]) ? DMREADABLE : 0;
 			perm |= qwritable(p->q[0]) ? DMWRITABLE : 0;
-			devdir(c, c->qid, tab[2].name, qlen(p->q[1]), eve, perm, &dir);
+			devdir(c, c->qid, tab[2].name, qlen(p->q[1]), eve.name, perm, &dir);
 			break;
 		default:
 			panic("pipestat");
@@ -488,7 +488,7 @@ static int pipewstat(struct chan *c, uint8_t *dp, int n)
 	if (c->qid.type & QTDIR)
 		error(EPERM, ERROR_FIXME);
 	p = c->aux;
-	if (strcmp(current->user, p->user) != 0)
+	if (strcmp(current->user.name, p->user) != 0)
 		error(EPERM, ERROR_FIXME);
 	d = kzmalloc(sizeof(*d) + n, 0);
 	if (waserror()) {

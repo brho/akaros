@@ -158,7 +158,7 @@ void sdaddpart(struct sdunit *unit, char *name, uint64_t start, uint64_t end)
 	pp->start = start;
 	pp->end = end;
 	kstrdup(&pp->sdperm.name, name);
-	kstrdup(&pp->sdperm.user, eve);
+	kstrdup(&pp->sdperm.user, eve.name);
 	pp->sdperm.perm = 0640;
 	pp->valid = 1;
 }
@@ -181,7 +181,7 @@ static void sddelpart(struct sdunit *unit, char *name)
 		error(EINVAL, "%s: %d > npart %d", __func__, i, unit->npart);
 
 	/* TODO: Implement permission checking and raise errors as appropriate. */
-	// if (strcmp(up->user, pp->SDperm.user) && !iseve())
+	// if (strcmp(current->user.name, pp->SDperm.user) && !iseve())
 		// error(Eperm);
 
 	pp->valid = 0;
@@ -327,7 +327,7 @@ static struct sdunit *sdgetunit(struct sdev *sdev, int subno)
 
 		snprintf(buf, sizeof(buf), "%s%d", sdev->name, subno);
 		kstrdup(&unit->sdperm.name, buf);
-		kstrdup(&unit->sdperm.user, eve);
+		kstrdup(&unit->sdperm.user, eve.name);
 		unit->sdperm.perm = 0555;
 		unit->subno = subno;
 		unit->dev = sdev;
@@ -447,7 +447,7 @@ static int sd2gen(struct chan *c, int i, struct dir *dp)
 		      unit->vers, QTFILE);
 		perm = &unit->ctlperm;
 		if (emptystr(perm->user)) {
-			kstrdup(&perm->user, eve);
+			kstrdup(&perm->user, eve.name);
 			perm->perm = 0644; /* nothing secret in ctl */
 		}
 		devdir(c, q, "ctl", 0, perm->user, perm->perm, dp);
@@ -459,7 +459,7 @@ static int sd2gen(struct chan *c, int i, struct dir *dp)
 		      unit->vers, QTFILE);
 		perm = &unit->rawperm;
 		if (emptystr(perm->user)) {
-			kstrdup(&perm->user, eve);
+			kstrdup(&perm->user, eve.name);
 			perm->perm = DMEXCL | 0600;
 		}
 		devdir(c, q, "raw", 0, perm->user, perm->perm, dp);
@@ -472,7 +472,7 @@ static int sd2gen(struct chan *c, int i, struct dir *dp)
 		mkqid(&q, QID(DEV(c->qid), UNIT(c->qid), PART(c->qid), Qpart),
 		      unit->vers + pp->vers, QTFILE);
 		if (emptystr(pp->sdperm.user))
-			kstrdup(&pp->sdperm.user, eve);
+			kstrdup(&pp->sdperm.user, eve.name);
 		devdir(c, q, pp->sdperm.name, l, pp->sdperm.user, pp->sdperm.perm, dp);
 		rv = 1;
 		break;
@@ -489,7 +489,7 @@ static int sd1gen(struct chan *c, int i, struct dir *dp)
 	switch (i) {
 	case Qtopctl:
 		mkqid(&q, QID(0, 0, 0, Qtopctl), 0, QTFILE);
-		devdir(c, q, "sdctl", 0, eve, 0644, dp); /* no secrets */
+		devdir(c, q, "sdctl", 0, eve.name, 0644, dp); /* no secrets */
 		return 1;
 	}
 	return -1;
@@ -510,7 +510,7 @@ static int sdgen(struct chan *c, char *d, struct dirtab *dir, int j, int s,
 		if (s == DEVDOTDOT) {
 			mkqid(&q, QID(0, 0, 0, Qtopdir), 0, QTDIR);
 			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s", sddevtab.name);
-			devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
+			devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
 			return 1;
 		}
 
@@ -552,7 +552,7 @@ static int sdgen(struct chan *c, char *d, struct dirtab *dir, int j, int s,
 
 		mkqid(&q, QID(sdev->idno, s, 0, Qunitdir), 0, QTDIR);
 		if (emptystr(unit->sdperm.user))
-			kstrdup(&unit->sdperm.user, eve);
+			kstrdup(&unit->sdperm.user, eve.name);
 		devdir(c, q, unit->sdperm.name, 0, unit->sdperm.user, unit->sdperm.perm,
 		       dp);
 		kref_put(&sdev->r);
@@ -562,13 +562,13 @@ static int sdgen(struct chan *c, char *d, struct dirtab *dir, int j, int s,
 		if (s == DEVDOTDOT) {
 			mkqid(&q, QID(0, 0, 0, Qtopdir), 0, QTDIR);
 			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s", sddevtab.name);
-			devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
+			devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
 			return 1;
 		}
 
 		sdev = sdgetdev(DEV(c->qid));
 		if (sdev == NULL) {
-			devdir(c, c->qid, "unavailable", 0, eve, 0, dp);
+			devdir(c, c->qid, "unavailable", 0, eve.name, 0, dp);
 			return 1;
 		}
 
@@ -609,7 +609,7 @@ static int sdgen(struct chan *c, char *d, struct dirtab *dir, int j, int s,
 		mkqid(&q, QID(DEV(c->qid), UNIT(c->qid), i, Qpart),
 		      unit->vers + pp->vers, QTFILE);
 		if (emptystr(pp->sdperm.user))
-			kstrdup(&pp->sdperm.user, eve);
+			kstrdup(&pp->sdperm.user, eve.name);
 		devdir(c, q, pp->sdperm.name, l, pp->sdperm.user, pp->sdperm.perm, dp);
 		qunlock(&unit->ctl);
 		kref_put(&sdev->r);
@@ -619,7 +619,7 @@ static int sdgen(struct chan *c, char *d, struct dirtab *dir, int j, int s,
 	case Qpart:
 		sdev = sdgetdev(DEV(c->qid));
 		if (sdev == NULL) {
-			devdir(c, q, "unavailable", 0, eve, 0, dp);
+			devdir(c, q, "unavailable", 0, eve.name, 0, dp);
 			return 1;
 		}
 		unit = sdev->unit[UNIT(c->qid)];
@@ -1442,7 +1442,7 @@ static int32_t sdwstat(struct chan *c, uint8_t *dp, int32_t n)
 	}
 
 	/* TODO: Implement permissions checking and raise errors as appropriate. */
-	// if (strcmp(up->user, perm->user) && !iseve())
+	// if (strcmp(current->user.name, perm->user) && !iseve())
 		// error(Eperm);
 
 	d = kzmalloc(sizeof(struct dir) + n, 0);

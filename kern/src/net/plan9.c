@@ -46,7 +46,7 @@
 
 char *commonuser(void)
 {
-	return current->user;
+	return current->user.name;
 }
 
 struct chan *commonfdtochan(int fd, int mode, int a, int b)

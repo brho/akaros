@@ -85,13 +85,13 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 			case DEVDOTDOT:
 				q.path = 0;
 				q.type = QTDIR;
-				devdir(c, q, ".", 0, eve, 0555, dp);
+				devdir(c, q, ".", 0, eve.name, 0555, dp);
 				break;
 			case 0:
 				q.path = N2ndqid;
 				q.type = QTDIR;
 				strlcpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
-				devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
+				devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
 				break;
 			default:
 				return -1;
@@ -139,23 +139,23 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 			case DEVDOTDOT:
 				q.type = QTDIR;
 				q.path = 0;
-				devdir(c, q, ".", 0, eve, DMDIR | 0555, dp);
+				devdir(c, q, ".", 0, eve.name, DMDIR | 0555, dp);
 				break;
 			case 0:
 				q.path = Ncloneqid;
-				devdir(c, q, "clone", 0, eve, 0666, dp);
+				devdir(c, q, "clone", 0, eve.name, 0666, dp);
 				break;
 			case 1:
 				q.path = Naddrqid;
-				devdir(c, q, "addr", 0, eve, 0666, dp);
+				devdir(c, q, "addr", 0, eve.name, 0666, dp);
 				break;
 			case 2:
 				q.path = Nstatqid;
-				devdir(c, q, "stats", 0, eve, 0444, dp);
+				devdir(c, q, "stats", 0, eve.name, 0444, dp);
 				break;
 			case 3:
 				q.path = Nifstatqid;
-				devdir(c, q, "ifstats", 0, eve, 0444, dp);
+				devdir(c, q, "ifstats", 0, eve.name, 0444, dp);
 				break;
 			default:
 				i -= 4;
@@ -166,7 +166,7 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 				q.type = QTDIR;
 				q.path = NETQID(i, N3rdqid);
 				snprintf(get_cur_genbuf(), GENBUF_SZ, "%d", i);
-				devdir(c, q, get_cur_genbuf(), 0, eve, DMDIR | 0555, dp);
+				devdir(c, q, get_cur_genbuf(), 0, eve.name, DMDIR | 0555, dp);
 				break;
 		}
 		return 1;
@@ -180,7 +180,7 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 		o = f->owner;
 		perm = f->mode;
 	} else {
-		o = eve;
+		o = eve.name;
 		perm = 0666;
 	}
 	switch (i) {
@@ -188,7 +188,7 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 			q.type = QTDIR;
 			q.path = N2ndqid;
 			strlcpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
-			devdir(c, q, get_cur_genbuf(), 0, eve, DMDIR | 0555, dp);
+			devdir(c, q, get_cur_genbuf(), 0, eve.name, DMDIR | 0555, dp);
 			break;
 		case 0:
 			q.path = NETQID(NETID(c->qid.path), Ndataqid);
@@ -200,15 +200,15 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 			break;
 		case 2:
 			q.path = NETQID(NETID(c->qid.path), Nstatqid);
-			devdir(c, q, "stats", 0, eve, 0444, dp);
+			devdir(c, q, "stats", 0, eve.name, 0444, dp);
 			break;
 		case 3:
 			q.path = NETQID(NETID(c->qid.path), Ntypeqid);
-			devdir(c, q, "type", 0, eve, 0444, dp);
+			devdir(c, q, "type", 0, eve.name, 0444, dp);
 			break;
 		case 4:
 			q.path = NETQID(NETID(c->qid.path), Nifstatqid);
-			devdir(c, q, "ifstats", 0, eve, 0444, dp);
+			devdir(c, q, "ifstats", 0, eve.name, 0444, dp);
 			break;
 		default:
 			return -1;
@@ -250,7 +250,7 @@ struct chan *netifopen(struct ether *nif, struct chan *c, int omode)
 			case Ndataqid:
 			case Nctlqid:
 				f = nif->f[id];
-				if (netown(f, current->user, omode & 7) < 0)
+				if (netown(f, current->user.name, omode & 7) < 0)
 					error(EPERM, ERROR_FIXME);
 				break;
 		}
@@ -458,7 +458,7 @@ int netifwstat(struct ether *nif, struct chan *c, uint8_t * db, int n)
 	if (f == 0)
 		error(ENOENT, ERROR_FIXME);
 
-	if (netown(f, current->user, O_WRITE) < 0)
+	if (netown(f, current->user.name, O_WRITE) < 0)
 		error(EPERM, ERROR_FIXME);
 
 	dir = kzmalloc(sizeof(struct dir) + n, 0);
@@ -547,7 +547,7 @@ static int netown(struct netfile *p, char *o, int omode)
 	if (*p->owner) {
 		if (strncmp(o, p->owner, KNAMELEN) == 0)	/* User */
 			mode = p->mode;
-		else if (strncmp(o, eve, KNAMELEN) == 0)	/* Bootes is group */
+		else if (strncmp(o, eve.name, KNAMELEN) == 0)	/* Bootes is group */
 			mode = p->mode << 3;
 		else
 			mode = p->mode << 6;	/* Other */
@@ -617,7 +617,7 @@ static int openfile(struct ether *nif, int id)
 		}
 		f->inuse = 1;
 		qreopen(f->in);
-		netown(f, current->user, 0);
+		netown(f, current->user.name, 0);
 		qunlock(&f->qlock);
 		qunlock(&nif->qlock);
 		poperror();

@@ -79,6 +79,7 @@ extern spinlock_t pid_hash_lock;
 
 /* Initialization */
 void proc_init(void);
+void proc_set_username(struct proc *p, char *name);
 void proc_set_progname(struct proc *p, char *name);
 void proc_replace_binary_path(struct proc *p, char *path);
 void proc_init_procinfo(struct proc* p);

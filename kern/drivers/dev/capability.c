@@ -106,7 +106,7 @@ static struct chan *capopen(struct chan *c, int omode)
 	switch ((uint32_t)c->qid.path) {
 	case Qhash:
 		if (!iseve())
-			error(EPERM, "Permission denied: only eve() can open Qhash");
+			error(EPERM, "Permission denied: only eve can open Qhash");
 		break;
 	}
 
@@ -256,20 +256,20 @@ static long capwrite(struct chan *c, void *va, long n, int64_t m)
 			*to++ = 0;
 			panic("todo");
 			/*
-			if (strcmp(from, up->user) != 0)
+			if (strcmp(from, current->user.name) != 0)
 				error(EINVAL, "capability must match user");
 			*/
 		}
 
 		/* set user id */
 		// TODO: make user a char *, not a fixed array.
-		//kstrdup(&current->user, to);
+		//kstrdup(&current->user.name to);
 		// In the original user names were NULL-terminated; ensure
 		// that is still the case.
-		if (strlen(to) > sizeof(current->user)-1)
-			error(EINVAL, "New user name is > %d bytes", sizeof(current->user));
-		memset(current->user, 0, sizeof(current->user));
-		strncpy(current->user, to, sizeof(current->user));
+		if (strlen(to) > sizeof(current->user.name) - 1)
+			error(EINVAL, "New user name is > %d bytes",
+			      sizeof(current->user.name) - 1);
+		proc_set_username(current, to);
 		//up->basepri = PriNormal;
 
 

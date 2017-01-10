@@ -98,7 +98,7 @@ struct queue *qlog;
 
 extern void nullmediumlink(void);
 extern void pktmediumlink(void);
-extern char *eve;
+extern struct username eve;
 static long ndbwrite(struct Fs *, char *unused_char_p_t, uint32_t, int);
 static void closeconv(struct conv *);
 static void setup_proto_qio_bypass(struct conv *cv);
@@ -136,7 +136,7 @@ static int ip3gen(struct chan *c, int i, struct dir *dp)
 
 	cv = chan2conv(c);
 	if (cv->owner == NULL)
-		kstrdup(&cv->owner, eve);
+		kstrdup(&cv->owner, eve.name);
 	mkqid(&q, QID(PROTO(c->qid), CONV(c->qid), i), 0, QTFILE);
 
 	switch (i) {

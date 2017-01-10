@@ -1654,7 +1654,8 @@ static int acpigen(struct chan *c, char *name, struct dirtab *tab, int ntab,
 
 	if (i == DEVDOTDOT) {
 		assert((c->qid.path & QIndexMask) == Qdir);
-		devdir(c, a->parent->qid, a->parent->name, 0, eve, DMDIR|0555, dp);
+		devdir(c, a->parent->qid, a->parent->name, 0, eve.name, DMDIR | 0555,
+		       dp);
 		return 1;
 	}
 	return devgen(c, name, a->cdirs, a->nchildren + NQtypes, i, dp);

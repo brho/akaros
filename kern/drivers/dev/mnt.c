@@ -325,7 +325,7 @@ struct chan *mntauth(struct chan *c, char *spec)
 
 	r->request.type = Tauth;
 	r->request.afid = c->fid;
-	r->request.uname = current->user;
+	r->request.uname = current->user.name;
 	r->request.aname = spec;
 	mountrpc(m, r);
 
@@ -391,7 +391,7 @@ static struct chan *mntattach(char *muxattach)
 		r->request.afid = NOFID;
 	else
 		r->request.afid = bogus.authchan->fid;
-	r->request.uname = current->user;
+	r->request.uname = current->user.name;
 	r->request.aname = bogus.spec;
 	mountrpc(m, r);
 

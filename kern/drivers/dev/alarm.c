@@ -90,7 +90,7 @@ static char *devname(void)
 #define QID2A(q) ((struct proc_alarm*)KADDR(((q).path >> ADDR_SHIFT)))
 #define TYPE(q) ((q).path & ((1 << ADDR_SHIFT) - 1))
 #define QID(ptr, type) ((PADDR(ptr) << ADDR_SHIFT) | type)
-extern char *eve;
+extern struct username eve;
 
 static void alarm_release(struct kref *kref)
 {
@@ -152,7 +152,7 @@ static int alarmgen(struct chan *c, char *entry_name,
 	/* Whether we're in one dir or at the top, .. still takes us to the top. */
 	if (s == DEVDOTDOT) {
 		mkqid(&q, Qtopdir, 0, QTDIR);
-		devdir(c, q, devname(), 0, eve, 0555, dp);
+		devdir(c, q, devname(), 0, eve.name, 0555, dp);
 		return 1;
 	}
 	switch (TYPE(c->qid)) {
@@ -161,7 +161,7 @@ static int alarmgen(struct chan *c, char *entry_name,
 			 * alarm dirs at the top level */
 			if (s == 0) {
 				mkqid(&q, Qclone, 0, QTFILE);
-				devdir(c, q, "clone", 0, eve, 0666, dp);
+				devdir(c, q, "clone", 0, eve.name, 0666, dp);
 				return 1;
 			}
 			s--;	/* 1 -> 0th element, 2 -> 1st element, etc */
@@ -201,7 +201,7 @@ static int alarmgen(struct chan *c, char *entry_name,
 			}
 			snprintf(get_cur_genbuf(), GENBUF_SZ, "a%d", a_i->id);
 			mkqid(&q, QID(a_i, Qalarmdir), 0, QTDIR);
-			devdir(c, q, get_cur_genbuf(), 0, eve, 0555, dp);
+			devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
 			spin_unlock(&p->alarmset.lock);
 			return 1;
 		case Qalarmdir:
@@ -210,19 +210,19 @@ static int alarmgen(struct chan *c, char *entry_name,
 			switch (s) {
 				case Qctl:
 					mkqid(&q, QID(QID2A(c->qid), Qctl), 0, QTFILE);
-					devdir(c, q, "ctl", 0, eve, 0666, dp);
+					devdir(c, q, "ctl", 0, eve.name, 0666, dp);
 					return 1;
 				case Qtimer:
 					mkqid(&q, QID(QID2A(c->qid), Qtimer), 0, QTFILE);
-					devdir(c, q, "timer", 0, eve, 0666, dp);
+					devdir(c, q, "timer", 0, eve.name, 0666, dp);
 					return 1;
 				case Qperiod:
 					mkqid(&q, QID(QID2A(c->qid), Qperiod), 0, QTFILE);
-					devdir(c, q, "period", 0, eve, 0666, dp);
+					devdir(c, q, "period", 0, eve.name, 0666, dp);
 					return 1;
 				case Qcount:
 					mkqid(&q, QID(QID2A(c->qid), Qcount), 0, QTFILE);
-					devdir(c, q, "count", 0, eve, 0666, dp);
+					devdir(c, q, "count", 0, eve.name, 0666, dp);
 					return 1;
 			}
 			return -1;
@@ -238,19 +238,19 @@ static int alarmgen(struct chan *c, char *entry_name,
 			 * for the a directory by path and fail.  Then it will manually
 			 * build the stat output (check the -1 case in devstat). */
 		case Qclone:
-			devdir(c, c->qid, "clone", 0, eve, 0666, dp);
+			devdir(c, c->qid, "clone", 0, eve.name, 0666, dp);
 			return 1;
 		case Qctl:
-			devdir(c, c->qid, "ctl", 0, eve, 0666, dp);
+			devdir(c, c->qid, "ctl", 0, eve.name, 0666, dp);
 			return 1;
 		case Qtimer:
-			devdir(c, c->qid, "timer", 0, eve, 0666, dp);
+			devdir(c, c->qid, "timer", 0, eve.name, 0666, dp);
 			return 1;
 		case Qperiod:
-			devdir(c, c->qid, "period", 0, eve, 0666, dp);
+			devdir(c, c->qid, "period", 0, eve.name, 0666, dp);
 			return 1;
 		case Qcount:
-			devdir(c, c->qid, "count", 0, eve, 0666, dp);
+			devdir(c, c->qid, "count", 0, eve.name, 0666, dp);
 			return 1;
 	}
 	return -1;

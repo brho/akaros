@@ -26,6 +26,12 @@
 TAILQ_HEAD(vcore_tailq, vcore);
 /* 'struct proc_list' declared in sched.h (not ideal...) */
 
+struct username {
+	char name[128];
+	spinlock_t name_lock;
+};
+void set_username(struct username *u, char *name);
+
 #define PROC_PROGNAME_SZ 20
 // TODO: clean this up.
 struct proc {
@@ -33,7 +39,7 @@ struct proc {
 	TAILQ_ENTRY(proc) sibling_link;
 	spinlock_t proc_lock;
 	struct user_context scp_ctx; 	/* context for an SCP.  TODO: move to vc0 */
-	char user[64];
+	struct username user;
 
 	/* This is effectively a (potentially short) version of argv[0].
 	 */

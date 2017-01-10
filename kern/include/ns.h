@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <env.h>
 #include <err.h>
 #include <rendez.h>
 #include <rwlock.h>
@@ -1004,7 +1005,7 @@ static inline int abs(int a)
 	return a;
 }
 
-extern char *eve;
+extern struct username eve;
 extern unsigned int qiomaxatomic;
 
 /* special sections */

@@ -100,7 +100,7 @@ static int srvgen(struct chan *c, char *name, struct dirtab *tab,
 	if (s == DEVDOTDOT) {
 		/* changing whatever c->aux was to be topdir */
 		mkqid(&q, Qtopdir, 0, QTDIR);
-		devdir(c, q, devname(), 0, eve, 0555, dp);
+		devdir(c, q, devname(), 0, eve.name, 0555, dp);
 		return 1;
 	}
 	spin_lock(&srvlock);
@@ -129,7 +129,7 @@ static void __srvinit(void)
 	top_dir = kzmalloc(sizeof(struct srvfile), MEM_WAIT);
 	/* kstrdup, just in case we free this later */
 	kstrdup(&top_dir->name, "srv");
-	kstrdup(&top_dir->user, current ? current->user : "eve");
+	kstrdup(&top_dir->user, current ? current->user.name : "eve");
 	top_dir->perm = DMDIR | 0770;
 	/* +1 for existing, should never decref this */
 	kref_init(&top_dir->ref, fake_release, 1);
@@ -226,7 +226,7 @@ static void srvcreate(struct chan *c, char *name, int omode, uint32_t perm)
 	struct srvfile *srv;
 	srv = kzmalloc(sizeof(struct srvfile), MEM_WAIT);
 	kstrdup(&srv->name, name);
-	kstrdup(&srv->user, current ? current->user : "eve");
+	kstrdup(&srv->user, current ? current->user.name : "eve");
 	srv->perm = 0770;	/* TODO need some security thoughts */
 	atomic_set(&srv->opens, 1);	/* we return it opened */
 	mkqid(&c->qid, Qsrvfile, 0, QTFILE);

@@ -222,7 +222,7 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 	uint32_t path, perm, len;
 	if (s == DEVDOTDOT) {
 		mkqid(&qid, Qdir, 0, QTDIR);
-		devdir(c, qid, devname(), 0, eve, 0555, dp);
+		devdir(c, qid, devname(), 0, eve.name, 0555, dp);
 		return 1;
 	}
 
@@ -230,20 +230,20 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 		if (s == 0) {
 			strlcpy(get_cur_genbuf(), "trace", GENBUF_SZ);
 			mkqid(&qid, Qtrace, -1, QTFILE);
-			devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
+			devdir(c, qid, get_cur_genbuf(), 0, eve.name, 0444, dp);
 			return 1;
 		}
 		if (s == 1) {
 			strlcpy(get_cur_genbuf(), "tracepids", GENBUF_SZ);
 			mkqid(&qid, Qtracepids, -1, QTFILE);
-			devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
+			devdir(c, qid, get_cur_genbuf(), 0, eve.name, 0444, dp);
 			return 1;
 		}
 		if (s == 2) {
 			p = current;
 			strlcpy(get_cur_genbuf(), "self", GENBUF_SZ);
 			mkqid(&qid, (p->pid + 1) << QSHIFT, p->pid, QTDIR);
-			devdir(c, qid, get_cur_genbuf(), 0, p->user, DMDIR | 0555, dp);
+			devdir(c, qid, get_cur_genbuf(), 0, p->user.name, DMDIR | 0555, dp);
 			return 1;
 		}
 		s -= 3;
@@ -278,20 +278,20 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 			return -1;
 		}
 		mkqid(&qid, (s + 1) << QSHIFT, pid, QTDIR);
-		devdir(c, qid, get_cur_genbuf(), 0, p->user, DMDIR | 0555, dp);
+		devdir(c, qid, get_cur_genbuf(), 0, p->user.name, DMDIR | 0555, dp);
 		proc_decref(p);
 		return 1;
 	}
 	if (c->qid.path == Qtrace) {
 		strlcpy(get_cur_genbuf(), "trace", GENBUF_SZ);
 		mkqid(&qid, Qtrace, -1, QTFILE);
-		devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
+		devdir(c, qid, get_cur_genbuf(), 0, eve.name, 0444, dp);
 		return 1;
 	}
 	if (c->qid.path == Qtracepids) {
 		strlcpy(get_cur_genbuf(), "tracepids", GENBUF_SZ);
 		mkqid(&qid, Qtracepids, -1, QTFILE);
-		devdir(c, qid, get_cur_genbuf(), 0, eve, 0444, dp);
+		devdir(c, qid, get_cur_genbuf(), 0, eve.name, 0444, dp);
 		return 1;
 	}
 	if (s >= ARRAY_SIZE(procdir))
@@ -330,7 +330,7 @@ procgen(struct chan *c, char *name, struct dirtab *tab, int unused, int s,
 #endif
 
 	mkqid(&qid, path | tab->qid.path, c->qid.vers, QTFILE);
-	devdir(c, qid, tab->name, len, p->user, perm, dp);
+	devdir(c, qid, tab->name, len, p->user.name, perm, dp);
 	proc_decref(p);
 	return 1;
 }
@@ -413,7 +413,7 @@ static void nonone(struct proc *p)
 #if 0
 	if (p == up)
 		return;
-	if (strcmp(current->user, "none") != 0)
+	if (strcmp(current->user.name, "none") != 0)
 		return;
 	if (iseve())
 		return;
@@ -693,18 +693,18 @@ static int procwstat(struct chan *c, uint8_t * db, int n)
 	if (p->pid != PID(c->qid))
 		error(ESRCH, ERROR_FIXME);
 
-	if (strcmp(current->user, p->user) != 0 && strcmp(current->user, eve) != 0)
+	if (strcmp(current->user.name, p->user.name) != 0 && !iseve())
 		error(EPERM, ERROR_FIXME);
 
 	d = kzmalloc(sizeof(struct dir) + n, MEM_WAIT);
 	n = convM2D(db, n, &d[0], (char *)&d[1]);
 	if (n == 0)
 		error(ENOENT, ERROR_FIXME);
-	if (!emptystr(d->uid) && strcmp(d->uid, p->user) != 0) {
-		if (strcmp(current->user, eve) != 0)
+	if (!emptystr(d->uid) && strcmp(d->uid, p->user.name) != 0) {
+		if (!iseve())
 			error(EPERM, ERROR_FIXME);
 		else
-			kstrdup(&p->user, d->uid);
+			proc_set_username(p, d->uid);
 	}
 	if (d->mode != ~0UL)
 		p->procmode = d->mode & 0777;

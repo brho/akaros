@@ -268,7 +268,7 @@ rootgen(struct chan *c, char *name,
 		p = rootdata[c->qid.path].dotdot;
 		c->qid = roottab[p].qid;
 		name = roottab[p].name;
-		devdir(c, c->qid, name, 0, eve, 0777, dp);
+		devdir(c, c->qid, name, 0, eve.name, 0777, dp);
 		return 1;
 	}
 
@@ -277,7 +277,7 @@ rootgen(struct chan *c, char *name,
 		if (s)
 			return -1;
 		tab = &roottab[c->qid.path];
-		devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
+		devdir(c, tab->qid, tab->name, tab->length, eve.name, tab->perm, dp);
 		return 1;
 	}
 
@@ -289,7 +289,8 @@ rootgen(struct chan *c, char *name,
 		for (iter = 0, i = rootdata[path].child; /* break */; iter++) {
 			if (strncmp(tab->name, name, KNAMELEN) == 0) {
 				printd("Rootgen returns 1 for %s\n", name);
-				devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
+				devdir(c, tab->qid, tab->name, tab->length, eve.name, tab->perm,
+				       dp);
 				printd("return 1 with [%d, %d, %d]\n", dp->qid.path,
 				       dp->qid.vers, dp->qid.type);
 				return 1;
@@ -326,7 +327,7 @@ rootgen(struct chan *c, char *name,
 		return -1;
 	}
 	printd("root scan find returns path %p name %s\n", tab->qid.path, tab->name);
-	devdir(c, tab->qid, tab->name, tab->length, eve, tab->perm, dp);
+	devdir(c, tab->qid, tab->name, tab->length, eve.name, tab->perm, dp);
 	return 1;
 }
 

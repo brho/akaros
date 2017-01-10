@@ -19,6 +19,7 @@
 #include <error.h>
 #include <sys/queue.h>
 #include <event.h>
+#include <env.h>
 #include <ros/procinfo.h>
 
 #if 0
@@ -60,12 +61,12 @@ void logbuf(int c)
 int iseve(void)
 {
 #if 0
-	return strcmp(eve, o->user) == 0;
+	return strcmp(eve.name, o->user.name) == 0;
 #endif
 	return 1;
 }
 
-char *eve = "eve";
+struct username eve = {.name = "eve", .name_lock = SPINLOCK_INITIALIZER};
 char hostdomain[256] = "akaros.org";
 
 static struct {
@@ -725,7 +726,7 @@ static int consstat(struct chan *c, uint8_t *dp, int n)
 		tab = &consdir[Qstdin];
 		perm = tab->perm;
 		perm |= qreadable(cons_q) ? DMREADABLE : 0;
-		devdir(c, tab->qid, tab->name, qlen(cons_q), eve, perm, &dir);
+		devdir(c, tab->qid, tab->name, qlen(cons_q), eve.name, perm, &dir);
 		return dev_make_stat(c, &dir, dp, n);
 	default:
 		return devstat(c, dp, n, consdir, ARRAY_SIZE(consdir), devgen);
@@ -906,13 +907,13 @@ static long consread(struct chan *c, void *buf, long n, int64_t off)
 			return readbintime(buf, n);
 
 		case Qhostowner:
-			return consreadstr((uint32_t) offset, buf, n, eve);
+			return consreadstr((uint32_t) offset, buf, n, eve.name);
 
 		case Qhostdomain:
 			return consreadstr((uint32_t) offset, buf, n, hostdomain);
 
 		case Quser:
-			return consreadstr((uint32_t) offset, buf, n, current->user);
+			return consreadstr((uint32_t) offset, buf, n, current->user.name);
 
 		case Qnull:
 			return 0;
