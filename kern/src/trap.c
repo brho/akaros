@@ -59,6 +59,7 @@ int reflect_current_context(void)
 	uint32_t vcoreid = pcpui->owning_vcoreid;
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 
+	assert(pcpui->cur_proc == pcpui->owning_proc);
 	if (!proc_is_vcctx_ready(p))
 		return -1;
 	if (vcpd->notif_disabled)

@@ -717,6 +717,7 @@ static ssize_t sys_fork(env_t* e)
 {
 	uintptr_t temp;
 	int ret;
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	// TODO: right now we only support fork for single-core processes
 	if (e->state != PROC_RUNNING_S) {
@@ -736,6 +737,7 @@ static ssize_t sys_fork(env_t* e)
 		set_errno(EINVAL);
 		return -1;
 	}
+	assert(pcpui->cur_proc == pcpui->owning_proc);
 	copy_current_ctx_to(&env->scp_ctx);
 
 	/* Make the new process have the same VMRs as the older.  This will copy the
@@ -870,6 +872,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	}
 	/* Preemptively copy out the cur_ctx, in case we fail later (easier on
 	 * cur_ctx if we do this now) */
+	assert(pcpui->cur_proc == pcpui->owning_proc);
 	copy_current_ctx_to(&p->scp_ctx);
 	/* Check the size of the argenv array, error out if too large. */
 	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {

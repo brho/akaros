@@ -1147,7 +1147,7 @@ static void x86_finalize_vmtf(struct vm_trapframe *tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	x86_vmtf_clear_partial(tf);
-	unload_guest_pcore(pcpui->cur_proc, pcpui->guest_pcoreid);
+	unload_guest_pcore(pcpui->owning_proc, pcpui->guest_pcoreid);
 }
 
 /* Makes sure that the user context is fully saved into ctx and not split across
