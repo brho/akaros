@@ -26,8 +26,10 @@
 #include <crypto/2id.h>
 #include <crypto/2sha.h>
 
+#include <ctype.h>
+
 enum {
-	Hashlen = VB2_SHA256_BLOCK_SIZE,
+	Hashlen = VB2_MAX_DIGEST_SIZE * 2,
 	Maxhash = 256,
 };
 
@@ -37,7 +39,7 @@ enum {
  */
 struct Caphash {
 	struct Caphash *next;
-	char hash[Hashlen];
+	char hash[Hashlen + 1];
 };
 
 struct {
@@ -55,7 +57,7 @@ enum {
 /* caphash must be last */
 struct dirtab capdir[] = {
 	{".",       {Qdir, 0, QTDIR}, 0, DMDIR | 0500},
-	{"capuse",  {Quse}, 0, 0222,},
+	{"capuse",  {Quse},           0, 0222,},
 	{"caphash", {Qhash},          0, 0200,},
 };
 int ncapdir = ARRAY_SIZE(capdir);
@@ -116,19 +118,15 @@ static struct chan *capopen(struct chan *c, int omode)
 	return c;
 }
 
-/*
-  static char*
-  hashstr(uint8_t *hash)
-  {
-  static char buf[2*Hashlen+1];
-  int i;
+size_t __hashstr(char *buf, uint8_t *hash, size_t bytes_to_split)
+{
+	int i;
 
-  for(i = 0; i < Hashlen; i++)
-  sprint(buf+2*i, "%2.2x", hash[i]);
-  buf[2*Hashlen] = 0;
-  return buf;
-  }
-*/
+	for (i = 0; i < bytes_to_split; i++)
+		snprintf(buf + 2 * i, 3, "%02x", hash[i]);
+
+	return bytes_to_split;
+}
 
 static struct Caphash *remcap(uint8_t *hash)
 {
@@ -204,7 +202,8 @@ static long capwrite(struct chan *c, void *va, long n, int64_t m)
 {
 	struct Caphash *p;
 	char *cp;
-	uint8_t hash[Hashlen];
+	uint8_t hash[Hashlen + 1] = {0};
+	char *hashstr = NULL;
 	char *key, *from, *to;
 	char err[256];
 	int ret;
@@ -214,9 +213,11 @@ static long capwrite(struct chan *c, void *va, long n, int64_t m)
 	case Qhash:
 		if (!iseve())
 			error(EPERM, "permission denied: you must be eve");
-		if (n < Hashlen)
+		if (n < VB2_SHA256_DIGEST_SIZE * 2)
 			error(EIO, "Short read: on Qhash");
 		memmove(hash, va, Hashlen);
+		for (int i = 0; i < Hashlen; i++)
+			hash[i] = tolower(hash[i]);
 		addcap(hash);
 		break;
 
@@ -225,6 +226,7 @@ static long capwrite(struct chan *c, void *va, long n, int64_t m)
 		cp = NULL;
 		if (waserror()) {
 			kfree(cp);
+			kfree(hashstr);
 			nexterror();
 		}
 		cp = kzmalloc(n + 1, 0);
@@ -237,16 +239,25 @@ static long capwrite(struct chan *c, void *va, long n, int64_t m)
 			error(EIO, "short read: Quse");
 		*key++ = 0;
 
-		ret = hmac(VB2_ALG_RSA1024_SHA256, key, strlen(key),
-		           from, strlen(from), hash, sizeof(hash));
+		ret = hmac(VB2_HASH_SHA256, key, strlen(key),
+		           from, strlen(from), hash, Hashlen);
 		if (ret)
 			error(EINVAL, "HMAC failed");
 
-		p = remcap(hash);
+		// Convert to ASCII text
+		hashstr = (char *)kzmalloc(sizeof(hash), MEM_WAIT);
+		ret = __hashstr(hashstr, hash, VB2_SHA256_DIGEST_SIZE);
+		if (ret != VB2_SHA256_DIGEST_SIZE)
+			error(EINVAL, "hash is wrong length");
+
+		p = remcap((uint8_t *)hashstr);
 		if (p == NULL) {
 			snprintf(err, sizeof(err), "invalid capability %s@%s", from, key);
 			error(EINVAL, err);
 		}
+
+		kfree(hashstr);
+		hashstr = NULL;
 
 		/* if a from user is supplied, make sure it matches */
 		to = strchr(from, '@');
@@ -254,16 +265,11 @@ static long capwrite(struct chan *c, void *va, long n, int64_t m)
 			to = from;
 		} else {
 			*to++ = 0;
-			panic("todo");
-			/*
 			if (strcmp(from, current->user.name) != 0)
 				error(EINVAL, "capability must match user");
-			*/
 		}
 
 		/* set user id */
-		// TODO: make user a char *, not a fixed array.
-		//kstrdup(&current->user.name to);
 		// In the original user names were NULL-terminated; ensure
 		// that is still the case.
 		if (strlen(to) > sizeof(current->user.name) - 1)
@@ -271,7 +277,6 @@ static long capwrite(struct chan *c, void *va, long n, int64_t m)
 			      sizeof(current->user.name) - 1);
 		proc_set_username(current, to);
 		//up->basepri = PriNormal;
-
 
 		kfree(p);
 		kfree(cp);
