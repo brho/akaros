@@ -1357,8 +1357,11 @@ static DEFINE_PERCPU(struct guest_pcore *, gpc_to_clear_to);
  * */
 void vmx_clear_vmcs(void)
 {
-	struct guest_pcore *gpc = PERCPU_VAR(gpc_to_clear_to);
+	struct guest_pcore *gpc;
+	int8_t irq_state = 0;
 
+	disable_irqsave(&irq_state);
+	gpc = PERCPU_VAR(gpc_to_clear_to);
 	if (gpc) {
 		vmcs_clear(gpc->vmcs);
 		ept_sync_context(gpc_get_eptp(gpc));
@@ -1367,6 +1370,7 @@ void vmx_clear_vmcs(void)
 		gpc->vmcs_core_id = -1;
 		PERCPU_VAR(gpc_to_clear_to) = NULL;
 	}
+	enable_irqsave(&irq_state);
 }
 
 static void __clear_vmcs(uint32_t srcid, long a0, long a1, long a2)
@@ -1416,6 +1420,7 @@ void vmx_unload_guest_pcore(struct guest_pcore *gpc)
 	/* We don't have to worry about races yet.  No one will try to load gpc
 	 * until we've returned and unlocked, and no one will clear an old VMCS to
 	 * this GPC, since it was cleared before we finished loading (above). */
+	assert(!irq_is_enabled());
 	gpc->vmcs_core_id = core_id();
 	PERCPU_VAR(gpc_to_clear_to) = gpc;
 }
