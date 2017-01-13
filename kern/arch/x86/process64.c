@@ -104,24 +104,19 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *p = pcpui->cur_proc;
 	struct guest_pcore *gpc;
-	bool should_vmresume;
 
 	if (x86_vmtf_is_partial(tf)) {
 		gpc = lookup_guest_pcore(p, tf->tf_guest_pcoreid);
 		assert(gpc);
 		assert(pcpui->guest_pcoreid == tf->tf_guest_pcoreid);
-		should_vmresume = TRUE;
+		assert(gpc->should_vmresume);
 	} else {
-		gpc = load_guest_pcore(p, tf->tf_guest_pcoreid, &should_vmresume);
+		gpc = load_guest_pcore(p, tf->tf_guest_pcoreid);
 		if (!gpc) {
 			tf->tf_exit_reason = EXIT_REASON_GUEST_IN_USE;
 			handle_bad_vm_tf(tf);
 		}
 	}
-	if (should_vmresume)
-		tf->tf_flags |= VMCTX_FL_VMRESUME;
-	else
-		tf->tf_flags &= ~VMCTX_FL_VMRESUME;
 	vmcs_write(GUEST_RSP, tf->tf_rsp);
 	vmcs_write(GUEST_CR3, tf->tf_cr3);
 	vmcs_write(GUEST_RIP, tf->tf_rip);
@@ -140,6 +135,15 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	 * will arrive after we vmenter, since IRQs are currently disabled. */
 	if (test_bit(VMX_POSTED_OUTSTANDING_NOTIF, gpc->posted_irq_desc))
 		send_self_ipi(I_POKE_CORE);
+	/* The first time a VMCS is started after being loaded, it must be launched.
+	 * Subsequent starts must be resumes.  Once the VMCS is cleared, we start
+	 * with a launch again.  Note this is the VMCS, not the GPC unload. */
+	if (gpc->should_vmresume) {
+		tf->tf_flags |= VMCTX_FL_VMRESUME;
+	} else {
+		tf->tf_flags &= ~VMCTX_FL_VMRESUME;
+		gpc->should_vmresume = TRUE;
+	}
 	/* vmlaunch/resume can fail, so we need to be able to return from this.
 	 * Thus we can't clobber rsp via the popq style of setting the registers.
 	 * Likewise, we don't want to lose rbp via the clobber list.

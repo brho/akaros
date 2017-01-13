@@ -1068,7 +1068,6 @@ struct guest_pcore *create_guest_pcore(struct proc *p,
 {
 	ERRSTACK(2);
 	int8_t state = 0;
-	bool ignore;
 	struct guest_pcore *gpc = kmalloc(sizeof(struct guest_pcore), MEM_WAIT);
 
 	if (!gpc)
@@ -1091,9 +1090,10 @@ struct guest_pcore *create_guest_pcore(struct proc *p,
 	printd("%d: gpc->vmcs is %p\n", core_id(), gpc->vmcs);
 	gpc->cpu = -1;
 	gpc->vmcs_core_id = -1;
+	gpc->should_vmresume = FALSE;
 
 	disable_irqsave(&state);
-	vmx_load_guest_pcore(gpc, &ignore);
+	vmx_load_guest_pcore(gpc);
 	vmx_setup_vmcs(gpc);
 	vmx_setup_initial_guest_state(p, gpci);
 	vmx_unload_guest_pcore(gpc);
@@ -1362,6 +1362,7 @@ void vmx_clear_vmcs(void)
 	if (gpc) {
 		vmcs_clear(gpc->vmcs);
 		ept_sync_context(gpc_get_eptp(gpc));
+		gpc->should_vmresume = FALSE;
 		wmb(); /* write -1 after clearing */
 		gpc->vmcs_core_id = -1;
 		PERCPU_VAR(gpc_to_clear_to) = NULL;
@@ -1377,14 +1378,13 @@ static void __clear_vmcs(uint32_t srcid, long a0, long a1, long a2)
  * instance, only one core can be loading or unloading a particular GPC at a
  * time.  Other cores write to our GPC's vmcs_core_id and vmcs (doing a
  * vmcs_clear).  Once they write vmcs_core_id != -1, it's ours. */
-void vmx_load_guest_pcore(struct guest_pcore *gpc, bool *should_vmresume)
+void vmx_load_guest_pcore(struct guest_pcore *gpc)
 {
 	int remote_core;
 
 	assert(!irq_is_enabled());
 	if (gpc->vmcs_core_id == core_id()) {
 		PERCPU_VAR(gpc_to_clear_to) = NULL;
-		*should_vmresume = TRUE;
 		return;
 	}
 	/* Clear ours *before* waiting on someone else; avoids deadlock (circular
@@ -1409,7 +1409,6 @@ void vmx_load_guest_pcore(struct guest_pcore *gpc, bool *should_vmresume)
 	vmcs_load(gpc->vmcs);
 	__vmx_setup_pcpu(gpc);
 	gpc->vmcs_core_id = core_id();
-	*should_vmresume = FALSE;
 }
 
 void vmx_unload_guest_pcore(struct guest_pcore *gpc)

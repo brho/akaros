@@ -160,8 +160,7 @@ struct guest_pcore *lookup_guest_pcore(struct proc *p, int guest_pcoreid)
 	return p->vmm.guest_pcores[guest_pcoreid];
 }
 
-struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid,
-                                     bool *should_vmresume)
+struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid)
 {
 	struct guest_pcore *gpc;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -179,7 +178,7 @@ struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid,
 	spin_unlock(&p->vmm.lock);
 	/* We've got dibs on the gpc; we don't need to hold the lock any longer. */
 	pcpui->guest_pcoreid = guest_pcoreid;
-	vmx_load_guest_pcore(gpc, should_vmresume);
+	vmx_load_guest_pcore(gpc);
 	/* Load guest's xcr0 */
 	lxcr0(gpc->xcr0);
 
