@@ -209,6 +209,7 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	assert(read_flags() & FL_ZF);
 	tf->tf_exit_reason = EXIT_REASON_VMENTER_FAILED;
 	tf->tf_exit_qual = vmcs_read(VM_INSTRUCTION_ERROR);
+	tf->tf_flags |= VMCTX_FL_PARTIAL;
 	handle_bad_vm_tf(tf);
 }
 
