@@ -39,24 +39,7 @@ void showstatus(FILE *f, struct guest_thread *vm_thread)
 	fprintf(f, "Shutdown: core %d, %s due to %s(0x%x); ret code 0x%x\n",
 	        vm_tf->tf_guest_pcoreid, when, reason, shutdown,
 			vm_tf->tf_exit_reason);
-	fprintf(f, "  gva %p gpa %p cr3 %p\n", (void *)vm_tf->tf_guest_va,
-	        (void *)vm_tf->tf_guest_pa, (void *)vm_tf->tf_cr3);
-
-	fprintf(f, "  rax  0x%016lx\n",           vm_tf->tf_rax);
-	fprintf(f, "  rbx  0x%016lx\n",           vm_tf->tf_rbx);
-	fprintf(f, "  rcx  0x%016lx\n",           vm_tf->tf_rcx);
-	fprintf(f, "  rdx  0x%016lx\n",           vm_tf->tf_rdx);
-	fprintf(f, "  rbp  0x%016lx\n",           vm_tf->tf_rbp);
-	fprintf(f, "  rsi  0x%016lx\n",           vm_tf->tf_rsi);
-	fprintf(f, "  rdi  0x%016lx\n",           vm_tf->tf_rdi);
-	fprintf(f, "  r8   0x%016lx\n",           vm_tf->tf_r8);
-	fprintf(f, "  r9   0x%016lx\n",           vm_tf->tf_r9);
-	fprintf(f, "  r10  0x%016lx\n",           vm_tf->tf_r10);
-	fprintf(f, "  r11  0x%016lx\n",           vm_tf->tf_r11);
-	fprintf(f, "  r12  0x%016lx\n",           vm_tf->tf_r12);
-	fprintf(f, "  r13  0x%016lx\n",           vm_tf->tf_r13);
-	fprintf(f, "  r14  0x%016lx\n",           vm_tf->tf_r14);
-	fprintf(f, "  r15  0x%016lx\n",           vm_tf->tf_r15);
+	fprintf_vm_tf(f, vm_tf);
 }
 
 /* Convert a kernel guest virtual address to physical address.

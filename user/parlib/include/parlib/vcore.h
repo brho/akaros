@@ -6,6 +6,7 @@
 #include <string.h>
 #include <parlib/timing.h>
 #include <parlib/common.h>
+#include <stdio.h>
 
 __BEGIN_DECLS
 
@@ -65,8 +66,9 @@ void cpu_relax_vc(uint32_t vcoreid);
 uint32_t get_vcoreid(void);
 bool check_vcoreid(const char *str, uint32_t vcoreid);
 void __attribute__((noreturn)) vcore_yield_or_restart(void);
-void print_hw_tf(struct hw_trapframe *tf);
-void print_sw_tf(struct sw_trapframe *sw_tf);
+void fprintf_hw_tf(FILE *f, struct hw_trapframe *hw_tf);
+void fprintf_sw_tf(FILE *f, struct sw_trapframe *sw_tf);
+void fprintf_vm_tf(FILE *f, struct vm_trapframe *vm_tf);
 void print_user_context(struct user_context *ctx);
 
 /* This works so long as we don't dlopen parlib (which we never do) */
