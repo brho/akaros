@@ -175,6 +175,7 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
                    uintptr_t stack_top, uintptr_t tls_desc);
 void proc_secure_ctx(struct user_context *ctx);
 void __abandon_core(void);
+void __clear_owning_proc(uint32_t coreid);
 
 /* Degubbing */
 void print_allpids(void);

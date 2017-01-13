@@ -341,7 +341,11 @@ void __abandon_core(void)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	lcr3(boot_cr3);
-	vmx_clear_vmcs();
 	proc_decref(pcpui->cur_proc);
 	pcpui->cur_proc = 0;
+}
+
+void __clear_owning_proc(uint32_t coreid)
+{
+	vmx_clear_vmcs();
 }

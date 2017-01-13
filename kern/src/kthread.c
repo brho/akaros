@@ -154,7 +154,13 @@ void restart_kthread(struct kthread *kthread)
 			proc_decref(kthread->proc);
 			kthread->proc = 0;
 		} else {
-			/* Load our page tables before potentially decreffing cur_proc */
+			/* Load our page tables before potentially decreffing cur_proc.
+			 *
+			 * We don't need to do an EPT flush here.  The EPT is flushed and
+			 * managed in sync with the VMCS.  We won't run a different VM (and
+			 * thus *need* a different EPT) without first removing the old GPC,
+			 * which ultimately will result in a flushed EPT (on x86, this
+			 * actually happens when we clear_owning_proc()). */
 			lcr3(kthread->proc->env_cr3);
 			/* Might have to clear out an existing current.  If they need to be
 			 * set later (like in restartcore), it'll be done on demand. */

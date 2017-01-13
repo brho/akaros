@@ -65,3 +65,7 @@ void __abandon_core(void)
 	proc_decref(pcpui->cur_proc);
 	pcpui->cur_proc = 0;
 }
+
+void __clear_owning_proc(uint32_t coreid)
+{
+}

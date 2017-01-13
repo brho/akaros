@@ -1798,6 +1798,8 @@ void clear_owning_proc(uint32_t coreid)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	struct proc *p = pcpui->owning_proc;
+
+	__clear_owning_proc(coreid);
 	pcpui->owning_proc = 0;
 	pcpui->owning_vcoreid = 0xdeadbeef;
 	pcpui->cur_ctx = 0;			/* catch bugs for now (may go away) */
