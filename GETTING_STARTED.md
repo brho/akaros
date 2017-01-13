@@ -49,6 +49,11 @@ usually idling in there (alone), and if I'm at my computer, I'll respond.
 ----------------------------
 I'll describe how to get x86 working.  RISCV is similar.
 
+To start off, make sure AKAROS_ROOT and AKAROS_XCC_ROOT are set in your
+environment.  AKAROS_ROOT is the Akaros repo directory.  AKAROS_XCC_ROOT is a
+directory of your choosing where the toolchain will be installed (more on that
+in Section 3.1 below).
+
 The first step is to configure the kernel.  Targets like `config`,
 `menuconfig`, and some of the other KBuild targets work.  Defconfig gives you a
 default configuration.  For example, to config for 64-bit x86:
@@ -91,6 +96,12 @@ template to work from.
 
 You need to set your `INSTDIRS` to some place where you want the cross compiler
 installed.  I have a directory named `akaros-gcc-glibc` for this.
+
+Additionally, you must set the environment variable `$AKAROS_XCC_ROOT` to point
+to the installation directory for your architecture.  For instance, my
+AKAROS_XCC_ROOT is:
+
+`/home/brho/classes/akaros/akaros-gcc-glibc/install-x86_64-ucb-akaros-gcc/`
 
 You also need to add `bin` directories to your `PATH` where the cross compiler
 will be installed.  This will vary based on your value for `INSTDIRS`.  For
@@ -136,7 +147,11 @@ architecture until a new `ARCH` is selected (i.e. via `make ARCH=xxx defconfig`
 etc.)
 
 ### 3.3 Userspace
-To build userspace and test programs:
+First, you'll need to build a few common applications and libraries:
+
+`$ make apps-install`
+
+Then you can build the tests and small utility programs:
 
 `$ make tests`
 

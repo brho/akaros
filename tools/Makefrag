@@ -1,27 +1,32 @@
 # Helper for writing application Makefiles
 #
-# Those apps should include this directly and be located three directories down
-# from the AKAROS_ROOT.
+# Those apps should include this directly.
 #
 # Other than providing defaults for things like AKAROS_ROOT, the main thing
 # this does is set the cross compiler.  You can override some things with a
 # Makelocal.
 #
-# Exports CROSS_COMPILE, ARCH, KBUILD_VERBOSE, Q, MAKEFLAGS, BUILDDIR,
-# AKAROS_ROOT, AKAROS_XCC_ROOT, AKAROS_PREFIX, AKAROS_SYSROOT, MAKE_JOBS,
-# FIRST_KFS_PATH, KFS_ROOT
+# The calling environment must have AKAROS_ROOT and AKAROS_XCC_ROOT set.
+#
+# Exports CROSS_COMPILE, ARCH, KBUILD_VERBOSE, Q, MAKEFLAGS, AKAROS_ROOT,
+# AKAROS_XCC_ROOT, AKAROS_PREFIX, AKAROS_SYSROOT, MAKE_JOBS, FIRST_KFS_PATH,
+# KFS_ROOT
 
 # Do not print "Entering directory ...";
 MAKEFLAGS += --no-print-directory
 
 # Overrides
 -include Makelocal
-BUILDDIR ?= $(shell pwd)
-AKAROS_ROOT ?= $(BUILDDIR)/../../..
-MAKE_JOBS ?= 4
+
+ifndef AKAROS_ROOT
+    $(error AKAROS_ROOT is empty!  You must set it!)
+endif
+ifndef AKAROS_XCC_ROOT
+    $(error AKAROS_XCC_ROOT is empty!  You must set it!)
+endif
+
 FIRST_KFS_PATH ?= $(AKAROS_ROOT)/kern/kfs
 KFS_ROOT = $(FIRST_KFS_PATH)
-AKAROS_XCC_ROOT ?= $(shell grep X86_64_INSTDIR $(AKAROS_ROOT)/tools/compilers/gcc-glibc/Makelocal | cut -f 3 -d' ')
 
 # To put more focus on warnings, be less verbose as default
 # Use 'make V=1' to see the full commands
