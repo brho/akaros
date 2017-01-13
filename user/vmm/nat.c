@@ -542,20 +542,32 @@ static void get_host_ip_addrs(void)
 	register_printf_specifier('M', printf_ipmask, printf_ipmask_info);
 
 	lifc = get_first_noloop_iplifc(NULL, &to_free);
-	parlib_assert_perror(lifc);
+	if (!lifc) {
+		fprintf(stderr, "IP addr lookup failed (%r), no VM networking\n");
+		return;
+	}
 	snprintf(my_ip_str, sizeof(my_ip_str), "%i", lifc->ip);
 	snprintf(buf, sizeof(buf), "%i%M", lifc->ip, lifc->mask);
 	v4parsecidr(host_v4_addr, host_v4_mask, buf);
 	free_ipifc(to_free);
 
 	ret = my_router_addr(router_ip, NULL);
-	parlib_assert_perror(!ret);
+	if (ret) {
+		fprintf(stderr, "Router lookup failed (%r), no VM networking\n");
+		return;
+	}
 	v6tov4(host_v4_router, router_ip);
 
 	ndb = ndbopen("/net/ndb");
-	parlib_assert_perror(ndb);
+	if (!ndb) {
+		fprintf(stderr, "NDB open failed (%r), no VM networking\n");
+		return;
+	}
 	nt = ndbipinfo(ndb, "ip", my_ip_str, &dns, 1);
-	assert(nt);
+	if (!nt) {
+		fprintf(stderr, "DNS server lookup failed (%r), no VM networking\n");
+		return;
+	}
 	v4parseip(host_v4_dns, nt->val);
 	ndbfree(nt);
 	ndbclose(ndb);
