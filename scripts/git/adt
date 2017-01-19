@@ -3,7 +3,7 @@
 # Copyright 2016 Google Inc
 
 # Use local branch name as the default topic unless overridden
-GERRIT_TOPIC=`git status | grep "# On branch .*" | cut -f 4 -d " "`
+GERRIT_TOPIC=`git status | grep "branch .*" | rev | cut -f 1 -d " " | rev`
 
 GERRIT_REMOTE=gerrit
 GERRIT_PUSH_COMMAND="git push $GERRIT_REMOTE HEAD:refs/for/master"
@@ -73,7 +73,7 @@ do
 	fi
 done
 
-if [ $GERRIT_TOPIC != "" ]
+if [ "$GERRIT_TOPIC" != "" ]
 then
 	# Append topic
 	GERRIT_PUSH_COMMAND="$GERRIT_PUSH_COMMAND/$GERRIT_TOPIC"
