@@ -96,7 +96,7 @@ maybefilter() {
 # based on this information, the translation table below is amended
 # to show these devices in the pci (8) output.
 
-grep -a . '#pci'/*ctl | maybebridges | sed '
+grep -a . '#pci/pci'/*ctl | maybebridges | sed '
 	s/^.pci\///
 	s/ctl:/:	/
 	t noop
