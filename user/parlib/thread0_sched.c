@@ -146,21 +146,37 @@ static void thread0_thread_has_blocked(struct uthread *uth, int flags)
 	thread0_info.is_blocked = TRUE;
 }
 
-/* We only have one thread, so we don't need mutexes */
+/* We only have one thread, so we don't *need* mutexes.  But we'll use a bool to
+ * catch code that could deadlock itself. */
 static uth_mutex_t thread0_mtx_alloc(void)
 {
-	/* Returning something non-zero, in case someone compares it to 0 */
-	return (uth_mutex_t)0x1234;
+	bool *mtx = malloc(sizeof(bool));
+
+	assert(mtx);
+	*mtx = FALSE;
+	return (uth_mutex_t)mtx;
 }
 
 static void thread0_mtx_free(uth_mutex_t m)
 {
+	bool *mtx = (bool*)m;
+
+	assert(*mtx == FALSE);
+	free((void*)m);
 }
 
 static void thread0_mtx_lock(uth_mutex_t m)
 {
+	bool *mtx = (bool*)m;
+
+	assert(*mtx == FALSE);
+	*mtx = TRUE;
 }
 
 static void thread0_mtx_unlock(uth_mutex_t m)
 {
+	bool *mtx = (bool*)m;
+
+	assert(*mtx == TRUE);
+	*mtx = FALSE;
 }
