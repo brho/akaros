@@ -1,2 +1,5 @@
-# Put your own custom suff in this directory.
+# Put your own custom stuff in this directory.
 # They will be picked up by the ifconfig script.
+#
+# For a specific host, you'll need to set $me, $mask, $remote, $route, and $dns
+# You can optionally set $search, which will be a search path in resolv.conf

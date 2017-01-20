@@ -11,20 +11,6 @@ export rootdir=/root
 export rootspec=''
 export rootsrv=boot
 
-if [ -f /etc/network/default ]
-then
-	source /etc/network/default
-else
-	echo '/etc/network/default not found'
-fi
-
-if [ -f /etc/network/local ]
-then
-	source /etc/network/local
-else
-	echo '/etc/network/local not found'
-fi
-
 if [ -d /etc/network/local.d ]
 then
 	for cfg in /etc/network/local.d/*
@@ -53,7 +39,7 @@ fi
 
 if [ -x /bin/ipconfig ]
 then
-	if [ ! -z "$me" ]
+	if [ -n "$me" ]
 	then
 		ipconfig -g $route ether /net/ether$NIC $me $mask
 	else
@@ -62,13 +48,16 @@ then
 	fi
 	ipconfig -P loopback /dev/null 127.0.0.1
 else
-	if [ -z "$me" ]
+	if [ ! -n "$me" ]
 	then
 		# By default, configure for QEMU.
+		# We only use qemu's setting when we don't have ipconfig so that we can
+		# test ipconfig + DHCP with qemu.
 		me='10.0.2.15'
 		mask='255.255.255.0'
 		remote='10.0.2.0'
 		route='10.0.2.2'
+		dns='10.0.2.3'
 	fi
 	#
 	# Get an instance of an IP stack and bind ether$NIC to it.
@@ -91,6 +80,25 @@ else
 	echo 'bind loopback /dev/null' > /net/ipifc/$i/ctl
 	echo 'add 127.0.0.1 255.0.0.0 127.0.0.0' > /net/ipifc/$i/ctl
 fi
+
+######### DNS Config #############
+
+# If we used some form of static configuration, /net/ndb doesn't know about our
+# DNS server.  This assumes the last contents of ndb is the IP block
+if [ -n "$me" ]
+then
+	echo -e "\tdns=$dns" >> /net/ndb
+fi
+# Either way, we have DNS in ndb now, but some apps want it in resolv.conf
+DNS=`grep "dns=" /net/ndb | cut -f 2 -d'='`
+echo "nameserver $DNS" >> /etc/resolv.conf
+# And we may have some additional search paths for resolv.conf
+if [ -n "$me" ]
+then
+	echo "search $search" >> /etc/resolv.conf
+fi
+# We also can provide an etc hosts file for loopback
+echo "127.0.0.1 localhost" >> /etc/hosts
 
 daemonize /bin/cs -S
 mount -a '#srv/cs' /net
