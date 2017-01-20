@@ -479,12 +479,15 @@ void uthread_usleep(unsigned int usecs)
 	sys_block(usecs);	/* usec sleep */
 }
 
-void uthread_sleep_forever(void)
+static void __sleep_forever_cb(struct uthread *uth, void *arg)
 {
-	uth_mutex_t mtx = uth_mutex_alloc();
+	uthread_has_blocked(uth, UTH_EXT_BLK_JUSTICE);
+}
 
-	uth_mutex_lock(mtx);
-	uth_mutex_lock(mtx);
+void __attribute__((noreturn)) uthread_sleep_forever(void)
+{
+	uthread_yield(FALSE, __sleep_forever_cb, NULL);
+	assert(0);
 }
 
 /* Cleans up the uthread (the stuff we did in uthread_init()).  If you want to

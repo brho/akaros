@@ -98,7 +98,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
                    void *yield_arg);
 void uthread_sleep(unsigned int seconds);
 void uthread_usleep(unsigned int usecs);
-void uthread_sleep_forever(void);
+void __attribute__((noreturn)) uthread_sleep_forever(void);
 void uthread_has_blocked(struct uthread *uthread, int flags);
 void uthread_paused(struct uthread *uthread);
 
