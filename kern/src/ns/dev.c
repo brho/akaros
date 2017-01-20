@@ -390,9 +390,6 @@ void devpermcheck(char *fileuid, uint32_t perm, int omode)
 {
 	int rwx;
 
-	/* TODO: Implement permission checking, for now permission is always
-	 * granted. */
-	return;
 	/* select user, group, or other from the traditional rwxrwxrwx, shifting
 	 * into the upper-most position */
 	if (strcmp(current->user.name, fileuid) == 0)
