@@ -539,9 +539,8 @@ spinlock_t netlock = SPINLOCK_INITIALIZER;
 
 static int netown(struct netfile *p, char *o, int omode)
 {
-	static int access[] = { 0400, 0200, 0600, 0100 };
 	int mode;
-	int t;
+	int rwx;
 
 	spin_lock(&netlock);
 	if (*p->owner) {
@@ -552,8 +551,8 @@ static int netown(struct netfile *p, char *o, int omode)
 		else
 			mode = p->mode << 6;	/* Other */
 
-		t = access[omode & 3];
-		if ((t & mode) == t) {
+		rwx = omode_to_rwx(omode);
+		if ((rwx & mode) == rwx) {
 			spin_unlock(&netlock);
 			return 0;
 		} else {
