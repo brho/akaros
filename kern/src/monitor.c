@@ -411,6 +411,7 @@ int mon_kill(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("No such proc\n");
 		return 1;
 	}
+	p->exitcode = 1;	/* typical EXIT_FAILURE */
 	proc_destroy(p);
 	proc_decref(p);
 	return 0;
