@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 static void ev_handler(struct event_msg *msg, unsigned int ev_type, void *data)
 {
@@ -22,10 +24,11 @@ int main(int argc, char *argv[], char *envp[])
 	struct event_queue *evq, *triggered;
 	pid_t pid;
 	struct event_msg msg;
+	int wstatus;
 
 	register_ev_handler(EV_USER_IPI, ev_handler, 0);
 	evq = get_eventq(EV_MBOX_UCQ);
-	evq->ev_flags |= EVENT_IPI | EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP;
+	evq->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP;
 	register_kevent_q(evq, EV_USER_IPI);
 
 	pid = create_child_with_stdfds(argv[1], argc - 1, argv + 1, envp);
@@ -35,7 +38,10 @@ int main(int argc, char *argv[], char *envp[])
 	}
 	sys_proc_run(pid);
 
-	uthread_sleep_forever();
-
-	return -1;
+	waitpid(pid, &wstatus, 0);
+	if (!WIFEXITED(wstatus)) {
+		fprintf(stderr, "child %s did not exit normally!\n", argv[1]);
+		return -1;
+	}
+	return WEXITSTATUS(wstatus);
 }
