@@ -737,11 +737,28 @@ int main(int argc, char **argv)
 	// The low 1m so we can fill in bullshit like ACPI. */
 	// And, sorry, due to the STUPID format of the RSDP for now we need the low 1M.
 	low1m = mmap((int*)4096, MiB-4096, PROT_READ | PROT_WRITE,
-	             MAP_ANONYMOUS, -1, 0);
+	             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
 	if (low1m != (void *)4096) {
 		perror("Unable to mmap low 1m");
 		exit(1);
 	}
+
+	/* As I understood it, the spec was that SMBIOS
+	 * tables live at f0000. We've been finding that
+	 * they can have pointers to exxxx. So, for now,
+	 * we assume you will take a 128K snapshot of flash
+	 * and we'll just splat the whole mess in at
+	 * 0xe0000. We can get more sophisticated about
+	 * this later if needed. TODO: parse the table,
+	 * and make sure that ACPI doesn't trash it.
+	 * Although you'll know instantly if that happens
+	 * as you'll get dmidecode errors. But it still needs
+	 * to be better. */
+	if (smbiostable) {
+		fprintf(stderr, "Using SMBIOS table %s\n", smbiostable);
+		smbios(smbiostable, (void *)0xe0000);
+	}
+
 	r = a;
 	fprintf(stderr, "install rsdp to %p\n", r);
 	*r = rsdp;
@@ -903,17 +920,6 @@ int main(int argc, char **argv)
 	a += 4096;
 	cmdline = a;
 	a += 4096;
-
-	if (smbiostable) {
-		if (a > (void *)0xf0000) {
-			fprintf(stderr, "No room for SMBIOS table: current table pointer is %p\n",
-				a);
-			exit(1);
-		}
-		a = (void *)0xf0000;
-		fprintf(stderr, "Using SMBIOS table %s\n", smbiostable);
-		a += smbios(smbiostable, a);
-	}
 
 	bp->hdr.cmd_line_ptr = (uintptr_t) cmdline;
 
