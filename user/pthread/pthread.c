@@ -252,9 +252,6 @@ static void pth_thread_has_blocked(struct uthread *uthread, int flags)
 	 * mostly communicating to our future selves in pth_thread_runnable(), which
 	 * gets called by whoever triggered this callback */
 	pthread->state = PTH_BLK_MUTEX;
-	/* Just for yucks: */
-	if (flags == UTH_EXT_BLK_JUSTICE)
-		printf("For great justice!\n");
 }
 
 static void __signal_and_restart(struct uthread *uthread,
