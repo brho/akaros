@@ -35,6 +35,7 @@ atomic_t kprintinuse = 0;		/* test and set whether /dev/kprint is open */
 int iprintscreenputs = 1;
 int keepbroken = 1;
 
+static bool cons_has_init = FALSE;
 struct queue *cons_q;			/* Akaros cons input: keyboard, serial, etc */
 spinlock_t cons_q_lock = SPINLOCK_INITIALIZER;
 struct fdtap_slist cons_q_fd_taps = SLIST_HEAD_INITIALIZER(cons_q_fd_taps);
@@ -698,6 +699,8 @@ static void consinit(void)
 #if 0
 	addclock0link(kbdputcclock, 22);
 #endif
+	cmb();	/* single-core, just need previous instructions to be issued. */
+	cons_has_init = TRUE;
 }
 
 static char *devname(void);
@@ -1650,7 +1653,13 @@ void killkid(void)
 	proc_decref(victim);
 }
 
+/* This can be called any time after arch_init()->cons_irq_init().  That can
+ * happen *before* the console device is initialized (devtab{reset,init}()).
+ *
+ * All other functions in #cons shouldn't be called until after cons_init(). */
 void cons_add_char(char c)
 {
+	if (!cons_has_init)
+		return;
 	qiwrite(cons_q, &c, sizeof(char));
 }
