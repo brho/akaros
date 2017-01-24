@@ -41,7 +41,9 @@
 
 struct virtual_machine local_vm, *vm = &local_vm;
 
-struct vmm_gpcore_init gpci;
+#define APIC_GPA			0xfee00000ULL
+
+struct vmm_gpcore_init *gpcis;
 
 /* By 1999, you could just scan the hardware
  * and work it out. But 2005, that was no longer possible. How sad.
@@ -97,22 +99,12 @@ struct acpi_table_madt madt = {
 		.asl_compiler_revision = 0,
 	},
 
-	.address = 0xfee00000ULL,
+	.address = APIC_GPA,
 	.flags = 0,
 };
 
-struct acpi_madt_local_apic Apic0 = {.header = {.type = ACPI_MADT_TYPE_LOCAL_APIC, .length = sizeof(struct acpi_madt_local_apic)},
-                                     .processor_id = 0, .id = 0, .lapic_flags = 1};
 struct acpi_madt_io_apic Apic1 = {.header = {.type = ACPI_MADT_TYPE_IO_APIC, .length = sizeof(struct acpi_madt_io_apic)},
                                   .id = 0, .address = 0xfec00000, .global_irq_base = 0};
-struct acpi_madt_local_x2apic X2Apic0 = {
-	.header = {
-		.type = ACPI_MADT_TYPE_LOCAL_X2APIC,
-		.length = sizeof(struct acpi_madt_local_x2apic)
-	},
-	.local_apic_id = 0,
-	.uid = 0
-};
 
 struct acpi_madt_interrupt_override isor[] = {
 	/* From the ACPI Specification Version 6.1:
@@ -173,10 +165,12 @@ void timer_thread(void *arg)
 	uint8_t vector;
 	uint32_t initial_count;
 	while (1) {
-		vector = ((uint32_t *)gpci.vapic_addr)[0x32] & 0xff;
-		initial_count = ((uint32_t *)gpci.vapic_addr)[0x38];
-		if (vector && initial_count)
-			vmm_interrupt_guest(vm, 0, vector);
+		for (int i = 0; i < vm->nr_gpcs; i++) {
+			vector = ((uint32_t *)gpcis[i].vapic_addr)[0x32] & 0xff;
+			initial_count = ((uint32_t *)gpcis[i].vapic_addr)[0x38];
+			if (vector && initial_count)
+				vmm_interrupt_guest(vm, i, vector);
+		}
 		uthread_usleep(100000);
 	}
 	fprintf(stderr, "SENDING TIMER\n");
@@ -547,6 +541,85 @@ static void set_vnet_port_fwds(char *net_opts)
 		perror("parse opts file");
 }
 
+/* Initialize the MADT structs for each local apic. */
+void *init_madt_local_apic(void *start)
+{
+	struct acpi_madt_local_apic *apic = start;
+
+	for (int i = 0; i < vm->nr_gpcs; i++) {
+		apic->header.type = ACPI_MADT_TYPE_LOCAL_APIC;
+		apic->header.length = sizeof(struct acpi_madt_local_apic);
+		apic->processor_id = i;
+		apic->id = i;
+		apic->lapic_flags = 1;
+		apic = (void *)apic + sizeof(struct acpi_madt_local_apic);
+	}
+	return apic;
+}
+
+/* Initialize the MADT structs for each local x2apic. */
+void *init_madt_local_x2apic(void *start)
+{
+	struct acpi_madt_local_x2apic *apic = start;
+
+	for (int i = 0; i < vm->nr_gpcs; i++) {
+		apic->header.type = ACPI_MADT_TYPE_LOCAL_X2APIC;
+		apic->header.length = sizeof(struct acpi_madt_local_x2apic);
+		apic->local_apic_id = i;
+		apic->uid = i;
+		apic->lapic_flags = 1;
+		apic = (void *)apic + sizeof(struct acpi_madt_local_x2apic);
+	}
+	return apic;
+}
+
+/* We map the APIC-access page, the per core Virtual APIC page and the
+ * per core Posted Interrupt Descriptors.
+ * Note: check if the PID/PIR needs to be a 4k page. */
+int alloc_intr_pages(void)
+{
+	void *a_page;
+	void *pages, *pir;
+
+	a_page = mmap((void *)APIC_GPA, PGSIZE, PROT_READ | PROT_WRITE,
+	              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	fprintf(stderr, "a_page mmap pointer %p\n", a_page);
+
+	if (a_page != (void *)APIC_GPA) {
+		perror("Could not mmap APIC");
+		exit(1);
+	}
+	/* The VM should never actually read from this page. */
+	for (int i = 0; i < PGSIZE/4; i++)
+		((uint32_t *)a_page)[i] = 0xDEADBEEF;
+
+	/* Allocate VAPIC and PIR pages. */
+	pages = mmap((void*)0, vm->nr_gpcs * 2 * PGSIZE, PROT_READ | PROT_WRITE,
+	             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	if (pages == MAP_FAILED) {
+		perror("Unable to map VAPIC and PIR pages.");
+		exit(1);
+	}
+
+	/* We use the first vm->nr_gpcs pages for the VAPIC, and the second set
+	 * for the PIRs. Each VAPIC and PIR gets its own 4k page. */
+	pir = pages + (vm->nr_gpcs * PGSIZE);
+
+	/* Set the addresses in the gpcis. */
+	for (int i = 0; i < vm->nr_gpcs; i++) {
+		gpcis[i].posted_irq_desc = pir + (PGSIZE * i);
+		gpcis[i].vapic_addr = pages + (PGSIZE * i);
+		gpcis[i].apic_addr = a_page;
+
+		/* Set APIC ID. */
+		((uint32_t *)gpcis[i].vapic_addr)[0x20/4] = i;
+		/* Set APIC VERSION. */
+		((uint32_t *)gpcis[i].vapic_addr)[0x30/4] = 0x01060015;
+		/* Set LOGICAL APIC ID. */
+		((uint32_t *)gpcis[i].vapic_addr)[0xD0/4] = 1 << i;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	struct boot_params *bp;
@@ -562,7 +635,6 @@ int main(int argc, char **argv)
 	uint64_t entry = 0;
 	int ret;
 	uint8_t csum;
-	void *a_page;
 	struct vm_trapframe *vm_tf;
 	uint64_t tsc_freq_khz;
 	char *cmdlinep;
@@ -575,6 +647,7 @@ int main(int argc, char **argv)
 	char *smbiostable = NULL;
 	int nptp, npml4, npml3, npml2;
 	char *net_opts = NULL;
+	uint64_t num_pcs = 1;
 
 	static struct option long_options[] = {
 		{"debug",         no_argument,       0, 'd'},
@@ -589,6 +662,7 @@ int main(int argc, char **argv)
 		{"image_file",    required_argument, 0, 'f'},
 		{"cmdline",       required_argument, 0, 'k'},
 		{"net",           required_argument, 0, 'n'},
+		{"num_cores",     required_argument, 0, 'N'},
 		{"smbiostable",   required_argument, 0, 't'},
 		{"help",          no_argument,       0, 'h'},
 		{0, 0, 0, 0}
@@ -608,24 +682,7 @@ int main(int argc, char **argv)
 	vm->low4k[0x40e] = 0;
 	vm->low4k[0x40f] = 0;
 
-	//Place mmap(Gan)
-	a_page = mmap((void *)0xfee00000, PGSIZE, PROT_READ | PROT_WRITE,
-	              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
-	fprintf(stderr, "a_page mmap pointer %p\n", a_page);
-
-	if (a_page != (void *)0xfee00000) {
-		perror("Could not mmap APIC");
-		exit(1);
-	}
-	if (((uint64_t)a_page & 0xfff) != 0) {
-		perror("APIC page mapping is not page aligned");
-		exit(1);
-	}
-
-	((uint32_t *)a_page)[0x30/4] = 0x01060015;
-	//((uint32_t *)a_page)[0x30/4] = 0xDEADBEEF;
-
-	while ((c = getopt_long(argc, argv, "dvm:M:S:c:gsf:k:n:t:hR:",
+	while ((c = getopt_long(argc, argv, "dvm:M:S:c:gsf:k:N:n:t:hR:",
 				long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
@@ -686,6 +743,9 @@ int main(int argc, char **argv)
 		case 'n':
 			net_opts = optarg;
 			break;
+		case 'N':
+			num_pcs = strtoull(optarg, 0, 0);
+			break;
 		case 'h':
 		default:
 			// Sadly, the getopt_long struct does
@@ -701,6 +761,7 @@ int main(int argc, char **argv)
 			exit(0);
 		}
 	}
+
 	if (strlen(cmdline_default) == 0) {
 		fprintf(stderr, "WARNING: No command line parameter file specified.\n");
 	}
@@ -710,6 +771,15 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Usage: %s vmimage [-n (no vmcall printf)]\n", argv[0]);
 		exit(1);
 	}
+
+	// Set vm->nr_gpcs before it's referenced in the struct setups below.
+	vm->nr_gpcs = num_pcs;
+	fprintf(stderr, "NUM PCS: %d\n", num_pcs);
+	gpcis = (struct vmm_gpcore_init *)
+	                malloc(num_pcs * sizeof(struct vmm_gpcore_init));
+	vm->gpcis = gpcis;
+
+	alloc_intr_pages();
 
 	if ((uintptr_t)(memstart + memsize) >= (uintptr_t)BRK_START) {
 		fprintf(stderr,
@@ -812,12 +882,14 @@ int main(int argc, char **argv)
 	x->table_offset_entry[3] = (uint64_t) m;
 	a += sizeof(*m);
 	fprintf(stderr, "install madt to %p\n", m);
-	memmove(a, &Apic0, sizeof(Apic0));
-	a += sizeof(Apic0);
+
+	a = init_madt_local_apic(a);
+
 	memmove(a, &Apic1, sizeof(Apic1));
 	a += sizeof(Apic1);
-	memmove(a, &X2Apic0, sizeof(X2Apic0));
-	a += sizeof(X2Apic0);
+
+	a = init_madt_local_x2apic(a);
+
 	memmove(a, &isor, sizeof(isor));
 	a += sizeof(isor);
 	m->header.length = a - (void *)m;
@@ -839,23 +911,11 @@ int main(int argc, char **argv)
 	hexdump(stdout, r, a-(void *)r);
 
 	a = (void *)(((unsigned long)a + 0xfff) & ~0xfff);
-	gpci.posted_irq_desc = a;
-	memset(a, 0, 4096);
-	a += 4096;
-	gpci.vapic_addr = a;
-	memset(a, 0, 4096);
-	((uint32_t *)a)[0x30/4] = 0x01060014;
-	// set up apic values? do we need to?
-	// qemu does this.
-	//((uint8_t *)a)[4] = 1;
-	a += 4096;
-	gpci.apic_addr = (void*)0xfee00000;
 
 	/* Allocate memory for, and zero the bootparams
 	 * page before writing to it, or Linux thinks
 	 * we're talking crazy.
 	 */
-	a += 4096;
 	bp = a;
 	memset(bp, 0, 4096);
 
@@ -941,7 +1001,7 @@ int main(int argc, char **argv)
 		 */
 		vm->virtio_mmio_devices[i]->irq = i;
 		len = snprintf(cmdlinep, cmdlinesz,
-		               " virtio_mmio.device=1K@0x%llx:%lld",
+		               "\n virtio_mmio.device=1K@0x%llx:%lld",
 		               vm->virtio_mmio_devices[i]->addr,
 		               vm->virtio_mmio_devices[i]->irq);
 		if (len >= cmdlinesz) {
@@ -952,8 +1012,16 @@ int main(int argc, char **argv)
 		cmdlinep += len;
 	}
 
-	vm->nr_gpcs = 1;
-	vm->gpcis = &gpci;
+	/* Set maxcpus to the number of cores we're giving the guest. */
+	len = snprintf(cmdlinep, cmdlinesz,
+	               "\n maxcpus=%lld", vm->nr_gpcs);
+	if (len >= cmdlinesz) {
+		fprintf(stderr, "Too many arguments to the linux command line.");
+		exit(1);
+	}
+	cmdlinesz -= len;
+	cmdlinep += len;
+
 	ret = vmm_init(vm, vmmflags);
 	assert(!ret);
 
