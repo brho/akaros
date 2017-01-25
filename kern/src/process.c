@@ -2377,10 +2377,13 @@ void print_proc_info(pid_t pid)
 	uint64_t total_time = 0;
 	struct proc *child, *p = pid2proc(pid);
 	struct vcore *vc_i;
+	struct preempt_data *vcpd;
+
 	if (!p) {
 		printk("Bad PID.\n");
 		return;
 	}
+	vcpd = &p->procdata->vcore_preempt_data[0];
 	spinlock_debug(&p->proc_lock);
 	//spin_lock(&p->proc_lock); // No locking!!
 	printk("struct proc: %p\n", p);
@@ -2389,6 +2392,8 @@ void print_proc_info(pid_t pid)
 	printk("PPID: %d\n", p->ppid);
 	printk("State: %s (%p)\n", procstate2str(p->state), p->state);
 	printk("\tIs %san MCP\n", p->procinfo->is_mcp ? "" : "not ");
+	if (!scp_is_vcctx_ready(vcpd))
+		printk("\tIs NOT vcctx ready\n");
 	printk("Refcnt: %d\n", atomic_read(&p->p_kref.refcount) - 1);
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): %p\n", p->env_cr3);
