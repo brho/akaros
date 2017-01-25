@@ -66,6 +66,7 @@ static void cons_irq_init(void)
 	/* Register interrupt handlers for all console devices */
 	SLIST_FOREACH(i, &cdev_list, next) {
 		register_irq(i->irq, irq_console, i, MKBUS(BusISA, 0, 0, 0));
+		irq_console(0, i);
 #ifdef CONFIG_POLL_CONSOLE
 		ktask("cons_poller", cons_poller, i);
 #endif /* CONFIG_POLL_CONSOLE */
