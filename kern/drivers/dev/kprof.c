@@ -446,6 +446,17 @@ size_t kprof_tracedata_read(void *data, size_t size, size_t offset)
 	return size;
 }
 
+void kprof_dump_data(void)
+{
+	void *buf;
+	size_t len = kprof_tracedata_size();
+
+	buf = kmalloc(len, MEM_WAIT);
+	kprof_tracedata_read(buf, len, 0);
+	printk("%s", buf);
+	kfree(buf);
+}
+
 void kprof_tracedata_write(const char *pretty_buf, size_t len)
 {
 	spin_lock_irqsave(&ktrace_lock);
