@@ -24,14 +24,15 @@
 #include <parlib/arch/atomic.h>
 #include <ros/procdata.h>
 
-/* This is a simple ev_q that routes notifs to vcore0's public mbox.  This
- * should work for any bit messages, even if the process hasn't done any set up
- * yet, since the memory for the mbox is allocted by the kernel (procdata).
- * Don't send full messages to it, since the UCQ won't be initialized. */
+/* This is a simple ev_q that ultimately triggers notif_pending on vcore 0 (due
+ * to the IPI) and makes sure the process wakes up.
+ *
+ * This works for any bit messages, even if the process hasn't done any set up
+ * yet, since the memory for the mbox is allocted by the kernel (procdata). */
 struct event_mbox __simple_evbitmap = { .type = EV_MBOX_BITMAP, };
 struct event_queue __ros_scp_simple_evq =
                   { .ev_mbox = &__simple_evbitmap,
-                    .ev_flags = EVENT_WAKEUP,
+                    .ev_flags = EVENT_WAKEUP | EVENT_IPI,
                     .ev_alert_pending = FALSE,
                     .ev_vcore = 0,
                     .ev_handler = 0 };
