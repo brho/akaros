@@ -162,5 +162,5 @@ int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
 	} else {
 		*regp = ioapic_read(vm_thread, ix, offset);
 	}
-
+	return 0;
 }

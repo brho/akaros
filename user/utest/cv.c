@@ -28,6 +28,7 @@ bool test_signal_no_wait(void)
 	uth_cond_var_signal(cv);
 	pthread_yield();
 	uth_cond_var_free(cv);
+	return TRUE;
 }
 
 void *__cv_signaller(void *arg)
@@ -109,6 +110,7 @@ bool test_signal(void)
 
 	uth_cond_var_free(args->cv);
 	uth_mutex_free(args->mtx);
+	return TRUE;
 }
 
 bool test_broadcast(void)
@@ -143,6 +145,7 @@ bool test_broadcast(void)
 
 	uth_cond_var_free(args->cv);
 	uth_mutex_free(args->mtx);
+	return TRUE;
 }
 /* <--- End definition of test cases ---> */
 

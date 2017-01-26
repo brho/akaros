@@ -367,6 +367,7 @@ static bool __insert_awaiter(struct timer_chain *tchain,
 		}
 	}
 	printf("Could not find a spot for awaiter %p\n", waiter);
+	assert(0);
 }
 
 /* Sets the alarm.  If it is a kthread-style alarm (func == 0), sleep on it

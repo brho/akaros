@@ -998,12 +998,14 @@ int pthread_condattr_getclock(const pthread_condattr_t *attr,
                               clockid_t *clock_id)
 {
 	*clock_id = attr->clock;
+	return 0;
 }
 
 int pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock_id)
 {
 	printf("Warning: we don't do pthread condvar clock stuff\n");
 	attr->clock = clock_id;
+	return 0;
 }
 
 pthread_t pthread_self()

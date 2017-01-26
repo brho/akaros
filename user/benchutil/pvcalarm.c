@@ -61,7 +61,7 @@ static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type,
                               void *data);
 
 /* Initialize the pvcalarm service. Only call this function once */
-static int init_global_pvcalarm()
+static void init_global_pvcalarm(void)
 {
 	global_pvcalarm.interval = 0;
 	global_pvcalarm.callback = NULL;
@@ -167,6 +167,7 @@ int disable_pvcalarms()
 		stop_pvcalarm(&global_pvcalarm.data[i]);
 
 	atomic_set(&global_pvcalarm.state, S_DISABLED);
+	return 0;
 }
 
 /* Initialize a specific pvcalarm.  This happens once per vcore as it comes

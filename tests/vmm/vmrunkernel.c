@@ -576,7 +576,7 @@ void *init_madt_local_x2apic(void *start)
 /* We map the APIC-access page, the per core Virtual APIC page and the
  * per core Posted Interrupt Descriptors.
  * Note: check if the PID/PIR needs to be a 4k page. */
-int alloc_intr_pages(void)
+void alloc_intr_pages(void)
 {
 	void *a_page;
 	void *pages, *pir;

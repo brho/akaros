@@ -16,6 +16,7 @@ bool test_sigmask(void) {
 		pthread_sigmask(SIG_BLOCK, &s, NULL);
 		for (int i=0; i<100000; i++)
 			pthread_yield();
+		return 0;
 	}
 	void signal_handler(int signo)
 	{

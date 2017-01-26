@@ -18,6 +18,7 @@ void *handler(void *arg) {
 	printf("Begin thread: %d\n", id);
     futex(&var, FUTEX_WAIT, 0, &timeout, NULL, 0);
 	printf("End thread: %d\n", id);
+	return 0;
 }
 
 int main(int argc, char **argv)

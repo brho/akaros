@@ -7,6 +7,7 @@
 #pragma once
 
 #include <parlib/common.h>
+#include <parlib/assert.h>
 #include <ros/trapframe.h>
 
 __BEGIN_DECLS
@@ -25,6 +26,7 @@ static bool has_refl_fault(struct user_context *ctx)
 	case ROS_VM_CTX:
 		return ctx->tf.vm_tf.tf_flags & VMCTX_FL_HAS_FAULT ? TRUE : FALSE;
 	}
+	assert(0);
 }
 
 static void clear_refl_fault(struct user_context *ctx)

@@ -289,6 +289,7 @@ int deregister_ev_handler(unsigned int ev_type, handle_event_t handler,
 {
 	/* TODO: User-level RCU */
 	printf("Failed to dereg handler, not supported yet!\n");
+	return -1;
 }
 
 static void run_ev_handlers(unsigned int ev_type, struct event_msg *ev_msg)

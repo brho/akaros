@@ -145,10 +145,9 @@ static void prep_vcore_0(void)
 	__prep_vcore(0, mmap_block);
 }
 
-static int prep_remaining_vcores(void)
+static void prep_remaining_vcores(void)
 {
 	uintptr_t mmap_block;
-	int ret;
 
 	mmap_block = (uintptr_t)mmap(0, PGSIZE * 4 * (max_vcores() - 1),
 	                             PROT_WRITE | PROT_READ,
@@ -207,8 +206,7 @@ void vcore_change_to_m(void)
 {
 	int ret;
 
-	ret = prep_remaining_vcores();
-	assert(!ret);
+	prep_remaining_vcores();
 	__procdata.res_req[RES_CORES].amt_wanted = 1;
 	__procdata.res_req[RES_CORES].amt_wanted_min = 1;	/* whatever */
 	assert(!in_multi_mode());

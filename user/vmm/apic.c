@@ -192,7 +192,7 @@ int __apic_access(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
 		*regp = apic_read(offset);
 		DPRINTF("Read: Set %s from %s @%p to %p\n", regname(destreg), apicregs[offset].name, gpa, *regp);
 	}
-
+	return 0;
 }
 
 void vapic_status_dump(FILE *f, void *vapic)

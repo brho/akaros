@@ -58,6 +58,7 @@ bool test_sigperf(void)
 			old_count = new_count;
 			pthread_yield();
 		}
+		return 0;
 	}
 	void signal_handler(int signo)
 	{

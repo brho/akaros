@@ -6,14 +6,17 @@ TEST_SUITE("EXAMPLE");
 
 bool test_one(void) {
 	UT_ASSERT_M("One plus one should equal 2", 1+1 == 2);
+	return TRUE;
 }
 
 bool test_two(void) {
 	UT_ASSERT_M("One minus one should equal 0", 1-1 == 0);
+	return TRUE;
 }
 
 bool test_three(void) {
 	UT_ASSERT_M("1 should equal 1", 1 == 1);
+	return TRUE;
 }
 
 /* <--- End definition of test cases ---> */

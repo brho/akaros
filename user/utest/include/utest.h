@@ -89,7 +89,8 @@ static void apply_whitelist(char *whitelist[], int whitelist_len,
 	}
 }
 
-static int run_utests(char *suite_name, struct utest tests[], int num_tests) {
+static void run_utests(char *suite_name, struct utest tests[], int num_tests)
+{
 	extern char utest_msg[];
 	printf("<-- BEGIN_USERSPACE_%s_TESTS -->\n", suite_name);
 
