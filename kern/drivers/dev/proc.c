@@ -29,6 +29,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
+#include <umem.h>
 #include <arch/vmm/vmm.h>
 #include <ros/vmm.h>
 
@@ -61,6 +62,7 @@ enum {
 	Qsegment,
 	Qstatus,
 	Qstrace,
+	Qstrace_traceset,
 	Qvmstatus,
 	Qtext,
 	Qwait,
@@ -124,6 +126,7 @@ struct dirtab procdir[] = {
 	{"segment", {Qsegment}, 0, 0444},
 	{"status", {Qstatus}, STATSIZE, 0444},
 	{"strace", {Qstrace}, 0, 0444},
+	{"strace_traceset", {Qstrace_traceset}, 0, 0666},
 	{"vmstatus", {Qvmstatus}, 0, 0444},
 	{"text", {Qtext}, 0, 0000},
 	{"wait", {Qwait}, 0, 0400},
@@ -633,6 +636,12 @@ static struct chan *procopen(struct chan *c, int omode)
 			kref_get(&p->strace->users, 1);
 			c->aux = p->strace;
 			break;
+		case Qstrace_traceset:
+			if (!p->strace)
+				error(ENOENT, "Process does not have tracing enabled");
+			kref_get(&p->strace->users, 1);
+			c->aux = p->strace;
+			break;
 		case Qmaps:
 			c->aux = build_maps(p);
 			break;
@@ -847,6 +856,13 @@ static void procclose(struct chan *c)
 		kref_put(&s->users);
 		c->aux = NULL;
 	}
+	if (QID(c->qid) == Qstrace_traceset && c->aux != 0) {
+		struct strace *s = c->aux;
+
+		assert(c->flag & COPEN);
+		kref_put(&s->users);
+		c->aux = NULL;
+	}
 }
 
 void int2flag(int flag, char *s)
@@ -943,10 +959,14 @@ static long procread(struct chan *c, void *va, long n, int64_t off)
 	 * already have the chan open, and all we want to do is read the queue,
 	 * which exists because of our kref on it. */
 	switch (QID(c->qid)) {
-		case Qstrace:
-			s = c->aux;
-			n = qread(s->q, va, n);
-			return n;
+	case Qstrace:
+		s = c->aux;
+		n = qread(s->q, va, n);
+		return n;
+	case Qstrace_traceset:
+		s = c->aux;
+		return readmem(offset, va, n, s->trace_set,
+		               bitmap_size(MAX_SYSCALL_NR));
 	}
 
 	if ((p = pid2proc(SLOT(c->qid))) == NULL)
@@ -1101,7 +1121,8 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 	struct proc *p, *t;
 	int i, id, l;
 	char *args;
-	uintptr_t offset;
+	uintptr_t offset = off;
+	struct strace *s;
 
 	if (c->qid.type & QTDIR)
 		error(EISDIR, ERROR_FIXME);
@@ -1160,6 +1181,14 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 #endif
 		case Qctl:
 			procctlreq(p, va, n);
+			break;
+		case Qstrace_traceset:
+			s = c->aux;
+			if (n + offset > bitmap_size(MAX_SYSCALL_NR))
+				error(EINVAL, "strace_traceset: Short write (%llu at off %llu)",
+				      n, offset);
+			if (memcpy_from_user(current, (void*)s->trace_set + offset, va, n))
+				error(EFAULT, "strace_traceset: Bad addr (%p + %llu)", va, n);
 			break;
 		default:
 			error(EFAIL, "unknown qid %#llux in procwrite\n", c->qid.path);
@@ -1351,6 +1380,7 @@ static void procctlreq(struct proc *p, char *va, int n)
 		if (!p->strace) {
 			strace = kzmalloc(sizeof(*p->strace), MEM_WAIT);
 			spinlock_init(&strace->lock);
+			bitmap_set(strace->trace_set, 0, MAX_SYSCALL_NR);
 			strace->q = qopen(65536, Qdropoverflow|Qcoalesce, NULL, NULL);
 			/* both of these refs are put when the proc is freed.  procs is for
 			 * every process that has this p->strace.  users is procs + every

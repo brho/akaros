@@ -7,6 +7,7 @@
 #include <process.h>
 #include <kref.h>
 #include <ns.h>
+#include <bitmap.h>
 
 #define SYSTRACE_ON					0x01
 #define SYSTRACE_LOUD				0x02
@@ -51,6 +52,7 @@ struct strace {
 	struct kref users; /* when users goes to zero, q and struct are freed. */
 	struct queue *q;
 	spinlock_t lock;
+	DECLARE_BITMAP(trace_set, MAX_SYSCALL_NR);
 };
 
 extern bool systrace_loud;

@@ -119,11 +119,18 @@ static void systrace_output(struct systrace_record *trace,
 
 static bool should_strace(struct proc *p, struct syscall *sysc)
 {
+	unsigned int sysc_num;
+
 	if (systrace_loud)
 		return TRUE;
-	if (p->strace && p->strace->tracing)
-		return TRUE;
-	return FALSE;
+	if (!p->strace || !p->strace->tracing)
+		return FALSE;
+	/* TOCTTOU concerns - sysc is __user. */
+	sysc_num = ACCESS_ONCE(sysc->num);
+	if (sysc_num > MAX_SYSCALL_NR)
+		return FALSE;
+	/* TODO: for drops, consider checking for qio overflow first. */
+	return test_bit(sysc_num, p->strace->trace_set);
 }
 
 /* Starts a trace for p running sysc, attaching it to kthread.  Pairs with

@@ -92,8 +92,7 @@
 /* was SYS_something			148 */
 #define SYS_fd2path				149
 
-/* Syscalls we plan to remove someday */
-/* was SYS_cache_buster        200 */
+#define MAX_SYSCALL_NR			200
 
 // for system calls that pass filenames
 #define MAX_PATH_LEN 256
