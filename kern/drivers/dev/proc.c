@@ -124,7 +124,7 @@ struct dirtab procdir[] = {
 	{"user", {Quser}, 0, 0444},
 	{"segment", {Qsegment}, 0, 0444},
 	{"status", {Qstatus}, STATSIZE, 0444},
-	{"strace", {Qstrace}, 0, 0666},
+	{"strace", {Qstrace}, 0, 0444},
 	{"vmstatus", {Qvmstatus}, 0, 0444},
 	{"text", {Qtext}, 0, 0000},
 	{"wait", {Qwait}, 0, 0400},
@@ -1153,16 +1153,6 @@ static long procwrite(struct chan *c, void *va, long n, int64_t off)
 #endif
 		case Qctl:
 			procctlreq(p, va, n);
-			break;
-
-		/* this lets your write a marker into the data stream,
-		 * which is a very powerful tool. */
-		case Qstrace:
-			assert(c->aux);
-			/* it is possible that the q hungup and is closed.  that would be
-			 * the case if all of the procs closed and decref'd.  if the q is
-			 * closed, qwrite() will throw an error. */
-			n = qwrite(((struct strace*)c->aux)->q, va, n);
 			break;
 		default:
 			error(EFAIL, "unknown qid %#llux in procwrite\n", c->qid.path);
