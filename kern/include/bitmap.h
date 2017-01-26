@@ -54,6 +54,7 @@
  * bitmap_find_free_region(bitmap, bits, order)	Find and allocate bit region
  * bitmap_release_region(bitmap, pos, order)	Free specified bit region
  * bitmap_allocate_region(bitmap, pos, order)	Allocate specified bit region
+ * bitmap_size(nbits)				Size in bytes
  */
 
 /*
@@ -296,4 +297,9 @@ static inline int bitmap_parse(const char *buf, unsigned int buflen,
 			unsigned long *maskp, int nmaskbits)
 {
 	return __bitmap_parse(buf, buflen, 0, maskp, nmaskbits);
+}
+
+static inline size_t bitmap_size(int nbits)
+{
+	return BITS_TO_LONGS(nbits) * sizeof(unsigned long);
 }
