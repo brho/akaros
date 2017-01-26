@@ -118,8 +118,6 @@ struct proc {
 	struct vmm vmm;
 
 	struct strace				*strace;
-	bool						strace_on;
-	bool						strace_inherit;
 };
 
 /* Til we remove all Env references */

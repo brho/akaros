@@ -117,6 +117,15 @@ static void systrace_output(struct systrace_record *trace,
 		printk("%s", trace->pretty_buf);
 }
 
+static bool should_strace(struct proc *p, struct syscall *sysc)
+{
+	if (systrace_loud)
+		return TRUE;
+	if (p->strace && p->strace->tracing)
+		return TRUE;
+	return FALSE;
+}
+
 /* Starts a trace for p running sysc, attaching it to kthread.  Pairs with
  * systrace_finish_trace(). */
 static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
@@ -127,7 +136,7 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 	size_t data_len = 0;
 
 	kthread->strace = 0;
-	if (!p->strace_on && !systrace_loud)
+	if (!should_strace(p, sysc))
 		return;
 	trace = kmalloc(SYSTR_BUF_SZ, MEM_ATOMIC);
 	if (p->strace) {
@@ -552,13 +561,11 @@ static size_t sys_getvcoreid(struct proc *p)
 /* Helper for proc_create and fork */
 static void inherit_strace(struct proc *parent, struct proc *child)
 {
-	if (parent->strace && parent->strace_inherit) {
+	if (parent->strace && parent->strace->inherit) {
 		/* Refcnt on both, put in the child's ->strace. */
 		kref_get(&parent->strace->users, 1);
 		kref_get(&parent->strace->procs, 1);
 		child->strace = parent->strace;
-		child->strace_on = TRUE;
-		child->strace_inherit = TRUE;
 	}
 }
 

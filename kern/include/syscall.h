@@ -50,6 +50,7 @@ struct strace {
 	struct kref procs; /* when procs goes to zero, q is hung up. */
 	struct kref users; /* when users goes to zero, q and struct are freed. */
 	struct queue *q;
+	spinlock_t lock;
 };
 
 extern bool systrace_loud;

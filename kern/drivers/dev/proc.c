@@ -92,7 +92,6 @@ enum {
 	CMvmkill,
 	CMstraceme,
 	CMstraceall,
-	CMstraceoff,
 };
 
 enum {
@@ -159,7 +158,6 @@ struct cmdtab proccmd[] = {
 	{CMvmkill, "vmkill", 0},
 	{CMstraceme, "straceme", 0},
 	{CMstraceall, "straceall", 0},
-	{CMstraceoff, "straceoff", 0},
 };
 
 /*
@@ -622,6 +620,13 @@ static struct chan *procopen(struct chan *c, int omode)
 		case Qstrace:
 			if (!p->strace)
 				error(ENOENT, "Process does not have tracing enabled");
+			spin_lock(&p->strace->lock);
+			if (p->strace->tracing) {
+				spin_unlock(&p->strace->lock);
+				error(EBUSY, "Process is already being traced");
+			}
+			p->strace->tracing = TRUE;
+			spin_unlock(&p->strace->lock);
 			/* the ref we are upping is the one we put in __proc_free, which is
 			 * the one we got from CMstrace{on,me}.  We have a ref on p, so we
 			 * know we won't free until we decref the proc. */
@@ -837,6 +842,8 @@ static void procclose(struct chan *c)
 	if (QID(c->qid) == Qstrace && c->aux != 0) {
 		struct strace *s = c->aux;
 
+		assert(c->flag & COPEN);	/* only way aux should have been set */
+		s->tracing = FALSE;
 		kref_put(&s->users);
 		c->aux = NULL;
 	}
@@ -1299,7 +1306,7 @@ void procctlclosefiles(struct proc *p, int all, int fd)
 static void strace_shutdown(struct kref *a)
 {
 	struct strace *strace = container_of(a, struct strace, procs);
-	static const char base_msg[] = "Traced ~%lu syscs, Dropped %lu";
+	static const char base_msg[] = "# Traced ~%lu syscs, Dropped %lu";
 	size_t msg_len = NUMSIZE64 * 2 + sizeof(base_msg);
 	char *msg = kmalloc(msg_len, 0);
 
@@ -1343,6 +1350,7 @@ static void procctlreq(struct proc *p, char *va, int n)
 		/* common allocation.  if we inherited, we might have one already */
 		if (!p->strace) {
 			strace = kzmalloc(sizeof(*p->strace), MEM_WAIT);
+			spinlock_init(&strace->lock);
 			strace->q = qopen(65536, Qdropoverflow|Qcoalesce, NULL, NULL);
 			/* both of these refs are put when the proc is freed.  procs is for
 			 * every process that has this p->strace.  users is procs + every
@@ -1399,16 +1407,10 @@ static void procctlreq(struct proc *p, char *va, int n)
 	case CMvminit:
 		break;
 	case CMstraceme:
-		p->strace_on = TRUE;
-		p->strace_inherit = FALSE;
+		p->strace->inherit = FALSE;
 		break;
 	case CMstraceall:
-		p->strace_on = TRUE;
-		p->strace_inherit = TRUE;
-		break;
-	case CMstraceoff:
-		p->strace_on = FALSE;
-		p->strace_inherit = FALSE;
+		p->strace->inherit = TRUE;
 		break;
 	}
 	poperror();
