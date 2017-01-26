@@ -471,7 +471,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 			qunlock(&p->qlock);
 			poperror();
 			if (cv == NULL) {
-				error(ENODEV, ERROR_FIXME);
+				error(ENODEV, "Null conversation from Fsprotoclone");
 				break;
 			}
 			mkqid(&c->qid, QID(p->x, cv->x, Qctl), 0, QTFILE);
@@ -1633,7 +1633,9 @@ retry:
 		if (c == NULL) {
 			c = kzmalloc(sizeof(struct conv), 0);
 			if (c == NULL)
-				error(ENOMEM, ERROR_FIXME);
+				error(ENOMEM,
+				      "conv kzmalloc(%d, 0) failed in Fsprotoclone",
+				      sizeof(struct conv));
 			qlock_init(&c->qlock);
 			qlock_init(&c->listenq);
 			rendez_init(&c->cr);
@@ -1648,7 +1650,9 @@ retry:
 				c->ptcl = kzmalloc(p->ptclsize, 0);
 				if (c->ptcl == NULL) {
 					kfree(c);
-					error(ENOMEM, ERROR_FIXME);
+					error(ENOMEM,
+					      "ptcl kzmalloc(%d, 0) failed in Fsprotoclone",
+					      p->ptclsize);
 				}
 			}
 			*pp = c;
