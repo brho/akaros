@@ -118,7 +118,7 @@ static struct chan *capopen(struct chan *c, int omode)
 	return c;
 }
 
-size_t __hashstr(char *buf, uint8_t *hash, size_t bytes_to_split)
+static size_t __hashstr(char *buf, uint8_t *hash, size_t bytes_to_split)
 {
 	int i;
 
