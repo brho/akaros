@@ -39,7 +39,7 @@ void sys_reboot(void)
 
 void sys_yield(bool being_nice)
 {
-	ros_syscall(SYS_yield, being_nice, 0, 0, 0, 0, 0);
+	ros_syscall(SYS_proc_yield, being_nice, 0, 0, 0, 0, 0);
 }
 
 int sys_proc_create(const char *path, size_t path_l, char *const argv[],

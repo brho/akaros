@@ -85,7 +85,7 @@ void __ros_early_syscall_blockon(struct syscall *sysc)
 		/* Sending false for now - we want to signal proc code that we want to
 		 * wait (piggybacking on the MCP meaning of this variable).  If
 		 * notif_pending is set, the kernel will immediately return us. */
-		__ros_syscall_noerrno(SYS_yield, FALSE, 0, 0, 0, 0, 0);
+		__ros_syscall_noerrno(SYS_proc_yield, FALSE, 0, 0, 0, 0, 0);
 	}
 	/* For early SCPs, the kernel turns off notif_pending for us.  For SCPs in
 	 * vcore context that blocked (should be rare!), it'll still be set.  Other

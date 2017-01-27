@@ -26,7 +26,7 @@ __sched_yield (void)
 {
   /* TRUE tells the kernel we simply want to let someone else process, and not
    * that we are waiting on an event. */
-  return ros_syscall(SYS_yield, TRUE, 0, 0, 0, 0, 0);
+  return ros_syscall(SYS_proc_yield, TRUE, 0, 0, 0, 0, 0);
 }
 libc_hidden_def (__sched_yield)
 weak_alias (__sched_yield, sched_yield)

@@ -15,7 +15,7 @@
 #define SYS_proc_create				10
 #define SYS_proc_run				11
 #define SYS_proc_destroy			12
-#define SYS_yield					13
+#define SYS_proc_yield				13
 #define SYS_change_vcore			14
 #define SYS_fork					15
 #define SYS_exec					16
