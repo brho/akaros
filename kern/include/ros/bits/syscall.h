@@ -23,12 +23,6 @@
 #define SYS_mmap					18
 #define SYS_munmap					19
 #define SYS_mprotect				20
-/* // these are the other mmap related calls, some of which we'll implement
-#define SYS_mincore // can read page tables instead
-#define SYS_madvise
-#define SYS_mlock
-#define SYS_msync
-*/
 /* was SYS_brk						21 */
 #define SYS_shared_page_alloc		22
 #define SYS_shared_page_free		23

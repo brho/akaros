@@ -22,6 +22,7 @@ kern/src/arch
 kern/src/build_info.*
 kern/src/error.c
 user/parlib/include/parlib/arch
+user/parlib/syscall_tbl.c
 Documentation/doxygen/rosdoc
 sim/
 sim

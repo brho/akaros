@@ -26,6 +26,9 @@ enum {
 	PG_RDWR   = 6,
 };
 
+extern const char *const __syscall_tbl[];
+extern int __syscall_tbl_sz;
+
 int         sys_null(void);
 size_t      sys_getpcoreid(void);
 int         sys_proc_destroy(int pid, int exitcode);
