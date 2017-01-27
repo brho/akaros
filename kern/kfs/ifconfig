@@ -26,6 +26,7 @@ fi
 #
 /bin/bind -b '#cons' /dev
 /bin/bind -b '#random' /dev
+/bin/bind -a '#capability' /dev
 #/bin/bind '#d' /fd
 #/bin/bind -c '#e' /env
 /bin/bind -b '#proc' /proc
