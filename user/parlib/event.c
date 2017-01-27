@@ -271,7 +271,9 @@ spinpdrlock_t ev_h_wlock = SPINPDR_INITIALIZER;
 int register_ev_handler(unsigned int ev_type, handle_event_t handler,
                         void *data)
 {
+	/* Nasty uthread code assumes this was malloced */
 	struct ev_handler *new_h = malloc(sizeof(struct ev_handler));
+
 	if (!new_h)
 		return -1;
 	new_h->func = handler;

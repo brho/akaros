@@ -40,7 +40,7 @@ int main(int argc, char** argv)
 	/* Inits a thread for us, though we won't use it.  Just a hack to get into
 	 * _M mode.  Note this requests one vcore for us */
 	struct uthread dummy = {0};
-	uthread_2ls_init(&dummy, &ghetto_sched_ops);
+	uthread_2ls_init(&dummy, &ghetto_sched_ops, NULL, NULL);
 	uthread_mcp_init();
 
 	/* Reset the blockon to be the spinner...  This is really shitty.  Any

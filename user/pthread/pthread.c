@@ -471,9 +471,6 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	 * private preference.  Also note that enable_kevent() is just an example,
 	 * and you probably want to use parts of event.c to do what you want. */
 	enable_kevent(EV_USER_IPI, 0, EVENT_IPI | EVENT_VCORE_PRIVATE);
-
-	/* Handle syscall events. */
-	register_ev_handler(EV_SYSCALL, pth_handle_syscall, 0);
 	/* Set up the per-vcore structs to track outstanding syscalls */
 	sysc_mgmt = malloc(sizeof(struct sysc_mgmt) * max_vcores());
 	assert(sysc_mgmt);
@@ -518,7 +515,8 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	}
 #endif
 	/* Sched ops is set by 2ls_init */
-	uthread_2ls_init((struct uthread*)t, &pthread_sched_ops);
+	uthread_2ls_init((struct uthread*)t, &pthread_sched_ops, pth_handle_syscall,
+	                 NULL);
 	atomic_init(&threads_total, 1);			/* one for thread0 */
 }
 

@@ -134,9 +134,28 @@ void uthread_mcp_init()
 	vcore_change_to_m();
 }
 
-/* The real 2LS calls this, passing in a uthread representing thread0. */
-void uthread_2ls_init(struct uthread *uthread, struct schedule_ops *ops)
+/* The real 2LS calls this, passing in a uthread representing thread0, its 2LS
+ * ops, and its syscall handling routine.  (NULL is fine).
+ *
+ * When we're called, thread0 has it's handler installed.  We need to remove it
+ * and install our own (if they want one).  All of the actual changes  must be
+ * done atomically with respect to syscalls (i.e., no syscalls in between).  If
+ * the user did something like have an outstanding async syscall while we're in
+ * here, then they'll crash hard. */
+void uthread_2ls_init(struct uthread *uthread, struct schedule_ops *ops,
+                      void (*handle_sysc)(struct event_msg *, unsigned int,
+                                          void *),
+                      void *data)
 {
+	struct ev_handler *old_h, *new_h = NULL;
+
+	if (handle_sysc) {
+		new_h = malloc(sizeof(struct ev_handler));
+		assert(new_h);
+		new_h->func = handle_sysc;
+		new_h->data = data;
+		new_h->next = NULL;
+	}
 	uthread_init_thread0(uthread);
 	/* We need to *atomically* change the current_uthread and the schedule_ops
 	 * to the new 2LSs thread0 and ops, such that there is no moment when only
@@ -158,9 +177,13 @@ void uthread_2ls_init(struct uthread *uthread, struct schedule_ops *ops)
 	 * previously). */
 	uthread_track_thread0(uthread);
 	sched_ops = ops;
+	/* Racy, but we shouldn't be concurrent */
+	old_h = ev_handlers[EV_SYSCALL];
+	ev_handlers[EV_SYSCALL] = new_h;
 	cmb();
 	__vcore_context = FALSE;
 	enable_notifs(0);	/* will trigger a self_notif if we missed a notif */
+	free(old_h);
 }
 
 /* Helper: tells the kernel our SCP is capable of going into vcore context on
@@ -207,6 +230,8 @@ void __attribute__((constructor)) uthread_lib_init(void)
 	/* Use the thread0 sched's uth */
 	extern struct uthread *thread0_uth;
 	extern void thread0_lib_init(void);
+	extern void thread0_handle_syscall(struct event_msg *ev_msg,
+	                                   unsigned int ev_type, void *data);
 	int ret;
 
 	/* Only run once, but make sure that vcore_lib_init() has run already. */
@@ -217,9 +242,20 @@ void __attribute__((constructor)) uthread_lib_init(void)
 	                     sizeof(struct uthread));
 	assert(!ret);
 	memset(thread0_uth, 0, sizeof(struct uthread));	/* aggressively 0 for bugs*/
-	/* Init the 2LS, which sets up current_uthread, before thread0 lib */
-	uthread_2ls_init(thread0_uth, &thread0_2ls_ops);
+	/* Need to do thread0_lib_init() first, since it sets up evq's referred to
+	 * in thread0_handle_syscall(). */
 	thread0_lib_init();
+	uthread_2ls_init(thread0_uth, &thread0_2ls_ops, thread0_handle_syscall,
+	                 NULL);
+	/* Switch our errno/errstr functions to be uthread-aware.  See glibc's
+	 * errno.c for more info. */
+	ros_errno_loc = __ros_errno_loc;
+	ros_errstr_loc = __ros_errstr_loc;
+	register_ev_handler(EV_EVENT, handle_ev_ev, 0);
+	/* Now that we're ready (I hope) to operate as an MCP, we tell the kernel.
+	 * We must set vcctx and blockon atomically with respect to syscalls,
+	 * meaning no syscalls in between. */
+	cmb();
 	scp_vcctx_ready();
 	/* Change our blockon from glibc's internal one to the regular one, which
 	 * uses vcore context and works for SCPs (with or without 2LS) and MCPs.
@@ -228,11 +264,6 @@ void __attribute__((constructor)) uthread_lib_init(void)
 	ros_syscall_blockon = __ros_uth_syscall_blockon;
 	cmb();
 	init_posix_signals();
-	/* Switch our errno/errstr functions to be uthread-aware.  See glibc's
-	 * errno.c for more info. */
-	ros_errno_loc = __ros_errno_loc;
-	ros_errstr_loc = __ros_errstr_loc;
-	register_ev_handler(EV_EVENT, handle_ev_ev, 0);
 	/* Accept diagnostic events.  Other parts of the program/libraries can
 	 * register handlers to run.  You can kick these with "notify PID 9". */
 	enable_kevent(EV_FREE_APPLE_PIE, 0, EVENT_IPI | EVENT_WAKEUP |

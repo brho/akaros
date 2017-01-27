@@ -121,8 +121,8 @@ static void __attribute__((constructor)) vmm_lib_init(void)
 	thread0->stacktop = (void*)USTACKTOP;
 	/* for lack of a better vcore, might as well send to 0 */
 	sysc_evq = setup_sysc_evq(0);
-	register_ev_handler(EV_SYSCALL, vmm_handle_syscall, 0);
-	uthread_2ls_init((struct uthread*)thread0, &vmm_sched_ops);
+	uthread_2ls_init((struct uthread*)thread0, &vmm_sched_ops,
+                     vmm_handle_syscall, NULL);
 }
 
 /* The scheduling policy is encapsulated in the next few functions (from here

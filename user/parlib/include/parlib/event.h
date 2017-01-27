@@ -47,6 +47,7 @@ struct ev_handler {
 	handle_event_t				func;
 	void						*data;
 };
+extern struct ev_handler *ev_handlers[];
 int register_ev_handler(unsigned int ev_type, handle_event_t handler,
                         void *data);
 int deregister_ev_handler(unsigned int ev_type, handle_event_t handler,

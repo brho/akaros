@@ -53,8 +53,8 @@ struct thread0_info {
 static struct thread0_info thread0_info;
 static struct event_queue *sysc_evq;
 
-static void thread0_handle_syscall(struct event_msg *ev_msg,
-                                   unsigned int ev_type, void *data)
+void thread0_handle_syscall(struct event_msg *ev_msg,
+                            unsigned int ev_type, void *data)
 {
 	thread0_info.is_blocked = FALSE;
 }
@@ -65,7 +65,6 @@ void thread0_lib_init(void)
 	/* we don't care about the message, so don't bother with a UCQ */
 	sysc_evq = get_eventq(EV_MBOX_BITMAP);
 	sysc_evq->ev_flags = EVENT_INDIR | EVENT_WAKEUP;
-	register_ev_handler(EV_SYSCALL, thread0_handle_syscall, 0);
 }
 
 /* Thread0 scheduler ops (for processes that haven't linked in a full 2LS) */
