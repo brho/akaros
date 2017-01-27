@@ -97,9 +97,9 @@ static int32_t capstat(struct chan *c, uint8_t *db, int32_t n)
 static struct chan *capopen(struct chan *c, int omode)
 {
 	if (c->qid.type & QTDIR) {
-		if (omode != O_RDONLY)
-			error(EISDIR, "Is a directory");
-		c->mode = omode;
+		if (openmode(omode) != O_READ)
+			error(EISDIR, "Can only read a directory");
+		c->mode = openmode(omode);
 		c->flag |= COPEN;
 		c->offset = 0;
 		return c;
