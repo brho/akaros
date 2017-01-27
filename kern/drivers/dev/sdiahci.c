@@ -1,4 +1,3 @@
-#define DEBUG
 /*
  * This file is part of the UCB release of Plan 9. It is subject to the license
  * terms in the LICENSE file found in the top-level directory of this
@@ -652,13 +651,16 @@ static int64_t ahciidentify(struct aportc *pc, uint16_t *id)
 	}
 	if (ahciidentify0(pc, id, i) == -1)
 		return -1;
+
+#ifdef DEBUG
 	printd("ahci: %s: ahciidentify0 return dump=\n\t", __func__);
-	for (cnt = 0; cnt < 101; cnt++) {
+	for (cnt = 0; cnt < 64; cnt++) {
 		printd("0x%08x  ", id[cnt]);
-		if (cnt % 5 == 4 && cnt != 100)
+		if (cnt % 4 == 3 && cnt != 63)
 			printd("\n\t");
 	}
 	printd("\n");
+#endif
 
 	i = gbit16(id + 83) | gbit16(id + 86);
 	if (i & (1 << 10)) {
@@ -1284,7 +1286,7 @@ static int doportreset(struct drive *d)
 	i = -1;
 	qlock(&d->portm.ql);
 	if (ahciportreset(&d->portc) == -1)
-		printd("ahci: doportreset: fails\n");
+		printd("ahci: doportreset: fails\n")
 	else
 		i = 0;
 	qunlock(&d->portm.ql);
