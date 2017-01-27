@@ -14,7 +14,7 @@
 
 pthread_t th1, th2;
 int nr_switch_loops = 100;
-bool ready = FALSE;
+pthread_barrier_t barrier;
 bool should_exit = FALSE;
 
 static void __pth_switch_cb(struct uthread *uthread, void *target)
@@ -36,8 +36,7 @@ void *switch_thread(void *arg)
 {	
 	pthread_t other_thr = *(pthread_t*)arg;
 
-	while (!ready)
-		cpu_relax();
+	pthread_barrier_wait(&barrier);
 	for (int i = 0; i < nr_switch_loops; i++) {
 		cmb();
 		if (should_exit)
@@ -73,6 +72,7 @@ int main(int argc, char** argv)
 	pthread_need_tls(FALSE);
 	pthread_mcp_init();					/* gives us one vcore */
 
+	pthread_barrier_init(&barrier, NULL, 2);
 	/* each is passed the other's pthread_t.  th1 starts the switching. */
 	if (pthread_create(&th1, NULL, &switch_thread, &th2))
 		perror("pth_create 1 failed");
@@ -82,8 +82,6 @@ int main(int argc, char** argv)
 
 	if (gettimeofday(&start_tv, 0))
 		perror("Start time error...");
-
-	ready = TRUE;			/* signal to any spinning uthreads to start */
 
 	pthread_join(th1, &join_ret);
 	pthread_join(th2, &join_ret);

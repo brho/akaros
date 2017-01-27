@@ -38,13 +38,12 @@ int amt_fake_work = 0;
 pthread_t my_threads[MAX_NR_TEST_THREADS];
 void *my_retvals[MAX_NR_TEST_THREADS];
 
-bool ready = FALSE;
+pthread_barrier_t barrier;
 
 void *yield_thread(void* arg)
 {	
 	/* Wait til all threads are created */
-	while (!ready)
-		cpu_relax();
+	pthread_barrier_wait(&barrier);
 	for (int i = 0; i < nr_yield_loops; i++) {
 		printf_safe("[A] pthread %d %p on vcore %d, itr: %d\n", pthread_id(),
 		            pthread_self(), vcore_id(), i);
@@ -94,6 +93,7 @@ int main(int argc, char** argv)
 	}
 #endif /* __ros__ */
 
+	pthread_barrier_init(&barrier, NULL, nr_yield_threads);
 	/* create and join on yield */
 	for (int i = 0; i < nr_yield_threads; i++) {
 		printf_safe("[A] About to create thread %d\n", i);
@@ -102,7 +102,6 @@ int main(int argc, char** argv)
 	}
 	if (gettimeofday(&start_tv, 0))
 		perror("Start time error...");
-	ready = TRUE;			/* signal to any spinning uthreads to start */
 	for (int i = 0; i < nr_yield_threads; i++) {
 		printf_safe("[A] About to join on thread %d(%p)\n", i, my_threads[i]);
 		pthread_join(my_threads[i], &my_retvals[i]);
