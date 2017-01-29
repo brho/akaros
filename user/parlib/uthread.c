@@ -234,6 +234,10 @@ void __attribute__((constructor)) uthread_lib_init(void)
 	                                   unsigned int ev_type, void *data);
 	int ret;
 
+	/* Surprise!  Parlib's ctors also run in shared objects.  We can't have
+	 * multiple versions of parlib (with multiple data structures). */
+	if (__in_fake_parlib())
+		return;
 	/* Only run once, but make sure that vcore_lib_init() has run already. */
 	init_once_racy(return);
 	vcore_lib_init();

@@ -35,6 +35,16 @@ void __attribute__((noreturn)) __vcore_entry(void)
 }
 void vcore_entry(void) __attribute__((weak, alias ("__vcore_entry")));
 
+static void __fake_start(void)
+{
+}
+void _start(void) __attribute__((weak, alias ("__fake_start")));
+
+bool __in_fake_parlib(void)
+{
+	return _start == __fake_start;
+}
+
 /* TODO: probably don't want to dealloc.  Considering caching */
 static void free_transition_tls(int id)
 {
@@ -168,6 +178,8 @@ static void vcore_libc_init(void)
 
 void __attribute__((constructor)) vcore_lib_init(void)
 {
+	if (__in_fake_parlib())
+		return;
 	/* Note this is racy, but okay.  The first time through, we are _S.
 	 * Also, this is the "lowest" level constructor for now, so we don't need
 	 * to call any other init functions after our run_once() call. This may
