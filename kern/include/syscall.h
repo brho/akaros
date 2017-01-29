@@ -46,6 +46,7 @@ struct systrace_record {
 struct strace {
 	bool tracing;
 	bool inherit;
+	bool drop_overflow;
 	atomic_t nr_drops;
 	unsigned long appx_nr_sysc;
 	struct kref procs; /* when procs goes to zero, q is hung up. */

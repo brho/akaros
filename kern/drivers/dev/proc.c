@@ -94,6 +94,7 @@ enum {
 	CMvmkill,
 	CMstraceme,
 	CMstraceall,
+	CMstrace_drop,
 };
 
 enum {
@@ -161,6 +162,7 @@ struct cmdtab proccmd[] = {
 	{CMvmkill, "vmkill", 0},
 	{CMstraceme, "straceme", 0},
 	{CMstraceall, "straceall", 0},
+	{CMstrace_drop, "strace_drop", 2},
 };
 
 /*
@@ -628,6 +630,10 @@ static struct chan *procopen(struct chan *c, int omode)
 				spin_unlock(&p->strace->lock);
 				error(EBUSY, "Process is already being traced");
 			}
+			/* It's not critical that we reopen before setting tracing, but it's
+			 * a little cleaner (concurrent syscalls could be trying to use the
+			 * queue before it was reopened, and they'd throw). */
+			qreopen(p->strace->q);
 			p->strace->tracing = TRUE;
 			spin_unlock(&p->strace->lock);
 			/* the ref we are upping is the one we put in __proc_free, which is
@@ -853,6 +859,7 @@ static void procclose(struct chan *c)
 
 		assert(c->flag & COPEN);	/* only way aux should have been set */
 		s->tracing = FALSE;
+		qhangup(s->q, NULL);
 		kref_put(&s->users);
 		c->aux = NULL;
 	}
@@ -1376,12 +1383,16 @@ static void procctlreq(struct proc *p, char *va, int n)
 	switch (ct->index) {
 	case CMstraceall:
 	case CMstraceme:
+	case CMstrace_drop:
 		/* common allocation.  if we inherited, we might have one already */
 		if (!p->strace) {
 			strace = kzmalloc(sizeof(*p->strace), MEM_WAIT);
 			spinlock_init(&strace->lock);
 			bitmap_set(strace->trace_set, 0, MAX_SYSCALL_NR);
-			strace->q = qopen(65536, Qdropoverflow|Qcoalesce, NULL, NULL);
+			strace->q = qopen(65536, 0, NULL, NULL);
+			/* The queue is reopened and hungup whenever we open the Qstrace
+			 * file.  This hangup might not be necessary, but is safer. */
+			qhangup(strace->q, NULL);
 			/* both of these refs are put when the proc is freed.  procs is for
 			 * every process that has this p->strace.  users is procs + every
 			 * user (e.g. from open()).
@@ -1441,6 +1452,14 @@ static void procctlreq(struct proc *p, char *va, int n)
 		break;
 	case CMstraceall:
 		p->strace->inherit = TRUE;
+		break;
+	case CMstrace_drop:
+		if (!strcmp(cb->f[1], "on"))
+			p->strace->drop_overflow = TRUE;
+		else if (!strcmp(cb->f[1], "off"))
+			p->strace->drop_overflow = FALSE;
+		else
+			error(EINVAL, "strace_drop takes on|off %s", cb->f[1]);
 		break;
 	}
 	poperror();

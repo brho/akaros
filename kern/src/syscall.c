@@ -104,17 +104,58 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
 	return len;
 }
 
+/* If some syscalls block, then they can really hurt the user and the
+ * kernel.  For instance, if you blocked another call because the trace queue is
+ * full, the 2LS will want to yield the vcore, but then *that* call would block
+ * too.  Since that caller was in vcore context, the core will just spin
+ * forever.
+ *
+ * Even worse, some syscalls operate on the calling core or current context,
+ * thus accessing pcpui.  If we block, then that old context is gone.  Worse, we
+ * could migrate and then be operating on a different core.  Imagine
+ * SYS_halt_core.  Doh! */
+static bool sysc_can_block(unsigned int sysc_num)
+{
+	switch (sysc_num) {
+	case SYS_proc_yield:
+	case SYS_fork:
+	case SYS_exec:
+	case SYS_pop_ctx:
+	case SYS_getvcoreid:
+	case SYS_halt_core:
+	case SYS_vc_entry:
+	case SYS_change_vcore:
+	case SYS_change_to_m:
+		return FALSE;
+	}
+	return TRUE;
+}
+
 /* Helper: spits out our trace to the various sinks. */
 static void systrace_output(struct systrace_record *trace,
                             struct strace *strace, bool entry)
 {
+	ERRSTACK(1);
 	size_t pretty_len;
 
+	/* qio ops can throw, especially the blocking qwrite.  I had it block on the
+	 * outbound path of sys_proc_destroy().  The rendez immediately throws. */
+	if (waserror()) {
+		poperror();
+		return;
+	}
 	pretty_len = systrace_fill_pretty_buf(trace, entry);
-	if (strace)
-		qiwrite(strace->q, trace->pretty_buf, pretty_len);
+	if (strace) {
+		/* At this point, we're going to emit the exit trace.  It's just a
+		 * question of whether or not we block while doing it. */
+		if (strace->drop_overflow || !sysc_can_block(trace->syscallno))
+			qiwrite(strace->q, trace->pretty_buf, pretty_len);
+		else
+			qwrite(strace->q, trace->pretty_buf, pretty_len);
+	}
 	if (systrace_loud)
 		printk("%s", trace->pretty_buf);
+	poperror();
 }
 
 static bool should_strace(struct proc *p, struct syscall *sysc)
@@ -127,9 +168,14 @@ static bool should_strace(struct proc *p, struct syscall *sysc)
 		return FALSE;
 	/* TOCTTOU concerns - sysc is __user. */
 	sysc_num = ACCESS_ONCE(sysc->num);
+	if (qfull(p->strace->q)) {
+		if (p->strace->drop_overflow || !sysc_can_block(sysc_num)) {
+			atomic_inc(&p->strace->nr_drops);
+			return FALSE;
+		}
+	}
 	if (sysc_num > MAX_SYSCALL_NR)
 		return FALSE;
-	/* TODO: for drops, consider checking for qio overflow first. */
 	return test_bit(sysc_num, p->strace->trace_set);
 }
 
@@ -145,25 +191,20 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 	kthread->strace = 0;
 	if (!should_strace(p, sysc))
 		return;
+	/* TODO: consider a block_alloc and qpass, though note that we actually
+	 * write the same trace in twice (entry and exit). */
 	trace = kmalloc(SYSTR_BUF_SZ, MEM_ATOMIC);
 	if (p->strace) {
-		/* We're using qiwrite below, which has no flow control.  We'll do it
-		 * manually.  TODO: consider a block_alloc and qpass, though note that
-		 * we actually write the same trace in twice (entry and exit).
-		 * Alternatively, we can add another qio method that has flow control
-		 * and non blocking. */
-		if (qfull(p->strace->q)) {
+		if (!trace) {
 			atomic_inc(&p->strace->nr_drops);
-			kfree(trace);
 			return;
 		}
-		if (!trace)
-			atomic_inc(&p->strace->nr_drops);
 		/* Avoiding the atomic op.  We sacrifice accuracy for less overhead. */
 		p->strace->appx_nr_sysc++;
+	} else {
+		if (!trace)
+			return;
 	}
-	if (!trace)
-		return;
 	/* if you ever need to debug just one strace function, this is
 	 * handy way to do it: just bail out if it's not the one you
 	 * want.
@@ -2593,6 +2634,7 @@ void run_local_syscall(struct syscall *sysc)
 	}
 	pcpui->cur_kthread->sysc = sysc;	/* let the core know which sysc it is */
 	systrace_start_trace(pcpui->cur_kthread, sysc);
+	pcpui = &per_cpu_info[core_id()];	/* reload again */
 	alloc_sysc_str(pcpui->cur_kthread);
 	/* syscall() does not return for exec and yield, so put any cleanup in there
 	 * too. */
@@ -2602,6 +2644,7 @@ void run_local_syscall(struct syscall *sysc)
 	pcpui = &per_cpu_info[core_id()];
 	free_sysc_str(pcpui->cur_kthread);
 	systrace_finish_trace(pcpui->cur_kthread, sysc->retval);
+	pcpui = &per_cpu_info[core_id()];	/* reload again */
 	/* Some 9ns paths set errstr, but not errno.  glibc will ignore errstr.
 	 * this is somewhat hacky, since errno might get set unnecessarily */
 	if ((current_errstr()[0] != 0) && (!sysc->err))
