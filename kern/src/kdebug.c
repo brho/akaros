@@ -268,15 +268,17 @@ void backtrace_hwtf(struct hw_trapframe *hw_tf)
 void backtrace_user_ctx(struct proc *p, struct user_context *ctx)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	uintptr_t st_save;
 
 	if (!ctx) {
 		printk("Null user context!\n");
 		return;
 	}
-	assert(pcpui->cur_proc);
+	st_save = switch_to(p);
 	pcpui->__lock_checking_enabled--;
 	backtrace_user_frame(get_user_ctx_pc(ctx), get_user_ctx_fp(ctx));
 	pcpui->__lock_checking_enabled++;
+	switch_back(p, st_save);
 }
 
 static spinlock_t __px_lock = SPINLOCK_INITIALIZER_IRQSAVE;
