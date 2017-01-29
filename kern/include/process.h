@@ -181,4 +181,4 @@ void __clear_owning_proc(uint32_t coreid);
 
 /* Degubbing */
 void print_allpids(void);
-void print_proc_info(pid_t pid);
+void print_proc_info(pid_t pid, int verbosity);

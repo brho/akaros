@@ -342,6 +342,8 @@ int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int mon_procinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
+	int verbosity = 0;
+
 	if (argc < 2) {
 		printk("Usage: procinfo OPTION\n");
 		printk("\tall: show all active pids\n");
@@ -353,11 +355,13 @@ int mon_procinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 	if (!strcmp(argv[1], "all")) {
 		print_allpids();
 	} else if (!strcmp(argv[1], "pid")) {
-		if (argc != 3) {
+		if (argc < 3) {
 			printk("Give me a pid number.\n");
 			return 1;
 		}
-		print_proc_info(strtol(argv[2], 0, 0));
+		if (argc >= 4)
+			verbosity = strtol(argv[3], 0, 0);
+		print_proc_info(strtol(argv[2], 0, 0), verbosity);
 	} else if (!strcmp(argv[1], "unlock")) {
 		if (argc != 3) {
 			printk("Gimme lock address!  Me want lock address!.\n");
@@ -390,11 +394,15 @@ int mon_procinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int mon_pip(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	if (argc != 2) {
+	int verbosity = 0;
+
+	if (argc < 2) {
 		printk("Give me a pid number.\n");
 		return 1;
 	}
-	print_proc_info(strtol(argv[1], 0, 0));
+	if (argc >= 3)
+		verbosity = strtol(argv[2], 0, 0);
+	print_proc_info(strtol(argv[1], 0, 0), verbosity);
 	return 0;
 }
 
@@ -813,7 +821,7 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 			printk("ERRRRRRRRRR.\n");
 			return 1;
 		}
-		print_proc_info(strtol(argv[2], 0, 0));
+		print_proc_info(strtol(argv[2], 0, 0), 0);
 	} else {
 		printk("Bad option\n");
 		return 1;

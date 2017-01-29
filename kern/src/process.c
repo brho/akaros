@@ -2371,7 +2371,7 @@ void proc_free_set(struct process_set *pset)
 	kfree(pset->procs);
 }
 
-void print_proc_info(pid_t pid)
+void print_proc_info(pid_t pid, int verbosity)
 {
 	int j = 0;
 	uint64_t total_time = 0;
@@ -2394,6 +2394,10 @@ void print_proc_info(pid_t pid)
 	printk("\tIs %san MCP\n", p->procinfo->is_mcp ? "" : "not ");
 	if (!scp_is_vcctx_ready(vcpd))
 		printk("\tIs NOT vcctx ready\n");
+	if (verbosity > 0 && !p->procinfo->is_mcp) {
+		printk("Last saved SCP context:");
+		backtrace_user_ctx(p, &p->scp_ctx);
+	}
 	printk("Refcnt: %d\n", atomic_read(&p->p_kref.refcount) - 1);
 	printk("Flags: 0x%08x\n", p->env_flags);
 	printk("CR3(phys): %p\n", p->env_cr3);
@@ -2408,16 +2412,20 @@ void print_proc_info(pid_t pid)
 	printk("Inactive / Yielded:\n");
 	TAILQ_FOREACH(vc_i, &p->inactive_vcs, list)
 		printk("\tVcore %d\n", vcore2vcoreid(p, vc_i));
-	printk("Nsec Online, up to the last offlining:\n------------------------");
-	for (int i = 0; i < p->procinfo->max_vcores; i++) {
-		uint64_t vc_time = tsc2nsec(vcore_account_gettotal(p, i));
-		if (i % 4 == 0)
-			printk("\n");
-		printk("  VC %3d: %14llu", i, vc_time);
-		total_time += vc_time;
+	if (verbosity > 0) {
+		printk("Nsec Online, up to the last offlining:\n");
+		printk("------------------------");
+		for (int i = 0; i < p->procinfo->max_vcores; i++) {
+			uint64_t vc_time = tsc2nsec(vcore_account_gettotal(p, i));
+
+			if (i % 4 == 0)
+				printk("\n");
+			printk("  VC %3d: %14llu", i, vc_time);
+			total_time += vc_time;
+		}
+		printk("\n");
+		printk("Total CPU-NSEC: %llu\n", total_time);
 	}
-	printk("\n");
-	printk("Total CPU-NSEC: %llu\n", total_time);
 	printk("Resources:\n------------------------\n");
 	for (int i = 0; i < MAX_NUM_RESOURCES; i++)
 		printk("\tRes type: %02d, amt wanted: %08d, amt granted: %08d\n", i,
