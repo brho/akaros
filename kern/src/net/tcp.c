@@ -3227,7 +3227,7 @@ void tcpinit(struct Fs *fs)
 	tcp->inuse = tcpinuse;
 	tcp->gc = tcpgc;
 	tcp->ipproto = IP_TCPPROTO;
-	tcp->nc = scalednconv();
+	tcp->nc = 4096;
 	tcp->ptclsize = sizeof(Tcpctl);
 	tpriv->stats[MaxConn] = tcp->nc;
 

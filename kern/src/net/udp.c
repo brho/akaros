@@ -679,7 +679,7 @@ void udpinit(struct Fs *fs)
 	udp->advise = udpadvise;
 	udp->stats = udpstats;
 	udp->ipproto = IP_UDPPROTO;
-	udp->nc = Nchans;
+	udp->nc = 4096;
 	udp->ptclsize = sizeof(Udpcb);
 
 	Fsproto(fs, udp);
