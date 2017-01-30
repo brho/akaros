@@ -11,3 +11,4 @@ earlyprintk=vmcall,keep
  clocksource=tsc
  pit=none
  root=/dev/vda1
+ noht
