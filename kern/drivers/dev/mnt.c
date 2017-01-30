@@ -854,12 +854,17 @@ void mountio(struct mnt *m, struct mntrpc *r)
 		/* Syscall aborts are like Plan 9 Eintr.  For those, we need to change
 		 * the old request to a flsh (mntflushalloc) and try again.  We'll
 		 * always try to flush, and you can't get out until the flush either
-		 * succeeds or errors out with a non-abort/Eintr error. */
-		if (get_errno() != EINTR) {
-			/* all other errors (not abort or Eintr) */
+		 * succeeds or errors out with a non-abort/Eintr error.
+		 *
+		 * This all means that regular aborts cannot break us out of here!  We
+		 * can consider that policy in the future, if we need to.  Regardless,
+		 * if the process is dying, we really do need to abort. */
+		if ((get_errno() != EINTR) || proc_is_dying(current)) {
+			/* all other errors or dying, bail out! */
 			mntflushfree(m, r);
 			nexterror();
 		}
+		/* try again.  this is where you can get the "rpc tags" errstr. */
 		r = mntflushalloc(r, m->msize);
 		/* need one for every waserror call (so this plus one outside) */
 		poperror();
