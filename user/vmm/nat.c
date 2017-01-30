@@ -334,7 +334,12 @@ static struct ip_nat_map *create_map(uint8_t protocol, uint16_t guest_port,
 	snprintf(dialstring, sizeof(dialstring), "%s!*!%s", proto_str, host_port);
 
 	bypass_fd = bypass9(dialstring, conv_dir, 0);
-	parlib_assert_perror(bypass_fd >= 0);
+	if (bypass_fd < 0) {
+		fprintf(stderr, "Failed to clone a conv for %s:%s (%r), won't bypass!",
+		        proto_str, host_port);
+		free(map);
+		return NULL;
+	}
 
 	port_check = get_port9(conv_dir, "local", &map->host_port);
 	parlib_assert_perror(port_check);
@@ -358,6 +363,8 @@ static struct ip_nat_map *get_map_by_tuple(uint8_t protocol,
 	if (map)
 		return map;
 	map = create_map(protocol, guest_port, "*", FALSE);
+	if (!map)
+		return NULL;
 	kref_get(&map->kref, 1);
 	add_map(map);
 	return map;
@@ -686,6 +693,10 @@ void vnet_port_forward(char *protocol, char *host_port, char *guest_port)
 		return;
 	}
 	map = create_map(proto_nr, atoi(guest_port), host_port, TRUE);
+	if (!map) {
+		fprintf(stderr, "Failed to set up port forward!");
+		exit(-1);
+	}
 	add_map(map);
 }
 
@@ -1075,6 +1086,8 @@ static struct ip_nat_map *handle_udp_tx(struct iovec *iov, int iovcnt,
 		return NULL;
 	}
 	map = get_map_by_tuple(IP_UDPPROTO, src_port);
+	if (!map)
+		return NULL;
 	xsum_changed_port(iov, iovcnt, udp_off + UDP_OFF_XSUM, src_port,
 	                  map->host_port);
 	iov_put_be16(iov, iovcnt, udp_off + UDP_OFF_SRC_PORT, map->host_port);
@@ -1094,6 +1107,8 @@ static struct ip_nat_map *handle_tcp_tx(struct iovec *iov, int iovcnt,
 	src_port = iov_get_be16(iov, iovcnt, tcp_off + TCP_OFF_SRC_PORT);
 	dst_port = iov_get_be16(iov, iovcnt, tcp_off + TCP_OFF_DST_PORT);
 	map = get_map_by_tuple(IP_TCPPROTO, src_port);
+	if (!map)
+		return NULL;
 	xsum_changed_port(iov, iovcnt, tcp_off + TCP_OFF_XSUM, src_port,
 	                  map->host_port);
 	iov_put_be16(iov, iovcnt, tcp_off + TCP_OFF_SRC_PORT, map->host_port);
