@@ -335,8 +335,8 @@ static struct ip_nat_map *create_map(uint8_t protocol, uint16_t guest_port,
 
 	bypass_fd = bypass9(dialstring, conv_dir, 0);
 	if (bypass_fd < 0) {
-		fprintf(stderr, "Failed to clone a conv for %s:%s (%r), won't bypass!",
-		        proto_str, host_port);
+		fprintf(stderr, "Failed to clone a conv for %s:%d (%r), won't bypass!\n",
+		        proto_str, guest_port);
 		free(map);
 		return NULL;
 	}

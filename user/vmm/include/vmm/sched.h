@@ -20,7 +20,7 @@ __BEGIN_DECLS
 #define VMM_THREAD_CTLR			2
 #define VMM_THREAD_TASK			3
 
-#define VMM_THR_STACKSIZE		8192
+#define VMM_THR_STACKSIZE		(4 * PGSIZE)
 
 struct guest_thread;
 struct ctlr_thread;
