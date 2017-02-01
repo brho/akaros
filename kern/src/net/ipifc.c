@@ -1524,10 +1524,8 @@ void ipifc_trace_block(struct Ipifc *ifc, struct block *bp)
 		ifc->tracedrop++;
 		return;
 	}
-	if (qpass(ifc->conv->sq, newb) < 0) {
+	if (qpass(ifc->conv->sq, newb) < 0)
 		ifc->tracedrop++;
-		freeb(newb);
-	}
 }
 
 /*
