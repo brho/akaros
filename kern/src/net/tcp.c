@@ -1972,11 +1972,15 @@ void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
 	h6 = (Tcp6hdr *) (bp->rp);
 
 	if ((h4->vihl & 0xF0) == IP_VER4) {
+		uint8_t ttl;
+
 		version = V4;
 		length = nhgets(h4->length);
 		v4tov6(dest, h4->tcpdst);
 		v4tov6(source, h4->tcpsrc);
 
+		/* ttl isn't part of the xsum pseudo header, but bypass needs it. */
+		ttl = h4->Unused;
 		h4->Unused = 0;
 		hnputs(h4->tcplen, length - TCP4_PKT);
 		if (!(bp->flag & Btcpck) && (h4->tcpcksum[0] || h4->tcpcksum[1]) &&
@@ -1987,6 +1991,7 @@ void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
 			freeblist(bp);
 			return;
 		}
+		h4->Unused = ttl;
 
 		hdrlen = ntohtcp4(&seg, &bp);
 		if (hdrlen < 0) {
