@@ -835,7 +835,7 @@ void mountrpc(struct mnt *m, struct mntrpc *r)
 			cn = "?";
 			if (r->c != NULL && r->c->name != NULL)
 				cn = r->c->name->s;
-			printd
+			printk
 				("mnt: proc %s %lu: mismatch from %s %s rep 0x%p tag %d fid %d T%d R%d rp %d\n",
 				 "current->text", "current->pid", sn, cn, r, r->request.tag,
 				 r->request.fid, r->request.type, r->reply.type, r->reply.tag);
