@@ -10,4 +10,8 @@
 
 #define	VMM_VMCALL_PRINTF	0x1	/* Enable VMCALL output console hack */
 
+/* VMCALL FUNCTION NUMBERS */
+#define VMCALL_PRINTC		0x1
+#define VMCALL_SMPBOOT		0x2
+
 #define VMM_ALL_FLAGS	(VMM_VMCALL_PRINTF)

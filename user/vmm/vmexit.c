@@ -121,20 +121,82 @@ static bool handle_ept_fault(struct guest_thread *gth)
 	return TRUE;
 }
 
-static bool handle_vmcall(struct guest_thread *gth)
+static bool handle_vmcall_printc(struct guest_thread *gth)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 	uint8_t byte;
 
-	if (gth->vmcall)
-		return gth->vmcall(gth, vm_tf);
 	byte = vm_tf->tf_rdi;
 	printf("%c", byte);
 	if (byte == '\n')
 		printf("%c", '%');
 	fflush(stdout);
-	vm_tf->tf_rip += 3;
 	return TRUE;
+}
+
+static bool handle_vmcall_smpboot(struct guest_thread *gth)
+{
+	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
+	struct vm_trapframe *vm_tf_ap;
+	struct virtual_machine *vm = gth_to_vm(gth);
+	int cur_pcores = vm->up_gpcs;
+
+	/* Check if we're guest pcore 0. Only the BSP is allowed to start APs. */
+	if (vm_tf->tf_guest_pcoreid != 0) {
+		fprintf(stderr,
+		        "Only guest pcore 0 is allowed to start APs. core was %ld\n",
+		        vm_tf->tf_guest_pcoreid);
+		return FALSE;
+	}
+
+	/* Check if we've reached the maximum, if yes, blow out. */
+	if (vm->nr_gpcs == cur_pcores) {
+		fprintf(stderr,
+		        "guest tried to start up too many cores. max was %ld, current up %ld\n",
+		        vm->nr_gpcs, cur_pcores);
+		return FALSE;
+	}
+
+	/* Start up secondary core. */
+	vm_tf_ap = gth_to_vmtf(vm->gths[cur_pcores]);
+	/* We use the BSP's CR3 for now. This should be fine because they
+	 * change it later anyway. */
+	vm_tf_ap->tf_cr3 = vm_tf->tf_cr3;
+
+	/* Starting RIP is passed in via rdi. */
+	vm_tf_ap->tf_rip = vm_tf->tf_rdi;
+
+	/* Starting RSP is passed in via rsi. */
+	vm_tf_ap->tf_rsp = vm_tf->tf_rsi;
+
+	vm->up_gpcs++;
+
+	start_guest_thread(vm->gths[cur_pcores]);
+
+	return TRUE;
+}
+
+static bool handle_vmcall(struct guest_thread *gth)
+{
+	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
+	bool retval = FALSE;
+
+	if (gth->vmcall)
+		return gth->vmcall(gth, vm_tf);
+
+	switch (vm_tf->tf_rax) {
+		case VMCALL_PRINTC:
+			retval = handle_vmcall_printc(gth);
+			break;
+		case VMCALL_SMPBOOT:
+			retval = handle_vmcall_smpboot(gth);
+			break;
+	}
+
+	if (retval)
+		vm_tf->tf_rip += 3;
+
+	return retval;
 }
 
 static bool handle_io(struct guest_thread *gth)

@@ -26,6 +26,12 @@ enum {
 struct virtual_machine {
 	struct guest_thread			**gths;
 	unsigned int				nr_gpcs;
+	/* up_gpcs should not need synchronization. only the BSP should be making
+	 * startup vmcalls. For security's sake we might still want to lock in the
+	 * future. TODO(ganshun)
+	 * up_gpcs refers to the number of guest pcores that have
+	 * been started so far. */
+	unsigned int				up_gpcs;
 	struct vmm_gpcore_init		*gpcis;
 	bool						vminit;
 

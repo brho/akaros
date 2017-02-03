@@ -1101,6 +1101,7 @@ int main(int argc, char **argv)
 	vm_tf->tf_rip = entry;
 	vm_tf->tf_rsp = stack;
 	vm_tf->tf_rsi = (uint64_t) bp;
+	vm->up_gpcs = 1;
 	start_guest_thread(vm->gths[0]);
 
 	uthread_sleep_forever();
