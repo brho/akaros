@@ -701,6 +701,7 @@ apps-clean: $(app-dirs-clean)
 	@$(call make_as_parent, -C tools/apps/ipconfig clean)
 	@$(call make_as_parent, -C tools/dev-libs/elfutils clean)
 	@$(call make_as_parent, -C tools/dev-util/perf clean)
+	@$(call make_as_parent, -C tools/sys-apps/bash clean)
 
 # Cross Compiler
 # =========================================================================
