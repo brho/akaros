@@ -4,6 +4,7 @@
 #endif
 
 #include <ros/common.h>
+#include <ros/syscall.h>
 #include <process.h>
 #include <kref.h>
 #include <ns.h>
@@ -20,7 +21,6 @@
 #define MAX_ASRC_BATCH				10
 
 #define SYSTR_RECORD_SZ				256
-#define SYSTR_BUF_SZ 				PGSIZE
 #define SYSTR_PRETTY_BUF_SZ			(SYSTR_BUF_SZ -                            \
                                      sizeof(struct systrace_record))
 struct systrace_record {

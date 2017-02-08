@@ -1389,7 +1389,7 @@ static void procctlreq(struct proc *p, char *va, int n)
 			strace = kzmalloc(sizeof(*p->strace), MEM_WAIT);
 			spinlock_init(&strace->lock);
 			bitmap_set(strace->trace_set, 0, MAX_SYSCALL_NR);
-			strace->q = qopen(65536, 0, NULL, NULL);
+			strace->q = qopen(65536, Qmsg, NULL, NULL);
 			/* The queue is reopened and hungup whenever we open the Qstrace
 			 * file.  This hangup might not be necessary, but is safer. */
 			qhangup(strace->q, NULL);

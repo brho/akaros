@@ -13,6 +13,7 @@
 #define SC_ABORT				0x0010		/* syscall abort attempted */
 
 #define MAX_ERRSTR_LEN			128
+#define SYSTR_BUF_SZ			PGSIZE
 
 struct syscall {
 	unsigned int				num;
