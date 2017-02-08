@@ -251,6 +251,8 @@ vfprintf (FILE *s, const CHAR_T *format, va_list ap)
   CHAR_T work_buffer[1000];
   CHAR_T *workstart = NULL;
   CHAR_T *workend;
+  /* AKAROS: this might get mmaped */
+  void *specs_buf = NULL;
 
   /* We have to save the original argument pointer.  */
   va_list ap_save;
@@ -1683,7 +1685,18 @@ do_positional:
     size_t nspecs = 0;
     /* A more or less arbitrary start value.  */
     size_t nspecs_size = 32 * sizeof (struct printf_spec);
-    struct printf_spec *specs = alloca (nspecs_size);
+
+	/* AKAROS: specs_buf declared above and conditionally freed below */
+    //struct printf_spec *specs = alloca (nspecs_size);
+    struct printf_spec *specs;
+
+    specs_buf = mmap(0, ROUNDUP(nspecs_size, PGSIZE), PROT_WRITE | PROT_READ,
+                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (specs_buf == MAP_FAILED) {
+      write(2, failmsg, sizeof(failmsg));
+      exit(-1);
+    }
+	specs = (struct printf_spec*)specs_buf;
 
     /* The number of arguments the format string requests.  This will
        determine the size of the array needed to store the argument
@@ -2054,6 +2067,8 @@ all_done:
     free (args_malloced);
   if (__glibc_unlikely (workstart != NULL))
     free (workstart);
+  if (__glibc_unlikely (specs_buf != NULL))
+    munmap(specs_buf, ROUNDUP(32 * sizeof (struct printf_spec), PGSIZE));
   /* Unlock the stream.  */
   _IO_funlockfile (s);
   _IO_cleanup_region_end (0);
