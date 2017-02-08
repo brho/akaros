@@ -631,13 +631,11 @@ struct cmdtab {
 
 /* queue state bits, all can be set in qopen (Qstarve is always set) */
 enum {
-	Qstarve = (1 << 0),			/* consumer starved */
-	Qmsg = (1 << 1),	/* message stream */
-	Qclosed = (1 << 2),	/* queue has been closed/hungup */
-	Qflow = (1 << 3),	/* producer flow controlled */
-	Qcoalesce = (1 << 4),	/* coalesce empty packets on read */
-	Qkick = (1 << 5),	/* always call the kick routine after qwrite */
-	Qdropoverflow = (1 << 6),	/* writes that would block will be dropped */
+	Qmsg			= (1 << 1),	/* message stream */
+	Qclosed			= (1 << 2),	/* queue has been closed/hungup */
+	Qcoalesce		= (1 << 3),	/* coalesce empty packets on read */
+	Qkick			= (1 << 4),	/* always call the kick routine after qwrite */
+	Qdropoverflow	= (1 << 5),	/* writes that would block will be dropped */
 };
 
 #define DEVDOTDOT -1
