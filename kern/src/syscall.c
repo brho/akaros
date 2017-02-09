@@ -193,7 +193,7 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 		return;
 	/* TODO: consider a block_alloc and qpass, though note that we actually
 	 * write the same trace in twice (entry and exit). */
-	trace = kmalloc(SYSTR_BUF_SZ, MEM_ATOMIC);
+	trace = kpages_alloc(SYSTR_BUF_SZ, MEM_ATOMIC);
 	if (p->strace) {
 		if (!trace) {
 			atomic_inc(&p->strace->nr_drops);
@@ -294,7 +294,7 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 	}
 
 	systrace_output(trace, p->strace, FALSE);
-	kfree(kthread->strace);
+	kpages_free(kthread->strace, SYSTR_BUF_SZ);
 	kthread->strace = 0;
 }
 
