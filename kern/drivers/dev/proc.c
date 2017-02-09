@@ -74,24 +74,7 @@ enum {
 enum {
 	CMclose,
 	CMclosefiles,
-	CMfixedpri,
 	CMhang,
-	CMkill,
-	CMnohang,
-	CMnoswap,
-	CMpri,
-	CMprivate,
-	CMprofile,
-	CMstart,
-	CMstartstop,
-	CMstartsyscall,
-	CMstop,
-	CMwaitstop,
-	CMwired,
-	CMcore,
-	CMvminit,
-	CMvmstart,
-	CMvmkill,
 	CMstraceme,
 	CMstraceall,
 	CMstrace_drop,
@@ -139,27 +122,8 @@ struct dirtab procdir[] = {
 static
 struct cmdtab proccmd[] = {
 	{CMclose, "close", 2},
-	{CMclosefiles, "closefiles", 1},
-	{CMfixedpri, "fixedpri", 2},
-	{CMhang, "hang", 1},
-	{CMnohang, "nohang", 1},
-	{CMnoswap, "noswap", 1},
-	{CMkill, "kill", 1},
-	{CMpri, "pri", 2},
-	{CMprivate, "private", 1},
-	{CMprofile, "profile", 1},
-	{CMstart, "start", 1},
-	{CMstartstop, "startstop", 1},
-	{CMstartsyscall, "startsyscall", 1},
-	{CMstop, "stop", 1},
-	{CMwaitstop, "waitstop", 1},
-	{CMwired, "wired", 2},
-	{CMcore, "core", 2},
-	{CMcore, "core", 2},
-	{CMcore, "core", 2},
-	{CMvminit, "vminit", 0},
-	{CMvmstart, "vmstart", 0},
-	{CMvmkill, "vmkill", 0},
+	{CMclosefiles, "closefiles", 0},
+	{CMhang, "hang", 0},
 	{CMstraceme, "straceme", 0},
 	{CMstraceall, "straceall", 0},
 	{CMstrace_drop, "strace_drop", 2},
@@ -1416,8 +1380,6 @@ static void procctlreq(struct proc *p, char *va, int n)
 
 	/* actually do the command. */
 	switch (ct->index) {
-	case CMvmstart:
-	case CMvmkill:
 	default:
 		error(EFAIL, "Command not implemented");
 		break;
@@ -1431,22 +1393,6 @@ static void procctlreq(struct proc *p, char *va, int n)
 		we may want this.Let us pause a proc.case CMhang:p->hang = 1;
 		break;
 #endif
-	case CMkill:
-		p = pid2proc(strtol(cb->f[1], 0, 0));
-		if (!p)
-			error(EFAIL, "No such proc\n");
-
-		enable_irqsave(&irq_state);
-		proc_destroy(p);
-		disable_irqsave(&irq_state);
-		proc_decref(p);
-		/* this is a little ghetto. it's not fully free yet, but we are also
-		 * slowing it down by messing with it, esp with the busy waiting on a
-		 * hyperthreaded core. */
-		spin_on(p->env_cr3);
-		break;
-	case CMvminit:
-		break;
 	case CMstraceme:
 		p->strace->inherit = FALSE;
 		break;
