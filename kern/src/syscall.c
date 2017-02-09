@@ -302,13 +302,16 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 
 static void alloc_sysc_str(struct kthread *kth)
 {
-	kth->name = kmalloc(SYSCALL_STRLEN, MEM_WAIT);
+	kth->name = kmalloc(SYSCALL_STRLEN, MEM_ATOMIC);
+	if (!kth->name)
+		return;
 	kth->name[0] = 0;
 }
 
 static void free_sysc_str(struct kthread *kth)
 {
 	char *str = kth->name;
+
 	kth->name = 0;
 	kfree(str);
 }
@@ -316,7 +319,9 @@ static void free_sysc_str(struct kthread *kth)
 #define sysc_save_str(...)                                                     \
 {                                                                              \
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];                     \
-	snprintf(pcpui->cur_kthread->name, SYSCALL_STRLEN, __VA_ARGS__);           \
+                                                                               \
+	if (pcpui->cur_kthread->name)                                              \
+		snprintf(pcpui->cur_kthread->name, SYSCALL_STRLEN, __VA_ARGS__);       \
 }
 
 #else
