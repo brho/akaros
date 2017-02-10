@@ -3901,8 +3901,11 @@ static void ether_shutdown(struct ether *edev)
 
 static void ether_promiscuous(void *arg, int on)
 {
-	struct ether *edev = arg;
-	panic("Not implemented");
+	struct ether *edev;
+
+	edev = arg;
+	/* TODO: set promisc on/off */
+	error(EFAIL, "mlx4 promiscuous mode not supported");
 }
 
 static void ether_multicast(void *arg, uint8_t *addr, int add)

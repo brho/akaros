@@ -127,6 +127,7 @@ static void bnx2x_promiscuous(void *arg, int on)
 	edev = arg;
 	ctlr = edev->ctlr;
 	/* TODO: set promisc on/off */
+	error(EFAIL, "bnx2x promiscuous mode not supported");
 }
 
 static void bnx2x_multicast(void *arg, uint8_t * addr, int add)
