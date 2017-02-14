@@ -89,8 +89,10 @@ static void serial_put_char(struct cons_dev *cdev, uint8_t c)
 		#endif /* CONFIG_PRINTK_NO_BACKSPACE */
 			break;
 		case '\n':
-		case '\r':
 			__serial_put_char(cdev->val, (uint8_t)('\n'));
+			__serial_put_char(cdev->val, (uint8_t)('\r'));
+			break;
+		case '\r':
 			__serial_put_char(cdev->val, (uint8_t)('\r'));
 			break;
 		default:
