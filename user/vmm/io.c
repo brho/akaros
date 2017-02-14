@@ -55,7 +55,7 @@ void regp(uint32_t **reg)
 
 static void configaddr(uint32_t val)
 {
-	printf("%s 0x%lx\n", __func__, val);
+	printd("%s 0x%lx\n", __func__, val);
 	cf8 = val;
 }
 
@@ -64,7 +64,7 @@ static void configread32(uint32_t edx, uint64_t *reg)
 	uint32_t *r = &cf8;
 	regp(&r);
 	*reg = *r;
-	printf("%s: 0x%lx 0x%lx, 0x%lx 0x%lx\n", __func__, cf8, edx, r, *reg);
+	printd("%s: 0x%lx 0x%lx, 0x%lx 0x%lx\n", __func__, cf8, edx, r, *reg);
 }
 
 static void configread16(uint32_t edx, uint64_t *reg)
@@ -74,7 +74,7 @@ static void configread16(uint32_t edx, uint64_t *reg)
 	configread32(edx, &val);
 	val >>= which;
 	*reg = val;
-	printf("%s: 0x%lx, 0x%lx 0x%lx\n", __func__, edx, val, *reg);
+	printd("%s: 0x%lx, 0x%lx 0x%lx\n", __func__, edx, val, *reg);
 }
 
 static void configread8(uint32_t edx, uint64_t *reg)
@@ -84,7 +84,7 @@ static void configread8(uint32_t edx, uint64_t *reg)
 	configread32(edx, &val);
 	val >>= which;
 	*reg = val;
-	printf("%s: 0x%lx, 0x%lx 0x%lx\n", __func__, edx, val, *reg);
+	printd("%s: 0x%lx, 0x%lx 0x%lx\n", __func__, edx, val, *reg);
 }
 
 static void configwrite32(uint32_t addr, uint32_t val)
@@ -92,17 +92,17 @@ static void configwrite32(uint32_t addr, uint32_t val)
 	uint32_t *r = &cf8;
 	regp(&r);
 	*r = val;
-	printf("%s 0x%lx 0x%lx\n", __func__, addr, val);
+	printd("%s 0x%lx 0x%lx\n", __func__, addr, val);
 }
 
 static void configwrite16(uint32_t addr, uint16_t val)
 {
-	printf("%s 0x%lx 0x%lx\n", __func__, addr, val);
+	printd("%s 0x%lx 0x%lx\n", __func__, addr, val);
 }
 
 static void configwrite8(uint32_t addr, uint8_t val)
 {
-	printf("%s 0x%lx 0x%lx\n", __func__, addr, val);
+	printd("%s 0x%lx 0x%lx\n", __func__, addr, val);
 }
 
 /* this is very minimal. It needs to move to vmm/io.c but we don't

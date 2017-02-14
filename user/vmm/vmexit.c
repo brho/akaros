@@ -220,7 +220,6 @@ static bool handle_msr(struct guest_thread *gth)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 
-	/* TODO: consider pushing the gth into msrio */
 	if (msrio(gth, gth_to_gpci(gth), vm_tf->tf_exit_reason)) {
 		/* Use event injection through vmctl to send a general protection fault
 		 * vmctl.interrupt gets written to the VM-Entry Interruption-Information

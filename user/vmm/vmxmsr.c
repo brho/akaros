@@ -289,7 +289,7 @@ int msrio(struct guest_thread *vm_thread, struct vmm_gpcore_init *gpci,
 			continue;
 		return emmsrs[i].f(vm_thread, &emmsrs[i], opcode);
 	}
-	fprintf(stderr, "msrio for 0x%lx failed\n", vm_tf->tf_rcx);
+	printd("msrio for 0x%lx failed\n", vm_tf->tf_rcx);
 	return SHUTDOWN_UNHANDLED_EXIT_REASON;
 }
 
