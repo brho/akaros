@@ -3899,21 +3899,6 @@ static void ether_shutdown(struct ether *edev)
 	panic("Not implemented");
 }
 
-static void ether_promiscuous(void *arg, int on)
-{
-	struct ether *edev;
-
-	edev = arg;
-	/* TODO: set promisc on/off */
-	error(EFAIL, "mlx4 promiscuous mode not supported");
-}
-
-static void ether_multicast(void *arg, uint8_t *addr, int add)
-{
-	struct ether *edev = arg;
-	panic("Not implemented");
-}
-
 /* Called by devether's probe routines.  Return -1 if the edev does not match
  * any of your ctlrs. */
 static int mlx4_pnp(struct ether *edev)
@@ -3988,8 +3973,8 @@ static int mlx4_pnp(struct ether *edev)
 	edev->shutdown = ether_shutdown;
 
 	edev->arg = edev;
-	edev->promiscuous = ether_promiscuous;
-	edev->multicast = ether_multicast;
+	edev->promiscuous = NULL;
+	edev->multicast = NULL;
 
 	return 0;
 }

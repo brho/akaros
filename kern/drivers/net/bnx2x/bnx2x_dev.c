@@ -118,29 +118,6 @@ static long bnx2x_ctl(struct ether *edev, void *buf, long n)
 	return n;
 }
 
-static void bnx2x_promiscuous(void *arg, int on)
-{
-	int rctl;
-	struct bnx2x *ctlr;
-	struct ether *edev;
-
-	edev = arg;
-	ctlr = edev->ctlr;
-	/* TODO: set promisc on/off */
-	error(EFAIL, "bnx2x promiscuous mode not supported");
-}
-
-static void bnx2x_multicast(void *arg, uint8_t * addr, int add)
-{
-	int bit, x;
-	struct bnx2x *ctlr;
-	struct ether *edev;
-
-	edev = arg;
-	ctlr = edev->ctlr;
-	/* TODO: add or remove a multicast addr */
-}
-
 /* The poke function: we are guaranteed that only one copy of this func runs
  * per poke tracker (per queue).  Both transmit and tx_int will poke, and after
  * any pokes, the func will run at least once.
@@ -479,8 +456,8 @@ static int bnx2x_pnp(struct ether *edev)
 	edev->shutdown = bnx2x_shutdown;
 
 	edev->arg = edev;
-	edev->promiscuous = bnx2x_promiscuous;
-	edev->multicast = bnx2x_multicast;
+	edev->promiscuous = NULL;
+	edev->multicast = NULL;
 
 	bnx2x_reset(ctlr);
 

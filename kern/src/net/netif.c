@@ -405,6 +405,8 @@ long netifwrite(struct ether *nif, struct chan *c, void *a, long n)
 			nif->all++;
 	} else if (matchtoken(buf, "promiscuous")) {
 		if (f->prom == 0) {
+			/* Note that promisc has two meanings: put the NIC into promisc
+			 * mode, and record our outbound traffic.  See etheroq(). */
 			if (nif->prom == 0 && nif->promiscuous != NULL)
 				nif->promiscuous(nif->arg, 1);
 			f->prom = 1;
