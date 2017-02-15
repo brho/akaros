@@ -328,7 +328,7 @@ ipoput4(struct Fs *f,
 			hnputs(eh->id, NEXT_ID(ip->id4));
 		hnputs(eh->length, len);
 		if (!gating) {
-			eh->frag[0] = 0;
+			eh->frag[0] = 0x40;
 			eh->frag[1] = 0;
 		}
 		eh->cksum[0] = 0;
