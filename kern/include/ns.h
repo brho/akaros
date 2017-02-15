@@ -857,12 +857,12 @@ bool qwritable(struct queue *q);
 
 void *realloc(void *, uint32_t);
 int readmem(unsigned long offset, char *buf, unsigned long n,
-			void *mem, size_t mem_len);
+			const void *mem, size_t mem_len);
 int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
 			size_t size);
 int readnum_hex(unsigned long off, char *buf, unsigned long n,
                 unsigned long val, size_t size);
-int readstr(unsigned long offset, char *buf, unsigned long n, char *str);
+int readstr(unsigned long offset, char *buf, unsigned long n, const char *str);
 int readnum_int64_t(uint32_t, char *unused_char_p_t, uint32_t, int64_t, int);
 unsigned long strtoul_from_ubuf(void *ubuf, size_t count, int base);
 void ready(struct proc *);

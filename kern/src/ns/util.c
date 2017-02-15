@@ -7,7 +7,7 @@
 
 /* Copies n bytes from mem + offset into buf, similar to a read() call. */
 int readmem(unsigned long offset, char *buf, unsigned long n,
-			void *mem, size_t mem_len)
+			const void *mem, size_t mem_len)
 {
 	if (offset >= mem_len)
 		return 0;
@@ -44,7 +44,7 @@ int readnum_hex(unsigned long off, char *buf, unsigned long n,
 	return __readnum(off, buf, n, val, size, "0x%lx");
 }
 
-int readstr(unsigned long offset, char *buf, unsigned long n, char *str)
+int readstr(unsigned long offset, char *buf, unsigned long n, const char *str)
 {
 	/* always include the \0 */
 	return readmem(offset, buf, n, str, strlen(str) + 1);
