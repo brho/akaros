@@ -21,6 +21,7 @@ enum {
 	Kvercommitid,
 	Kverversion,
 	Kverversionname,
+	Kverkconfig,
 	BUILD_ID_SZ = 20,
 	BUILD_ID_OFFSET = 16,
 };
@@ -33,10 +34,13 @@ static struct dirtab vertab[] = {
 	{"commitid",		{Kvercommitid},		0,	0444},
 	{"version",			{Kverversion},		0,	0444},
 	{"version_name",	{Kverversionname},	0,	0444},
+	{"kconfig",			{Kverkconfig},		0,	0444},
 };
 
 extern char __note_build_id_start[];
 extern char __note_build_id_end[];
+
+extern const char *__kconfig_str;
 
 static char *get_build_id_start(void)
 {
@@ -81,6 +85,7 @@ static void ver_init(void)
 	vertab[Kvercommitid].length = ver_get_file_size(build_info_commitid);
 	vertab[Kverversion].length = ver_get_file_size(build_info_version);
 	vertab[Kverversionname].length = ver_get_file_size(build_info_version_name);
+	vertab[Kverkconfig].length = strlen(__kconfig_str) + 1;
 }
 
 static void ver_shutdown(void)
@@ -113,7 +118,6 @@ static struct chan *ver_open(struct chan *c, int omode)
 
 static void ver_close(struct chan *c)
 {
-
 }
 
 /* Returns a char representing the lowest 4 bits of x */
@@ -162,6 +166,8 @@ static long ver_read(struct chan *c, void *va, long n, int64_t off)
 		if (build_info_version_name)
 			return ver_emit_nlstr(va, build_info_version_name, n, (long) off);
 		break;
+	case Kverkconfig:
+		return readstr(off, va, n, __kconfig_str);
 	default:
 		error(EINVAL, ERROR_FIXME);
 	}

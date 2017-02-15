@@ -17,7 +17,10 @@ $(src)/build_info.c: $(src)/build_info.cid
 	@echo "const char build_info_version_name[] = { \"$(VERNAME)\" };"\
 		>> $(@)
 
-clean-files += build_info.c build_info.cid
+$(src)/kconfig_info.c: .config
+	@scripts/make_kconfig_info.sh $< $@
+
+clean-files += build_info.c build_info.cid kconfig_info.c
 
 obj-y						+= alarm.o
 obj-y						+= apipe.o
@@ -48,6 +51,7 @@ obj-y						+= frontend.o
 obj-y						+= hashtable.o
 obj-y						+= hexdump.o
 obj-y						+= init.o
+obj-y						+= kconfig_info.o
 obj-y						+= kdebug.o
 obj-y						+= kfs.o
 obj-y						+= kmalloc.o
