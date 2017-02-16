@@ -1893,5 +1893,5 @@ bool qreadable(struct queue *q)
 /* Helper for detecting whether we'll block on a write at this instant. */
 bool qwritable(struct queue *q)
 {
-	return qwindow(q) > 0;
+	return !q->limit || qwindow(q) > 0;
 }
