@@ -156,6 +156,15 @@ static void udpconnect(struct conv *c, char **argv, int argc)
 	iphtadd(&upriv->ht, c);
 }
 
+static void udpbind(struct conv *c, char **argv, int argc)
+{
+	Udppriv *upriv;
+
+	upriv = c->p->priv;
+	Fsstdbind(c, argv, argc);
+	iphtadd(&upriv->ht, c);
+}
+
 static int udpstate(struct conv *c, char *state, int n)
 {
 	return snprintf(state, n, "%s qin %d qout %d\n",
@@ -669,6 +678,7 @@ void udpinit(struct Fs *fs)
 	udp->priv = kzmalloc(sizeof(Udppriv), 0);
 	udp->name = "udp";
 	udp->connect = udpconnect;
+	udp->bind = udpbind;
 	udp->announce = udpannounce;
 	udp->bypass = udpbypass;
 	udp->ctl = udpctl;
