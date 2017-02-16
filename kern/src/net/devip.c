@@ -1328,6 +1328,22 @@ static void ttlctlmsg(struct conv *c, struct cmdbuf *cb)
 		c->ttl = atoi(cb->f[1]);
 }
 
+/* Binds a conversation, as if the user wrote "bind *" into ctl. */
+static void autobind(struct conv *cv)
+{
+	ERRSTACK(1);
+	struct cmdbuf *cb;
+
+	cb = parsecmd("bind *", 7);
+	if (waserror()) {
+		kfree(cb);
+		nexterror();
+	}
+	bindctlmsg(cv->p, cv, cb);
+	poperror();
+	kfree(cb);
+}
+
 static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 {
 	ERRSTACK(1);
@@ -1348,6 +1364,10 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 		case Qdata:
 			x = f->p[PROTO(ch->qid)];
 			c = x->conv[CONV(ch->qid)];
+			/* connection-less protocols (UDP) can write without manually
+			 * binding. */
+			if (c->lport == 0)
+				autobind(c);
 			if (ch->flag & O_NONBLOCK)
 				qwrite_nonblock(c->wq, a, n);
 			else
