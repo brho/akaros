@@ -41,6 +41,7 @@
 #define SYS_nanosleep				36
 #define SYS_pop_ctx					37
 #define SYS_vmm_poke_guest			38
+#define SYS_send_event				39
 
 /* FS Syscalls */
 #define SYS_read				100

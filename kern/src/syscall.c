@@ -1314,6 +1314,19 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
 	return 0;
 }
 
+static int sys_send_event(struct proc *p, struct event_queue *ev_q,
+                          struct event_msg *u_msg, uint32_t vcoreid)
+{
+	struct event_msg local_msg = {0};
+
+	if (memcpy_from_user(p, &local_msg, u_msg, sizeof(struct event_msg))) {
+		set_errno(EINVAL);
+		return -1;
+	}
+	send_event(p, ev_q, &local_msg, vcoreid);
+	return 0;
+}
+
 /* Puts the calling core into vcore context, if it wasn't already, via a
  * self-IPI / active notification.  Barring any weird unmappings, we just send
  * ourselves a __notify. */
@@ -2525,6 +2538,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_provision] = {(syscall_t)sys_provision, "provision"},
 	[SYS_notify] = {(syscall_t)sys_notify, "notify"},
 	[SYS_self_notify] = {(syscall_t)sys_self_notify, "self_notify"},
+	[SYS_send_event] = {(syscall_t)sys_send_event, "send_event"},
 	[SYS_vc_entry] = {(syscall_t)sys_vc_entry, "vc_entry"},
 	[SYS_halt_core] = {(syscall_t)sys_halt_core, "halt_core"},
 #ifdef CONFIG_ARSC_SERVER

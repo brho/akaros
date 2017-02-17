@@ -83,6 +83,12 @@ int sys_self_notify(uint32_t vcoreid, unsigned int ev_type,
 	return ros_syscall(SYS_self_notify, vcoreid, ev_type, u_msg, priv, 0, 0);
 }
 
+int sys_send_event(struct event_queue *ev_q, struct event_msg *ev_msg,
+                   uint32_t vcoreid)
+{
+	return syscall(SYS_send_event, ev_q, ev_msg, vcoreid);
+}
+
 int sys_halt_core(unsigned long usec)
 {
 	return ros_syscall(SYS_halt_core, usec, 0, 0, 0, 0, 0);

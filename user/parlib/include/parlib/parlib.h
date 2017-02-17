@@ -46,6 +46,8 @@ int			sys_provision(int pid, unsigned int res_type, long res_val);
 int         sys_notify(int pid, unsigned int ev_type, struct event_msg *u_msg);
 int         sys_self_notify(uint32_t vcoreid, unsigned int ev_type,
                             struct event_msg *u_msg, bool priv);
+int         sys_send_event(struct event_queue *ev_q, struct event_msg *ev_msg,
+                           uint32_t vcoreid);
 int         sys_halt_core(unsigned long usec);
 void*		sys_init_arsc();
 int         sys_block(unsigned long usec);
