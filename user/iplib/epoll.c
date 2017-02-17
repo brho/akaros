@@ -41,6 +41,7 @@
 #include <malloc.h>
 #include <sys/queue.h>
 #include <sys/plan9_helpers.h>
+#include <ros/fs.h>
 
 /* Sanity check, so we can ID our own FDs */
 #define EPOLL_UFD_MAGIC 		0xe9011
@@ -283,6 +284,36 @@ int epoll_create1(int flags)
 	return epoll_create(1);
 }
 
+/* Linux's epoll will check for events, even if edge-triggered, during
+ * additions (and probably modifications) to the epoll set.  It's a questionable
+ * policy, since it can hide user bugs.
+ *
+ * We can do the same, though only for EPOLLIN and EPOLLOUT for FDs that can
+ * report their status via stat.  (same as select()).
+ *
+ * Note that this could result in spurious events, which should be fine. */
+static void fire_existing_events(int fd, int ep_events,
+                                 struct event_queue *ev_q)
+{
+	struct stat stat_buf[1];
+	struct event_msg ev_msg[1];
+	int ret;
+	int synth_ep_events = 0;
+
+	ret = fstat(fd, stat_buf);
+	assert(!ret);
+	if ((ep_events & EPOLLIN) && S_READABLE(stat_buf->st_mode))
+		synth_ep_events |= EPOLLIN;
+	if ((ep_events & EPOLLOUT) && S_WRITABLE(stat_buf->st_mode))
+		synth_ep_events |= EPOLLOUT;
+	if (synth_ep_events) {
+		ev_msg->ev_type = fd;
+		ev_msg->ev_arg2 = ep_events_to_taps(synth_ep_events);
+		ev_msg->ev_arg3 = 0; /* tap->data is unused for epoll. */
+		sys_send_event(ev_q, ev_msg, vcore_id());
+	}
+}
+
 static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
                            struct epoll_event *event)
 {
@@ -348,6 +379,7 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 	ep_fd->ep_event = *event;
 	ep_fd->ep_event.events |= EPOLLHUP;
 	ceq_ev->user_data = (uint64_t)ep_fd;
+	fire_existing_events(fd, ep_fd->ep_event.events, ep->ceq_evq);
 	return 0;
 }
 
