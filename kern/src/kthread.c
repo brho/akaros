@@ -593,11 +593,34 @@ static void debug_upped_sem(struct semaphore *sem)
 
 #endif /* CONFIG_SEMAPHORE_DEBUG */
 
-void print_sem_info(struct semaphore *sem)
+static bool __sem_has_pid(struct semaphore *sem, pid_t pid)
 {
 	struct kthread *kth_i;
+
+	if (pid == -1)
+		return TRUE;
+	TAILQ_FOREACH(kth_i, &sem->waiters, link) {
+		if (kth_i->proc) {
+			if (kth_i->proc->pid == pid)
+				return TRUE;
+		} else {
+			if (pid == 0)
+				return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+static void print_sem_info(struct semaphore *sem, pid_t pid)
+{
+	struct kthread *kth_i;
+
 	/* Always safe to irqsave */
 	spin_lock_irqsave(&sem->lock);
+	if (!__sem_has_pid(sem, pid)) {
+		spin_unlock_irqsave(&sem->lock);
+		return;
+	}
 	printk("Semaphore %p has %d signals (neg = waiters)\n", sem,
 	       sem->nr_signals);
 	TAILQ_FOREACH(kth_i, &sem->waiters, link)
@@ -609,14 +632,14 @@ void print_sem_info(struct semaphore *sem)
 	spin_unlock_irqsave(&sem->lock);
 }
 
-void print_all_sem_info(void)
+void print_all_sem_info(pid_t pid)
 {
 #ifdef CONFIG_SEMAPHORE_DEBUG
 	struct semaphore *sem_i;
 	printk("All sems with waiters:\n");
 	spin_lock_irqsave(&sems_with_waiters_lock);
 	TAILQ_FOREACH(sem_i, &sems_with_waiters, link)
-		print_sem_info(sem_i);
+		print_sem_info(sem_i, pid);
 	spin_unlock_irqsave(&sems_with_waiters_lock);
 #else
 	printk("Failed to print all sems: build with CONFIG_SEMAPHORE_DEBUG\n");

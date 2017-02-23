@@ -121,8 +121,7 @@ bool sem_up(struct semaphore *sem);
 bool sem_trydown_irqsave(struct semaphore *sem, int8_t *irq_state);
 void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state);
 bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state);
-void print_sem_info(struct semaphore *sem);
-void print_all_sem_info(void);
+void print_all_sem_info(pid_t pid);
 
 void cv_init(struct cond_var *cv);
 void cv_init_irqsave(struct cond_var *cv);
