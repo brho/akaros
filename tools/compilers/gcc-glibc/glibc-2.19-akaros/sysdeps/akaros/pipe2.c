@@ -40,6 +40,7 @@ int __pipe2(int pipedes[2], int flags)
 	}
 	pipedes[0] = dfd;
 	pipedes[1] = d1fd;
+	close(dirfd);
 	return 0;
 }
 weak_alias(__pipe2, pipe2)
