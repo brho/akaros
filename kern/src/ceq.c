@@ -128,3 +128,58 @@ void send_ceq_msg(struct ceq *ceq, struct proc *p, struct event_msg *msg)
 	/* At this point, we have a valid slot */
 	*ring_slot = msg->ev_type;
 }
+
+void ceq_dumper(int pid, struct event_queue *ev_q)
+{
+	struct proc *p;
+	uintptr_t switch_state;
+	struct ceq *ceq;
+
+	p = pid2proc(pid);
+	if (!p) {
+		printk("No such proc %d\n", pid);
+		return;
+	}
+	switch_state = switch_to(p);
+	if (ev_q->ev_mbox->type != EV_MBOX_CEQ) {
+		printk("Not a CEQ evq (type %d)\n", ev_q->ev_mbox->type);
+		goto out;
+	}
+	ceq = &ev_q->ev_mbox->ceq;
+	printk("CEQ %p\n---------------\n"
+	       "\tevents ptr %p\n"
+	       "\tnr_events %d\n"
+	       "\tlast_recovered %d\n"
+	       "\tmax_event_ever %ld\n"
+	       "\tring %p\n"
+	       "\tring_sz %d\n"
+	       "\toperation %d\n"
+	       "\tring_overflowed %d\n"
+	       "\toverflow_recovery %d\n"
+	       "\tprod_idx %lu\n"
+	       "\tcons_pub_idx %lu\n"
+	       "\tcons_pvt_idx %lu\n"
+	       "\n",
+		   ceq,
+	       ceq->events,
+	       ceq->nr_events,
+	       ceq->last_recovered,
+	       atomic_read(&ceq->max_event_ever),
+	       ceq->ring,
+	       ceq->ring_sz,
+	       ceq->operation,
+	       ceq->ring_overflowed,
+	       ceq->overflow_recovery,
+	       atomic_read(&ceq->prod_idx),
+	       atomic_read(&ceq->cons_pub_idx),
+	       atomic_read(&ceq->cons_pvt_idx));
+	for (int i = 0; i < atomic_read(&ceq->max_event_ever) + 1; i++)
+		printk("\tEvent %3d, coal %p, blob %p, idx_posted %d, user %p\n", i,
+		       atomic_read(&ceq->events[i].coalesce),
+		       ceq->events[i].blob_data,
+		       ceq->events[i].idx_posted,
+		       ceq->events[i].user_data);
+out:
+	switch_back(p, switch_state);
+	proc_decref(p);
+}
