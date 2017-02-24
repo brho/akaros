@@ -49,7 +49,7 @@ int shutdown(int fd, int how)
 		werrstr("Rock lookup failed");
 		return -1;
 	}
-	ctlfd = open(r->ctl, O_RDWR);
+	ctlfd = _sock_open_ctlfd(r);
 	if (!ctlfd)
 		return -1;
 	ret = write(ctlfd, msg, msg_sz);

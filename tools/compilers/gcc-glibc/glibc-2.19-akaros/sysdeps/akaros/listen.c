@@ -44,7 +44,7 @@ int __listen(int fd, int backlog)
 
 	switch (r->domain) {
 		case PF_INET:
-			cfd = open(r->ctl, O_RDWR);
+			cfd = _sock_open_ctlfd(r);
 			if (cfd < 0) {
 				errno = EBADF;
 				return -1;

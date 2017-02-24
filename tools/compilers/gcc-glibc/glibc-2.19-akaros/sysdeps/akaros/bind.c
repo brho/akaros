@@ -50,7 +50,7 @@ int __bind(int fd, __CONST_SOCKADDR_ARG addr, socklen_t alen)
 	if (r->domain != PF_INET)
 		return 0;
 
-	cfd = open(r->ctl, O_RDWR);
+	cfd = _sock_open_ctlfd(r);
 	if (cfd < 0) {
 		errno = EBADF;
 		return -1;

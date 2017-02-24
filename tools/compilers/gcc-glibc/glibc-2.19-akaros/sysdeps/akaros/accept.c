@@ -39,7 +39,7 @@ int accept(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 	char *p;
 	const char *net = 0;
 	char listen[Ctlsize];
-	int open_flags = O_RDWR;
+	int open_flags;
 
 	r = _sock_findrock(fd, 0);
 	if (r == 0) {
@@ -65,6 +65,8 @@ int accept(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 			if (p == 0)
 				return -1;
 			strcpy(p + 1, "listen");
+			open_flags = O_RDWR;
+			/* This is for the listen - maybe don't block on open */
 			open_flags |= (r->sopts & SOCK_NONBLOCK ? O_NONBLOCK : 0);
 			lcfd = open(listen, open_flags);
 			if (lcfd < 0)
@@ -111,7 +113,10 @@ int accept(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 
 				/* open new connection */
 				_sock_srvname(file, name);
-				nfd = open(file, O_RDWR);
+				open_flags = O_RDWR;
+				/* This is for the listen - maybe don't block on open */
+				open_flags |= (r->sopts & SOCK_NONBLOCK ? O_NONBLOCK : 0);
+				nfd = open(file, open_flags);
 				if (nfd < 0)
 					continue;
 

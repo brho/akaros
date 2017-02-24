@@ -36,16 +36,19 @@ int __socket(int domain, int type, int protocol)
 	const char *net;
 	char msg[128];
 	static struct close_cb _sock_close_cb = {.func = _sock_fd_closed};
+	int open_flags;
 
 	run_once(register_close_cb(&_sock_close_cb));
 
 	switch (domain) {
 		case PF_INET:
+			open_flags = O_RDWR;
+			open_flags |= (type & SOCK_CLOEXEC ? O_CLOEXEC : 0);
 			/* get a free network directory */
 			switch (_sock_strip_opts(type)) {
 				case SOCK_DGRAM:
 					net = "udp";
-					cfd = open("/net/udp/clone", O_RDWR);
+					cfd = open("/net/udp/clone", open_flags);
 					/* All BSD UDP sockets are in 'headers' mode, where each
 					 * packet has the remote addr:port, local addr:port and
 					 * other info. */
@@ -64,7 +67,7 @@ int __socket(int domain, int type, int protocol)
 					break;
 				case SOCK_STREAM:
 					net = "tcp";
-					cfd = open("/net/tcp/clone", O_RDWR);
+					cfd = open("/net/tcp/clone", open_flags);
 					break;
 				default:
 					errno = EPROTONOSUPPORT;
@@ -75,9 +78,11 @@ int __socket(int domain, int type, int protocol)
 			}
 			return _sock_data(cfd, net, domain, type, protocol, 0);
 		case PF_UNIX:
-			if (pipe(pfd) < 0) {
+			open_flags = 0;
+			open_flags |= (type & SOCK_CLOEXEC ? O_CLOEXEC : 0);
+			open_flags |= (type & SOCK_NONBLOCK ? O_CLOEXEC : 0);
+			if (pipe2(pfd, open_flags) < 0)
 				return -1;
-			}
 			r = _sock_newrock(pfd[0]);
 			r->domain = domain;
 			r->stype = _sock_strip_opts(type);

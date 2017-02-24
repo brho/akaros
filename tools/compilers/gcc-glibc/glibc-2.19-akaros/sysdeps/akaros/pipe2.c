@@ -20,7 +20,7 @@ int __pipe2(int pipedes[2], int flags)
 		__set_errno(EFAULT);
 		return -1;
 	}
-	dirfd = open("#pipe", O_PATH);
+	dirfd = open("#pipe", O_PATH | (flags & O_CLOEXEC));
 	if (dirfd < 0)
 		return -1;
 	dfd = openat(dirfd, "data", O_RDWR | flags);

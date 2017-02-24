@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
+#include <ctype.h>
 
 /* bsd extensions */
 #include <sys/uio.h>
@@ -25,6 +26,14 @@
 
 #include <sys/plan9_helpers.h>
 
+int _sock_open_ctlfd(Rock *r)
+{
+	int open_flags = O_RDWR;
+
+	open_flags |= (r->sopts & SOCK_CLOEXEC ? O_CLOEXEC : 0);
+	return open(r->ctl, open_flags);
+}
+
 void
 _sock_ingetaddr(Rock *r, struct sockaddr_in *ip, socklen_t *alen,
                 const char *a)
@@ -32,12 +41,15 @@ _sock_ingetaddr(Rock *r, struct sockaddr_in *ip, socklen_t *alen,
 	int n, fd;
 	char *p;
 	char name[Ctlsize];
+	int open_flags;
 
 	/* get remote address */
 	strcpy(name, r->ctl);
 	p = strrchr(name, '/');
 	strcpy(p + 1, a);
-	fd = open(name, O_RDONLY);
+	open_flags = O_RDONLY;
+	open_flags |= (r->sopts & SOCK_CLOEXEC ? O_CLOEXEC : 0);
+	fd = open(name, open_flags);
 	if (fd >= 0) {
 		n = read(fd, name, sizeof(name) - 1);
 		if (n > 0) {
@@ -209,7 +221,7 @@ int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
 	int n, fd;
 	Rock *r;
 	char name[Ctlsize];
-	int open_flags = O_RDWR;
+	int open_flags;
 
 	/* get the data file name */
 	n = read(cfd, name, sizeof(name) - 1);
@@ -223,7 +235,9 @@ int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
 	snprintf(name, sizeof(name), "/net/%s/%d/data", net, n);
 
 	/* open data file */
+	open_flags = O_RDWR;
 	open_flags |= (type & SOCK_NONBLOCK ? O_NONBLOCK : 0);
+	open_flags |= (type & SOCK_CLOEXEC ? O_CLOEXEC : 0);
 	fd = open(name, open_flags);
 	close(cfd);	/* close this no matter what */
 	if (fd < 0) {
@@ -309,6 +323,7 @@ static int _rock_get_listen_fd(Rock *r)
 	char listen_file[Ctlsize + 3];
 	char *p;
 	int ret;
+	int open_flags;
 
 	if (r->has_listen_fd)
 		return r->listen_fd;
@@ -329,7 +344,9 @@ static int _rock_get_listen_fd(Rock *r)
 		assert(strcmp(p, "ctl") == 0);
 	}
 	strlcpy(p, "listen", sizeof(listen_file) - (p - listen_file));
-	ret = open(listen_file, O_PATH);
+	open_flags = O_PATH;
+	open_flags |= (r->sopts & SOCK_CLOEXEC ? O_CLOEXEC : 0);
+	ret = open(listen_file, open_flags);
 	/* Probably a bug in the rock code (or the kernel!) if we couldn't walk to
 	 * our listen. */
 	assert(ret >= 0);
@@ -352,7 +369,11 @@ int _sock_lookup_listen_fd(int sock_fd)
 
 /* Given an FD, opens the FD with the name 'sibling' in the same directory.
  * e.g., you have a data, you open a ctl.  Don't use this with cloned FDs (i.e.
- * open clone, get a ctl back) until we fix 9p and fd2path. */
+ * open clone, get a ctl back) until we fix 9p and fd2path.
+ *
+ * Careful, this will always open O_CLOEXEC.  The rationale is that the callers
+ * of this are low-level libraries that quickly close the FD, before any
+ * non-malicious exec. */
 int get_sibling_fd(int fd, const char *sibling)
 {
 	char path[MAX_PATH_LEN];
@@ -366,7 +387,7 @@ int get_sibling_fd(int fd, const char *sibling)
 	graft++;
 	*graft = 0;
 	snprintf(graft, sizeof(path) - strlen(path), sibling);
-	return open(path, O_RDWR);
+	return open(path, O_RDWR | O_CLOEXEC);
 }
 
 /* Writes num to FD in ASCII in hex format. */
