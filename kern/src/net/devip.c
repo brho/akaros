@@ -157,7 +157,9 @@ static int ip3gen(struct chan *c, int i, struct dir *dp)
 			return founddevdir(c, q, "err", qlen(cv->eq),
 							   cv->owner, perm, dp);
 		case Qlisten:
-			return founddevdir(c, q, "listen", 0, cv->owner, cv->perm, dp);
+			perm = cv->perm;
+			perm |= cv->incall ? DMREADABLE : 0;
+			return founddevdir(c, q, "listen", 0, cv->owner, perm, dp);
 		case Qlocal:
 			p = "local";
 			break;
@@ -653,9 +655,10 @@ static char *ipchaninfo(struct chan *ch, char *ret, size_t ret_l)
 		case Qlisten:
 			proto = f->p[PROTO(ch->qid)];
 			conv = proto->conv[CONV(ch->qid)];
-			snprintf(ret, ret_l, "Qlisten, %s proto %s, conv idx %d",
+			snprintf(ret, ret_l,
+			         "Qlisten, %s proto %s, conv idx %d, has %sincalls",
 			         SLIST_EMPTY(&conv->listen_taps) ? "untapped" : "tapped",
-			         proto->name, conv->x);
+			         proto->name, conv->x, conv->incall ? "" : "no ");
 			break;
 		case Qlog:
 			ret = "Qlog";
