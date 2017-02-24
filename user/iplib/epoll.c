@@ -33,6 +33,7 @@
 #include <parlib/ceq.h>
 #include <parlib/uthread.h>
 #include <parlib/timing.h>
+#include <parlib/slab.h>
 #include <sys/user_fd.h>
 #include <sys/close_cb.h>
 #include <stdio.h>
@@ -46,11 +47,22 @@
 /* Sanity check, so we can ID our own FDs */
 #define EPOLL_UFD_MAGIC 		0xe9011
 
+/* Each waiter that uses a timeout will have its own structure for dealing with
+ * its timeout.
+ *
+ * TODO: (RCU/SLAB) it's not safe to reap the objects, until we sort out
+ * INDIRs and RCU-style grace periods.  Not a big deal, since the number of
+ * these is the number of threads that concurrently do epoll timeouts. */
+struct ep_alarm {
+	struct event_queue			*alarm_evq;
+	struct syscall				sysc;
+};
+
+static struct kmem_cache *ep_alarms_cache;
+
 struct epoll_ctlr {
 	TAILQ_ENTRY(epoll_ctlr)		link;
 	struct event_queue			*ceq_evq;
-	struct event_queue			*alarm_evq;
-	struct ceq					*ceq;	/* convenience pointer */
 	uth_mutex_t					mtx;
 	struct user_fd				ufd;
 };
@@ -208,7 +220,6 @@ static void epoll_close(struct user_fd *ufd)
 	} while (nr_done < nr_tap_req);
 	free(tap_reqs);
 	ep_put_ceq_evq(ep->ceq_evq);
-	ep_put_alarm_evq(ep->alarm_evq);
 	uth_mutex_lock(ctlrs_mtx);
 	TAILQ_REMOVE(&all_ctlrs, ep, link);
 	uth_mutex_unlock(ctlrs_mtx);
@@ -226,7 +237,6 @@ static int init_ep_ctlr(struct epoll_ctlr *ep, int size)
 	/* Size is a hint for the CEQ concurrency.  We can actually handle as many
 	 * kernel FDs as is possible. */
 	ep->ceq_evq = ep_get_ceq_evq(ROUNDUPPWR2(size));
-	ep->alarm_evq = ep_get_alarm_evq();
 	return 0;
 }
 
@@ -243,12 +253,36 @@ static void epoll_fd_closed(int fd)
 	uth_mutex_unlock(ctlrs_mtx);
 }
 
+static void ep_alarm_ctor(void *obj, size_t unused)
+{
+	struct ep_alarm *ep_a = (struct ep_alarm*)obj;
+
+	ep_a->alarm_evq = ep_get_alarm_evq();
+}
+
+static void ep_alarm_dtor(void *obj, size_t unused)
+{
+	struct ep_alarm *ep_a = (struct ep_alarm*)obj;
+
+	/* TODO: (RCU/SLAB).  Somehow the slab allocator is trying to reap our
+	 * objects.  Note that when we update userspace to use magazines, the dtor
+	 * will fire earlier (when the object is given to the slab layer).  We'll
+	 * need to be careful about the final freeing of the ev_q. */
+	panic("Epoll alarms should never be destroyed!");
+	ep_put_alarm_evq(ep_a->alarm_evq);
+}
+
 static void epoll_init(void)
 {
 	static struct close_cb epoll_close_cb = {.func = epoll_fd_closed};
 
 	register_close_cb(&epoll_close_cb);
 	ctlrs_mtx = uth_mutex_alloc();
+	ep_alarms_cache = kmem_cache_create("epoll alarms",
+	                                    sizeof(struct ep_alarm),
+	                                    __alignof__(sizeof(struct ep_alarm)), 0,
+	                                    ep_alarm_ctor, ep_alarm_dtor);
+	assert(ep_alarms_cache);
 }
 
 int epoll_create(int size)
@@ -517,8 +551,8 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 	struct event_msg msg = {0};
 	struct event_msg dummy_msg;
 	struct event_queue *which_evq;
+	struct ep_alarm *ep_a;
 	int nr_ret;
-	struct syscall sysc;
 
 	nr_ret = __epoll_wait_poll(ep, events, maxevents);
 	if (nr_ret)
@@ -527,16 +561,22 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 		return 0;
 	/* From here on down, we're going to block until there is some activity */
 	if (timeout != -1) {
-		syscall_async_evq(&sysc, ep->alarm_evq, SYS_block, timeout * 1000);
-		uth_blockon_evqs(&msg, &which_evq, 2, ep->ceq_evq, ep->alarm_evq);
-		if (which_evq == ep->alarm_evq)
+		ep_a = kmem_cache_alloc(ep_alarms_cache, 0);
+		assert(ep_a);
+		syscall_async_evq(&ep_a->sysc, ep_a->alarm_evq, SYS_block,
+		                  timeout * 1000);
+		uth_blockon_evqs(&msg, &which_evq, 2, ep->ceq_evq, ep_a->alarm_evq);
+		if (which_evq == ep_a->alarm_evq) {
+			kmem_cache_free(ep_alarms_cache, ep_a);
 			return 0;
+		}
 		/* The alarm sysc may or may not have finished yet.  This will force it
 		 * to *start* to finish iff it is still a submitted syscall. */
-		sys_abort_sysc(&sysc);
+		sys_abort_sysc(&ep_a->sysc);
 		/* But we still need to wait until the syscall completed.  Need a
 		 * dummy msg, since we don't want to clobber the real msg. */
-		uth_blockon_evqs(&dummy_msg, 0, 1, ep->alarm_evq);
+		uth_blockon_evqs(&dummy_msg, 0, 1, ep_a->alarm_evq);
+		kmem_cache_free(ep_alarms_cache, ep_a);
 	} else {
 		uth_blockon_evqs(&msg, &which_evq, 1, ep->ceq_evq);
 	}
