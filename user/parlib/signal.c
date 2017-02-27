@@ -151,7 +151,7 @@ static void __prep_sighandler(struct uthread *uthread,
 
 	if (uthread->flags & UTHREAD_SAVED) {
 		ctx = &uthread->u_ctx;
-		stack = get_user_ctx_stack(ctx) - sizeof(struct sigdata);
+		stack = get_user_ctx_sp(ctx) - sizeof(struct sigdata);
 		assert(stack_ptr_is_sane(stack));
 		uthread->sigstate.data = (struct sigdata*)stack;
 		if (uthread->flags & UTHREAD_FPSAVED) {
@@ -161,7 +161,7 @@ static void __prep_sighandler(struct uthread *uthread,
 	} else {
 		assert(current_uthread == uthread);
 		ctx = &vcpd_of(vcore_id())->uthread_ctx;
-		stack = get_user_ctx_stack(ctx) - sizeof(struct sigdata);
+		stack = get_user_ctx_sp(ctx) - sizeof(struct sigdata);
 		assert(stack_ptr_is_sane(stack));
 		uthread->sigstate.data = (struct sigdata*)stack;
 		save_fp_state(&uthread->sigstate.data->as);

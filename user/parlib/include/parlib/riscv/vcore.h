@@ -107,11 +107,6 @@ static inline void init_user_ctx(struct user_context *ctx, uint32_t entry_pt,
 	u_tf->epc = entry_pt;
 }
 
-static inline uintptr_t get_user_ctx_stack(struct user_context *ctx)
-{
-	return ctx->tf.hw_tf.gpr[GPR_SP];
-}
-
 #define __vcore_id_on_entry \
 ({ \
 	register int temp asm ("a0"); \
