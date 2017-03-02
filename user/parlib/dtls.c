@@ -199,10 +199,15 @@ static inline void __destroy_dtls(dtls_data_t *dtls_data)
 			v->dtls = NULL;
 			key->dtor(dtls);
 		}
-		__maybe_free_dtls_key(key);
-
 		n = TAILQ_NEXT(v, link);
 		TAILQ_REMOVE(&dtls_data->list, v, link);
+		/* Free both the key (which is v->key) and v *after* removing v from the
+		 * list.  It's possible that free() will call back into the DTLS (e.g.
+		 * pthread_getspecific()), and v must be off the list by then.
+		 *
+		 * For a similar, hilarious bug in glibc, check out:
+		 * https://sourceware.org/bugzilla/show_bug.cgi?id=3317 */
+		__maybe_free_dtls_key(key);
 		__free_dtls_value(v);
 		v = n;
 	}

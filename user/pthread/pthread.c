@@ -694,10 +694,11 @@ static void __pth_exit_cb(struct uthread *uthread, void *junk)
 static inline void pthread_exit_no_cleanup(void *ret)
 {
 	struct pthread_tcb *pthread = pthread_self();
+
 	pthread->retval = ret;
-	destroy_dtls();
 	while (SLIST_FIRST(&pthread->cr_stack))
 		pthread_cleanup_pop(FALSE);
+	destroy_dtls();
 	uthread_yield(FALSE, __pth_exit_cb, 0);
 }
 
