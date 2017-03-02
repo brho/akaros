@@ -364,6 +364,11 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 		werrstr("Epoll level-triggered not supported");
 		return -1;
 	}
+	if (event->events & EPOLLONESHOT) {
+		errno = EPERM;
+		werrstr("Epoll one-shot not supported");
+		return -1;
+	}
 	/* The sockets-to-plan9 networking shims are a bit inconvenient.  The user
 	 * asked us to epoll on an FD, but that FD is actually a Qdata FD.  We might
 	 * need to actually epoll on the listen_fd.  Further, we don't know yet
