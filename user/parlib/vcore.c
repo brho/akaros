@@ -463,7 +463,7 @@ void ensure_vcore_runs(uint32_t vcoreid)
 void cpu_relax_vc(uint32_t vcoreid)
 {
 	static __thread unsigned int __vc_relax_spun = 0;
-	assert(in_vcore_context());
+	assert(!notif_is_enabled(vcore_id()));
 	if (__vc_relax_spun++ >= NR_RELAX_SPINS) {
 		/* if vcoreid == vcore_id(), this might be expensive */
 		ensure_vcore_runs(vcoreid);
