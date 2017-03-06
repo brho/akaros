@@ -61,6 +61,7 @@ struct schedule_ops {
 	uth_mutex_t (*mutex_alloc)(void);
 	void (*mutex_free)(uth_mutex_t);
 	void (*mutex_lock)(uth_mutex_t);
+	bool (*mutex_trylock)(uth_mutex_t);
 	void (*mutex_unlock)(uth_mutex_t);
 	uth_cond_var_t (*cond_var_alloc)(void);
 	void (*cond_var_free)(uth_cond_var_t);
@@ -159,6 +160,7 @@ static inline struct user_context *get_cur_uth_ctx(void)
 uth_mutex_t uth_mutex_alloc(void);
 void uth_mutex_free(uth_mutex_t m);
 void uth_mutex_lock(uth_mutex_t m);
+bool uth_mutex_trylock(uth_mutex_t m);
 void uth_mutex_unlock(uth_mutex_t m);
 
 /* Generic Uthread Condition Variables.  2LSs can implement their own methods.

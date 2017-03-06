@@ -95,6 +95,19 @@ static void uth_default_mtx_lock(struct uth_default_mtx *mtx)
 	uthread_yield(TRUE, __mutex_cb, &link);
 }
 
+static bool uth_default_mtx_trylock(struct uth_default_mtx *mtx)
+{
+	bool ret = FALSE;
+
+	spin_pdr_lock(&mtx->lock);
+	if (!mtx->locked) {
+		mtx->locked = TRUE;
+		ret = TRUE;
+	}
+	spin_pdr_unlock(&mtx->lock);
+	return ret;
+}
+
 static void uth_default_mtx_unlock(struct uth_default_mtx *mtx)
 {
 	struct uth_mtx_link *first;
@@ -137,6 +150,13 @@ void uth_mutex_lock(uth_mutex_t m)
 		return;
 	}
 	uth_default_mtx_lock((struct uth_default_mtx*)m);
+}
+
+bool uth_mutex_trylock(uth_mutex_t m)
+{
+	if (sched_ops->mutex_trylock)
+		return sched_ops->mutex_trylock(m);
+	return uth_default_mtx_trylock((struct uth_default_mtx*)m);
 }
 
 void uth_mutex_unlock(uth_mutex_t m)

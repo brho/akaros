@@ -25,6 +25,7 @@ static void thread0_thread_has_blocked(struct uthread *uth, int flags);
 static uth_mutex_t thread0_mtx_alloc(void);
 static void thread0_mtx_free(uth_mutex_t m);
 static void thread0_mtx_lock(uth_mutex_t m);
+static bool thread0_mtx_trylock(uth_mutex_t m);
 static void thread0_mtx_unlock(uth_mutex_t m);
 
 /* externed into uthread.c */
@@ -38,6 +39,7 @@ struct schedule_ops thread0_2ls_ops = {
 	.mutex_alloc = thread0_mtx_alloc,
 	.mutex_free = thread0_mtx_free,
 	.mutex_lock = thread0_mtx_lock,
+	.mutex_trylock = thread0_mtx_trylock,
 	.mutex_unlock = thread0_mtx_unlock,
 };
 
@@ -170,6 +172,16 @@ static void thread0_mtx_lock(uth_mutex_t m)
 
 	assert(*mtx == FALSE);
 	*mtx = TRUE;
+}
+
+static bool thread0_mtx_trylock(uth_mutex_t m)
+{
+	bool *mtx = (bool*)m;
+
+	if (*mtx)
+		return FALSE;
+	*mtx = TRUE;
+	return TRUE;
 }
 
 static void thread0_mtx_unlock(uth_mutex_t m)
