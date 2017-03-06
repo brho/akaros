@@ -15183,6 +15183,7 @@ $as_echo_n "checking for thread model used by GCC... " >&6; }
 $as_echo "$target_thread_file" >&6; }
 
 case $target_thread_file in
+    akaros)	thread_header=config/gthr-akaros.h ;;
     aix)	thread_header=config/rs6000/gthr-aix.h ;;
     dce)	thread_header=config/pa/gthr-dce.h ;;
     lynx)	thread_header=config/gthr-lynx.h ;;
