@@ -169,6 +169,88 @@ void uth_mutex_unlock(uth_mutex_t m)
 }
 
 
+/************** Recursive mutexes **************/
+
+/* Note the interface type uth_recurse_mtx_t is a pointer to this struct. */
+struct uth_recurse_mtx {
+	uth_mutex_t					mtx;
+	struct uthread				*lockholder;
+	unsigned int				count;
+};
+
+uth_recurse_mutex_t uth_recurse_mutex_alloc(void)
+{
+	struct uth_recurse_mtx *r_mtx = malloc(sizeof(struct uth_recurse_mtx));
+
+	assert(r_mtx);
+	r_mtx->mtx = uth_mutex_alloc();
+	r_mtx->lockholder = NULL;
+	r_mtx->count = 0;
+	return (uth_recurse_mutex_t)r_mtx;
+}
+
+void uth_recurse_mutex_free(uth_recurse_mutex_t r_m)
+{
+	struct uth_recurse_mtx *r_mtx = (struct uth_recurse_mtx*)r_m;
+
+	uth_mutex_free(r_mtx->mtx);
+	free(r_mtx);
+}
+
+void uth_recurse_mutex_lock(uth_recurse_mutex_t r_m)
+{
+	struct uth_recurse_mtx *r_mtx = (struct uth_recurse_mtx*)r_m;
+
+	assert(!in_vcore_context());
+	assert(current_uthread);
+	/* We don't have to worry about races on current_uthread or count.  They are
+	 * only written by the initial lockholder, and this check will only be true
+	 * for the initial lockholder, which cannot concurrently call this function
+	 * twice (a thread is single-threaded).
+	 *
+	 * A signal handler running for a thread should not attempt to grab a
+	 * recursive mutex (that's probably a bug).  If we need to support that,
+	 * we'll have to disable notifs temporarily. */
+	if (r_mtx->lockholder == current_uthread) {
+		r_mtx->count++;
+		return;
+	}
+	uth_mutex_lock(r_mtx->mtx);
+	r_mtx->lockholder = current_uthread;
+	r_mtx->count = 1;
+}
+
+bool uth_recurse_mutex_trylock(uth_recurse_mutex_t r_m)
+{
+	struct uth_recurse_mtx *r_mtx = (struct uth_recurse_mtx*)r_m;
+	bool ret;
+
+	assert(!in_vcore_context());
+	assert(current_uthread);
+	if (r_mtx->lockholder == current_uthread) {
+		r_mtx->count++;
+		return TRUE;
+	}
+	ret = uth_mutex_trylock(r_mtx->mtx);
+	if (ret) {
+		r_mtx->lockholder = current_uthread;
+		r_mtx->count = 1;
+	}
+	return ret;
+}
+
+void uth_recurse_mutex_unlock(uth_recurse_mutex_t r_m)
+{
+	struct uth_recurse_mtx *r_mtx = (struct uth_recurse_mtx*)r_m;
+
+	r_mtx->count--;
+	if (!r_mtx->count) {
+		r_mtx->lockholder = NULL;
+		uth_mutex_unlock(r_mtx->mtx);
+	}
+}
+
+
 /************** Default Condition Variable Implementation **************/
 
 

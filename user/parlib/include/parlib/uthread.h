@@ -44,6 +44,7 @@ extern __thread struct uthread *current_uthread;
  * compiler warnings if someone passes the wrong pointer type.  Internally, we
  * use another struct type for mtx and cvs. */
 typedef struct __uth_mtx_opaque * uth_mutex_t;
+typedef struct __uth_recurse_mtx_opaque * uth_recurse_mutex_t;
 typedef struct __uth_cv_opaque * uth_cond_var_t;
 
 /* 2L-Scheduler operations.  Examples in pthread.c. */
@@ -162,6 +163,14 @@ void uth_mutex_free(uth_mutex_t m);
 void uth_mutex_lock(uth_mutex_t m);
 bool uth_mutex_trylock(uth_mutex_t m);
 void uth_mutex_unlock(uth_mutex_t m);
+
+/* Recursive mutexes.  Internally, these are built on top of the regular
+ * mutexes, and 2LSs do not have their own version. */
+uth_recurse_mutex_t uth_recurse_mutex_alloc(void);
+void uth_recurse_mutex_free(uth_recurse_mutex_t r_m);
+void uth_recurse_mutex_lock(uth_recurse_mutex_t r_m);
+bool uth_recurse_mutex_trylock(uth_recurse_mutex_t r_m);
+void uth_recurse_mutex_unlock(uth_recurse_mutex_t r_m);
 
 /* Generic Uthread Condition Variables.  2LSs can implement their own methods.
  * Callers to cv_wait must hold the mutex, which it will atomically wait and
