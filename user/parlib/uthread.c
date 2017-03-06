@@ -1193,3 +1193,10 @@ static void __uthread_free_tls(struct uthread *uthread)
 	free_tls(uthread->tls_desc);
 	uthread->tls_desc = NULL;
 }
+
+bool uth_2ls_is_multithreaded(void)
+{
+	/* thread 0 is single threaded.  For the foreseeable future, every other 2LS
+	 * will be multithreaded. */
+	return sched_ops != &thread0_2ls_ops;
+}

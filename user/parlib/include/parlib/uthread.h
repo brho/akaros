@@ -182,4 +182,7 @@ void uth_cond_var_wait(uth_cond_var_t cv, uth_mutex_t m);
 void uth_cond_var_signal(uth_cond_var_t cv);
 void uth_cond_var_broadcast(uth_cond_var_t cv);
 
+/* Called by gcc to see if we are multithreaded. */
+bool uth_2ls_is_multithreaded(void);
+
 __END_DECLS
