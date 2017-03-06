@@ -34,7 +34,7 @@ struct dtls_key {
 struct dtls_value {
 	TAILQ_ENTRY(dtls_value) link;
 	struct dtls_key *key;
-	void *dtls;
+	const void *dtls;
 };
 TAILQ_HEAD(dtls_list, dtls_value);
 
@@ -161,7 +161,7 @@ static inline struct dtls_value *__get_dtls(dtls_data_t *dtls_data,
 }
 
 static inline void __set_dtls(dtls_data_t *dtls_data, dtls_key_t key,
-                              void *dtls)
+                              const void *dtls)
 {
 	struct dtls_value *v;
 
@@ -180,7 +180,7 @@ static inline void __destroy_dtls(dtls_data_t *dtls_data)
 {
 	struct dtls_value *v, *n;
 	dtls_key_t key;
-	void *dtls;
+	const void *dtls;
 
 	v = TAILQ_FIRST(&dtls_data->list);
 	while (v != NULL) {
@@ -197,7 +197,7 @@ static inline void __destroy_dtls(dtls_data_t *dtls_data)
 		if (key->valid && key->dtor) {
 			dtls = v->dtls;
 			v->dtls = NULL;
-			key->dtor(dtls);
+			key->dtor((void*)dtls);
 		}
 		n = TAILQ_NEXT(v, link);
 		TAILQ_REMOVE(&dtls_data->list, v, link);
@@ -213,7 +213,7 @@ static inline void __destroy_dtls(dtls_data_t *dtls_data)
 	}
 }
 
-void set_dtls(dtls_key_t key, void *dtls)
+void set_dtls(dtls_key_t key, const void *dtls)
 {
 	bool initialized = true;
 	dtls_data_t *dtls_data = NULL;
@@ -237,7 +237,7 @@ void *get_dtls(dtls_key_t key)
 		return NULL;
 	dtls_data = &__dtls_data;
 	v = __get_dtls(dtls_data, key);
-	return v ? v->dtls : NULL;
+	return v ? (void*)v->dtls : NULL;
 }
 
 void destroy_dtls(void)

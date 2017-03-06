@@ -27,7 +27,7 @@ void dtls_key_delete(dtls_key_t key);
 
 /* Set dtls storage for the provided dtls key on the current uthread or vcore.
  */
-void set_dtls(dtls_key_t key, void *dtls);
+void set_dtls(dtls_key_t key, const void *dtls);
 
 /* Get dtls storage for the provided dtls key on the current uthread or vcore.
  */
