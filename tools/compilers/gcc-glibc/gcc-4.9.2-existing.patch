@@ -1,0 +1,435 @@
+diff -ruB --unidirectional-new-file ../gcc-4.9.2/config/gthr.m4 ../gcc-4.9.2-akaros/config/gthr.m4
+--- gcc-4.9.2/config/gthr.m4	2012-10-15 09:10:30.000000000 -0400
++++ gcc-4.9.2-akaros/config/gthr.m4	2017-03-03 10:23:03.195008678 -0500
+@@ -11,6 +11,7 @@
+ AC_DEFUN([GCC_AC_THREAD_HEADER],
+ [
+ case $1 in
++    akaros)	thread_header=config/gthr-akaros.h ;;
+     aix)	thread_header=config/rs6000/gthr-aix.h ;;
+     dce)	thread_header=config/pa/gthr-dce.h ;;
+     lynx)	thread_header=config/gthr-lynx.h ;;
+diff -ruB --unidirectional-new-file ../gcc-4.9.2/config.sub ../gcc-4.9.2-akaros/config.sub
+--- gcc-4.9.2/config.sub	2013-10-01 12:50:56.000000000 -0400
++++ gcc-4.9.2-akaros/config.sub	2015-12-17 14:58:45.053386336 -0500
+@@ -1356,7 +1356,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -akaros* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -ruB --unidirectional-new-file ../gcc-4.9.2/gcc/config.gcc ../gcc-4.9.2-akaros/gcc/config.gcc
+--- gcc-4.9.2/gcc/config.gcc	2014-09-17 10:16:02.000000000 -0400
++++ gcc-4.9.2-akaros/gcc/config.gcc	2016-08-29 14:36:33.860402669 -0400
+@@ -878,6 +878,25 @@
+   default_use_cxa_atexit=yes
+   use_gcc_stdint=wrap
+   ;;
++*-*-akaros*)
++  # brho 2016-05-26 needed for various command line options like -rdynamic
++  extra_options="$extra_options gnu-user.opt"
++  # brho 2015-04-17
++  # We need this for the shared libgcc_s.so
++  tmake_file="t-slibgcc"
++  # Linux has these options (among others that I removed).  I think it's saying
++  # to use the glibc targetcm, which needs glibc-c.o to be built, which needs
++  # the t-glibc makefrag
++  c_target_objs="${c_target_objs} glibc-c.o"
++  cxx_target_objs="${cxx_target_objs} glibc-c.o"
++  tmake_file="${tmake_file} t-glibc"
++  target_has_targetcm=yes
++  # We've had these options for a while, linux also has them (and tgmath=no)
++  default_use_cxa_atexit=yes
++  use_gcc_stdint=wrap
++  gas=yes
++  gnu_ld=yes
++  ;;
+ esac
+ 
+ case ${target} in
+@@ -1357,6 +1376,27 @@
+     tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h i386/rdos.h i386/rdos64.h"
+     tmake_file="i386/t-i386elf t-svr4"
+     ;;
++# hasn't been compiled in a long time (2015-04-17)
++i[34567]86-*-akaros*)
++	# i386 linux, plus akaros/h i386/akaros.h
++	# consider adding i386/gnu-user-common.h i386/gnu-user.h etc
++	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h glibc-stdint.h gnu-user.h akaros.h i386/akaros.h"
++	# linux doesn't use the tmake_file here, but a subset of these is still
++	# needed (probably the FP stuff)
++	tmake_file="${tmake_file} t-slibgcc-elf-ver t-linux i386/t-fprules-softfp soft-fp/t-softfp i386/t-linux"
++	;;
++x86_64-*-akaros*)
++	# similar to linux, but minus some gnu bits.  gnu-user64 wants an x32 ld
++	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h gnu-user.h glibc-stdint.h i386/x86-64.h akaros.h i386/akaros64.h"
++	tmake_file="${tmake_file} i386/t-linux64"
++	# linux does not need these tmake files, but we need at least some of them.
++	# without these, compilation failed.
++	tmake_file="${tmake_file} i386/t-fprules-softfp soft-fp/t-softfp i386/t-linux"
++	;;
++riscv*-*-akaros*)
++	tm_file="dbxelf.h elfos.h gnu-user.h akaros.h ${tm_file} riscv/akaros.h riscv/akaros64.h glibc-stdint.h"
++	tmake_file="${tmake_file} t-slibgcc-elf-ver t-linux"
++	;;
+ i[34567]86-*-freebsd*)
+ 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h ${fbsd_tm_file} i386/freebsd.h"
+ 	;;
+diff -ruB --unidirectional-new-file ../gcc-4.9.2/gcc/configure ../gcc-4.9.2-akaros/gcc/configure
+--- gcc-4.9.2/gcc/configure	2014-10-10 08:51:28.000000000 -0400
++++ gcc-4.9.2-akaros/gcc/configure	2017-03-03 09:52:31.094928720 -0500
+@@ -11204,7 +11204,7 @@
+     # default
+     target_thread_file='single'
+     ;;
+-  aix | dce | lynx | mipssde | posix | rtems | \
++  akaros | aix | dce | lynx | mipssde | posix | rtems | \
+   single | tpf | vxworks | win32)
+     target_thread_file=${enable_threads}
+     ;;
+diff -ruB --unidirectional-new-file ../gcc-4.9.2/libgcc/config.host ../gcc-4.9.2-akaros/libgcc/config.host
+--- gcc-4.9.2/libgcc/config.host	2014-03-27 11:40:31.000000000 -0400
++++ gcc-4.9.2-akaros/libgcc/config.host	2015-12-17 14:58:45.053386336 -0500
+@@ -226,7 +226,7 @@
+       ;;
+   esac
+   ;;
+-*-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-knetbsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu)
++*-*-linux* | frv-*-*linux* | *-*-kfreebsd*-gnu | *-*-knetbsd*-gnu | *-*-gnu* | *-*-kopensolaris*-gnu | *-*-akaros*)
+   tmake_file="$tmake_file t-crtstuff-pic t-libgcc-pic t-eh-dw2-dip t-slibgcc t-slibgcc-gld t-slibgcc-elf-ver t-linux"
+   extra_parts="crtbegin.o crtbeginS.o crtbeginT.o crtend.o crtendS.o"
+   if test x$enable_vtable_verify = xyes; then
+@@ -562,12 +562,14 @@
+ 	;;
+ x86_64-*-openbsd*)
+ 	;;
++riscv*-*-akaros*)
++	;;
+ i[34567]86-*-linux*)
+ 	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
+ 	tmake_file="${tmake_file} i386/t-crtpc i386/t-crtfm i386/t-crtstuff t-dfprules"
+ 	md_unwind_header=i386/linux-unwind.h
+ 	;;
+-i[34567]86-*-kfreebsd*-gnu | i[34567]86-*-knetbsd*-gnu | i[34567]86-*-gnu* | i[34567]86-*-kopensolaris*-gnu)
++i[34567]86-*-akaros* | i[34567]86-*-kfreebsd*-gnu | i[34567]86-*-knetbsd*-gnu | i[34567]86-*-gnu* | i[34567]86-*-kopensolaris*-gnu)
+ 	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
+ 	tmake_file="${tmake_file} i386/t-crtpc i386/t-crtfm i386/t-crtstuff t-dfprules"
+ 	;;
+@@ -576,7 +578,7 @@
+ 	tmake_file="${tmake_file} i386/t-crtpc i386/t-crtfm i386/t-crtstuff t-dfprules"
+ 	md_unwind_header=i386/linux-unwind.h
+ 	;;
+-x86_64-*-kfreebsd*-gnu | x86_64-*-knetbsd*-gnu)
++x86_64-*-akaros* | x86_64-*-kfreebsd*-gnu | x86_64-*-knetbsd*-gnu)
+ 	extra_parts="$extra_parts crtprec32.o crtprec64.o crtprec80.o crtfastmath.o"
+ 	tmake_file="${tmake_file} i386/t-crtpc i386/t-crtfm i386/t-crtstuff t-dfprules"
+ 	;;
+@@ -1259,6 +1261,7 @@
+   i[34567]86-*-kfreebsd*-gnu | x86_64-*-kfreebsd*-gnu | \
+   i[34567]86-*-linux* | x86_64-*-linux* | \
+   i[34567]86-*-gnu* | \
++  i[34567]86-*-akaros* | x86_64-*-akaros* | \
+   i[34567]86-*-solaris2* | x86_64-*-solaris2.1[0-9]* | \
+   i[34567]86-*-cygwin* | x86_64-*-cygwin* | \
+   i[34567]86-*-mingw* | x86_64-*-mingw* | \
+diff -ruB --unidirectional-new-file ../gcc-4.9.2/libgcc/configure ../gcc-4.9.2-akaros/libgcc/configure
+--- gcc-4.9.2/libgcc/configure	2014-02-07 02:46:34.000000000 -0500
++++ gcc-4.9.2-akaros/libgcc/configure	2017-03-03 10:24:15.231328458 -0500
+@@ -4561,6 +4561,7 @@
+ # Map from thread model to thread header.
+ 
+ case $target_thread_file in
++    akaros)	thread_header=config/gthr-akaros.h ;;
+     aix)	thread_header=config/rs6000/gthr-aix.h ;;
+     dce)	thread_header=config/pa/gthr-dce.h ;;
+     lynx)	thread_header=config/gthr-lynx.h ;;
+diff -ruB --unidirectional-new-file ../gcc-4.9.2/libgcc/crtstuff.c ../gcc-4.9.2-akaros/libgcc/crtstuff.c
+--- gcc-4.9.2/libgcc/crtstuff.c	2014-03-10 14:31:20.000000000 -0400
++++ gcc-4.9.2-akaros/libgcc/crtstuff.c	2016-10-05 17:05:34.811880982 -0400
+@@ -45,6 +45,8 @@
+ 
+    This file must be compiled with gcc.  */
+ 
++/* AKAROS: changed so we set # define USE_PT_GNU_EH_FRAME */
++
+ /* Target machine header files require this define. */
+ #define IN_LIBGCC2
+ 
+@@ -112,12 +114,14 @@
+ # endif
+ #endif
+ 
++/* AKAROS: added __gnu_akaros__ */
+ #if defined(OBJECT_FORMAT_ELF) \
+     && !defined(OBJECT_FORMAT_FLAT) \
+     && defined(HAVE_LD_EH_FRAME_HDR) \
+     && !defined(CRTSTUFFT_O) \
+     && defined(inhibit_libc) \
+-    && (defined(__GLIBC__) || defined(__gnu_linux__) || defined(__GNU__))
++    && (defined(__GLIBC__) || defined(__gnu_linux__) || \
++	    defined(__gnu_akaros__) || defined(__GNU__))
+ /* On systems using glibc, an inhibit_libc build of libgcc is only
+    part of a bootstrap process.  Build the same crt*.o as would be
+    built with headers present, so that it is not necessary to build
+diff -ruB --unidirectional-new-file ../gcc-4.9.2/libgomp/configure.tgt ../gcc-4.9.2-akaros/libgomp/configure.tgt
+--- gcc-4.9.2/libgomp/configure.tgt	2013-06-06 06:04:49.000000000 -0400
++++ gcc-4.9.2-akaros/libgomp/configure.tgt	2015-12-17 14:58:45.053386336 -0500
+@@ -127,6 +127,10 @@
+ 	esac
+ 	;;
+ 
++  *-*-akaros*)
++	config_path="akaros posix"
++	;;
++
+   *-*-mingw32*)
+ 	config_path="mingw32 posix"
+ 	;;
+diff -ruB --unidirectional-new-file ../gcc-4.9.2/libstdc++-v3/configure ../gcc-4.9.2-akaros/libstdc++-v3/configure
+--- gcc-4.9.2/libstdc++-v3/configure	2014-03-20 14:57:07.000000000 -0400
++++ gcc-4.9.2-akaros/libstdc++-v3/configure	2017-03-03 10:25:14.351591016 -0500
+@@ -6332,7 +6332,7 @@
+   ;;
+ 
+ # This must be Linux ELF.
+-linux* | k*bsd*-gnu | kopensolaris*-gnu)
++linux* | k*bsd*-gnu | kopensolaris*-gnu | akaros*)
+   lt_cv_deplibs_check_method=pass_all
+   ;;
+ 
+@@ -7118,7 +7118,7 @@
+   rm -rf conftest*
+   ;;
+ 
+-x86_64-*kfreebsd*-gnu|x86_64-*linux*|powerpc*-*linux*| \
++x86_64-*akaros*|x86_64-*kfreebsd*-gnu|x86_64-*linux*|powerpc*-*linux*| \
+ s390*-*linux*|s390*-*tpf*|sparc*-*linux*)
+   # Find out which ABI we are using.
+   echo 'int i;' > conftest.$ac_ext
+@@ -7133,7 +7133,7 @@
+ 	  x86_64-*kfreebsd*-gnu)
+ 	    LD="${LD-ld} -m elf_i386_fbsd"
+ 	    ;;
+-	  x86_64-*linux*)
++	  x86_64-*linux*|x86_64-*akaros*)
+ 	    case `/usr/bin/file conftest.o` in
+ 	      *x86-64*)
+ 		LD="${LD-ld} -m elf32_x86_64"
+@@ -7162,7 +7162,7 @@
+ 	  x86_64-*kfreebsd*-gnu)
+ 	    LD="${LD-ld} -m elf_x86_64_fbsd"
+ 	    ;;
+-	  x86_64-*linux*)
++	  x86_64-*linux*|x86_64-*akaros*)
+ 	    LD="${LD-ld} -m elf_x86_64"
+ 	    ;;
+ 	  powerpcle-*linux*)
+@@ -8684,7 +8684,7 @@
+       lt_prog_compiler_static='-non_shared'
+       ;;
+ 
+-    linux* | k*bsd*-gnu | kopensolaris*-gnu)
++    linux* | k*bsd*-gnu | kopensolaris*-gnu | akaros*)
+       case $cc_basename in
+       # old Intel for x86_64 which still supported -KPIC.
+       ecc*)
+@@ -9279,7 +9279,7 @@
+       archive_expsym_cmds='sed "s,^,_," $export_symbols >$output_objdir/$soname.expsym~$CC -shared $pic_flag $libobjs $deplibs $compiler_flags ${wl}-h,$soname ${wl}--retain-symbols-file,$output_objdir/$soname.expsym ${wl}--image-base,`expr ${RANDOM-$$} % 4096 / 2 \* 262144 + 1342177280` -o $lib'
+       ;;
+ 
+-    gnu* | linux* | tpf* | k*bsd*-gnu | kopensolaris*-gnu)
++    gnu* | linux* | tpf* | k*bsd*-gnu | kopensolaris*-gnu | akaros*)
+       tmp_diet=no
+       if test "$host_os" = linux-dietlibc; then
+ 	case $cc_basename in
+@@ -10819,7 +10819,7 @@
+   ;;
+ 
+ # This must be Linux ELF.
+-linux* | k*bsd*-gnu | kopensolaris*-gnu)
++linux* | k*bsd*-gnu | kopensolaris*-gnu | akaros*)
+   version_type=linux
+   need_lib_prefix=no
+   need_version=no
+@@ -12744,7 +12744,7 @@
+         inherit_rpath_CXX=yes
+         ;;
+ 
+-      linux* | k*bsd*-gnu | kopensolaris*-gnu)
++      linux* | k*bsd*-gnu | kopensolaris*-gnu | akaros*)
+         case $cc_basename in
+           KCC*)
+ 	    # Kuck and Associates, Inc. (KAI) C++ Compiler
+@@ -13331,7 +13331,7 @@
+   postdeps_CXX=
+   ;;
+ 
+-linux*)
++linux* | akaros*)
+   case `$CC -V 2>&1 | sed 5q` in
+   *Sun\ C*)
+     # Sun C++ 5.9
+@@ -13582,7 +13582,7 @@
+ 	    ;;
+ 	esac
+ 	;;
+-      linux* | k*bsd*-gnu | kopensolaris*-gnu)
++      linux* | k*bsd*-gnu | kopensolaris*-gnu | akaros*)
+ 	case $cc_basename in
+ 	  KCC*)
+ 	    # KAI C++ Compiler
+@@ -14503,7 +14503,7 @@
+   ;;
+ 
+ # This must be Linux ELF.
+-linux* | k*bsd*-gnu | kopensolaris*-gnu)
++linux* | k*bsd*-gnu | kopensolaris*-gnu | akaros*)
+   version_type=linux
+   need_lib_prefix=no
+   need_version=no
+@@ -15183,6 +15183,7 @@
+ $as_echo "$target_thread_file" >&6; }
+ 
+ case $target_thread_file in
++    akaros)	thread_header=config/gthr-akaros.h ;;
+     aix)	thread_header=config/rs6000/gthr-aix.h ;;
+     dce)	thread_header=config/pa/gthr-dce.h ;;
+     lynx)	thread_header=config/gthr-lynx.h ;;
+@@ -15214,7 +15215,7 @@
+   if test x$gcc_no_link != xyes; then
+     # Can do link tests. Limit to some tested platforms
+     case "$host" in
+-      *-*-linux* | *-*-uclinux* | *-*-kfreebsd*-gnu | *-*-gnu*)
++      *-*-linux* | *-*-uclinux* | *-*-kfreebsd*-gnu | *-*-gnu* | *-*-akaros*)
+ 	atomic_builtins_link_tests=yes
+ 	;;
+     esac
+@@ -15843,7 +15844,7 @@
+   # Default to "generic".
+   if test $enable_clocale_flag = auto; then
+     case ${target_os} in
+-      linux* | gnu* | kfreebsd*-gnu | knetbsd*-gnu)
++      linux* | gnu* | kfreebsd*-gnu | knetbsd*-gnu | akaros*)
+ 	enable_clocale_flag=gnu
+ 	;;
+       darwin* | freebsd*)
+@@ -16239,7 +16240,7 @@
+   # Default to "new".
+   if test $enable_libstdcxx_allocator_flag = auto; then
+     case ${target_os} in
+-      linux* | gnu* | kfreebsd*-gnu | knetbsd*-gnu)
++      linux* | gnu* | kfreebsd*-gnu | knetbsd*-gnu | akaros*)
+ 	enable_libstdcxx_allocator_flag=new
+ 	;;
+       *)
+@@ -19461,7 +19462,7 @@
+         ac_has_nanosleep=yes
+         ac_has_sched_yield=yes
+         ;;
+-      gnu* | linux* | kfreebsd*-gnu | knetbsd*-gnu)
++      gnu* | linux* | kfreebsd*-gnu | knetbsd*-gnu | akaros*)
+         { $as_echo "$as_me:${as_lineno-$LINENO}: checking for at least GNU libc 2.17" >&5
+ $as_echo_n "checking for at least GNU libc 2.17... " >&6; }
+         cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+@@ -19961,7 +19962,7 @@
+ 
+   if test x"$ac_has_clock_monotonic" != x"yes"; then
+     case ${target_os} in
+-      linux*)
++      linux* | akaros*)
+ 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for clock_gettime syscall" >&5
+ $as_echo_n "checking for clock_gettime syscall... " >&6; }
+ 	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+@@ -26836,7 +26837,7 @@
+ if ac_fn_c_try_link "$LINENO"; then :
+   chktls_save_LDFLAGS="$LDFLAGS"
+ 	  	  	  case $host in
+-	    *-*-linux*)
++	    *-*-linux* | *-*-akaros*)
+ 	      LDFLAGS="-shared -Wl,--no-undefined $LDFLAGS"
+ 	      ;;
+ 	  esac
+@@ -27399,7 +27400,7 @@
+                 if test "X$additional_includedir" = "X/usr/local/include"; then
+                   if test -n "$GCC"; then
+                     case $host_os in
+-                      linux*) haveit=yes;;
++                      linux* | akaros*) haveit=yes;;
+                     esac
+                   fi
+                 fi
+@@ -27443,7 +27444,7 @@
+                       if test "X$additional_libdir" = "X/usr/local/lib"; then
+                         if test -n "$GCC"; then
+                           case $host_os in
+-                            linux*) haveit=yes;;
++                            linux* | akaros*) haveit=yes;;
+                           esac
+                         fi
+                       fi
+@@ -52273,7 +52274,7 @@
+ if ac_fn_c_try_link "$LINENO"; then :
+   chktls_save_LDFLAGS="$LDFLAGS"
+ 	  	  	  case $host in
+-	    *-*-linux*)
++	    *-*-linux* | *-*-akaros*)
+ 	      LDFLAGS="-shared -Wl,--no-undefined $LDFLAGS"
+ 	      ;;
+ 	  esac
+@@ -52464,7 +52465,7 @@
+ 	;;
+     esac
+     ;;
+-  *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-knetbsd*-gnu | *-cygwin*)
++  *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-knetbsd*-gnu | *-cygwin* | *-akaros*)
+ 
+   # All these tests are for C++; save the language and the compiler flags.
+   # The CXXFLAGS thing is suspicious, but based on similar bits previously
+@@ -58474,7 +58475,7 @@
+ if ac_fn_c_try_link "$LINENO"; then :
+   chktls_save_LDFLAGS="$LDFLAGS"
+ 	  	  	  case $host in
+-	    *-*-linux*)
++	    *-*-linux* | *-*-akaros*)
+ 	      LDFLAGS="-shared -Wl,--no-undefined $LDFLAGS"
+ 	      ;;
+ 	  esac
+@@ -77175,7 +77176,7 @@
+ 
+ 
+ case "$target" in
+-  *-linux*)
++  *-linux* | *-akaros*)
+     case "$enable_linux_futex" in
+       default)
+ 	# If headers don't have gettid/futex syscalls definition, then
+diff -ruB --unidirectional-new-file ../gcc-4.9.2/libstdc++-v3/configure.host ../gcc-4.9.2-akaros/libstdc++-v3/configure.host
+--- gcc-4.9.2/libstdc++-v3/configure.host	2013-07-04 17:07:44.000000000 -0400
++++ gcc-4.9.2-akaros/libstdc++-v3/configure.host	2015-12-17 14:58:45.061386380 -0500
+@@ -298,6 +298,9 @@
+     os_include_dir="os/qnx/qnx6.1"
+     c_model=c
+     ;;
++  akaros*)
++    os_include_dir="os/akaros"
++    ;;
+   solaris2)
+     # This too-vague configuration does not provide enough information
+     # to select a ctype include, and thus os_include_dir is a crap shoot.
+diff -ruB --unidirectional-new-file ../gcc-4.9.2/libstdc++-v3/crossconfig.m4 ../gcc-4.9.2-akaros/libstdc++-v3/crossconfig.m4
+--- gcc-4.9.2/libstdc++-v3/crossconfig.m4	2014-03-20 14:57:07.000000000 -0400
++++ gcc-4.9.2-akaros/libstdc++-v3/crossconfig.m4	2015-12-17 14:58:45.061386380 -0500
+@@ -198,6 +198,10 @@
+     AC_DEFINE(HAVE_SINHF)
+     AC_DEFINE(HAVE_SINHL)
+     ;;
++  *-akaros*)
++    GLIBCXX_CHECK_MATH_SUPPORT
++    GLIBCXX_CHECK_STDLIB_SUPPORT
++    ;;
+   *-rtems*)
+     GLIBCXX_CHECK_COMPILER_FEATURES
+     GLIBCXX_CHECK_LINKER_FEATURES

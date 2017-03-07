@@ -1,8 +1,0 @@
-sparc64.*-.*-linux.*	libpthread=0		GLIBC_2.2
-sh.*-.*-linux.*		libpthread=0		GLIBC_2.2
-s390x-.*-linux.*	libpthread=0		GLIBC_2.2
-powerpc64-.*-linux.*	libpthread=0		GLIBC_2.3
-powerpc.*le-.*-linux.*	libpthread=0		GLIBC_2.17
-#x86_64-.*-akaros.*      libpthread=0        GLIBC_2.2.5
-.*-.*-linux.*		libpthread=0
-.*-.*-akaros.*		libpthread=0

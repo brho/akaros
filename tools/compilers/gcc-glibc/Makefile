@@ -342,14 +342,14 @@ binutils-clean:
 #################################
 ########## GCC Stage 1 ##########
 #################################
-.gcc-akaros-patch:
+.gcc-akaros-directory-patch:
 	-cd gcc-$(GCC_VERSION); \
 	diff -ruB --unidirectional-new-file \
 	     ../gcc-$(GCC_VERSION) \
 	     ../gcc-$(GCC_VERSION)-akaros \
 	     | grep -v "Only in ../gcc-$(GCC_VERSION)" \
-	     > ../.gcc-$(GCC_VERSION)-akaros.patch; \
-	     patch -p2 < ../.gcc-$(GCC_VERSION)-akaros.patch
+	     > ../.gcc-$(GCC_VERSION)-akaros-directory.patch; \
+	     patch -p2 < ../.gcc-$(GCC_VERSION)-akaros-directory.patch
 
 gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2 \
 		    gmp-$(GMP_VERSION) \
@@ -357,9 +357,10 @@ gcc-$(GCC_VERSION): gcc-$(GCC_VERSION).tar.bz2 \
 		    mpc-$(MPC_VERSION)
 	rm -rf gcc-$(GCC_VERSION)
 	tar -jxf gcc-$(GCC_VERSION).tar.bz2
-	$(MAKE) .gcc-akaros-patch
+	$(MAKE) .gcc-akaros-directory-patch
 	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-r233572.patch
 	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-riscv.patch
+	patch --no-backup-if-mismatch -p0 < gcc-$(GCC_VERSION)-existing.patch
 	(cd gcc-$(GCC_VERSION) && \
 	 ln -s ../gmp-$(GMP_VERSION) gmp && \
 	 ln -s ../mpfr-$(MPFR_VERSION) mpfr && \
@@ -491,14 +492,14 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 #################################
 ######### Glibc Stage 1 #########
 #################################
-.glibc-akaros-patch:
+.glibc-akaros-directory-patch:
 	-cd glibc-$(GLIBC_VERSION); \
 	diff -ruB --unidirectional-new-file \
 	     ../glibc-$(GLIBC_VERSION) \
 	     ../glibc-$(GLIBC_VERSION)-akaros \
 	     | grep -v "Only in ../glibc-$(GLIBC_VERSION)" \
-	     > ../.glibc-$(GLIBC_VERSION)-akaros.patch; \
-	     patch -p2 < ../.glibc-$(GLIBC_VERSION)-akaros.patch
+	     > ../.glibc-$(GLIBC_VERSION)-akaros-directory.patch; \
+	     patch -p2 < ../.glibc-$(GLIBC_VERSION)-akaros-directory.patch
 
 # On occasion, include/pthread.h was getting installed in stage 2, clobbering
 # parlib's pthread.h.
@@ -506,8 +507,9 @@ glibc-$(GLIBC_VERSION): glibc-$(GLIBC_VERSION).tar.bz2
 	rm -rf glibc-$(GLIBC_VERSION)
 	tar -jxf glibc-$(GLIBC_VERSION).tar.bz2
 	rm glibc-$(GLIBC_VERSION)/include/pthread.h
-	$(MAKE) .glibc-akaros-patch
+	$(MAKE) .glibc-akaros-directory-patch
 	patch --no-backup-if-mismatch -p0 < glibc-$(GLIBC_VERSION)-riscv.patch
+	patch --no-backup-if-mismatch -p0 < glibc-$(GLIBC_VERSION)-existing.patch
 
 $(BINARY_PREFIX)glibc-stage1-builddir: glibc-$(GLIBC_VERSION)
 	rm -rf $@

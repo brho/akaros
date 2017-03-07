@@ -1,0 +1,477 @@
+diff -ruB --unidirectional-new-file ../glibc-2.19/abi-tags ../glibc-2.19-akaros/abi-tags
+--- glibc-2.19/abi-tags	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/abi-tags	2015-12-17 14:58:45.065386401 -0500
+@@ -28,5 +28,7 @@
+ 
+ .*-.*-syllable.*	5	2.0.0	# just an arbitrary value
+ 
++.*-.*-akaros.*		6	1.0.0	# just an arbitrary value
++
+ # There is no catch-all default here because every supported OS that uses
+ # ELF must have its own unique ABI tag.
+diff -ruB --unidirectional-new-file ../glibc-2.19/configure ../glibc-2.19-akaros/configure
+--- glibc-2.19/configure	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/configure	2015-12-17 14:58:45.065386401 -0500
+@@ -4121,6 +4121,16 @@
+   tail="$2"
+ done
+ 
++# For akaros, we don't have a base OS, which messes things up. Change this for
++# the purpose of sysdeps detection.
++test "x$base_os" != x || case "$os" in
++akaros*)
++  base=/akaros
++  vendor=
++  ostry=
++  ;;
++esac
++
+ # For sparc/sparc32, try sparc/sparc32 and then sparc.
+ mach=
+ tail=$machine${submachine:+/$submachine}
+diff -ruB --unidirectional-new-file ../glibc-2.19/configure.ac ../glibc-2.19-akaros/configure.ac
+--- glibc-2.19/configure.ac	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/configure.ac	2015-12-17 14:58:45.065386401 -0500
+@@ -722,6 +722,16 @@
+   tail="$2"
+ done
+ 
++# For akaros, we don't have a base OS, which messes things up. Change this for
++# the purpose of sysdeps detection.
++test "x$base_os" != x || case "$os" in
++akaros*)
++  base=/akaros
++  vendor=
++  ostry=
++  ;;
++esac
++
+ # For sparc/sparc32, try sparc/sparc32 and then sparc.
+ mach=
+ tail=$machine${submachine:+/$submachine}
+diff -ruB --unidirectional-new-file ../glibc-2.19/elf/Makefile ../glibc-2.19-akaros/elf/Makefile
+--- glibc-2.19/elf/Makefile	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/elf/Makefile	2015-12-17 14:58:45.065386401 -0500
+@@ -24,7 +24,7 @@
+ headers		= elf.h bits/elfclass.h link.h bits/link.h
+ routines	= $(dl-routines) dl-support dl-iteratephdr \
+ 		  dl-addr enbl-secure dl-profstub \
+-		  dl-origin dl-libc dl-sym dl-tsd dl-sysdep
++		  dl-origin dl-libc dl-sym dl-tsd #dl-sysdep
+ 
+ # The core dynamic linking functions are in libc for the static and
+ # profiled libraries.
+diff -ruB --unidirectional-new-file ../glibc-2.19/include/alloca.h ../glibc-2.19-akaros/include/alloca.h
+--- glibc-2.19/include/alloca.h	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/include/alloca.h	2016-10-05 17:05:34.571879935 -0400
+@@ -1,5 +1,7 @@
+ #ifndef _ALLOCA_H
+ 
++/* AKAROS: Modified the alloca cutoff */
++
+ #include <stdlib/alloca.h>
+ #include <stackinfo.h>
+ 
+@@ -16,7 +18,10 @@
+ extern int __libc_alloca_cutoff (size_t size) __attribute__ ((const));
+ libc_hidden_proto (__libc_alloca_cutoff)
+ 
+-#define __MAX_ALLOCA_CUTOFF	65536
++/* AKAROS: Limit to a small amount, so 2LSs and vcore context can have small
++ * stacks.  Glibc typically uses 1/4 of the stack.  Assuming our users have at
++ * least 4K stacks, we can use 1k, but let's be paranoid and use 512 for now. */
++#define __MAX_ALLOCA_CUTOFF	512
+ 
+ #include <allocalim.h>
+ 
+diff -ruB --unidirectional-new-file ../glibc-2.19/include/errno.h ../glibc-2.19-akaros/include/errno.h
+--- glibc-2.19/include/errno.h	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/include/errno.h	2015-12-17 14:58:45.065386401 -0500
+@@ -1,3 +1,5 @@
++/* Modified for Akaros, removed the redefinition of errno */
++
+ #ifndef _ERRNO_H
+ 
+ #include <stdlib/errno.h>
+@@ -21,13 +23,16 @@
+ 
+ #  include <tls.h>
+ 
+-#  undef  errno
+-#  ifndef NOT_IN_libc
+-#   define errno __libc_errno
+-#  else
+-#   define errno errno		/* For #ifndef errno tests.  */
+-#  endif
++/* AKAROS doesn't want the redef of errno */
++#  ifndef __akaros__
++#    undef  errno
++#    ifndef NOT_IN_libc
++#     define errno __libc_errno
++#    else
++#     define errno errno		/* For #ifndef errno tests.  */
++#    endif
+ extern __thread int errno attribute_tls_model_ie;
++#  endif
+ 
+ # endif	/* !NOT_IN_libc || IN_LIB */
+ 
+diff -ruB --unidirectional-new-file ../glibc-2.19/include/libc-symbols.h ../glibc-2.19-akaros/include/libc-symbols.h
+--- glibc-2.19/include/libc-symbols.h	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/include/libc-symbols.h	2016-02-16 11:25:16.761066328 -0500
+@@ -1,3 +1,5 @@
++/* Modified for Akaros, removed the static_link_warning() */
++
+ /* Support macros for making weak and strong aliases for symbols,
+    and for using symbol sets and linker warnings with GNU ld.
+    Copyright (C) 1995-2014 Free Software Foundation, Inc.
+@@ -231,6 +233,14 @@
+   link_warning (name, #name " is not implemented and will always fail")
+ 
+ /* Warning for linking functions calling dlopen into static binaries.  */
++
++/* AKAROS doesn't want the annoying warning, breaks -Werror. */
++#ifdef __akaros__
++
++#define static_link_warning(name)
++
++#else
++
+ #ifdef SHARED
+ #define static_link_warning(name)
+ #else
+@@ -241,6 +251,8 @@
+ for linking")
+ #endif
+ 
++#endif /* __akaros__ */
++
+ /* Declare SYMBOL to be TYPE (`function' or `object') of SIZE bytes
+    alias to ORIGINAL, when the assembler supports such declarations
+    (such as in ELF).
+diff -ruB --unidirectional-new-file ../glibc-2.19/Makeconfig ../glibc-2.19-akaros/Makeconfig
+--- glibc-2.19/Makeconfig	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/Makeconfig	2015-12-17 14:58:45.065386401 -0500
+@@ -493,13 +493,17 @@
+ LDFLAGS-rdynamic = -rdynamic
+ LDFLAGS-Bsymbolic = -Bsymbolic
+ 
+-# Choose the default search path for the dynamic linker based on
+-# where we will install libraries.
+-ifneq ($(libdir),$(slibdir))
+-default-rpath = $(slibdir):$(libdir)
+-else
+-default-rpath = $(libdir)
+-endif
++# For akaros we want the default-rpath to be the path on our resulting
++# machine, not the path of the lib directory in our cross compiler
++default-rpath = "/lib"
++
++## Choose the default search path for the dynamic linker based on
++## where we will install libraries.
++#ifneq ($(libdir),$(slibdir))
++#default-rpath = $(slibdir):$(libdir)
++#else
++#default-rpath = $(libdir)
++#endif
+ 
+ ifndef link-extra-libs
+ link-extra-libs = $(LDLIBS-$(@F))
+@@ -1028,10 +1032,12 @@
+ # These are the subdirectories containing the library source.  The order
+ # is more or less arbitrary.  The sorting step will take care of the
+ # dependencies.
++#
++# AKAROS_PORT removed gshadow.  relies on NSS, has no man interface
+ all-subdirs = csu assert ctype locale intl catgets math setjmp signal	    \
+ 	      stdlib stdio-common libio malloc string wcsmbs time dirent    \
+ 	      grp pwd posix io termios resource misc socket sysvipc gmon    \
+-	      gnulib iconv iconvdata wctype manual shadow gshadow po argp   \
++	      gnulib iconv iconvdata wctype manual shadow po argp   \
+ 	      crypt localedata timezone rt conform debug		    \
+ 	      $(add-on-subdirs) dlfcn elf
+ 
+diff -ruB --unidirectional-new-file ../glibc-2.19/nptl/shlib-versions ../glibc-2.19-akaros/nptl/shlib-versions
+--- glibc-2.19/nptl/shlib-versions	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/nptl/shlib-versions	2015-12-17 14:58:45.065386401 -0500
+@@ -3,4 +3,6 @@
+ s390x-.*-linux.*	libpthread=0		GLIBC_2.2
+ powerpc64-.*-linux.*	libpthread=0		GLIBC_2.3
+ powerpc.*le-.*-linux.*	libpthread=0		GLIBC_2.17
++#x86_64-.*-akaros.*      libpthread=0        GLIBC_2.2.5
+ .*-.*-linux.*		libpthread=0
++.*-.*-akaros.*		libpthread=0
+diff -ruB --unidirectional-new-file ../glibc-2.19/rt/Makefile ../glibc-2.19-akaros/rt/Makefile
+--- glibc-2.19/rt/Makefile	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/rt/Makefile	2015-12-17 14:58:45.065386401 -0500
+@@ -53,7 +53,7 @@
+ 	 tst-cputimer1 tst-cputimer2 tst-cputimer3 \
+ 	 tst-clock2
+ 
+-extra-libs := librt
++extra-libs := #librt
+ extra-libs-others := $(extra-libs)
+ 
+ include ../Rules
+diff -ruB --unidirectional-new-file ../glibc-2.19/scripts/config.sub ../glibc-2.19-akaros/scripts/config.sub
+--- glibc-2.19/scripts/config.sub	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/scripts/config.sub	2015-12-17 14:58:45.065386401 -0500
+@@ -117,7 +117,7 @@
+ case $maybe_os in
+   nto-qnx* | linux-gnu* | linux-android* | linux-dietlibc | linux-newlib* | \
+   linux-musl* | linux-uclibc* | uclinux-uclibc* | uclinux-gnu* | kfreebsd*-gnu* | \
+-  knetbsd*-gnu* | netbsd*-gnu* | \
++  knetbsd*-gnu* | netbsd*-gnu* | akaros*-gnu* | \
+   kopensolaris*-gnu* | \
+   storm-chaos* | os2-emx* | rtmk-nova*)
+     os=-$maybe_os
+@@ -1356,7 +1356,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -akaros* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -ruB --unidirectional-new-file ../glibc-2.19/shlib-versions ../glibc-2.19-akaros/shlib-versions
+--- glibc-2.19/shlib-versions	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/shlib-versions	2015-12-17 14:58:45.065386401 -0500
+@@ -24,6 +24,7 @@
+ s390x-.*-linux.*        DEFAULT			GLIBC_2.2
+ powerpc64-.*-linux.*	DEFAULT			GLIBC_2.3
+ powerpc.*le-.*-linux.*	DEFAULT			GLIBC_2.17
++x86_64-.*-akaros.*      DEFAULT			GLIBC_2.2.5
+ .*-.*-gnu-gnu.*		DEFAULT			GLIBC_2.2.6
+ 
+ # Configuration		ABI			Identifier for ABI data files
+@@ -44,6 +45,7 @@
+ sh.*-.*-linux.*		libc=6			GLIBC_2.2
+ sparc64.*-.*-linux.*	libc=6			GLIBC_2.2
+ .*-.*-linux.*		libc=6
++.*-.*-akaros.*		libc=6
+ 
+ # libmachuser.so.1 corresponds to mach/*.defs as of Utah's UK22 release.
+ .*-.*-gnu-gnu.*		libmachuser=1
+diff -ruB --unidirectional-new-file ../glibc-2.19/stdio-common/vfprintf.c ../glibc-2.19-akaros/stdio-common/vfprintf.c
+--- glibc-2.19/stdio-common/vfprintf.c	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/stdio-common/vfprintf.c	2017-02-10 09:46:12.976092517 -0500
+@@ -29,6 +29,11 @@
+ #include <_itoa.h>
+ #include <locale/localeinfo.h>
+ #include <stdio.h>
++#include <ros/common.h>
++#include <sys/mman.h>
++
++/* Modified for AKAROS, uses mmap in place of large stack allocations */
++static char *failmsg = "vfprintf mmap failed!";
+ 
+ /* This code is shared between the standard stdio implementation found
+    in GNU C library and the libio implementation originally found in
+@@ -246,6 +251,8 @@
+   CHAR_T work_buffer[1000];
+   CHAR_T *workstart = NULL;
+   CHAR_T *workend;
++  /* AKAROS: this might get mmaped */
++  void *specs_buf = NULL;
+ 
+   /* We have to save the original argument pointer.  */
+   va_list ap_save;
+@@ -1678,7 +1685,18 @@
+     size_t nspecs = 0;
+     /* A more or less arbitrary start value.  */
+     size_t nspecs_size = 32 * sizeof (struct printf_spec);
+-    struct printf_spec *specs = alloca (nspecs_size);
++
++	/* AKAROS: specs_buf declared above and conditionally freed below */
++    //struct printf_spec *specs = alloca (nspecs_size);
++    struct printf_spec *specs;
++
++    specs_buf = mmap(0, ROUNDUP(nspecs_size, PGSIZE), PROT_WRITE | PROT_READ,
++                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++    if (specs_buf == MAP_FAILED) {
++      write(2, failmsg, sizeof(failmsg));
++      exit(-1);
++    }
++	specs = (struct printf_spec*)specs_buf;
+ 
+     /* The number of arguments the format string requests.  This will
+        determine the size of the array needed to store the argument
+@@ -2049,6 +2067,8 @@
+     free (args_malloced);
+   if (__glibc_unlikely (workstart != NULL))
+     free (workstart);
++  if (__glibc_unlikely (specs_buf != NULL))
++    munmap(specs_buf, ROUNDUP(32 * sizeof (struct printf_spec), PGSIZE));
+   /* Unlock the stream.  */
+   _IO_funlockfile (s);
+   _IO_cleanup_region_end (0);
+@@ -2276,7 +2296,17 @@
+ buffered_vfprintf (_IO_FILE *s, const CHAR_T *format,
+ 		   _IO_va_list args)
+ {
+-  CHAR_T buf[_IO_BUFSIZ];
++  /* AKAROS: mmap the buf.  */
++  //CHAR_T buf[_IO_BUFSIZ];
++  CHAR_T *buf;
++
++  buf = mmap(0, ROUNDUP(_IO_BUFSIZ, PGSIZE), PROT_WRITE | PROT_READ,
++             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++  if (buf == MAP_FAILED) {
++    write(2, failmsg, sizeof(failmsg));
++    exit(-1);
++  }
++
+   struct helper_file helper;
+   _IO_FILE *hp = (_IO_FILE *) &helper._f;
+   int result, to_flush;
+@@ -2338,6 +2368,7 @@
+   _IO_funlockfile (s);
+   __libc_cleanup_region_end (0);
+ 
++  munmap(buf, ROUNDUP(_IO_BUFSIZ, PGSIZE)); /* AKAROS */
+   return result;
+ }
+ 
+diff -ruB --unidirectional-new-file ../glibc-2.19/sunrpc/netname.c ../glibc-2.19-akaros/sunrpc/netname.c
+--- glibc-2.19/sunrpc/netname.c	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/sunrpc/netname.c	2015-12-17 14:58:45.065386401 -0500
+@@ -16,13 +16,13 @@
+    License along with the GNU C Library; if not, see
+    <http://www.gnu.org/licenses/>.  */
+ 
++/* AKAROS_PORT: removed references to nss; stubbed the funcs that used it. */
++
+ #include <stdio.h>
+ #include <unistd.h>
+ #include <string.h>
+ #include <rpc/rpc.h>
+ 
+-#include "nsswitch.h"
+-
+ #define	OPSYS_LEN 4
+ #define	MAXIPRINT (11)		/* max length of printed integer */
+ static const char OPSYS[] = "unix";
+@@ -139,56 +139,18 @@
+ /* Type of the lookup function for netname2user.  */
+ typedef int (*netname2user_function) (const char netname[MAXNETNAMELEN + 1],
+ 				      uid_t *, gid_t *, int *, gid_t *);
+-/* The lookup function for the first entry of this service.  */
+-extern int __nss_publickey_lookup (service_user ** nip, const char *name,
+-				   void **fctp) internal_function;
+-
+ int
+ netname2user (const char netname[MAXNETNAMELEN + 1], uid_t * uidp, gid_t * gidp,
+ 	      int *gidlenp, gid_t * gidlist)
+ {
+-  static service_user *startp;
+-  static netname2user_function start_fct;
+-  service_user *nip;
+-  union
+-  {
+-    netname2user_function f;
+-    void *ptr;
+-  } fct;
+-  enum nss_status status = NSS_STATUS_UNAVAIL;
+-  int no_more;
+-
+-  if (startp == NULL)
+-    {
+-      no_more = __nss_publickey_lookup (&nip, "netname2user", &fct.ptr);
+-      if (no_more)
+-	startp = (service_user *) - 1;
+-      else
+-	{
+-	  startp = nip;
+-	  start_fct = fct.f;
+-	}
+-    }
+-  else
+-    {
+-      fct.f = start_fct;
+-      no_more = (nip = startp) == (service_user *) - 1;
+-    }
+-
+-  while (!no_more)
+-    {
+-      status = (*fct.f) (netname, uidp, gidp, gidlenp, gidlist);
+-
+-      no_more = __nss_next2 (&nip, "netname2user", NULL, &fct.ptr, status, 0);
+-    }
+-
+-  return status == NSS_STATUS_SUCCESS;
++  return FALSE;
+ }
+ #ifdef EXPORT_RPC_SYMBOLS
+ libc_hidden_def (netname2user)
+ #else
+ libc_hidden_nolink_sunrpc (netname2user, GLIBC_2_1)
+ #endif
++stub_warning(netname2user)
+ 
+ int
+ netname2host (const char netname[MAXNETNAMELEN + 1], char *hostname,
+diff -ruB --unidirectional-new-file ../glibc-2.19/sysdeps/i386/configure ../glibc-2.19-akaros/sysdeps/i386/configure
+--- glibc-2.19/sysdeps/i386/configure	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/sysdeps/i386/configure	2015-12-17 14:58:45.077386468 -0500
+@@ -82,13 +82,13 @@
+ $as_echo "$libc_compiler_builtin_inlined" >&6; }
+ 
+ 
+-ac_fn_c_check_header_compile "$LINENO" "cpuid.h" "ac_cv_header_cpuid_h" "/* No default includes.  */
+-"
+-if test "x$ac_cv_header_cpuid_h" = xyes; then :
+-
+-else
+-  as_fn_error $? "gcc must provide the <cpuid.h> header" "$LINENO" 5
+-fi
++#ac_fn_c_check_header_compile "$LINENO" "cpuid.h" "ac_cv_header_cpuid_h" "/* No default includes.  */
++#"
++#if test "x$ac_cv_header_cpuid_h" = xyes; then :
++#
++#else
++#  as_fn_error $? "gcc must provide the <cpuid.h> header" "$LINENO" 5
++#fi
+ 
+ 
+ 
+diff -ruB --unidirectional-new-file ../glibc-2.19/sysdeps/i386/configure.ac ../glibc-2.19-akaros/sysdeps/i386/configure.ac
+--- glibc-2.19/sysdeps/i386/configure.ac	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/sysdeps/i386/configure.ac	2015-12-17 14:58:45.077386468 -0500
+@@ -30,9 +30,9 @@
+ *** Please use host i786, i686, i586, or i486.
+ *** For example: /source/glibc/configure CFLAGS='-O2 -march=i686' ...])])
+ 
+-AC_CHECK_HEADER([cpuid.h], ,
+-  [AC_MSG_ERROR([gcc must provide the <cpuid.h> header])],
+-  [/* No default includes.  */])
++#AC_CHECK_HEADER([cpuid.h], ,
++#  [AC_MSG_ERROR([gcc must provide the <cpuid.h> header])],
++#  [/* No default includes.  */])
+ 
+ dnl Check if -msse4 works.
+ AC_CACHE_CHECK(for SSE4 support, libc_cv_cc_sse4, [dnl
+diff -ruB --unidirectional-new-file ../glibc-2.19/sysdeps/i386/tlsdesc.sym ../glibc-2.19-akaros/sysdeps/i386/tlsdesc.sym
+--- glibc-2.19/sysdeps/i386/tlsdesc.sym	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/sysdeps/i386/tlsdesc.sym	2015-12-17 14:58:45.077386468 -0500
+@@ -8,7 +8,7 @@
+ 
+ -- Abuse tls.h macros to derive offsets relative to the thread register.
+ 
+-DTV_OFFSET			offsetof(struct pthread, header.dtv)
++DTV_OFFSET			offsetof(struct rthread, header.dtv)
+ 
+ TLSDESC_ARG			offsetof(struct tlsdesc, arg)
+ 
+diff -ruB --unidirectional-new-file ../glibc-2.19/sysdeps/x86_64/tlsdesc.sym ../glibc-2.19-akaros/sysdeps/x86_64/tlsdesc.sym
+--- glibc-2.19/sysdeps/x86_64/tlsdesc.sym	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/sysdeps/x86_64/tlsdesc.sym	2015-12-17 14:58:45.077386468 -0500
+@@ -8,7 +8,7 @@
+ 
+ -- Abuse tls.h macros to derive offsets relative to the thread register.
+ 
+-DTV_OFFSET			offsetof(struct pthread, header.dtv)
++DTV_OFFSET			offsetof(struct rthread, header.dtv)
+ 
+ TLSDESC_ARG			offsetof(struct tlsdesc, arg)
+ 
