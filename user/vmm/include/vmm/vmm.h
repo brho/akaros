@@ -8,6 +8,23 @@
 
 #include <ros/vmm.h>
 #include <vmm/sched.h>
+#include <vmm/linux_bootparam.h>
+
+// We need to reserve an area of the low 4G for thinks like tables, APIC, and
+// so on. So far, 256 MiB has been more than enough, so ...
+#define MiB 0x100000ull
+#define MinMemory (16*MiB)
+#define GiB (0x40000000ULL)
+#define _4GiB (0x100000000ULL)
+// BIOS conventions from 1978 make it smart to reserve the low 64k
+#define LOW64K 65536
+// The RESERVED area is for all the random junk like devices, ACPI, etc.
+// We just give it the top 1 GiB of the 32-bit address space, which
+// nicely translates to one GiB PTE.
+#define RESERVED 0xC0000000ULL
+#define RESERVEDSIZE (_4GiB - RESERVED)
+// Start the VM at 16 MiB, a standard number for 64 bit kernels on amd64
+#define KERNSTART 0x1000000
 
 #define VM_PAGE_FAULT			14
 
@@ -91,3 +108,9 @@ static struct virtual_machine *get_my_vm(void)
 {
 	return ((struct vmm_thread*)current_uthread)->vm;
 }
+
+/* memory helpers */
+void *init_e820map(struct boot_params *bp,
+                   unsigned long long memstart,
+                   unsigned long long memsize);
+void mmap_memory(unsigned long long memstart, unsigned long long memsize);

@@ -124,10 +124,6 @@ volatile int quit = 0;
 /* total hack. If the vm runs away we want to get control again. */
 unsigned int maxresume = (unsigned int) -1;
 
-#define MiB 0x100000ull
-#define GiB (1ull << 30)
-#define MinMemory (16*MiB)
-void *kernel;
 unsigned long long memsize = GiB;
 uintptr_t memstart = MinMemory;
 uintptr_t stack;
@@ -681,6 +677,13 @@ int main(int argc, char **argv)
 	memset(vm->low4k, 0xff, PGSIZE);
 	vm->low4k[0x40e] = 0;
 	vm->low4k[0x40f] = 0;
+	// Why is this here? Because the static initializer is getting
+	// set to 1.  Yes, 1. This might be part of the weirdness
+	// Barrett is reporting with linker sets. So let's leave it
+	// here until we trust our toolchain.
+	if (memsize != GiB)
+		fprintf(stderr, "static initializers are broken\n");
+	memsize = GiB;
 
 	while ((c = getopt_long(argc, argv, "dvm:M:S:c:gsf:k:N:n:t:hR:",
 				long_options, &option_index)) != -1) {
@@ -783,19 +786,12 @@ int main(int argc, char **argv)
 
 	if ((uintptr_t)(memstart + memsize) >= (uintptr_t)BRK_START) {
 		fprintf(stderr,
-		        "memstart 0x%lx memsize 0x%lx -> 0x%lx is too large; overlaps BRK_START at %p\n",
+		        "memstart 0x%llx memsize 0x%llx -> 0x%llx is too large; overlaps BRK_START at %p\n",
 		        memstart, memsize, memstart + memsize, BRK_START);
 		exit(1);
 	}
 
-	kernel = mmap((void *)memstart, memsize,
-	              PROT_READ | PROT_WRITE | PROT_EXEC,
-	              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
-	if (kernel != (void *)memstart) {
-		fprintf(stderr, "Could not mmap 0x%lx bytes at 0x%lx\n",
-		        memsize, memstart);
-		exit(1);
-	}
+	mmap_memory(memstart, memsize);
 
 	entry = load_kernel(argv[0]);
 	if (entry == 0) {
@@ -804,7 +800,7 @@ int main(int argc, char **argv)
 	}
 
 
-	// The low 1m so we can fill in bullshit like ACPI. */
+	// The low 1m is so we can fill in bullshit like ACPI.
 	// And, sorry, due to the STUPID format of the RSDP for now we need the low 1M.
 	low1m = mmap((int*)4096, MiB-4096, PROT_READ | PROT_WRITE,
 	             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
@@ -912,37 +908,8 @@ int main(int argc, char **argv)
 
 	a = (void *)(((unsigned long)a + 0xfff) & ~0xfff);
 
-	/* Allocate memory for, and zero the bootparams
-	 * page before writing to it, or Linux thinks
-	 * we're talking crazy.
-	 */
 	bp = a;
-	memset(bp, 0, 4096);
-
-	/* Put the e820 memory region information in the boot_params */
-	bp->e820_entries = 5;
-	int e820i = 0;
-
-	/* Give it just a tiny bit of memory -- 60k -- at low memory. */
-	bp->e820_map[e820i].addr = 0;
-	bp->e820_map[e820i].size = 4 * 1024;
-	bp->e820_map[e820i++].type = E820_RESERVED;
-
-	bp->e820_map[e820i].addr = 4 * 1024;
-	bp->e820_map[e820i].size = 64 * 1024 - 4 * 1024;
-	bp->e820_map[e820i++].type = E820_RAM;
-
-	bp->e820_map[e820i].addr = 64 * 1024;
-	bp->e820_map[e820i].size = memstart - 64 * 1024;
-	bp->e820_map[e820i++].type = E820_RESERVED;
-
-	bp->e820_map[e820i].addr = memstart;
-	bp->e820_map[e820i].size = memsize;
-	bp->e820_map[e820i++].type = E820_RAM;
-
-	bp->e820_map[e820i].addr = 0xf0000000;
-	bp->e820_map[e820i].size = 0x10000000;
-	bp->e820_map[e820i++].type = E820_RESERVED;
+	a = init_e820map(bp, memstart, memsize);
 
 	/* The MMIO address of the console device is really the address of an
 	 * unbacked EPT page: accesses to this page will cause a page fault that
@@ -950,10 +917,11 @@ int main(int argc, char **argv)
 	 * known MMIO address, and fulfill the MMIO read or write on the guest's
 	 * behalf accordingly. We place the virtio space at 512 GB higher than the
 	 * guest physical memory to avoid a full page table walk. */
-	uint64_t virtio_mmio_base_addr = ROUNDUP((bp->e820_map[e820i - 1].addr +
-	                                          bp->e820_map[e820i - 1].size),
-	                                         512 * GiB);
+	uint64_t virtio_mmio_base_addr;
 
+	virtio_mmio_base_addr = ROUNDUP((bp->e820_map[bp->e820_entries - 1].addr +
+	                                 bp->e820_map[bp->e820_entries - 1].size),
+	                                 512ULL * GiB);
 	cons_mmio_dev.addr =
 		virtio_mmio_base_addr + PGSIZE * VIRTIO_MMIO_CONSOLE_DEV;
 	cons_mmio_dev.vqdev = &cons_vqdev;
@@ -1041,8 +1009,11 @@ int main(int argc, char **argv)
 	npml2 = DIV_ROUND_UP(memstart + memsize, PML2_REACH);
 	nptp += npml2;
 
-	fprintf(stderr, "Memstart + memsize is %llx; %d pml4 %d pml3 %d pml2\n",
-		memstart + memsize, npml4, npml3, npml2);
+	fprintf(stderr,
+	        "Memstart is %llx, memsize is %llx, memstart + memsize is %llx; ",
+	        memstart, memsize, memstart + memsize);
+	fprintf(stderr, " %d pml4 %d pml3 %d pml2\n",
+	        npml4, npml3, npml2);
 
 	/* Place these page tables right after VM memory. We
 	 * used to use posix_memalign but that puts them
@@ -1066,7 +1037,7 @@ int main(int argc, char **argv)
 	 * mappings. */
 
 	p2m->pte[PML2(0)] = (uint64_t)0 | PTE_KERN_RW | PTE_PS;
-
+	memsize = GiB;
 	fprintf(stderr, "Map %p for %zu bytes\n", memstart, memsize);
 	for (uintptr_t p4 = memstart; p4 < memstart + memsize;
 	     p4 += PML4_PTE_REACH, p1++) {
@@ -1102,6 +1073,8 @@ int main(int argc, char **argv)
 	vm_tf->tf_rsp = stack;
 	vm_tf->tf_rsi = (uint64_t) bp;
 	vm->up_gpcs = 1;
+	fprintf(stderr, "Start guest: cr3 %p rip %p stack %p\n",
+	        p512, entry, stack);
 	start_guest_thread(vm->gths[0]);
 
 	uthread_sleep_forever();

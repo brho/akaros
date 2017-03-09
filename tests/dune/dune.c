@@ -28,10 +28,6 @@
 #include <sys/eventfd.h>
 #include <sys/uio.h>
 
-#define MiB 0x100000ull
-#define GiB (1ull << 30)
-#define MinMemory (16*MiB)
-
 static struct virtual_machine local_vm, *vm = &local_vm;
 struct vmm_gpcore_init gpci;
 static void *ram;
