@@ -162,6 +162,7 @@ static void __prep_sighandler(struct uthread *uthread,
 		assert(current_uthread == uthread);
 		ctx = &vcpd_of(vcore_id())->uthread_ctx;
 		stack = get_user_ctx_sp(ctx) - sizeof(struct sigdata);
+		stack = ROUNDDOWN(stack, __alignof__(struct sigdata));
 		assert(stack_ptr_is_sane(stack));
 		uthread->sigstate.data = (struct sigdata*)stack;
 		save_fp_state(&uthread->sigstate.data->as);
