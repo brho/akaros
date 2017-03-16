@@ -274,6 +274,9 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 			*(uintptr_t**)(buf + cp->obj_size) = buf + a_slab->obj_size;
 			buf += a_slab->obj_size;
 		}
+		/* Initialize the final object (note the -1 in the for loop). */
+		if (cp->ctor)
+			cp->ctor(buf, cp->obj_size);
 		*((uintptr_t**)(buf + cp->obj_size)) = NULL;
 	} else {
 		a_slab = kmem_cache_alloc(kmem_slab_cache, 0);
