@@ -101,6 +101,12 @@ then
 fi
 # We also can provide an etc hosts file for loopback
 echo "127.0.0.1 localhost" >> /etc/hosts
+# You can set HOST and then you may set FQDN, and we'll add it to etc hosts
+if [ "x$HOST" != "x" ]
+then
+	IP=`cat /net/ipifc/0/local | cut -f 1 -d ' '`
+	echo "$IP $FQDN $HOST" >> /etc/hosts
+fi
 
 daemonize /bin/cs -S
 mount -a '#srv/cs' /net
