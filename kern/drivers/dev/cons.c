@@ -729,6 +729,11 @@ static int consstat(struct chan *c, uint8_t *dp, int n)
 		perm |= qreadable(cons_q) ? DMREADABLE : 0;
 		devdir(c, tab->qid, tab->name, qlen(cons_q), eve.name, perm, &dir);
 		return dev_make_stat(c, &dir, dp, n);
+	case Qnull:
+		tab = &consdir[Qnull];
+		perm = tab->perm | DMWRITABLE;
+		devdir(c, tab->qid, tab->name, 0, eve.name, perm, &dir);
+		return dev_make_stat(c, &dir, dp, n);
 	default:
 		return devstat(c, dp, n, consdir, ARRAY_SIZE(consdir), devgen);
 	}
@@ -1312,11 +1317,33 @@ static int tap_stdin(struct chan *c, struct fd_tap *tap, int cmd)
 	return ret;
 }
 
+/* Null isn't really tapable, since there are no edge events - it is always
+ * writable.  However, users might want to tap their output files, regardless of
+ * whether or not it will generate an event.  We'll pretend that we tapped it
+ * (or untapped, based on the command).
+ *
+ * Note that epoll will generate an event, since it will stat null and see its
+ * writable, so epoll will appear to have an event. */
+static int tap_null(struct chan *c, struct fd_tap *tap, int cmd)
+{
+	/* We don't actually support HANGUP, but epoll implies it. */
+	#define CONS_NULL_TAPS (FDTAP_FILT_WRITABLE | FDTAP_FILT_HANGUP)
+
+	if (tap->filter & ~CONS_NULL_TAPS) {
+		set_error(ENOSYS, "Unsupported #%s tap, must be %p", devname(),
+		          CONS_NULL_TAPS);
+		return -1;
+	}
+	return 0;
+}
+
 static int cons_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
 {
 	switch ((uint32_t)c->qid.path) {
 	case Qstdin:
 		return tap_stdin(c, tap, cmd);
+	case Qnull:
+		return tap_null(c, tap, cmd);
 	default:
 		set_error(ENOSYS, "Can't tap #%s file type %d", devname(),
 		          c->qid.path);
