@@ -393,6 +393,25 @@ static void build_ignore_list(char *trace_set)
 	}
 }
 
+/* Removes the timestamp part of the line.  Use the return string in place of
+ * the full line you pass in. */
+static char *remove_timestamps(char *full_line)
+{
+	char *close_brace;
+
+	/* Format: E [  13655.986589401]-[      0.000000000] Syscall.  The seconds
+	 * field may vary in size, so we need to find the second ']'. */
+	close_brace = strchr(full_line, ']');
+	if (!close_brace)
+		return full_line;
+	close_brace = strchr(close_brace + 1, ']');
+	if (!close_brace)
+		return full_line;
+	/* move starting E or X marker */
+	*close_brace = full_line[0];
+	return close_brace;
+}
+
 static void parse_traces(int fd)
 {
 	char *line, *_line;
@@ -410,12 +429,8 @@ static void parse_traces(int fd)
 			fprintf(opts.outfile, "%s", _line);
 			continue;
 		}
-		if (!opts.with_time) {
-			/* move starting E or X marker */
-			_line[40] = _line[0];
-			/* skip over the timestamp */
-			_line = &_line[40];
-		}
+		if (!opts.with_time)
+			_line = remove_timestamps(_line);
 		fprintf(opts.outfile, "%s", _line);
 	}
 	/* This is a little hokey.  If the process exited, then the qio hung up and
