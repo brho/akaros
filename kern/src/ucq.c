@@ -143,8 +143,8 @@ void print_ucq(struct proc *p, struct ucq *ucq)
 	       atomic_read(&ucq->nr_extra_pgs));
 	printk("prod_overflow: %d\n", ucq->prod_overflow);
 	/* Try to see our previous ucqs */
-	for (int i = atomic_read(&ucq->prod_idx), count = 0;
-	     slot_is_good(i), count < 25;  i--, count++) {
+	for (uintptr_t i = atomic_read(&ucq->prod_idx), count = 0;
+	     slot_is_good(i) && count < 25;  i--, count++) {
 		/* only attempt to print messages on the same page */
 		if (PTE_ADDR(i) != PTE_ADDR(atomic_read(&ucq->prod_idx)))
 			break;
