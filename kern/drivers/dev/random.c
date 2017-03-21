@@ -136,7 +136,24 @@ static struct walkqid *randomwalk(struct chan *c, struct chan *nc, char **name,
 
 static int randomstat(struct chan *c, uint8_t *dp, int n)
 {
-	return devstat(c, dp, n, randomdir, ARRAY_SIZE(randomdir), devgen);
+	struct dir dir;
+	struct dirtab *tab;
+	int perm;
+
+	switch (c->qid.path) {
+	case Qrandom:
+		tab = &randomdir[Qrandom];
+		perm = tab->perm | DMREADABLE;
+		devdir(c, tab->qid, tab->name, 0, eve.name, perm, &dir);
+		return dev_make_stat(c, &dir, dp, n);
+	case Qurandom:
+		tab = &randomdir[Qurandom];
+		perm = tab->perm | DMREADABLE;
+		devdir(c, tab->qid, tab->name, 0, eve.name, perm, &dir);
+		return dev_make_stat(c, &dir, dp, n);
+	default:
+		return devstat(c, dp, n, randomdir, ARRAY_SIZE(randomdir), devgen);
+	}
 }
 
 /*
@@ -188,6 +205,28 @@ static int randomwstat(struct chan *c, uint8_t *dp, int n)
 	return -1;
 }
 
+static int random_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
+{
+	/* We don't actually support HANGUP, but epoll implies it. */
+	#define RANDOM_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_HANGUP)
+
+	if (tap->filter & ~RANDOM_TAPS) {
+		set_error(ENOSYS, "Unsupported #%s tap, must be %p", devname(),
+		          RANDOM_TAPS);
+		return -1;
+	}
+	switch (c->qid.path) {
+	case Qrandom:
+	case Qurandom:
+		/* Faking any legit command on (u)random, which never blocks. */
+		return 0;
+	default:
+		set_error(ENOSYS, "Can't tap #%s file type %d", devname(),
+		          c->qid.path);
+		return -1;
+	}
+}
+
 struct dev randomdevtab __devtab = {
 	.name = "random",
 
@@ -206,4 +245,5 @@ struct dev randomdevtab __devtab = {
 	.wstat = randomwstat,
 	.power = devpower,
 	.chaninfo = devchaninfo,
+	.tapfd = random_tapfd,
 };
