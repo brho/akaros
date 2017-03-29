@@ -1430,7 +1430,8 @@ size_t qread_nonblock(struct queue *q, void *va, size_t len)
 	return read_all_blocks(blist, va, len);
 }
 
-static int qnotfull(void *a)
+/* This is the rendez wake condition for writers. */
+static int qwriter_should_wake(void *a)
 {
 	struct queue *q = a;
 
@@ -1527,8 +1528,9 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int qio_flags)
 	if ((qio_flags & QIO_CAN_ERR_SLEEP) &&
 	    !(q->state & Qdropoverflow) && !(qio_flags & QIO_NON_BLOCK)) {
 		/* This is a racy peek at the q status.  If we accidentally block, our
-		 * rendez will return.  The rendez's peak (qnotfull) is also racy w.r.t.
-		 * the q's spinlock (that lock protects writes, but not reads).
+		 * rendez will return.  The rendez's peak (qwriter_should_wake) is also
+		 * racy w.r.t.  the q's spinlock (that lock protects writes, but not
+		 * reads).
 		 *
 		 * Here's the deal: when holding the rendez lock, if we see the sleep
 		 * condition, the consumer will wake us.  The condition will only ever
@@ -1545,8 +1547,8 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int qio_flags)
 		 *
 		 * Oh, and we spin in case we woke early and someone else filled the
 		 * queue, mesa-style. */
-		while (!qnotfull(q))
-			rendez_sleep(&q->wr, qnotfull, q);
+		while (!qwriter_should_wake(q))
+			rendez_sleep(&q->wr, qwriter_should_wake, q);
 	}
 	return ret;
 }
@@ -1845,7 +1847,7 @@ void qflush(struct queue *q)
 
 int qfull(struct queue *q)
 {
-	return q->dlen >= q->limit;
+	return !qwritable(q);
 }
 
 int qstate(struct queue *q)
