@@ -68,25 +68,23 @@ int inumber = 13;
  * memory a tad easier.
  */
 /* Da Rules.
- * The roottab contains [name, qid, length, perm]. Length means length for files.
+ * The roottab contains [name, qid, length, perm].
+ * Length is filesize for files, # children/elements for dirs
  * Qid is [path, vers, type]. Path is me. vers is next. Type is QTDIR for dir
  * and QTFILE for file and 0 for empty.
- * Data is [dotdot, ptr, size, *sizep, next]
- * dotdot is .., ptr is data (for files)
- * size is # elements (for dirs)
- * *sizep is a pointer for reasons not understood.
+ *
+ * We have rootdata to help out with a couple things, notably storing the 'data'
+ * of the object (file or dir) and the first child index/qid.path for
+ * directories.
+ *
+ * Data is [dotdot, child, ptr]
+ * dotdot is ..
+ * ptr is data for files, first child for dirs.
  * child is the qid.path of the first child of a directory.
  * Possibly 0 == no child.
  * To find the next sibling (in a directory), look at roottab[i].qid.vers.
- *
- *	int	dotdot;
- *      int     child;
- *	void	*ptr;
- *	int	size;
- *	int	*sizep;
- *
- * entry is empty if type is 0. We look in roottab to determine that.
-*/
+ */
+
 /* we pack the qid as follows: path is the index, vers is ., and type is type */
 
 /* Inferno seems to want to: perm |= DMDIR.  It gets checked in other places.
@@ -111,49 +109,47 @@ int inumber = 13;
  * grow dynamically (I think we assume roottab[i] = entry for qid.path all over
  * the place - imagine what happens if we wanted to squeeze in a new entry). */
 struct dirtab roottab[MAXFILE] = {
-	{"", {0, 0, QTDIR}, 0, DMDIR | 0777},
-	{"chan", {1, 2, QTDIR}, 0, DMDIR | 0777},
-	{"dev", {2, 3, QTDIR}, 0, DMDIR | 0777},
-	{"fd", {3, 4, QTDIR}, 0, DMDIR | 0777},
-	{"prog", {4, 5, QTDIR}, 0, DMDIR | 0777},
-	{"prof", {5, 6, QTDIR}, 0, DMDIR | 0777},
-	{"net", {6, 7, QTDIR}, 0, DMDIR | 0777},
-	{"net.alt", {7, 8, QTDIR}, 0, DMDIR | 0777},
-	{"nvfs", {8, 9, QTDIR}, 0, DMDIR | 0777},
-	{"env", {9, 10, QTDIR}, 0, DMDIR | 0777},
-	{"root", {10, 11, QTDIR}, 0, DMDIR | 0777},
-	{"srv", {11, 12, QTDIR}, 0, DMDIR | 0777},
-	{"mnt", {12, 13, QTDIR}, 0, DMDIR | 0777},
-	{"proc", {13, 0, QTDIR}, 0, DMDIR | 0777},
-	{"env_dir1", {14, 15, QTDIR}, 0, DMDIR | 0777},
-	{"env_dir2", {15, 0, QTDIR}, 0, DMDIR | 0777},
+	{"",				{ 0,  0, QTDIR}, 13, DMDIR | 0777},
+	{"chan",			{ 1,  2, QTDIR},  0, DMDIR | 0777},
+	{"dev",				{ 2,  3, QTDIR},  0, DMDIR | 0777},
+	{"fd",				{ 3,  4, QTDIR},  0, DMDIR | 0777},
+	{"prog",			{ 4,  5, QTDIR},  0, DMDIR | 0777},
+	{"prof",			{ 5,  6, QTDIR},  0, DMDIR | 0777},
+	{"net",				{ 6,  7, QTDIR},  0, DMDIR | 0777},
+	{"net.alt",			{ 7,  8, QTDIR},  0, DMDIR | 0777},
+	{"nvfs",			{ 8,  9, QTDIR},  0, DMDIR | 0777},
+	{"env",				{ 9, 10, QTDIR},  2, DMDIR | 0777},
+	{"root",			{10, 11, QTDIR},  0, DMDIR | 0777},
+	{"srv",				{11, 12, QTDIR},  0, DMDIR | 0777},
+	{"mnt",				{12, 13, QTDIR},  0, DMDIR | 0777},
+	{"proc",			{13,  0, QTDIR},  0, DMDIR | 0777},
+	{"env_dir1",		{14, 15, QTDIR},  0, DMDIR | 0777},
+	{"env_dir2",		{15,  0, QTDIR},  0, DMDIR | 0777},
 };
 
 struct rootdata {
 	int dotdot;
 	int child;
 	void *ptr;
-	int size;
-	int *sizep;
 };
 
 struct rootdata rootdata[MAXFILE] = {
-	{0,	1,	 &roottab[1],	 13,	NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	14,	 &roottab[14],	 2,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{0,	0,	 NULL,	 0,	 NULL},
-	{9,	0,	 NULL,	 0,	 NULL},
-	{9,	0,	 NULL,	 0,	 NULL},
+	{0,	1,	 &roottab[1]},
+	{0,	0,	 NULL},
+	{0,	0,	 NULL},
+	{0,	0,	 NULL},
+	{0,	0,	 NULL},
+	{0,	0,	 NULL},
+	{0,	0,	 NULL},
+	{0,	0,	 NULL},
+	{0,	0,	 NULL},
+	{0,	14,	 &roottab[14]},
+	{0,	0,	 NULL},
+	{0,	0,	 NULL},
+	{0,	0,	 NULL},
+	{0,	0,	 NULL},
+	{9,	0,	 NULL},
+	{9,	0,	 NULL},
 };
 
 /* this is super useful */
@@ -163,17 +159,15 @@ void dumprootdev(void)
 	struct rootdata *rd = rootdata;
 	int i;
 
-	printk("[       dirtab     ]      name: [pth, ver, typ],   len,        "
-	       "perm,  .., chld,       data pointer,  size,       size pointer\n");
+	printk("[       dirtab     ]                          name: [pth, ver, typ],   len,        perm,  .., chld,       data pointer\n");
 	for (i = 0; i < rootmaxq; i++, r++, rd++) {
 		if (i && (!r->name[0]))
 			continue;
-		printk("[%p]%10s: [%3d, %3d, %3d], %5d, %11o,",
+		printk("[%p]%30s: [%3d, %3d, %3d], %5d, %11o,",
 			   r,
 			   r->name, r->qid.path, r->qid.vers, r->qid.type,
 			   r->length, r->perm);
-		printk(" %3d, %4d, %p, %5d, %p\n",
-			   rd->dotdot, rd->child, rd->ptr, rd->size, rd->sizep);
+		printk(" %3d, %4d, %p\n", rd->dotdot, rd->child, rd->ptr);
 	}
 }
 
@@ -218,30 +212,11 @@ static int createentry(int dir, char *name, int omode, int perm)
 	      perm & DMDIR ? QTDIR : QTFILE);
 	rootdata[n].dotdot = roottab[dir].qid.path;
 	rootdata[dir].ptr = &roottab[n];
-	rootdata[n].size = 0;
-	rootdata[n].sizep = &rootdata[n].size;
 	return n;
 }
 
 static void rootinit(void)
 {
-	/* brho: pretty sure this should only be run once.  putting it in attach
-	 * will run it multiple times. */
-	int i;
-	uint32_t len;
-	struct rootdata *r;
-	/* this begins with the root. */
-	for (i = 0;; i++) {
-		r = &rootdata[i];
-		if (r->sizep) {
-			len = *r->sizep;
-			r->size = len;
-			roottab[i].length = len;
-		}
-		i = roottab[i].qid.vers;
-		if (!i)
-			break;
-	}
 }
 
 static struct chan *rootattach(char *spec)
@@ -346,13 +321,13 @@ static struct walkqid *rootwalk(struct chan *c, struct chan *nc, char **name,
 	}
 	p = c->qid.path;
 	printd("Start from #%d at %p\n", p, &roottab[p]);
-	return devwalk(c, nc, name, nname, &roottab[p], rootdata[p].size, rootgen);
+	return devwalk(c, nc, name, nname, &roottab[p], roottab[p].length, rootgen);
 }
 
 static int rootstat(struct chan *c, uint8_t * dp, int n)
 {
 	int p = c->qid.path;
-	return devstat(c, dp, n, rootdata[p].ptr, rootdata[p].size, rootgen);
+	return devstat(c, dp, n, rootdata[p].ptr, roottab[p].length, rootgen);
 }
 
 static struct chan *rootopen(struct chan *c, int omode)
@@ -360,7 +335,7 @@ static struct chan *rootopen(struct chan *c, int omode)
 	int p;
 	printd("rootopen: omode %o\n", omode);
 	p = c->qid.path;
-	return devopen(c, omode, rootdata[p].ptr, rootdata[p].size, rootgen);
+	return devopen(c, omode, rootdata[p].ptr, roottab[p].length, rootgen);
 }
 
 static void rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
@@ -377,7 +352,7 @@ static void rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
 	int newfile;
 	newfile = createentry(path, name, omode, perm);
 	c->qid = roottab[newfile].qid;	/* need to update c */
-	rd->size++;
+	r->length++;
 	if (newfile > rootmaxq)
 		rootmaxq = newfile;
 	printd("create: %s, newfile %d, dotdot %d, rootmaxq %d\n", name, newfile,
@@ -399,10 +374,10 @@ static long rootread(struct chan *c, void *buf, long n, int64_t offset)
 
 	p = c->qid.path;
 	if (c->qid.type & QTDIR) {
-		return devdirread(c, buf, n, rootdata[p].ptr, rootdata[p].size,
+		return devdirread(c, buf, n, rootdata[p].ptr, roottab[p].length,
 						  rootgen);
 	}
-	len = rootdata[p].size;
+	len = roottab[p].length;
 	if (offset < 0 || offset >= len) {
 		return 0;
 	}
@@ -430,14 +405,14 @@ static long rootwrite(struct chan *c, void *a, long n, int64_t off)
 	if (off < 0)
 		error(EFAIL, "rootwrite: offset < 0!");
 
-	if (off + n > rd->size){
+	if (off + n > r->length) {
 		void *p;
 		p = krealloc(rd->ptr, off + n, MEM_WAIT);
 		if (! p)
 			error(EFAIL, "rootwrite: could not grow the file to %d bytes",
 				  off + n);
 		rd->ptr = p;
-		rd->size = off + n;
+		r->length = off + n;
 	}
 	assert(current);
 	if (memcpy_from_user_errno(current, rd->ptr + off, a, n) < 0)
