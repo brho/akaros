@@ -234,7 +234,7 @@ static void vars_create(struct chan *c, char *name, int omode, uint32_t perm)
 		new_slot = vars_dir + nr_vars;
 		nr_vars *= 2;
 	}
-	strncpy(new_slot->name, name, sizeof(new_slot->name));
+	strlcpy(new_slot->name, name, sizeof(new_slot->name));
 	new_slot->qid.path = addr;
 	new_slot->qid.vers = 0;
 	new_slot->qid.type = QTFILE;

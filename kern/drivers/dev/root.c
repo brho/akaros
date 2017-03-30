@@ -204,7 +204,7 @@ static int newentry(int parent)
 static int createentry(int dir, char *name, int omode, int perm)
 {
 	int n = newentry(dir);
-	strncpy(roottab[n].name, name, sizeof(roottab[n].name));
+	strlcpy(roottab[n].name, name, sizeof(roottab[n].name));
 	roottab[n].length = 0;
 	roottab[n].perm = perm;
 	/* vers is already properly set. */
