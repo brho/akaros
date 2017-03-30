@@ -471,7 +471,7 @@ int netifwstat(struct ether *nif, struct chan *c, uint8_t * db, int n)
 	}
 	if (!emptystr(dir[0].uid))
 		strlcpy(f->owner, dir[0].uid, KNAMELEN);
-	if (dir[0].mode != ~0UL)
+	if (dir[0].mode != -1)
 		f->mode = dir[0].mode;
 	kfree(dir);
 	return m;

@@ -618,7 +618,7 @@ static int ipwstat(struct chan *c, uint8_t * dp, int n)
 		error(EPERM, ERROR_FIXME);
 	if (!emptystr(d->uid))
 		kstrdup(&cv->owner, d->uid);
-	if (d->mode != ~0UL)
+	if (d->mode != -1)
 		cv->perm = d->mode & 0777;
 	poperror();
 	kfree(d);

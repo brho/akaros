@@ -139,7 +139,7 @@ struct dir {
 	unsigned int dev;			/* server subtype */
 	/* file data */
 	struct qid qid;				/* unique id from server */
-	uint32_t mode;				/* permissions */
+	int mode;					/* permissions */
 	uint32_t atime;				/* last read time */
 	uint32_t mtime;				/* last write time */
 	int64_t length;				/* file length: see <u.h> */
@@ -475,7 +475,7 @@ struct dirtab {
 	char name[KNAMELEN];
 	struct qid qid;
 	int64_t length;
-	long perm;
+	int perm;
 };
 
 struct walkqid {

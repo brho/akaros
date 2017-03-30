@@ -442,7 +442,7 @@ static int rootwstat(struct chan *c, uint8_t *m_buf, int m_buf_sz)
 	if (!emptystr(dir->name))
 		printk("[%s] attempted rename of %s to %s\n", __FUNCTION__,
 		       file->name, dir->name);	/* strncpy for this btw */
-	if (dir->mode != ~0UL)
+	if (dir->mode != -1)
 		file->perm = dir->mode | (file->qid.type == QTDIR ? DMDIR : 0);
 	kfree(dir);
 	return m_sz;

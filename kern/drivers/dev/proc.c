@@ -693,7 +693,7 @@ static int procwstat(struct chan *c, uint8_t * db, int n)
 		else
 			proc_set_username(p, d->uid);
 	}
-	if (d->mode != ~0UL)
+	if (d->mode != -1)
 		p->procmode = d->mode & 0777;
 
 	poperror();

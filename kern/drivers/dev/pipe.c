@@ -507,7 +507,7 @@ static int pipewstat(struct chan *c, uint8_t *dp, int n)
 			error(EEXIST, ERROR_FIXME);
 		strncpy(p->pipedir[1 + d1].name, d->name, KNAMELEN);
 	}
-	if (d->mode != ~0UL)
+	if (d->mode != -1)
 		p->pipedir[d1 + 1].perm = d->mode & 0777;
 	poperror();
 	kfree(d);
