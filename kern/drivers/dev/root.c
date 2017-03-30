@@ -51,7 +51,6 @@ static char *devname(void)
 /* make it a power of 2 and nobody gets hurt */
 #define MAXFILE 1024
 int rootmaxq = MAXFILE;
-int inumber = 13;
 
 /* TODO:
  *  - synchronization!  what needs protection from concurrent use, etc.
@@ -59,6 +58,7 @@ int inumber = 13;
  * 	- does remove, mkdir, rmdir work?
  * 	- fill this with cpio stuff
  * 	- figure out how to use the page cache
+ * 	- atime/ctime/mtime/etctime
  */
 
 /* this gives you some idea of how much I like linked lists. Just make
@@ -229,16 +229,21 @@ static struct chan *rootattach(char *spec)
 	return c;
 }
 
-static int
-rootgen(struct chan *c, char *name,
-		struct dirtab *tab, int nd, int s, struct dir *dp)
+/* rootgen is unlike other gens when it comes to the dirtab (tab) and ntab (nd).
+ * We actually are a linked list of entries that happen to be in a table.  We
+ * can figure out where to start based on the chan's qid.path and start the gen
+ * from there.  So we don't need the 'tab' from dev.  Likewise, for directories,
+ * we can figure out nd - our length in the dirtab. */
+static int rootgen(struct chan *c, char *name, struct dirtab *tab_unused,
+                   int nd_unused, int s, struct dir *dp)
 {
 	int p, i;
 	struct rootdata *r;
 	int iter;
-	printd("rootgen, path is %d, tap %p, nd %d s %d name %s\n", c->qid.path,
-	       tab, nd, s, name);
+	struct dirtab *tab;
 
+	printd("rootgen from %s, for %s, s %d\n", roottab[c->qid.path].name, name,
+	       s);
 	if (s == DEVDOTDOT) {
 		p = rootdata[c->qid.path].dotdot;
 		c->qid = roottab[p].qid;
@@ -284,21 +289,19 @@ rootgen(struct chan *c, char *name,
 		printd("rootgen: :%s: failed at path %d\n", name, path);
 		return -1;
 	}
-	/* need to gen the file or the contents of the directory we are currently
-	 * at.  but i think the tab entries are all over the place.  nd is how
-	 * many entries the directory has. */
-	if (s >= nd) {
-		printd("S OVERFLOW\n");
+	/* Note we do not provide a "direct gen" for directories, which normally I'd
+	 * do here.  If we do, that will confuse devdirread, which expects us to
+	 * list our children, not ourselves.  stat() wants a "direct gen", e.g. for
+	 * ls -l or stat of a directory.  We can handle that in rootstat(). */
+	if (s >= roottab[c->qid.path].length)
 		return -1;
-	}
-	//tab += s;	/* this would only work if our entries were contig in the tab */
 	for (i = rootdata[c->qid.path].child; i; i = roottab[i].qid.vers) {
 		tab = &roottab[i];
 		if (s-- == 0)
 			break;
 	}
 	if (!i) {
-		printd("I OVERFLOW\n");
+		warn("#root overflowed 'i', probably a bug");
 		return -1;
 	}
 	printd("root scan find returns path %p name %s\n", tab->qid.path, tab->name);
@@ -309,33 +312,32 @@ rootgen(struct chan *c, char *name,
 static struct walkqid *rootwalk(struct chan *c, struct chan *nc, char **name,
 								int nname)
 {
-	uint32_t p;
-	if (0){
-		printk("rootwalk: c %p. :", c);
-		if (nname){
-			int i;
-			for (i = 0; i < nname - 1; i++)
-				printk("%s/", name[i]);
-			printk("%s:\n", name[i]);
-		}
-	}
-	p = c->qid.path;
-	printd("Start from #%d at %p\n", p, &roottab[p]);
-	return devwalk(c, nc, name, nname, &roottab[p], roottab[p].length, rootgen);
+	return devwalk(c, nc, name, nname, NULL, 0, rootgen);
 }
 
+/* Instead of using devstat, we use our own.  This allows us to have stats on
+ * directories.  devstat() just fakes it.  Note that gen cannot return a direct
+ * gen for a directory, since that would break devdirread(). */
 static int rootstat(struct chan *c, uint8_t * dp, int n)
 {
-	int p = c->qid.path;
-	return devstat(c, dp, n, rootdata[p].ptr, roottab[p].length, rootgen);
+	struct dir dir[1];
+	ssize_t ret;
+	struct dirtab *entry = &roottab[c->qid.path];
+
+	/* TODO: this assumes eve is the user, which is what synthetic devices do.
+	 * Likewise, it sets atime/mtime like a synth device.  There might be other
+	 * weird things, like qid.type and mode. */
+	devdir(c, entry->qid, entry->name, entry->length, eve.name, entry->perm,
+	       dir);
+	ret = convD2M(dir, dp, n);
+	if (!ret)
+		error(EFAIL, "#root failed to convert stat object to M");
+	return ret;
 }
 
 static struct chan *rootopen(struct chan *c, int omode)
 {
-	int p;
-	printd("rootopen: omode %o\n", omode);
-	p = c->qid.path;
-	return devopen(c, omode, rootdata[p].ptr, roottab[p].length, rootgen);
+	return devopen(c, omode, NULL, 0, rootgen);
 }
 
 static void rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
@@ -373,10 +375,8 @@ static long rootread(struct chan *c, void *buf, long n, int64_t offset)
 	uint8_t *data;
 
 	p = c->qid.path;
-	if (c->qid.type & QTDIR) {
-		return devdirread(c, buf, n, rootdata[p].ptr, roottab[p].length,
-						  rootgen);
-	}
+	if (c->qid.type & QTDIR)
+		return devdirread(c, buf, n, NULL, 0, rootgen);
 	len = roottab[p].length;
 	if (offset < 0 || offset >= len) {
 		return 0;

@@ -96,7 +96,15 @@ devdir(struct chan *c, struct qid qid, char *n,
  *
  * TODO(cross): Document devgen and clean this mess up. Devgen should probably
  * be removed and replaced with a smarter data structure.
- */
+ *
+ * Keep in mind that the expected behavior of gen functions that interoperate
+ * with dev functions (e.g. devdirread()) is that files are directly genned, but
+ * not directories.  Directories will fail to gen, and devstat() just makes
+ * something up.  See also:
+ * https://github.com/brho/plan9/blob/89d43d2262ad43eb4b26c2a8d6a27cfeddb33828/nix/sys/src/nix/port/dev.c#L74
+ *
+ * The comment about genning a file's siblings needs a grain of salt too.  Look
+ * through ipgen().  I think it's what I call "direct genning." */
 int
 devgen(struct chan *c, char *unused_name, struct dirtab *tab, int ntab,
        int i, struct dir *dp)
