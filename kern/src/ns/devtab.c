@@ -18,18 +18,31 @@
 
 void devtabreset()
 {
-	int i;
+	ERRSTACK(1);
+	volatile int i;
 
+	if (waserror()) {
+		panic("A devtab reset (probably %p) failed!", devtab[i].reset);
+		poperror();
+		return;
+	}
 	for (i = 0; &devtab[i] < __devtabend; i++) {
 		if (devtab[i].reset)
 			devtab[i].reset();
 	}
+	poperror();
 }
 
 void devtabinit()
 {
-	int i;
+	ERRSTACK(1);
+	volatile int i;
 
+	if (waserror()) {
+		panic("A devtab init (probably %p) failed!", devtab[i].init);
+		poperror();
+		return;
+	}
 	for (i = 0; &devtab[i] < __devtabend; i++) {
 		/* if we have errors, check the align of struct dev and objdump */
 		printd("i %d, '%s', dev %p, init %p\n", i, devtab[i].name,
@@ -37,6 +50,7 @@ void devtabinit()
 		if (devtab[i].init)
 			devtab[i].init();
 	}
+	poperror();
 }
 
 void devtabshutdown()
