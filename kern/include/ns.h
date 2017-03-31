@@ -468,7 +468,7 @@ struct dev {
 	char *(*chaninfo) (struct chan *, char *, size_t);
 	int (*tapfd) (struct chan *, struct fd_tap *, int);
 	int (*chan_ctl)(struct chan *, int);
-	/* we need to be aligned, we think to 64 bytes, for the linker tables. */
+	/* we need to be aligned to 64 bytes for the linker tables. */
 } __attribute__ ((aligned(64)));
 
 struct dirtab {
@@ -476,7 +476,8 @@ struct dirtab {
 	struct qid qid;
 	int64_t length;
 	int perm;
-};
+	/* we need to be aligned to 64 bytes for the linker tables. */
+} __attribute__ ((aligned(64)));
 
 struct walkqid {
 	struct chan *clone;
