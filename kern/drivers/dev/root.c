@@ -439,9 +439,23 @@ static int rootwstat(struct chan *c, uint8_t *m_buf, int m_buf_sz)
 		error(ENODATA, ERROR_FIXME);
 	}
 	/* TODO: handle more things than just the mode */
-	if (!emptystr(dir->name))
+	if (!emptystr(dir->name)) {
 		printk("[%s] attempted rename of %s to %s\n", __FUNCTION__,
 		       file->name, dir->name);	/* strncpy for this btw */
+		// XXX this isn't enough.  they give us the full path, like
+		// attempted rename of SOME_FILE
+		//                     /root/SOME_DIR/SOME_NEW_FILE
+		//
+		// the first one is just the final part.  we don't even know where we
+		// are in the directory hierarchy (is our parent called SOME_DIR?)
+		// we also don't know the name of our mount point for the destination
+		//
+		//  9ns rename creates the new_chan.  that seems fucked
+		//  		might be ok...
+		//  probably leaking shit
+		//  mount detection is wrong
+		strlcpy(file->name, dir->name, KNAMELEN);
+	}
 	if (dir->mode != -1)
 		file->perm = dir->mode | (file->qid.type == QTDIR ? DMDIR : 0);
 	kfree(dir);

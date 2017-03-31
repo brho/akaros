@@ -2355,7 +2355,8 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	 * into account for the Twstat.
 	 */
 	if (oldchan->mountpoint) {
-		printd("mountpoint: %C\n", oldchan->mountpoint);
+		// XXX this isn't tripping.
+		printk("mountpoint: %C\n", oldchan->mountpoint);
 		if (oldchan->mountpoint->name)
 			mountpointlen = oldchan->mountpoint->name->len;
 	}
@@ -2367,14 +2368,31 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	}
 
 	/* the omode and perm are of no importance. */
+	// XXX this can throw!
 	newchan = namec(to_path, Acreatechan, 0, 0);
 	if (newchan == NULL) {
 		printd("sys_rename %s to %s found no chan\n", from_path, to_path);
 		set_errno(EPERM);
 		goto done;
 	}
-	printd("Newchan: %C\n", newchan);
-	printd("Newchan: mchan %C\n", newchan->mchan);
+	printk("Newchan: %C\n", newchan);
+	printk("Newchan: mchan %C\n", newchan->mchan);
+	// XXX maybe we don't need this - Acreatechan returns the chan for the dir
+	// of the target (to_path).  so it's name is what we can strip
+	// 		maybe get rid of mntpt, mtpt len, etc?
+	// 		wait, what is cname?  name from namec?  relative?  abs?
+	// 			probably whatever path they used to for namec.
+	// 			/root,  \#root, etc
+	// 		also, newchan is the PARENT, but not the mountpoint.  we need the
+	// 		mountpoint of newchan, then strip that out
+	// 				then the device needs to know how to mv btw directories
+	//
+	// 		tried /root/foo2/xme, but failed to find /root/foo2 (prob on the
+	// 		walk for newchan)!
+	// 				err from devwalk, gen -1, j == 0
+	// 			might have been after previous bad renames corrupted something?
+	// 			though root/foo2 was in dumprootdev 
+	printk("Newchan: mtpt %C\n", newchan->mountpoint);
 
 	if ((newchan->dev != oldchan->dev) ||
 		(newchan->type != oldchan->type)) {
@@ -2393,6 +2411,9 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	 * Once stripped, it still has to be an absolute path.
 	 */
 	if (dir.name[0] == '/') {
+		// XXX we're hitting here, but mountpointlen == 0, i think
+		// 		also, should this be fore the newchan's walk, not oldchan?  (in
+		// 		the off chance you use a different path
 		dir.name = to_path + mountpointlen;
 		if (dir.name[0] != '/') {
 			set_errno(EINVAL);
@@ -2424,12 +2445,11 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 
 	poperror();
 	if (retval == mlen) {
-		retval = mlen;
+		retval = 0;
 	} else {
-		printk("syswstat did not go well\n");
 		set_errno(EXDEV);
+		retval = -1;
 	};
-	printk("syswstat returns %d\n", retval);
 
 done:
 	free_path(p, from_path);

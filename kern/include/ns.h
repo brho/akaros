@@ -105,7 +105,7 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 
 #define	STATMAX	65535U	/* max length of machine-independent stat structure */
 #define	ERRMAX			128	/* max length of error string */
-#define	KNAMELEN		28	/* max length of name held in kernel */
+#define	KNAMELEN		160	/* max length of name held in kernel */
 
 /* bits in Qid.type */
 #define QTDIR		0x80	/* type bit for directories */
