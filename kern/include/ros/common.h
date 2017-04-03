@@ -40,36 +40,6 @@ typedef unsigned long uintreg_t;
 
 #define COUNT_OF(x) (sizeof((x))/sizeof((x)[0]))
 
-// Efficient min and max operations
-#ifdef ROS_KERNEL /* Glibc or other user libs have their own */
-#define MIN(_a, _b)						\
-({								\
-	typeof(_a) __a = (_a);					\
-	typeof(_b) __b = (_b);					\
-	__a <= __b ? __a : __b;					\
-})
-#define MAX(_a, _b)						\
-({								\
-	typeof(_a) __a = (_a);					\
-	typeof(_b) __b = (_b);					\
-	__a >= __b ? __a : __b;					\
-})
-
-/* Other kernel-only includes */
-
-/* Test for alignment, e.g. 2^6 */
-#define ALIGNED(p, a)	(!(((uintptr_t)(p)) & ((a)-1)))
-/* Aligns x up to the mask, e.g. (2^6 - 1) (round up if any mask bits are set)*/
-#define __ALIGN_MASK(x, mask) (((uintptr_t)(x) + (mask)) & ~(mask))
-/* Aligns x up to the alignment, e.g. 2^6. */
-#define ALIGN(x, a) ((typeof(x)) __ALIGN_MASK(x, (a) - 1))
-/* Will return false for 0.  Debatable, based on what you want. */
-#define IS_PWR2(x) ((x) && !((x) & (x - 1)))
-
-#define ARRAY_SIZE(x) COUNT_OF(x)
-
-#endif
-
 #define ZERO_DATA(s) memset(&(s), 0, sizeof(s))
 
 /* Rounding operations (efficient when n is a power of 2)
