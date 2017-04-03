@@ -184,7 +184,7 @@ void __attribute__((constructor)) vcore_lib_init(void)
 	 * Also, this is the "lowest" level constructor for now, so we don't need
 	 * to call any other init functions after our run_once() call. This may
 	 * change in the future. */
-	init_once_racy(return);
+	parlib_init_once_racy(return);
 	/* Need to alloc vcore0's transition stuff here (technically, just the TLS)
 	 * so that schedulers can use vcore0's transition TLS before it comes up in
 	 * vcore_entry() */

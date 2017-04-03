@@ -91,7 +91,7 @@ static void uthread_track_thread0(struct uthread *uthread)
 void uthread_mcp_init()
 {
 	/* Prevent this from happening more than once. */
-	init_once_racy(return);
+	parlib_init_once_racy(return);
 
 	/* Doing this after the init_once check, since we don't want to let the
 	 * process/2LS change their mind about being an MCP or not once they have
@@ -239,7 +239,7 @@ void __attribute__((constructor)) uthread_lib_init(void)
 	if (__in_fake_parlib())
 		return;
 	/* Only run once, but make sure that vcore_lib_init() has run already. */
-	init_once_racy(return);
+	parlib_init_once_racy(return);
 	vcore_lib_init();
 
 	ret = posix_memalign((void**)&thread0_uth, __alignof__(struct uthread),

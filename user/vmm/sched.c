@@ -109,7 +109,7 @@ static void __attribute__((constructor)) vmm_lib_init(void)
 {
 	struct task_thread *thread0;
 
-	init_once_racy(return);
+	parlib_init_once_racy(return);
 	uthread_lib_init();
 
 	/* Note that thread0 doesn't belong to a VM.  We can set this during

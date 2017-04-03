@@ -436,7 +436,7 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	int ret;
 
 	/* Only run once, but make sure that uthread_lib_init() has run already. */
-	init_once_racy(return);
+	parlib_init_once_racy(return);
 	uthread_lib_init();
 
 	mcs_pdr_init(&queue_lock);
@@ -521,7 +521,7 @@ void __attribute__((constructor)) pthread_lib_init(void)
 void pthread_mcp_init()
 {
 	/* Prevent this from happening more than once. */
-	init_once_racy(return);
+	parlib_init_once_racy(return);
 
 	uthread_mcp_init();
 	/* From here forward we are an MCP running on vcore 0. Could consider doing

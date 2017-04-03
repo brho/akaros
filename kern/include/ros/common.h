@@ -155,16 +155,4 @@ do {                                                                           \
 	}                                                                          \
 } while (0)
 
-/* Aborts with 'retcmd' if this function has already been called.  Compared to
- * run_once, this is put at the top of a function that can be called from
- * multiple sources but should only execute once. */
-#define init_once_racy(retcmd)                                                 \
-do {                                                                           \
-	static bool initialized = FALSE;                                           \
-	if (initialized) {                                                         \
-		retcmd;                                                                \
-	}                                                                          \
-	initialized = TRUE;                                                        \
-} while (0)
-
 #endif /* __ASSEMBLER__ */

@@ -73,6 +73,18 @@ pid_t create_child(const char *exe, int argc, char *const argv[],
 pid_t create_child_with_stdfds(const char *exe, int argc, char *const argv[],
                                char *const envp[]);
 
+/* Aborts with 'retcmd' if this function has already been called.  Compared to
+ * run_once, this is put at the top of a function that can be called from
+ * multiple sources but should only execute once. */
+#define parlib_init_once_racy(retcmd)                                          \
+do {                                                                           \
+	static bool initialized = FALSE;                                           \
+	if (initialized) {                                                         \
+		retcmd;                                                                \
+	}                                                                          \
+	initialized = TRUE;                                                        \
+} while (0)
+
 __END_DECLS
 
 #endif	// !ASSEMBLER
