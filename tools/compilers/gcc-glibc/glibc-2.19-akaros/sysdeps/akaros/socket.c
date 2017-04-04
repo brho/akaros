@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <sys/close_cb.h>
 #include <ros/common.h>
+#include <parlib/parlib.h>
 
 /* bsd extensions */
 #include <sys/uio.h>
@@ -24,6 +25,13 @@
 #include <netinet/in.h>
 
 #include <sys/plan9_helpers.h>
+
+static void socket_init(void *arg)
+{
+	static struct close_cb _sock_close_cb = {.func = _sock_fd_closed};
+
+	register_close_cb(&_sock_close_cb);
+}
 
 /* Create a new socket of type TYPE in domain DOMAIN, using
    protocol PROTOCOL.  If PROTOCOL is zero, one is chosen automatically.
@@ -35,10 +43,10 @@ int __socket(int domain, int type, int protocol)
 	int pfd[2];
 	const char *net;
 	char msg[128];
-	static struct close_cb _sock_close_cb = {.func = _sock_fd_closed};
 	int open_flags;
+	static parlib_once_t once = PARLIB_ONCE_INIT;
 
-	run_once(register_close_cb(&_sock_close_cb));
+	parlib_run_once(&once, socket_init, NULL);
 
 	switch (domain) {
 		case PF_INET:

@@ -61,7 +61,7 @@ static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type,
                               void *data);
 
 /* Initialize the pvcalarm service. Only call this function once */
-static void init_global_pvcalarm(void)
+static void init_global_pvcalarm(void *arg)
 {
 	global_pvcalarm.interval = 0;
 	global_pvcalarm.callback = NULL;
@@ -108,6 +108,8 @@ static void stop_pvcalarm(struct pvcalarm_data *pvcalarm_data)
  * active vcore according to that policy. */
 int enable_pvcalarms(int method, uint64_t interval, void (*callback) (void))
 {
+	static parlib_once_t once = PARLIB_ONCE_INIT;
+
 	assert(!in_vcore_context());
 	if (method != PVCALARM_REAL && method != PVCALARM_PROF)
 		return EINVAL;
@@ -118,7 +120,7 @@ int enable_pvcalarms(int method, uint64_t interval, void (*callback) (void))
 	if (!atomic_cas(&global_pvcalarm.state, S_DISABLED, S_ENABLING))
 		return EBUSY;
 
-	run_once_racy(init_global_pvcalarm());
+	parlib_run_once(&once, init_global_pvcalarm, NULL);
 
 	global_pvcalarm.interval = usec2tsc(interval);
 	global_pvcalarm.callback = callback;

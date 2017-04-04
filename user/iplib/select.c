@@ -53,6 +53,7 @@
 #include <malloc.h>
 #include <parlib/arch/arch.h>
 #include <parlib/uthread.h>
+#include <parlib/parlib.h>
 #include <ros/common.h>
 #include <ros/fs.h>
 #include <signal.h>
@@ -108,7 +109,7 @@ static void select_forked(void)
 	uth_mutex_unlock(fdset_mtx);
 }
 
-static void select_init(void)
+static void select_init(void *arg)
 {
 	static struct close_cb select_close_cb = {.func = select_fd_closed};
 	static struct fork_cb select_fork_cb = {.func = select_forked};
@@ -162,8 +163,9 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
 	uintptr_t my_call_id;
 	int ret;
 	int ep_timeout = select_tv_to_ep_timeout(timeout);
+	static parlib_once_t once = PARLIB_ONCE_INIT;
 
-	run_once(select_init());
+	parlib_run_once(&once, select_init, NULL);
 	/* good thing nfds is a signed int... */
 	if (nfds < 0) {
 		errno = EINVAL;

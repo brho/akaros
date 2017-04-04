@@ -67,7 +67,7 @@ struct sysc_mgmt {
 	struct event_queue 			*ev_q;
 };
 
-#define PTHREAD_ONCE_INIT 0
+#define PTHREAD_ONCE_INIT PARLIB_ONCE_INIT
 #define PTHREAD_BARRIER_SERIAL_THREAD 12345
 #define PTHREAD_MUTEX_INITIALIZER {0,0}
 #define PTHREAD_RWLOCK_INITIALIZER PTHREAD_MUTEX_INITIALIZER
@@ -149,7 +149,7 @@ typedef struct
 	int sched_inherit;
 } pthread_attr_t;
 typedef int pthread_barrierattr_t;
-typedef int pthread_once_t;
+typedef parlib_once_t pthread_once_t;
 typedef dtls_key_t pthread_key_t;
 
 /* Akaros pthread extensions / hacks */

@@ -30,7 +30,7 @@ struct futex_data {
 };
 static struct futex_data __futex;
 
-static inline void futex_init()
+static inline void futex_init(void *arg)
 {
   mcs_pdr_init(&__futex.lock);
   TAILQ_INIT(&__futex.queue);
@@ -188,6 +188,9 @@ int futex(int *uaddr, int op, int val,
           const struct timespec *timeout,
           int *uaddr2, int val3)
 {
+  static parlib_once_t once = PARLIB_ONCE_INIT;
+
+  parlib_run_once(&once, futex_init, NULL);
   // Round to the nearest micro-second
   uint64_t us_timeout = (uint64_t)-1;
   assert(uaddr2 == NULL);
@@ -196,8 +199,6 @@ int futex(int *uaddr, int op, int val,
     us_timeout = timeout->tv_sec*1000000L + timeout->tv_nsec/1000L;
     assert(us_timeout > 0);
   }
-
-  run_once(futex_init());
   switch(op) {
     case FUTEX_WAIT:
       return futex_wait(uaddr, val, us_timeout);

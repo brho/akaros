@@ -272,7 +272,7 @@ static void ep_alarm_dtor(void *obj, size_t unused)
 	ep_put_alarm_evq(ep_a->alarm_evq);
 }
 
-static void epoll_init(void)
+static void epoll_init(void *arg)
 {
 	static struct close_cb epoll_close_cb = {.func = epoll_fd_closed};
 
@@ -289,8 +289,9 @@ int epoll_create(int size)
 {
 	int fd;
 	struct epoll_ctlr *ep;
+	static parlib_once_t once = PARLIB_ONCE_INIT;
 
-	run_once(epoll_init());
+	parlib_run_once(&once, epoll_init, NULL);
 	/* good thing the arg is a signed int... */
 	if (size < 0) {
 		errno = EINVAL;

@@ -15,6 +15,7 @@
 #include <parlib/slab.h>
 #include <stdio.h>
 #include <parlib/assert.h>
+#include <parlib/parlib.h>
 #include <sys/mman.h>
 #include <sys/param.h>
 
@@ -65,7 +66,7 @@ static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	spin_pdr_unlock(&kmem_caches_lock);
 }
 
-void kmem_cache_init(void)
+static void kmem_cache_init(void *arg)
 {
 	spin_pdr_init(&kmem_caches_lock);
 	SLIST_INIT(&kmem_caches);
@@ -90,8 +91,11 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
                                      void (*ctor)(void *, size_t),
                                      void (*dtor)(void *, size_t))
 {
-	run_once(kmem_cache_init());
-	struct kmem_cache *kc = kmem_cache_alloc(&kmem_cache_cache, 0);
+	struct kmem_cache *kc;
+	static parlib_once_t once = PARLIB_ONCE_INIT;
+
+	parlib_run_once(&once, kmem_cache_init, NULL);
+	kc = kmem_cache_alloc(&kmem_cache_cache, 0);
 	__kmem_cache_create(kc, name, obj_size, align, flags, ctor, dtor);
 	return kc;
 }

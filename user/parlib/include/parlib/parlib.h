@@ -73,6 +73,49 @@ pid_t create_child(const char *exe, int argc, char *const argv[],
 pid_t create_child_with_stdfds(const char *exe, int argc, char *const argv[],
                                char *const envp[]);
 
+/* Once */
+typedef struct {
+	bool ran_once;
+	bool is_running;
+} parlib_once_t;
+
+#define PARLIB_ONCE_INIT {FALSE, FALSE}
+
+/* Makes sure func is run exactly once.  Can handle concurrent callers, and
+ * other callers spin til the func is complete. */
+static inline void parlib_run_once(parlib_once_t *once_ctl,
+                                   void (*init_fn)(void *), void *arg)
+{
+	if (!once_ctl->ran_once) {
+		/* fetch and set TRUE, without a header or test_and_set weirdness */
+		if (!__sync_fetch_and_or(&once_ctl->is_running, TRUE)) {
+			/* we won the race and get to run the func */
+			init_fn(arg);
+			wmb();	/* don't let the ran_once write pass previous writes */
+			once_ctl->ran_once = TRUE;
+		} else {
+			/* someone else won, wait til they are done to break out */
+			while (!once_ctl->ran_once)
+				cpu_relax();
+		}
+	}
+}
+
+/* Unprotected, single-threaded version, makes sure func is run exactly once */
+static inline void parlib_run_once_racy(parlib_once_t *once_ctl,
+                                        void (*init_fn)(void *), void *arg)
+{
+	if (!once_ctl->ran_once) {
+		init_fn(arg);
+		once_ctl->ran_once = TRUE;
+	}
+}
+
+static inline void parlib_set_ran_once(parlib_once_t *once_ctl)
+{
+	once_ctl->ran_once = TRUE;
+}
+
 /* Aborts with 'retcmd' if this function has already been called.  Compared to
  * run_once, this is put at the top of a function that can be called from
  * multiple sources but should only execute once. */

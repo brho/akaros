@@ -98,7 +98,6 @@ void kmem_cache_destroy(struct kmem_cache *cp);
 void *kmem_cache_alloc(struct kmem_cache *cp, int flags);
 void kmem_cache_free(struct kmem_cache *cp, void *buf);
 /* Back end: internal functions */
-void kmem_cache_init(void);
 void kmem_cache_reap(struct kmem_cache *cp);
 
 /* Debug */

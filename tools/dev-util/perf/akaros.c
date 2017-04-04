@@ -52,17 +52,18 @@ static int get_vars_nr_cores(void)
 
 static int nr_cores;
 
-static void set_nr_cores(void)
+static void set_nr_cores(void *arg)
 {
 	nr_cores = get_vars_nr_cores();
 	if (nr_cores == -1)
 		nr_cores = guess_nr_cores();
 }
 
-
 size_t ros_total_cores(void)
 {
-	run_once(set_nr_cores());
+	static parlib_once_t once = PARLIB_ONCE_INIT;
+
+	parlib_run_once(&once, set_nr_cores, NULL);
 	return nr_cores;
 }
 

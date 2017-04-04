@@ -1014,11 +1014,15 @@ int pthread_equal(pthread_t t1, pthread_t t2)
   return t1 == t2;
 }
 
-int pthread_once(pthread_once_t* once_control, void (*init_routine)(void))
+int pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
 {
-  if (atomic_swap_u32(once_control, 1) == 0)
-    init_routine();
-  return 0;
+	/* pthread_once's init routine doesn't take an argument, like parlibs.  This
+	 * means the func will be run with an argument passed to it, but it'll be
+	 * ignored. */
+	parlib_run_once(once_control, (void (*)(void *))init_routine, NULL);
+	/* The return for pthread_once isn't an error from the function, it's just
+	 * an overall error.  Note pthread's init_routine() has no return value. */
+	return 0;
 }
 
 int pthread_barrier_init(pthread_barrier_t *b,

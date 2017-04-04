@@ -79,19 +79,23 @@ void __print_func_exit(const char *func, const char *file)
 	spinlock_unlock(&lock);
 }
 
+static int kptrace;
+
+static void trace_init(void *arg)
+{
+	kptrace = open("#kprof/kptrace", O_WRITE);
+	if (kptrace < 0)
+		perror("Unable to open kptrace!\n");
+}
+
 void trace_printf(const char *fmt, ...)
 {
-	static int kptrace;
 	va_list args;
 	char buf[128];
 	int amt;
+	static parlib_once_t once = PARLIB_ONCE_INIT;
 
-	run_once(
-		kptrace = open("#kprof/kptrace", O_WRITE);
-		if (kptrace < 0)
-			perror("Unable to open kptrace!\n");
-	);
-
+	parlib_run_once(&once, trace_init, NULL);
 	if (kptrace < 0)
 		return;
 	amt = snprintf(buf, sizeof(buf), "PID %d: ", getpid());
