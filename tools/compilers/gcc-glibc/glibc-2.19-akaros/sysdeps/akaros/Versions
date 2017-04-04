@@ -90,5 +90,6 @@ libc {
     spin_pdr_trylock;
     spin_pdr_lock;
     spin_pdr_unlock;
+    cpu_relax_vc;
   }
 }

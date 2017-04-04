@@ -99,3 +99,9 @@ void __spin_pdr_unlock(struct spin_pdr_lock *pdr_lock)
 	pdr_lock->lock = SPINPDR_UNLOCKED;
 }
 weak_alias(__spin_pdr_unlock, spin_pdr_unlock)
+
+void __cpu_relax_vc(uint32_t vcoreid)
+{
+	cpu_relax();
+}
+weak_alias(__cpu_relax_vc, cpu_relax_vc)

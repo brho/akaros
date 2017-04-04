@@ -9,6 +9,7 @@
 #ifndef __ASSEMBLER__
 
 #include <parlib/common.h>
+#include <parlib/vcore.h>
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
 #include <ros/procinfo.h>
@@ -96,7 +97,7 @@ static inline void parlib_run_once(parlib_once_t *once_ctl,
 		} else {
 			/* someone else won, wait til they are done to break out */
 			while (!once_ctl->ran_once)
-				cpu_relax();
+				cpu_relax_vc(vcore_id());
 		}
 	}
 }
