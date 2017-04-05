@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Google, Inc.
+/* Copyright (c) 2016-2017 Google, Inc.
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details. */
 
@@ -10,33 +10,15 @@
 #include <parlib/spinlock.h>
 #include <malloc.h>
 
-/* The linkage structs are for the yield callbacks */
-struct uth_default_mtx;
-struct uth_mtx_link {
-	TAILQ_ENTRY(uth_mtx_link)	next;
-	struct uth_default_mtx		*mtx;
-	struct uthread				*uth;
-};
-TAILQ_HEAD(mtx_link_tq, uth_mtx_link);
-
 struct uth_default_mtx {
 	struct spin_pdr_lock		lock;
-	struct mtx_link_tq			waiters;
+	uth_sync_t					sync_obj;
 	bool						locked;
 };
 
-struct uth_default_cv;
-struct uth_cv_link {
-	TAILQ_ENTRY(uth_cv_link)	next;
-	struct uth_default_cv		*cv;
-	struct uth_default_mtx		*mtx;
-	struct uthread				*uth;
-};
-TAILQ_HEAD(cv_link_tq, uth_cv_link);
-
 struct uth_default_cv {
 	struct spin_pdr_lock		lock;
-	struct cv_link_tq			waiters;
+	uth_sync_t					sync_obj;
 };
 
 
@@ -50,21 +32,20 @@ static struct uth_default_mtx *uth_default_mtx_alloc(void)
 	mtx = malloc(sizeof(struct uth_default_mtx));
 	assert(mtx);
 	spin_pdr_init(&mtx->lock);
-	TAILQ_INIT(&mtx->waiters);
+	mtx->sync_obj = __uth_sync_alloc();
 	mtx->locked = FALSE;
 	return mtx;
 }
 
 static void uth_default_mtx_free(struct uth_default_mtx *mtx)
 {
-	assert(TAILQ_EMPTY(&mtx->waiters));
+	__uth_sync_free(mtx->sync_obj);
 	free(mtx);
 }
 
 static void __mutex_cb(struct uthread *uth, void *arg)
 {
-	struct uth_mtx_link *link = (struct uth_mtx_link*)arg;
-	struct uth_default_mtx *mtx = link->mtx;
+	struct uth_default_mtx *mtx = (struct uth_default_mtx*)arg;
 
 	/* We need to tell the 2LS that its thread blocked.  We need to do this
 	 * before unlocking the mtx, since as soon as we unlock, the mtx could be
@@ -72,27 +53,22 @@ static void __mutex_cb(struct uthread *uth, void *arg)
 	 *
 	 * Also note the lock-ordering rule.  The mtx lock is grabbed before any
 	 * locks the 2LS might grab. */
-	uthread_has_blocked(uth, UTH_EXT_BLK_MUTEX);
+	uthread_has_blocked(uth, mtx->sync_obj, UTH_EXT_BLK_MUTEX);
 	spin_pdr_unlock(&mtx->lock);
 }
 
 static void uth_default_mtx_lock(struct uth_default_mtx *mtx)
 {
-	struct uth_mtx_link link;
-
 	spin_pdr_lock(&mtx->lock);
 	if (!mtx->locked) {
 		mtx->locked = TRUE;
 		spin_pdr_unlock(&mtx->lock);
 		return;
 	}
-	link.mtx = mtx;
-	link.uth = current_uthread;
-	TAILQ_INSERT_TAIL(&mtx->waiters, &link, next);
-	/* the unlock is done in the yield callback.  as always, we need to do this
-	 * part in vcore context, since as soon as we unlock the uthread could
-	 * restart.  (atomically yield and unlock). */
-	uthread_yield(TRUE, __mutex_cb, &link);
+	/* the unlock and sync enqueuing is done in the yield callback.  as always,
+	 * we need to do this part in vcore context, since as soon as we unlock the
+	 * uthread could restart.  (atomically yield and unlock). */
+	uthread_yield(TRUE, __mutex_cb, mtx);
 }
 
 static bool uth_default_mtx_trylock(struct uth_default_mtx *mtx)
@@ -110,17 +86,15 @@ static bool uth_default_mtx_trylock(struct uth_default_mtx *mtx)
 
 static void uth_default_mtx_unlock(struct uth_default_mtx *mtx)
 {
-	struct uth_mtx_link *first;
+	struct uthread *uth;
 
 	spin_pdr_lock(&mtx->lock);
-	first = TAILQ_FIRST(&mtx->waiters);
-	if (first)
-		TAILQ_REMOVE(&mtx->waiters, first, next);
-	else
+	uth = __uth_sync_get_next(mtx->sync_obj);
+	if (!uth)
 		mtx->locked = FALSE;
 	spin_pdr_unlock(&mtx->lock);
-	if (first)
-		uthread_runnable(first->uth);
+	if (uth)
+		uthread_runnable(uth);
 }
 
 
@@ -261,15 +235,20 @@ static struct uth_default_cv *uth_default_cv_alloc(void)
 	cv = malloc(sizeof(struct uth_default_cv));
 	assert(cv);
 	spin_pdr_init(&cv->lock);
-	TAILQ_INIT(&cv->waiters);
+	cv->sync_obj = __uth_sync_alloc();
 	return cv;
 }
 
 static void uth_default_cv_free(struct uth_default_cv *cv)
 {
-	assert(TAILQ_EMPTY(&cv->waiters));
+	__uth_sync_free(cv->sync_obj);
 	free(cv);
 }
+
+struct uth_cv_link {
+	struct uth_default_cv		*cv;
+	struct uth_default_mtx		*mtx;
+};
 
 static void __cv_wait_cb(struct uthread *uth, void *arg)
 {
@@ -283,8 +262,18 @@ static void __cv_wait_cb(struct uthread *uth, void *arg)
 	 *
 	 * Also note the lock-ordering rule.  The cv lock is grabbed before any
 	 * locks the 2LS might grab. */
-	uthread_has_blocked(uth, UTH_EXT_BLK_MUTEX);
+	uthread_has_blocked(uth, cv->sync_obj, UTH_EXT_BLK_MUTEX);
 	spin_pdr_unlock(&cv->lock);
+	/* This looks dangerous, since both the CV and MTX could use the
+	 * uth->sync_next TAILQ_ENTRY (or whatever the 2LS uses), but the uthread
+	 * never sleeps on both at the same time.  We *hold* the mtx - we aren't
+	 * *sleeping* on it.  Sleeping uses the sync_next.  Holding it doesn't.
+	 *
+	 * Next, consider what happens as soon as we unlock the CV.  Our thread
+	 * could get woken up, and then immediately try to grab the mtx and go to
+	 * sleep! (see below).  If that happens, the uthread is no longer sleeping
+	 * on the CV, and the sync_next is free.  The invariant is that a uthread
+	 * can only sleep on one sync_object at a time. */
 	uth_mutex_unlock((uth_mutex_t)mtx);
 }
 
@@ -348,37 +337,38 @@ static void uth_default_cv_wait(struct uth_default_cv *cv,
 
 	link.cv = cv;
 	link.mtx = mtx;
-	link.uth = current_uthread;
 	spin_pdr_lock(&cv->lock);
-	TAILQ_INSERT_TAIL(&cv->waiters, &link, next);
 	uthread_yield(TRUE, __cv_wait_cb, &link);
 	uth_mutex_lock((uth_mutex_t)mtx);
 }
 
 static void uth_default_cv_signal(struct uth_default_cv *cv)
 {
-	struct uth_cv_link *first;
+	struct uthread *uth;
 
 	spin_pdr_lock(&cv->lock);
-	first = TAILQ_FIRST(&cv->waiters);
-	if (first)
-		TAILQ_REMOVE(&cv->waiters, first, next);
+	uth = __uth_sync_get_next(cv->sync_obj);
 	spin_pdr_unlock(&cv->lock);
-	if (first)
-		uthread_runnable(first->uth);
+	if (uth)
+		uthread_runnable(uth);
 }
 
 static void uth_default_cv_broadcast(struct uth_default_cv *cv)
 {
-	struct cv_link_tq restartees = TAILQ_HEAD_INITIALIZER(restartees);
-	struct uth_cv_link *i, *safe;
+	struct uth_tailq restartees = TAILQ_HEAD_INITIALIZER(restartees);
+	struct uthread *i, *safe;
 
 	spin_pdr_lock(&cv->lock);
-	TAILQ_SWAP(&cv->waiters, &restartees, uth_cv_link, next);
+	/* If this turns out to be slow or painful for 2LSs, we can implement a
+	 * get_all or something (default used to use TAILQ_SWAP). */
+	while ((i = __uth_sync_get_next(cv->sync_obj))) {
+		/* Once the uth is out of the sync obj, we can reuse sync_next. */
+		TAILQ_INSERT_TAIL(&restartees, i, sync_next);
+	}
 	spin_pdr_unlock(&cv->lock);
 	/* Need the SAFE, since we can't touch the linkage once the uth could run */
-	TAILQ_FOREACH_SAFE(i, &restartees, next, safe)
-		uthread_runnable(i->uth);
+	TAILQ_FOREACH_SAFE(i, &restartees, sync_next, safe)
+		uthread_runnable(i);
 }
 
 
@@ -426,4 +416,95 @@ void uth_cond_var_broadcast(uth_cond_var_t cv)
 		return;
 	}
 	uth_default_cv_broadcast((struct uth_default_cv*)cv);
+}
+
+
+/************** Default Sync Obj Implementation **************/
+
+static uth_sync_t uth_default_sync_alloc(void)
+{
+	struct uth_tailq *tq;
+
+	tq = malloc(sizeof(struct uth_tailq));
+	assert(tq);
+	TAILQ_INIT(tq);
+	return (uth_sync_t)tq;
+}
+
+static void uth_default_sync_free(uth_sync_t sync)
+{
+	struct uth_tailq *tq = (struct uth_tailq*)sync;
+
+	assert(TAILQ_EMPTY(tq));
+	free(tq);
+}
+
+static struct uthread *uth_default_sync_get_next(uth_sync_t sync)
+{
+	struct uth_tailq *tq = (struct uth_tailq*)sync;
+	struct uthread *first;
+
+	first = TAILQ_FIRST(tq);
+	if (first)
+		TAILQ_REMOVE(tq, first, sync_next);
+	return first;
+}
+
+static bool uth_default_sync_get_uth(uth_sync_t sync, struct uthread *uth)
+{
+	struct uth_tailq *tq = (struct uth_tailq*)sync;
+	struct uthread *i;
+
+	TAILQ_FOREACH(i, tq, sync_next) {
+		if (i == uth) {
+			TAILQ_REMOVE(tq, i, sync_next);
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+/************** External uthread sync interface **************/
+
+/* Called by the 2LS->has_blocked op, if they are using the default sync.*/
+void __uth_default_sync_enqueue(struct uthread *uth, uth_sync_t sync)
+{
+	struct uth_tailq *tq = (struct uth_tailq*)sync;
+
+	TAILQ_INSERT_TAIL(tq, uth, sync_next);
+}
+
+/* Called by 2LS-independent sync code when a sync object is created. */
+uth_sync_t __uth_sync_alloc(void)
+{
+	if (sched_ops->sync_alloc)
+		return sched_ops->sync_alloc();
+	return uth_default_sync_alloc();
+}
+
+/* Called by 2LS-independent sync code when a sync object is destroyed. */
+void __uth_sync_free(uth_sync_t sync)
+{
+	if (sched_ops->sync_free) {
+		sched_ops->sync_free(sync);
+		return;
+	}
+	uth_default_sync_free(sync);
+}
+
+/* Called by 2LS-independent sync code when a thread needs to be woken. */
+struct uthread *__uth_sync_get_next(uth_sync_t sync)
+{
+	if (sched_ops->sync_get_next)
+		return sched_ops->sync_get_next(sync);
+	return uth_default_sync_get_next(sync);
+}
+
+/* Called by 2LS-independent sync code when a specific thread needs to be woken.
+ * Returns TRUE if the uthread was blocked on the object, FALSE o/w. */
+bool __uth_sync_get_uth(uth_sync_t sync, struct uthread *uth)
+{
+	if (sched_ops->sync_get_uth)
+		return sched_ops->sync_get_uth(sync, uth);
+	return uth_default_sync_get_uth(sync, uth);
 }

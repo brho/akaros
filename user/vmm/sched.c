@@ -37,7 +37,8 @@ static void vmm_sched_entry(void);
 static void vmm_thread_runnable(struct uthread *uth);
 static void vmm_thread_paused(struct uthread *uth);
 static void vmm_thread_blockon_sysc(struct uthread *uth, void *sysc);
-static void vmm_thread_has_blocked(struct uthread *uth, int flags);
+static void vmm_thread_has_blocked(struct uthread *uth, uth_sync_t sync_obj,
+                                   int flags);
 static void vmm_thread_refl_fault(struct uthread *uth,
                                   struct user_context *ctx);
 
@@ -269,13 +270,16 @@ static void vmm_thread_blockon_sysc(struct uthread *uth, void *syscall)
 	/* GIANT WARNING: do not touch the thread after this point. */
 }
 
-static void vmm_thread_has_blocked(struct uthread *uth, int flags)
+static void vmm_thread_has_blocked(struct uthread *uth, uth_sync_t sync_obj,
+                                   int flags)
 {
 	/* The thread blocked on something like a mutex.  It's not runnable, so we
 	 * don't need to put it on a list, but we do need to account for it not
 	 * running.  We'll find out (via thread_runnable) when it starts up again.
 	 */
 	acct_thread_blocked((struct vmm_thread*)uth);
+	if (sync_obj)
+		__uth_default_sync_enqueue(uth, sync_obj);
 }
 
 static void refl_error(struct uthread *uth, unsigned int trap_nr,

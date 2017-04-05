@@ -604,6 +604,9 @@ struct uth_sleep_ctlr {
 
 /* Attaches to an event_queue (ev_udata), tracks the uthreads for this evq */
 struct evq_wakeup_ctlr {
+	/* If we ever use a sync_obj, that would replace waiters.  But also note
+	 * that we want a pointer to something other than the uthread, and currently
+	 * we also wake all threads - there's no scheduling decision. */
 	struct wait_link_tailq		waiters;
 	struct spin_pdr_lock		lock;
 };
@@ -755,7 +758,8 @@ static bool extract_evqs_msg(struct event_queue *evqs[], size_t nr_evqs,
 static void __uth_blockon_evq_cb(struct uthread *uth, void *arg)
 {
 	struct uth_sleep_ctlr *uctlr = arg;
-	uthread_has_blocked(uth, UTH_EXT_BLK_EVENTQ);
+
+	uthread_has_blocked(uth, NULL, UTH_EXT_BLK_EVENTQ);
 	cmb();	/* actually block before saying 'blocked' */
 	uctlr->blocked = TRUE;	/* can be woken up now */
 	wrmb();	/* write 'blocked' before read 'check_evqs' */

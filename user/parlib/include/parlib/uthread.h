@@ -3,6 +3,7 @@
 #include <parlib/vcore.h>
 #include <parlib/signal.h>
 #include <ros/syscall.h>
+#include <sys/queue.h>
 
 __BEGIN_DECLS
 
@@ -31,6 +32,7 @@ struct uthread {
 	int state;
 	struct sigstate sigstate;
 	int notif_disabled_depth;
+	TAILQ_ENTRY(uthread) sync_next;
 	struct syscall *sysc;	/* syscall we're blocking on, if any */
 	struct syscall local_sysc;	/* for when we don't want to use the stack */
 	void (*yield_func)(struct uthread*, void*);
@@ -38,7 +40,27 @@ struct uthread {
 	int err_no;
 	char err_str[MAX_ERRSTR_LEN];
 };
+TAILQ_HEAD(uth_tailq, uthread);
+
 extern __thread struct uthread *current_uthread;
+
+
+/* This struct is undefined.  We use it instead of void * so we can get
+ * compiler warnings if someone passes the wrong pointer type.  Internally, 2LSs
+ * and the default implementation use another object type. */
+typedef struct __uth_sync_opaque * uth_sync_t;
+
+/* 2LS-independent synchronization code (e.g. uthread mutexes) uses these
+ * helpers to access 2LS-specific functions.
+ *
+ * Note the spinlock associated with the higher-level sync primitive is held for
+ * these (where applicable). */
+uth_sync_t __uth_sync_alloc(void);
+void __uth_sync_free(uth_sync_t sync);
+struct uthread *__uth_sync_get_next(uth_sync_t sync);
+bool __uth_sync_get_uth(uth_sync_t sync, struct uthread *uth);
+/* 2LSs that use default sync objs will call this in their has_blocked op. */
+void __uth_default_sync_enqueue(struct uthread *uth, uth_sync_t sync);
 
 /* These structs are undefined.  We use them instead of void * so we can get
  * compiler warnings if someone passes the wrong pointer type.  Internally, we
@@ -55,7 +77,7 @@ struct schedule_ops {
 	void (*thread_runnable)(struct uthread *);
 	void (*thread_paused)(struct uthread *);
 	void (*thread_blockon_sysc)(struct uthread *, void *);
-	void (*thread_has_blocked)(struct uthread *, int);
+	void (*thread_has_blocked)(struct uthread *, uth_sync_t, int);
 	void (*thread_refl_fault)(struct uthread *, struct user_context *);
 	/**** Defining these functions is optional. ****/
 	/* 2LSs can leave the mutex/cv funcs empty for a default implementation */
@@ -69,6 +91,10 @@ struct schedule_ops {
 	void (*cond_var_wait)(uth_cond_var_t, uth_mutex_t);
 	void (*cond_var_signal)(uth_cond_var_t);
 	void (*cond_var_broadcast)(uth_cond_var_t);
+	uth_sync_t (*sync_alloc)(void);
+	void (*sync_free)(uth_sync_t);
+	struct uthread *(*sync_get_next)(uth_sync_t);
+	bool (*sync_get_uth)(uth_sync_t, struct uthread *);
 	/* Functions event handling wants */
 	void (*preempt_pending)(void);
 };
@@ -106,7 +132,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 void uthread_sleep(unsigned int seconds);
 void uthread_usleep(unsigned int usecs);
 void __attribute__((noreturn)) uthread_sleep_forever(void);
-void uthread_has_blocked(struct uthread *uthread, int flags);
+void uthread_has_blocked(struct uthread *uthread, uth_sync_t sync, int flags);
 void uthread_paused(struct uthread *uthread);
 
 /* Utility functions */

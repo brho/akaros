@@ -40,7 +40,8 @@ static void pth_sched_entry(void);
 static void pth_thread_runnable(struct uthread *uthread);
 static void pth_thread_paused(struct uthread *uthread);
 static void pth_thread_blockon_sysc(struct uthread *uthread, void *sysc);
-static void pth_thread_has_blocked(struct uthread *uthread, int flags);
+static void pth_thread_has_blocked(struct uthread *uthread, uth_sync_t sync_obj,
+                                   int flags);
 static void pth_thread_refl_fault(struct uthread *uth,
                                   struct user_context *ctx);
 
@@ -242,7 +243,8 @@ static void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 	/* GIANT WARNING: do not touch the thread after this point. */
 }
 
-static void pth_thread_has_blocked(struct uthread *uthread, int flags)
+static void pth_thread_has_blocked(struct uthread *uthread, uth_sync_t sync_obj,
+                                   int flags)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 
@@ -252,6 +254,8 @@ static void pth_thread_has_blocked(struct uthread *uthread, int flags)
 	 * mostly communicating to our future selves in pth_thread_runnable(), which
 	 * gets called by whoever triggered this callback */
 	pthread->state = PTH_BLK_MUTEX;
+	if (sync_obj)
+		__uth_default_sync_enqueue(uthread, sync_obj);
 }
 
 static void __signal_and_restart(struct uthread *uthread,
