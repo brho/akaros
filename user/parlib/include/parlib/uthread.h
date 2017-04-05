@@ -2,6 +2,7 @@
 
 #include <parlib/vcore.h>
 #include <parlib/signal.h>
+#include <parlib/spinlock.h>
 #include <ros/syscall.h>
 #include <sys/queue.h>
 
@@ -62,13 +63,6 @@ bool __uth_sync_get_uth(uth_sync_t sync, struct uthread *uth);
 /* 2LSs that use default sync objs will call this in their has_blocked op. */
 void __uth_default_sync_enqueue(struct uthread *uth, uth_sync_t sync);
 
-/* These structs are undefined.  We use them instead of void * so we can get
- * compiler warnings if someone passes the wrong pointer type.  Internally, we
- * use another struct type for mtx and cvs. */
-typedef struct __uth_mtx_opaque * uth_mutex_t;
-typedef struct __uth_recurse_mtx_opaque * uth_recurse_mutex_t;
-typedef struct __uth_cv_opaque * uth_cond_var_t;
-
 /* 2L-Scheduler operations.  Examples in pthread.c. */
 struct schedule_ops {
 	/**** These functions must be defined ****/
@@ -80,17 +74,6 @@ struct schedule_ops {
 	void (*thread_has_blocked)(struct uthread *, uth_sync_t, int);
 	void (*thread_refl_fault)(struct uthread *, struct user_context *);
 	/**** Defining these functions is optional. ****/
-	/* 2LSs can leave the mutex/cv funcs empty for a default implementation */
-	uth_mutex_t (*mutex_alloc)(void);
-	void (*mutex_free)(uth_mutex_t);
-	void (*mutex_lock)(uth_mutex_t);
-	bool (*mutex_trylock)(uth_mutex_t);
-	void (*mutex_unlock)(uth_mutex_t);
-	uth_cond_var_t (*cond_var_alloc)(void);
-	void (*cond_var_free)(uth_cond_var_t);
-	void (*cond_var_wait)(uth_cond_var_t, uth_mutex_t);
-	void (*cond_var_signal)(uth_cond_var_t);
-	void (*cond_var_broadcast)(uth_cond_var_t);
 	uth_sync_t (*sync_alloc)(void);
 	void (*sync_free)(uth_sync_t);
 	struct uthread *(*sync_get_next)(uth_sync_t);
@@ -182,24 +165,42 @@ static inline struct user_context *get_cur_uth_ctx(void)
 	val;                                                                       \
 })
 
-/* Generic Uthread Mutexes.  2LSs implement their own methods, but we need a
- * 2LS-independent interface and default implementation. */
+/* Uthread Mutexes / CVs / etc. */
+
+typedef struct uth_mutex * uth_mutex_t;
+typedef struct uth_recurse_mutex * uth_recurse_mutex_t;
+typedef struct uth_cond_var * uth_cond_var_t;
+
+struct uth_mutex {
+	struct spin_pdr_lock		lock;
+	uth_sync_t					sync_obj;
+	bool						locked;
+};
+
+struct uth_recurse_mutex {
+	uth_mutex_t					mtx;
+	struct uthread				*lockholder;
+	unsigned int				count;
+};
+
+struct uth_cond_var {
+	struct spin_pdr_lock		lock;
+	uth_sync_t					sync_obj;
+};
+
 uth_mutex_t uth_mutex_alloc(void);
 void uth_mutex_free(uth_mutex_t m);
 void uth_mutex_lock(uth_mutex_t m);
 bool uth_mutex_trylock(uth_mutex_t m);
 void uth_mutex_unlock(uth_mutex_t m);
 
-/* Recursive mutexes.  Internally, these are built on top of the regular
- * mutexes, and 2LSs do not have their own version. */
 uth_recurse_mutex_t uth_recurse_mutex_alloc(void);
 void uth_recurse_mutex_free(uth_recurse_mutex_t r_m);
 void uth_recurse_mutex_lock(uth_recurse_mutex_t r_m);
 bool uth_recurse_mutex_trylock(uth_recurse_mutex_t r_m);
 void uth_recurse_mutex_unlock(uth_recurse_mutex_t r_m);
 
-/* Generic Uthread Condition Variables.  2LSs can implement their own methods.
- * Callers to cv_wait must hold the mutex, which it will atomically wait and
+/* Callers to cv_wait must hold the mutex, which it will atomically wait and
  * unlock, then relock when it returns.  Callers to signal and broadcast may
  * hold the mutex, if they choose. */
 uth_cond_var_t uth_cond_var_alloc(void);

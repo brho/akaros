@@ -10,26 +10,15 @@
 #include <parlib/spinlock.h>
 #include <malloc.h>
 
-struct uth_default_mtx {
-	struct spin_pdr_lock		lock;
-	uth_sync_t					sync_obj;
-	bool						locked;
-};
 
-struct uth_default_cv {
-	struct spin_pdr_lock		lock;
-	uth_sync_t					sync_obj;
-};
+/************** Mutexes **************/
 
 
-/************** Default Mutex Implementation **************/
-
-
-static struct uth_default_mtx *uth_default_mtx_alloc(void)
+uth_mutex_t uth_mutex_alloc(void)
 {
-	struct uth_default_mtx *mtx;
+	struct uth_mutex *mtx;
 
-	mtx = malloc(sizeof(struct uth_default_mtx));
+	mtx = malloc(sizeof(struct uth_mutex));
 	assert(mtx);
 	spin_pdr_init(&mtx->lock);
 	mtx->sync_obj = __uth_sync_alloc();
@@ -37,7 +26,7 @@ static struct uth_default_mtx *uth_default_mtx_alloc(void)
 	return mtx;
 }
 
-static void uth_default_mtx_free(struct uth_default_mtx *mtx)
+void uth_mutex_free(uth_mutex_t mtx)
 {
 	__uth_sync_free(mtx->sync_obj);
 	free(mtx);
@@ -45,7 +34,7 @@ static void uth_default_mtx_free(struct uth_default_mtx *mtx)
 
 static void __mutex_cb(struct uthread *uth, void *arg)
 {
-	struct uth_default_mtx *mtx = (struct uth_default_mtx*)arg;
+	struct uth_mutex *mtx = (struct uth_mutex*)arg;
 
 	/* We need to tell the 2LS that its thread blocked.  We need to do this
 	 * before unlocking the mtx, since as soon as we unlock, the mtx could be
@@ -57,7 +46,7 @@ static void __mutex_cb(struct uthread *uth, void *arg)
 	spin_pdr_unlock(&mtx->lock);
 }
 
-static void uth_default_mtx_lock(struct uth_default_mtx *mtx)
+void uth_mutex_lock(uth_mutex_t mtx)
 {
 	spin_pdr_lock(&mtx->lock);
 	if (!mtx->locked) {
@@ -71,7 +60,7 @@ static void uth_default_mtx_lock(struct uth_default_mtx *mtx)
 	uthread_yield(TRUE, __mutex_cb, mtx);
 }
 
-static bool uth_default_mtx_trylock(struct uth_default_mtx *mtx)
+bool uth_mutex_trylock(uth_mutex_t mtx)
 {
 	bool ret = FALSE;
 
@@ -84,7 +73,7 @@ static bool uth_default_mtx_trylock(struct uth_default_mtx *mtx)
 	return ret;
 }
 
-static void uth_default_mtx_unlock(struct uth_default_mtx *mtx)
+void uth_mutex_unlock(uth_mutex_t mtx)
 {
 	struct uthread *uth;
 
@@ -98,83 +87,28 @@ static void uth_default_mtx_unlock(struct uth_default_mtx *mtx)
 }
 
 
-/************** Wrappers for the uthread mutex interface **************/
-
-
-uth_mutex_t uth_mutex_alloc(void)
-{
-	if (sched_ops->mutex_alloc)
-		return sched_ops->mutex_alloc();
-	return (uth_mutex_t)uth_default_mtx_alloc();
-}
-
-void uth_mutex_free(uth_mutex_t m)
-{
-	if (sched_ops->mutex_free) {
-		sched_ops->mutex_free(m);
-		return;
-	}
-	uth_default_mtx_free((struct uth_default_mtx*)m);
-}
-
-void uth_mutex_lock(uth_mutex_t m)
-{
-	if (sched_ops->mutex_lock) {
-		sched_ops->mutex_lock(m);
-		return;
-	}
-	uth_default_mtx_lock((struct uth_default_mtx*)m);
-}
-
-bool uth_mutex_trylock(uth_mutex_t m)
-{
-	if (sched_ops->mutex_trylock)
-		return sched_ops->mutex_trylock(m);
-	return uth_default_mtx_trylock((struct uth_default_mtx*)m);
-}
-
-void uth_mutex_unlock(uth_mutex_t m)
-{
-	if (sched_ops->mutex_unlock) {
-		sched_ops->mutex_unlock(m);
-		return;
-	}
-	uth_default_mtx_unlock((struct uth_default_mtx*)m);
-}
-
-
 /************** Recursive mutexes **************/
 
-/* Note the interface type uth_recurse_mtx_t is a pointer to this struct. */
-struct uth_recurse_mtx {
-	uth_mutex_t					mtx;
-	struct uthread				*lockholder;
-	unsigned int				count;
-};
 
 uth_recurse_mutex_t uth_recurse_mutex_alloc(void)
 {
-	struct uth_recurse_mtx *r_mtx = malloc(sizeof(struct uth_recurse_mtx));
+	struct uth_recurse_mutex *r_mtx = malloc(sizeof(struct uth_recurse_mutex));
 
 	assert(r_mtx);
 	r_mtx->mtx = uth_mutex_alloc();
 	r_mtx->lockholder = NULL;
 	r_mtx->count = 0;
-	return (uth_recurse_mutex_t)r_mtx;
+	return r_mtx;
 }
 
-void uth_recurse_mutex_free(uth_recurse_mutex_t r_m)
+void uth_recurse_mutex_free(uth_recurse_mutex_t r_mtx)
 {
-	struct uth_recurse_mtx *r_mtx = (struct uth_recurse_mtx*)r_m;
-
 	uth_mutex_free(r_mtx->mtx);
 	free(r_mtx);
 }
 
-void uth_recurse_mutex_lock(uth_recurse_mutex_t r_m)
+void uth_recurse_mutex_lock(uth_recurse_mutex_t r_mtx)
 {
-	struct uth_recurse_mtx *r_mtx = (struct uth_recurse_mtx*)r_m;
-
 	assert(!in_vcore_context());
 	assert(current_uthread);
 	/* We don't have to worry about races on current_uthread or count.  They are
@@ -194,9 +128,8 @@ void uth_recurse_mutex_lock(uth_recurse_mutex_t r_m)
 	r_mtx->count = 1;
 }
 
-bool uth_recurse_mutex_trylock(uth_recurse_mutex_t r_m)
+bool uth_recurse_mutex_trylock(uth_recurse_mutex_t r_mtx)
 {
-	struct uth_recurse_mtx *r_mtx = (struct uth_recurse_mtx*)r_m;
 	bool ret;
 
 	assert(!in_vcore_context());
@@ -213,10 +146,8 @@ bool uth_recurse_mutex_trylock(uth_recurse_mutex_t r_m)
 	return ret;
 }
 
-void uth_recurse_mutex_unlock(uth_recurse_mutex_t r_m)
+void uth_recurse_mutex_unlock(uth_recurse_mutex_t r_mtx)
 {
-	struct uth_recurse_mtx *r_mtx = (struct uth_recurse_mtx*)r_m;
-
 	r_mtx->count--;
 	if (!r_mtx->count) {
 		r_mtx->lockholder = NULL;
@@ -225,36 +156,36 @@ void uth_recurse_mutex_unlock(uth_recurse_mutex_t r_m)
 }
 
 
-/************** Default Condition Variable Implementation **************/
+/************** Condition Variables **************/
 
 
-static struct uth_default_cv *uth_default_cv_alloc(void)
+uth_cond_var_t uth_cond_var_alloc(void)
 {
-	struct uth_default_cv *cv;
+	struct uth_cond_var *cv;
 
-	cv = malloc(sizeof(struct uth_default_cv));
+	cv = malloc(sizeof(struct uth_cond_var));
 	assert(cv);
 	spin_pdr_init(&cv->lock);
 	cv->sync_obj = __uth_sync_alloc();
 	return cv;
 }
 
-static void uth_default_cv_free(struct uth_default_cv *cv)
+void uth_cond_var_free(uth_cond_var_t cv)
 {
 	__uth_sync_free(cv->sync_obj);
 	free(cv);
 }
 
 struct uth_cv_link {
-	struct uth_default_cv		*cv;
-	struct uth_default_mtx		*mtx;
+	struct uth_cond_var			*cv;
+	struct uth_mutex			*mtx;
 };
 
 static void __cv_wait_cb(struct uthread *uth, void *arg)
 {
 	struct uth_cv_link *link = (struct uth_cv_link*)arg;
-	struct uth_default_cv *cv = link->cv;
-	struct uth_default_mtx *mtx = link->mtx;
+	struct uth_cond_var *cv = link->cv;
+	struct uth_mutex *mtx = link->mtx;
 
 	/* We need to tell the 2LS that its thread blocked.  We need to do this
 	 * before unlocking the cv, since as soon as we unlock, the cv could be
@@ -330,8 +261,7 @@ static void __cv_wait_cb(struct uthread *uth, void *arg)
  *
  * Also note that we use the external API for the mutex operations.  A 2LS could
  * have their own mutex ops but still use the generic cv ops. */
-static void uth_default_cv_wait(struct uth_default_cv *cv,
-                                struct uth_default_mtx *mtx)
+void uth_cond_var_wait(uth_cond_var_t cv, uth_mutex_t mtx)
 {
 	struct uth_cv_link link;
 
@@ -342,7 +272,7 @@ static void uth_default_cv_wait(struct uth_default_cv *cv,
 	uth_mutex_lock((uth_mutex_t)mtx);
 }
 
-static void uth_default_cv_signal(struct uth_default_cv *cv)
+void uth_cond_var_signal(uth_cond_var_t cv)
 {
 	struct uthread *uth;
 
@@ -353,7 +283,7 @@ static void uth_default_cv_signal(struct uth_default_cv *cv)
 		uthread_runnable(uth);
 }
 
-static void uth_default_cv_broadcast(struct uth_default_cv *cv)
+void uth_cond_var_broadcast(uth_cond_var_t cv)
 {
 	struct uth_tailq restartees = TAILQ_HEAD_INITIALIZER(restartees);
 	struct uthread *i, *safe;
@@ -369,53 +299,6 @@ static void uth_default_cv_broadcast(struct uth_default_cv *cv)
 	/* Need the SAFE, since we can't touch the linkage once the uth could run */
 	TAILQ_FOREACH_SAFE(i, &restartees, sync_next, safe)
 		uthread_runnable(i);
-}
-
-
-/************** Wrappers for the uthread CV interface **************/
-
-
-uth_cond_var_t uth_cond_var_alloc(void)
-{
-	if (sched_ops->cond_var_alloc)
-		return sched_ops->cond_var_alloc();
-	return (uth_cond_var_t)uth_default_cv_alloc();
-}
-
-void uth_cond_var_free(uth_cond_var_t cv)
-{
-	if (sched_ops->cond_var_free) {
-		sched_ops->cond_var_free(cv);
-		return;
-	}
-	uth_default_cv_free((struct uth_default_cv*)cv);
-}
-
-void uth_cond_var_wait(uth_cond_var_t cv, uth_mutex_t m)
-{
-	if (sched_ops->cond_var_wait) {
-		sched_ops->cond_var_wait(cv, m);
-		return;
-	}
-	uth_default_cv_wait((struct uth_default_cv*)cv, (struct uth_default_mtx*)m);
-}
-
-void uth_cond_var_signal(uth_cond_var_t cv)
-{
-	if (sched_ops->cond_var_signal) {
-		sched_ops->cond_var_signal(cv);
-		return;
-	}
-	uth_default_cv_signal((struct uth_default_cv*)cv);
-}
-
-void uth_cond_var_broadcast(uth_cond_var_t cv)
-{
-	if (sched_ops->cond_var_broadcast) {
-		sched_ops->cond_var_broadcast(cv);
-		return;
-	}
-	uth_default_cv_broadcast((struct uth_default_cv*)cv);
 }
 
 
