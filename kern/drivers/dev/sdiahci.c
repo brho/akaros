@@ -2165,7 +2165,7 @@ static int newctlr(struct ctlr *ctlr, struct sdev *sdev, int nunit)
 	pi = ahci_hba_read32(ctlr->hba, HBA_PI);
 	for (i = 0; i < NCtlrdrv; i++) {
 		drive = ctlr->rawdrive + i;
-		spinlock_init(&drive->Lock);
+		spinlock_init_irqsave(&drive->Lock);
 		drive->portno = i;
 		drive->driveno = -1;
 		drive->sectors = 0;
@@ -2232,6 +2232,7 @@ static struct sdev *iapnp(void)
 		qlock_init(&s->unitlock);
 		c->physio = p->bar[Abar].mmio_base32 & ~0xf;
 		c->mmio = (void *)vmap_pmem_nocache(c->physio, p->bar[Abar].mmio_sz);
+		spinlock_init_irqsave(&c->Lock);
 		if (c->mmio == 0) {
 			printk("ahci: %s: address %#lX in use did=%#x\n", Tname(c),
 			       c->physio, p->dev_id);
