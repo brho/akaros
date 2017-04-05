@@ -3,6 +3,7 @@
 #include <parlib/vcore.h>
 #include <parlib/signal.h>
 #include <parlib/spinlock.h>
+#include <parlib/parlib.h>
 #include <ros/syscall.h>
 #include <sys/queue.h>
 
@@ -175,18 +176,24 @@ struct uth_mutex {
 	struct spin_pdr_lock		lock;
 	uth_sync_t					sync_obj;
 	bool						locked;
+	parlib_once_t				once_ctl;
 };
+#define UTH_MUTEX_INIT { .once_ctl = PARLIB_ONCE_INIT }
 
 struct uth_recurse_mutex {
-	uth_mutex_t					*mtx;
+	uth_mutex_t					mtx;
 	struct uthread				*lockholder;
 	unsigned int				count;
+	parlib_once_t				once_ctl;
 };
+#define UTH_RECURSE_MUTEX_INIT { .once_ctl = PARLIB_ONCE_INIT }
 
 struct uth_cond_var {
 	struct spin_pdr_lock		lock;
 	uth_sync_t					sync_obj;
+	parlib_once_t				once_ctl;
 };
+#define UTH_COND_VAR_INIT { .once_ctl = PARLIB_ONCE_INIT }
 
 uth_mutex_t *uth_mutex_alloc(void);
 void uth_mutex_free(uth_mutex_t *m);

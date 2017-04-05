@@ -87,9 +87,12 @@ bool test_signal(void)
 	pthread_t signaller, waiter;
 	void *sig_join, *wait_join;
 	int ret;
+	static uth_mutex_t static_mtx = UTH_MUTEX_INIT;
+	static uth_cond_var_t static_cv = UTH_COND_VAR_INIT;
 
-	args->cv = uth_cond_var_alloc();
-	args->mtx = uth_mutex_alloc();
+	/* Also testing the static initializers.  Note we never free these. */
+	args->cv = &static_cv;
+	args->mtx = &static_mtx;
 
 	for (int i = 0; i < 1000; i += 10) {
 		args->flag = FALSE;
@@ -108,8 +111,6 @@ bool test_signal(void)
 		UT_ASSERT_M("Signaller Failed", sig_join == PTH_TEST_TRUE);
 	}
 
-	uth_cond_var_free(args->cv);
-	uth_mutex_free(args->mtx);
 	return TRUE;
 }
 

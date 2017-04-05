@@ -13,6 +13,18 @@
 
 /************** Mutexes **************/
 
+/* Takes a void * since it's called by parlib_run_once(), which enables us to
+ * statically initialize the mutex.  This init does everything not done by the
+ * static initializer.  Note we do not allow 'static' destruction.  (No one
+ * calls free). */
+static void __uth_mutex_init(void *arg)
+{
+	struct uth_mutex *mtx = (struct uth_mutex*)arg;
+
+	spin_pdr_init(&mtx->lock);
+	mtx->sync_obj = __uth_sync_alloc();
+	mtx->locked = FALSE;
+}
 
 uth_mutex_t *uth_mutex_alloc(void)
 {
@@ -20,14 +32,15 @@ uth_mutex_t *uth_mutex_alloc(void)
 
 	mtx = malloc(sizeof(struct uth_mutex));
 	assert(mtx);
-	spin_pdr_init(&mtx->lock);
-	mtx->sync_obj = __uth_sync_alloc();
-	mtx->locked = FALSE;
+	__uth_mutex_init(mtx);
+	/* The once is to make sure the object is initialized. */
+	parlib_set_ran_once(&mtx->once_ctl);
 	return mtx;
 }
 
 void uth_mutex_free(uth_mutex_t *mtx)
 {
+	/* Keep this in sync with uth_recurse_mutex_free(). */
 	__uth_sync_free(mtx->sync_obj);
 	free(mtx);
 }
@@ -48,6 +61,7 @@ static void __mutex_cb(struct uthread *uth, void *arg)
 
 void uth_mutex_lock(uth_mutex_t *mtx)
 {
+	parlib_run_once(&mtx->once_ctl, __uth_mutex_init, mtx);
 	spin_pdr_lock(&mtx->lock);
 	if (!mtx->locked) {
 		mtx->locked = TRUE;
@@ -64,6 +78,7 @@ bool uth_mutex_trylock(uth_mutex_t *mtx)
 {
 	bool ret = FALSE;
 
+	parlib_run_once(&mtx->once_ctl, __uth_mutex_init, mtx);
 	spin_pdr_lock(&mtx->lock);
 	if (!mtx->locked) {
 		mtx->locked = TRUE;
@@ -89,26 +104,38 @@ void uth_mutex_unlock(uth_mutex_t *mtx)
 
 /************** Recursive mutexes **************/
 
+static void __uth_recurse_mutex_init(void *arg)
+{
+	struct uth_recurse_mutex *r_mtx = (struct uth_recurse_mutex*)arg;
+
+	__uth_mutex_init(&r_mtx->mtx);
+	/* Since we always manually call __uth_mutex_init(), there's no reason to
+	 * mess with the regular mutex's static initializer.  Just say it's been
+	 * done. */
+	parlib_set_ran_once(&r_mtx->mtx.once_ctl);
+	r_mtx->lockholder = NULL;
+	r_mtx->count = 0;
+}
 
 uth_recurse_mutex_t *uth_recurse_mutex_alloc(void)
 {
 	struct uth_recurse_mutex *r_mtx = malloc(sizeof(struct uth_recurse_mutex));
 
 	assert(r_mtx);
-	r_mtx->mtx = uth_mutex_alloc();
-	r_mtx->lockholder = NULL;
-	r_mtx->count = 0;
+	__uth_recurse_mutex_init(r_mtx);
+	parlib_set_ran_once(&r_mtx->once_ctl);
 	return r_mtx;
 }
 
 void uth_recurse_mutex_free(uth_recurse_mutex_t *r_mtx)
 {
-	uth_mutex_free(r_mtx->mtx);
+	__uth_sync_free(r_mtx->mtx.sync_obj);
 	free(r_mtx);
 }
 
 void uth_recurse_mutex_lock(uth_recurse_mutex_t *r_mtx)
 {
+	parlib_run_once(&r_mtx->once_ctl, __uth_recurse_mutex_init, r_mtx);
 	assert(!in_vcore_context());
 	assert(current_uthread);
 	/* We don't have to worry about races on current_uthread or count.  They are
@@ -123,7 +150,7 @@ void uth_recurse_mutex_lock(uth_recurse_mutex_t *r_mtx)
 		r_mtx->count++;
 		return;
 	}
-	uth_mutex_lock(r_mtx->mtx);
+	uth_mutex_lock(&r_mtx->mtx);
 	r_mtx->lockholder = current_uthread;
 	r_mtx->count = 1;
 }
@@ -132,13 +159,14 @@ bool uth_recurse_mutex_trylock(uth_recurse_mutex_t *r_mtx)
 {
 	bool ret;
 
+	parlib_run_once(&r_mtx->once_ctl, __uth_recurse_mutex_init, r_mtx);
 	assert(!in_vcore_context());
 	assert(current_uthread);
 	if (r_mtx->lockholder == current_uthread) {
 		r_mtx->count++;
 		return TRUE;
 	}
-	ret = uth_mutex_trylock(r_mtx->mtx);
+	ret = uth_mutex_trylock(&r_mtx->mtx);
 	if (ret) {
 		r_mtx->lockholder = current_uthread;
 		r_mtx->count = 1;
@@ -151,7 +179,7 @@ void uth_recurse_mutex_unlock(uth_recurse_mutex_t *r_mtx)
 	r_mtx->count--;
 	if (!r_mtx->count) {
 		r_mtx->lockholder = NULL;
-		uth_mutex_unlock(r_mtx->mtx);
+		uth_mutex_unlock(&r_mtx->mtx);
 	}
 }
 
@@ -159,14 +187,22 @@ void uth_recurse_mutex_unlock(uth_recurse_mutex_t *r_mtx)
 /************** Condition Variables **************/
 
 
+static void __uth_cond_var_init(void *arg)
+{
+	struct uth_cond_var *cv = (struct uth_cond_var*)arg;
+
+	spin_pdr_init(&cv->lock);
+	cv->sync_obj = __uth_sync_alloc();
+}
+
 uth_cond_var_t *uth_cond_var_alloc(void)
 {
 	struct uth_cond_var *cv;
 
 	cv = malloc(sizeof(struct uth_cond_var));
 	assert(cv);
-	spin_pdr_init(&cv->lock);
-	cv->sync_obj = __uth_sync_alloc();
+	__uth_cond_var_init(cv);
+	parlib_set_ran_once(&cv->once_ctl);
 	return cv;
 }
 
@@ -265,6 +301,7 @@ void uth_cond_var_wait(uth_cond_var_t *cv, uth_mutex_t *mtx)
 {
 	struct uth_cv_link link;
 
+	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
 	link.cv = cv;
 	link.mtx = mtx;
 	spin_pdr_lock(&cv->lock);
@@ -276,6 +313,7 @@ void uth_cond_var_signal(uth_cond_var_t *cv)
 {
 	struct uthread *uth;
 
+	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
 	spin_pdr_lock(&cv->lock);
 	uth = __uth_sync_get_next(cv->sync_obj);
 	spin_pdr_unlock(&cv->lock);
@@ -288,6 +326,7 @@ void uth_cond_var_broadcast(uth_cond_var_t *cv)
 	struct uth_tailq restartees = TAILQ_HEAD_INITIALIZER(restartees);
 	struct uthread *i, *safe;
 
+	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
 	spin_pdr_lock(&cv->lock);
 	/* If this turns out to be slow or painful for 2LSs, we can implement a
 	 * get_all or something (default used to use TAILQ_SWAP). */
