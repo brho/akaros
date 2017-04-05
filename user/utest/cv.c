@@ -148,12 +148,73 @@ bool test_broadcast(void)
 	uth_mutex_free(args->mtx);
 	return TRUE;
 }
+
+static bool __test_recurse(struct uth_recurse_mutex *r_mtx)
+{
+	bool test;
+
+	uth_recurse_mutex_lock(r_mtx);
+	/* should be one lock deep */
+	UT_ASSERT(r_mtx->count == 1);
+	UT_ASSERT(r_mtx->lockholder == current_uthread);
+
+	test = uth_recurse_mutex_trylock(r_mtx);
+	UT_ASSERT_M("Failed to re(try)lock our owned mutex!", test);
+	/* should be two locks deep */
+	UT_ASSERT(r_mtx->count == 2);
+	UT_ASSERT(r_mtx->lockholder == current_uthread);
+
+	uth_recurse_mutex_lock(r_mtx);
+	/* should be three locks deep */
+	UT_ASSERT(r_mtx->count == 3);
+	UT_ASSERT(r_mtx->lockholder == current_uthread);
+
+	uth_recurse_mutex_unlock(r_mtx);
+	/* should be two locks deep */
+	UT_ASSERT(r_mtx->count == 2);
+	UT_ASSERT(r_mtx->lockholder == current_uthread);
+
+	uth_recurse_mutex_unlock(r_mtx);
+	/* should be one lock deep */
+	UT_ASSERT(r_mtx->count == 1);
+	UT_ASSERT(r_mtx->lockholder == current_uthread);
+
+	uth_recurse_mutex_unlock(r_mtx);
+	/* should be unlocked */
+	UT_ASSERT(r_mtx->count == 0);
+	UT_ASSERT(!r_mtx->lockholder);
+
+	return TRUE;
+}
+
+bool test_recurse(void)
+{
+	uth_recurse_mutex_t *r_mtx;
+
+	r_mtx = uth_recurse_mutex_alloc();
+	UT_ASSERT(r_mtx);
+	if (!__test_recurse(r_mtx))
+		return FALSE;
+	uth_recurse_mutex_free(r_mtx);
+
+	return TRUE;
+}
+
+bool test_recurse_static(void)
+{
+	static uth_recurse_mutex_t static_recurse_mtx = UTH_RECURSE_MUTEX_INIT;
+
+	return __test_recurse(&static_recurse_mtx);
+}
+
 /* <--- End definition of test cases ---> */
 
 struct utest utests[] = {
 	UTEST_REG(signal_no_wait),
 	UTEST_REG(signal),
 	UTEST_REG(broadcast),
+	UTEST_REG(recurse),
+	UTEST_REG(recurse_static),
 };
 int num_utests = sizeof(utests) / sizeof(struct utest);
 
