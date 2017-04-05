@@ -2407,7 +2407,9 @@ static void *mlx4_ib_add(struct mlx4_dev *dev)
 
 	mlx4_ib_alloc_eqs(dev, ibdev);
 
-	spin_lock_init(&iboe->lock);
+	/* Note: this is an Akaros function, different from Linux's
+	 * spin_lock_init. */
+	spinlock_init(&iboe->lock);
 
 	if (init_node_data(ibdev))
 		goto err_map;
