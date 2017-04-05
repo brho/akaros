@@ -11,8 +11,8 @@ TEST_SUITE("CV");
 /* <--- Begin definition of test cases ---> */
 
 struct common_args {
-	uth_cond_var_t				cv;
-	uth_mutex_t					mtx;
+	uth_cond_var_t				*cv;
+	uth_mutex_t					*mtx;
 	bool						flag;
 	unsigned int				wait_sleep;
 	unsigned int				sig_sleep;
@@ -22,7 +22,7 @@ struct common_args {
 
 bool test_signal_no_wait(void)
 {
-	uth_cond_var_t cv = uth_cond_var_alloc();
+	uth_cond_var_t *cv = uth_cond_var_alloc();
 
 	uth_cond_var_broadcast(cv);
 	uth_cond_var_signal(cv);

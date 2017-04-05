@@ -64,9 +64,9 @@
 
 static int epoll_fd;
 static fd_set all_fds;
-static uth_mutex_t fdset_mtx;
+static uth_mutex_t *fdset_mtx;
 static uintptr_t unique_caller;
-static uth_mutex_t sleep_mtx;
+static uth_mutex_t *sleep_mtx;
 
 static bool fd_is_set(unsigned int fd, fd_set *set)
 {

@@ -63,13 +63,13 @@ static struct kmem_cache *ep_alarms_cache;
 struct epoll_ctlr {
 	TAILQ_ENTRY(epoll_ctlr)		link;
 	struct event_queue			*ceq_evq;
-	uth_mutex_t					mtx;
+	uth_mutex_t					*mtx;
 	struct user_fd				ufd;
 };
 
 TAILQ_HEAD(epoll_ctlrs, epoll_ctlr);
 static struct epoll_ctlrs all_ctlrs = TAILQ_HEAD_INITIALIZER(all_ctlrs);
-static uth_mutex_t ctlrs_mtx;
+static uth_mutex_t *ctlrs_mtx;
 
 /* There's some bookkeeping we need to maintain on every FD.  Right now, the FD
  * is the index into the CEQ event array, so we can just hook this into the user

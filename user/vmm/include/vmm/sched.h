@@ -31,8 +31,8 @@ struct guest_thread {
 	struct ctlr_thread			*buddy;
 	unsigned int				gpc_id;
 	bool						halt_exit;
-	uth_mutex_t					halt_mtx;
-	uth_cond_var_t				halt_cv;
+	uth_mutex_t					*halt_mtx;
+	uth_cond_var_t				*halt_cv;
 	// TODO: work out a real ops strategy.
 	bool (*vmcall)(struct guest_thread *gth, struct vm_trapframe *);
 };

@@ -167,9 +167,9 @@ static inline struct user_context *get_cur_uth_ctx(void)
 
 /* Uthread Mutexes / CVs / etc. */
 
-typedef struct uth_mutex * uth_mutex_t;
-typedef struct uth_recurse_mutex * uth_recurse_mutex_t;
-typedef struct uth_cond_var * uth_cond_var_t;
+typedef struct uth_mutex uth_mutex_t;
+typedef struct uth_recurse_mutex uth_recurse_mutex_t;
+typedef struct uth_cond_var uth_cond_var_t;
 
 struct uth_mutex {
 	struct spin_pdr_lock		lock;
@@ -178,7 +178,7 @@ struct uth_mutex {
 };
 
 struct uth_recurse_mutex {
-	uth_mutex_t					mtx;
+	uth_mutex_t					*mtx;
 	struct uthread				*lockholder;
 	unsigned int				count;
 };
@@ -188,26 +188,26 @@ struct uth_cond_var {
 	uth_sync_t					sync_obj;
 };
 
-uth_mutex_t uth_mutex_alloc(void);
-void uth_mutex_free(uth_mutex_t m);
-void uth_mutex_lock(uth_mutex_t m);
-bool uth_mutex_trylock(uth_mutex_t m);
-void uth_mutex_unlock(uth_mutex_t m);
+uth_mutex_t *uth_mutex_alloc(void);
+void uth_mutex_free(uth_mutex_t *m);
+void uth_mutex_lock(uth_mutex_t *m);
+bool uth_mutex_trylock(uth_mutex_t *m);
+void uth_mutex_unlock(uth_mutex_t *m);
 
-uth_recurse_mutex_t uth_recurse_mutex_alloc(void);
-void uth_recurse_mutex_free(uth_recurse_mutex_t r_m);
-void uth_recurse_mutex_lock(uth_recurse_mutex_t r_m);
-bool uth_recurse_mutex_trylock(uth_recurse_mutex_t r_m);
-void uth_recurse_mutex_unlock(uth_recurse_mutex_t r_m);
+uth_recurse_mutex_t *uth_recurse_mutex_alloc(void);
+void uth_recurse_mutex_free(uth_recurse_mutex_t *r_m);
+void uth_recurse_mutex_lock(uth_recurse_mutex_t *r_m);
+bool uth_recurse_mutex_trylock(uth_recurse_mutex_t *r_m);
+void uth_recurse_mutex_unlock(uth_recurse_mutex_t *r_m);
 
 /* Callers to cv_wait must hold the mutex, which it will atomically wait and
  * unlock, then relock when it returns.  Callers to signal and broadcast may
  * hold the mutex, if they choose. */
-uth_cond_var_t uth_cond_var_alloc(void);
-void uth_cond_var_free(uth_cond_var_t cv);
-void uth_cond_var_wait(uth_cond_var_t cv, uth_mutex_t m);
-void uth_cond_var_signal(uth_cond_var_t cv);
-void uth_cond_var_broadcast(uth_cond_var_t cv);
+uth_cond_var_t *uth_cond_var_alloc(void);
+void uth_cond_var_free(uth_cond_var_t *cv);
+void uth_cond_var_wait(uth_cond_var_t *cv, uth_mutex_t *m);
+void uth_cond_var_signal(uth_cond_var_t *cv);
+void uth_cond_var_broadcast(uth_cond_var_t *cv);
 
 /* Called by gcc to see if we are multithreaded. */
 bool uth_2ls_is_multithreaded(void);

@@ -14,7 +14,7 @@
 /************** Mutexes **************/
 
 
-uth_mutex_t uth_mutex_alloc(void)
+uth_mutex_t *uth_mutex_alloc(void)
 {
 	struct uth_mutex *mtx;
 
@@ -26,7 +26,7 @@ uth_mutex_t uth_mutex_alloc(void)
 	return mtx;
 }
 
-void uth_mutex_free(uth_mutex_t mtx)
+void uth_mutex_free(uth_mutex_t *mtx)
 {
 	__uth_sync_free(mtx->sync_obj);
 	free(mtx);
@@ -46,7 +46,7 @@ static void __mutex_cb(struct uthread *uth, void *arg)
 	spin_pdr_unlock(&mtx->lock);
 }
 
-void uth_mutex_lock(uth_mutex_t mtx)
+void uth_mutex_lock(uth_mutex_t *mtx)
 {
 	spin_pdr_lock(&mtx->lock);
 	if (!mtx->locked) {
@@ -60,7 +60,7 @@ void uth_mutex_lock(uth_mutex_t mtx)
 	uthread_yield(TRUE, __mutex_cb, mtx);
 }
 
-bool uth_mutex_trylock(uth_mutex_t mtx)
+bool uth_mutex_trylock(uth_mutex_t *mtx)
 {
 	bool ret = FALSE;
 
@@ -73,7 +73,7 @@ bool uth_mutex_trylock(uth_mutex_t mtx)
 	return ret;
 }
 
-void uth_mutex_unlock(uth_mutex_t mtx)
+void uth_mutex_unlock(uth_mutex_t *mtx)
 {
 	struct uthread *uth;
 
@@ -90,7 +90,7 @@ void uth_mutex_unlock(uth_mutex_t mtx)
 /************** Recursive mutexes **************/
 
 
-uth_recurse_mutex_t uth_recurse_mutex_alloc(void)
+uth_recurse_mutex_t *uth_recurse_mutex_alloc(void)
 {
 	struct uth_recurse_mutex *r_mtx = malloc(sizeof(struct uth_recurse_mutex));
 
@@ -101,13 +101,13 @@ uth_recurse_mutex_t uth_recurse_mutex_alloc(void)
 	return r_mtx;
 }
 
-void uth_recurse_mutex_free(uth_recurse_mutex_t r_mtx)
+void uth_recurse_mutex_free(uth_recurse_mutex_t *r_mtx)
 {
 	uth_mutex_free(r_mtx->mtx);
 	free(r_mtx);
 }
 
-void uth_recurse_mutex_lock(uth_recurse_mutex_t r_mtx)
+void uth_recurse_mutex_lock(uth_recurse_mutex_t *r_mtx)
 {
 	assert(!in_vcore_context());
 	assert(current_uthread);
@@ -128,7 +128,7 @@ void uth_recurse_mutex_lock(uth_recurse_mutex_t r_mtx)
 	r_mtx->count = 1;
 }
 
-bool uth_recurse_mutex_trylock(uth_recurse_mutex_t r_mtx)
+bool uth_recurse_mutex_trylock(uth_recurse_mutex_t *r_mtx)
 {
 	bool ret;
 
@@ -146,7 +146,7 @@ bool uth_recurse_mutex_trylock(uth_recurse_mutex_t r_mtx)
 	return ret;
 }
 
-void uth_recurse_mutex_unlock(uth_recurse_mutex_t r_mtx)
+void uth_recurse_mutex_unlock(uth_recurse_mutex_t *r_mtx)
 {
 	r_mtx->count--;
 	if (!r_mtx->count) {
@@ -159,7 +159,7 @@ void uth_recurse_mutex_unlock(uth_recurse_mutex_t r_mtx)
 /************** Condition Variables **************/
 
 
-uth_cond_var_t uth_cond_var_alloc(void)
+uth_cond_var_t *uth_cond_var_alloc(void)
 {
 	struct uth_cond_var *cv;
 
@@ -170,7 +170,7 @@ uth_cond_var_t uth_cond_var_alloc(void)
 	return cv;
 }
 
-void uth_cond_var_free(uth_cond_var_t cv)
+void uth_cond_var_free(uth_cond_var_t *cv)
 {
 	__uth_sync_free(cv->sync_obj);
 	free(cv);
@@ -205,7 +205,7 @@ static void __cv_wait_cb(struct uthread *uth, void *arg)
 	 * sleep! (see below).  If that happens, the uthread is no longer sleeping
 	 * on the CV, and the sync_next is free.  The invariant is that a uthread
 	 * can only sleep on one sync_object at a time. */
-	uth_mutex_unlock((uth_mutex_t)mtx);
+	uth_mutex_unlock(mtx);
 }
 
 /* Caller holds mtx.  We will 'atomically' release it and wait.  On return,
@@ -261,7 +261,7 @@ static void __cv_wait_cb(struct uthread *uth, void *arg)
  *
  * Also note that we use the external API for the mutex operations.  A 2LS could
  * have their own mutex ops but still use the generic cv ops. */
-void uth_cond_var_wait(uth_cond_var_t cv, uth_mutex_t mtx)
+void uth_cond_var_wait(uth_cond_var_t *cv, uth_mutex_t *mtx)
 {
 	struct uth_cv_link link;
 
@@ -269,10 +269,10 @@ void uth_cond_var_wait(uth_cond_var_t cv, uth_mutex_t mtx)
 	link.mtx = mtx;
 	spin_pdr_lock(&cv->lock);
 	uthread_yield(TRUE, __cv_wait_cb, &link);
-	uth_mutex_lock((uth_mutex_t)mtx);
+	uth_mutex_lock(mtx);
 }
 
-void uth_cond_var_signal(uth_cond_var_t cv)
+void uth_cond_var_signal(uth_cond_var_t *cv)
 {
 	struct uthread *uth;
 
@@ -283,7 +283,7 @@ void uth_cond_var_signal(uth_cond_var_t cv)
 		uthread_runnable(uth);
 }
 
-void uth_cond_var_broadcast(uth_cond_var_t cv)
+void uth_cond_var_broadcast(uth_cond_var_t *cv)
 {
 	struct uth_tailq restartees = TAILQ_HEAD_INITIALIZER(restartees);
 	struct uthread *i, *safe;

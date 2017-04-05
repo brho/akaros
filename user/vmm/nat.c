@@ -222,8 +222,8 @@ struct buf_pkt {
 STAILQ_HEAD(buf_pkt_stailq, buf_pkt);
 
 struct buf_pkt_stailq inject_pkts = STAILQ_HEAD_INITIALIZER(inject_pkts);
-uth_mutex_t rx_mtx;
-uth_cond_var_t rx_cv;
+uth_mutex_t *rx_mtx;
+uth_cond_var_t *rx_cv;
 struct event_queue *inbound_evq;
 
 static void tap_inbound_conv(int fd);
