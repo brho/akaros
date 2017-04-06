@@ -2,8 +2,8 @@
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details. */
 
-/* Generic Uthread Mutexes and CVs.  2LSs implement their own methods, but we
- * need a 2LS-independent interface and default implementation. */
+/* Generic Uthread Semaphores, Mutexes, CVs, and other synchronization
+ * functions.  2LSs implement their own sync objects (bottom of the file). */
 
 #include <parlib/uthread.h>
 #include <sys/queue.h>
@@ -11,7 +11,99 @@
 #include <malloc.h>
 
 
-/************** Mutexes **************/
+/************** Semaphores and Mutexes **************/
+
+static void __uth_semaphore_init(void *arg)
+{
+	struct uth_semaphore *sem = (struct uth_semaphore*)arg;
+
+	spin_pdr_init(&sem->lock);
+	sem->sync_obj = __uth_sync_alloc();
+	/* If we used a static initializer for a semaphore, count is already set.
+	 * o/w it will be set by _alloc(). */
+}
+
+uth_semaphore_t *uth_semaphore_alloc(unsigned int count)
+{
+	struct uth_semaphore *sem;
+
+	sem = malloc(sizeof(struct uth_semaphore));
+	assert(sem);
+	__uth_semaphore_init(sem);
+	sem->count = count;
+	/* The once is to make sure the object is initialized. */
+	parlib_set_ran_once(&sem->once_ctl);
+	return sem;
+}
+
+void uth_semaphore_free(uth_semaphore_t *sem)
+{
+	/* Keep this in sync with uth_recurse_mutex_free(). */
+	__uth_sync_free(sem->sync_obj);
+	free(sem);
+}
+
+static void __semaphore_cb(struct uthread *uth, void *arg)
+{
+	struct uth_semaphore *sem = (struct uth_semaphore*)arg;
+
+	/* We need to tell the 2LS that its thread blocked.  We need to do this
+	 * before unlocking the sem, since as soon as we unlock, the sem could be
+	 * released and our thread restarted.
+	 *
+	 * Also note the lock-ordering rule.  The sem lock is grabbed before any
+	 * locks the 2LS might grab. */
+	uthread_has_blocked(uth, sem->sync_obj, UTH_EXT_BLK_MUTEX);
+	spin_pdr_unlock(&sem->lock);
+}
+
+void uth_semaphore_down(uth_semaphore_t *sem)
+{
+	parlib_run_once(&sem->once_ctl, __uth_semaphore_init, sem);
+	spin_pdr_lock(&sem->lock);
+	if (sem->count > 0) {
+		/* Only down if we got one.  This means a sem with no more counts is 0,
+		 * not negative (where -count == nr_waiters).  Doing it this way means
+		 * our timeout function works for sems and CVs. */
+		sem->count--;
+		spin_pdr_unlock(&sem->lock);
+		return;
+	}
+	/* the unlock and sync enqueuing is done in the yield callback.  as always,
+	 * we need to do this part in vcore context, since as soon as we unlock the
+	 * uthread could restart.  (atomically yield and unlock). */
+	uthread_yield(TRUE, __semaphore_cb, sem);
+}
+
+bool uth_semaphore_trydown(uth_semaphore_t *sem)
+{
+	bool ret = FALSE;
+
+	parlib_run_once(&sem->once_ctl, __uth_semaphore_init, sem);
+	spin_pdr_lock(&sem->lock);
+	if (sem->count > 0) {
+		sem->count--;
+		ret = TRUE;
+	}
+	spin_pdr_unlock(&sem->lock);
+	return ret;
+}
+
+void uth_semaphore_up(uth_semaphore_t *sem)
+{
+	struct uthread *uth;
+
+	/* once-ing the 'up', unlike mtxs 'unlock', since sems can be special. */
+	parlib_run_once(&sem->once_ctl, __uth_semaphore_init, sem);
+	spin_pdr_lock(&sem->lock);
+	uth = __uth_sync_get_next(sem->sync_obj);
+	/* If there was a waiter, we pass our resource/count to them. */
+	if (!uth)
+		sem->count++;
+	spin_pdr_unlock(&sem->lock);
+	if (uth)
+		uthread_runnable(uth);
+}
 
 /* Takes a void * since it's called by parlib_run_once(), which enables us to
  * statically initialize the mutex.  This init does everything not done by the
@@ -19,88 +111,44 @@
  * calls free). */
 static void __uth_mutex_init(void *arg)
 {
-	struct uth_mutex *mtx = (struct uth_mutex*)arg;
+	struct uth_semaphore *mtx = (struct uth_semaphore*)arg;
 
-	spin_pdr_init(&mtx->lock);
-	mtx->sync_obj = __uth_sync_alloc();
-	mtx->locked = FALSE;
+	__uth_semaphore_init(mtx);
+	mtx->count = 1;
 }
 
 uth_mutex_t *uth_mutex_alloc(void)
 {
-	struct uth_mutex *mtx;
+	struct uth_semaphore *mtx;
 
-	mtx = malloc(sizeof(struct uth_mutex));
+	mtx = malloc(sizeof(struct uth_semaphore));
 	assert(mtx);
 	__uth_mutex_init(mtx);
-	/* The once is to make sure the object is initialized. */
 	parlib_set_ran_once(&mtx->once_ctl);
 	return mtx;
 }
 
 void uth_mutex_free(uth_mutex_t *mtx)
 {
-	/* Keep this in sync with uth_recurse_mutex_free(). */
-	__uth_sync_free(mtx->sync_obj);
-	free(mtx);
-}
-
-static void __mutex_cb(struct uthread *uth, void *arg)
-{
-	struct uth_mutex *mtx = (struct uth_mutex*)arg;
-
-	/* We need to tell the 2LS that its thread blocked.  We need to do this
-	 * before unlocking the mtx, since as soon as we unlock, the mtx could be
-	 * released and our thread restarted.
-	 *
-	 * Also note the lock-ordering rule.  The mtx lock is grabbed before any
-	 * locks the 2LS might grab. */
-	uthread_has_blocked(uth, mtx->sync_obj, UTH_EXT_BLK_MUTEX);
-	spin_pdr_unlock(&mtx->lock);
+	uth_semaphore_free(mtx);
 }
 
 void uth_mutex_lock(uth_mutex_t *mtx)
 {
 	parlib_run_once(&mtx->once_ctl, __uth_mutex_init, mtx);
-	spin_pdr_lock(&mtx->lock);
-	if (!mtx->locked) {
-		mtx->locked = TRUE;
-		spin_pdr_unlock(&mtx->lock);
-		return;
-	}
-	/* the unlock and sync enqueuing is done in the yield callback.  as always,
-	 * we need to do this part in vcore context, since as soon as we unlock the
-	 * uthread could restart.  (atomically yield and unlock). */
-	uthread_yield(TRUE, __mutex_cb, mtx);
+	uth_semaphore_down(mtx);
 }
 
 bool uth_mutex_trylock(uth_mutex_t *mtx)
 {
-	bool ret = FALSE;
-
 	parlib_run_once(&mtx->once_ctl, __uth_mutex_init, mtx);
-	spin_pdr_lock(&mtx->lock);
-	if (!mtx->locked) {
-		mtx->locked = TRUE;
-		ret = TRUE;
-	}
-	spin_pdr_unlock(&mtx->lock);
-	return ret;
+	return uth_semaphore_trydown(mtx);
 }
 
 void uth_mutex_unlock(uth_mutex_t *mtx)
 {
-	struct uthread *uth;
-
-	spin_pdr_lock(&mtx->lock);
-	uth = __uth_sync_get_next(mtx->sync_obj);
-	if (!uth)
-		mtx->locked = FALSE;
-	spin_pdr_unlock(&mtx->lock);
-	if (uth)
-		uthread_runnable(uth);
+	uth_semaphore_up(mtx);
 }
-
 
 /************** Recursive mutexes **************/
 
@@ -214,14 +262,14 @@ void uth_cond_var_free(uth_cond_var_t *cv)
 
 struct uth_cv_link {
 	struct uth_cond_var			*cv;
-	struct uth_mutex			*mtx;
+	struct uth_semaphore		*mtx;
 };
 
 static void __cv_wait_cb(struct uthread *uth, void *arg)
 {
 	struct uth_cv_link *link = (struct uth_cv_link*)arg;
 	struct uth_cond_var *cv = link->cv;
-	struct uth_mutex *mtx = link->mtx;
+	struct uth_semaphore *mtx = link->mtx;
 
 	/* We need to tell the 2LS that its thread blocked.  We need to do this
 	 * before unlocking the cv, since as soon as we unlock, the cv could be

@@ -207,6 +207,57 @@ bool test_recurse_static(void)
 	return __test_recurse(&static_recurse_mtx);
 }
 
+static bool __test_semaphore(struct uth_semaphore *sem, int count)
+{
+	bool can_down;
+
+	UT_ASSERT(count > 2);	/* for our own use */
+	UT_ASSERT(sem->count == count);
+	/* should be able to down it count times without blocking */
+	for (int i = 0; i < count; i++) {
+		uth_semaphore_down(sem);
+		UT_ASSERT(sem->count == count - (i + 1));
+	}
+
+	/* shouldn't be able to down, since we grabbed them all */
+	can_down = uth_semaphore_trydown(sem);
+	UT_ASSERT(!can_down);
+	UT_ASSERT(sem->count == 0);
+
+	uth_semaphore_up(sem);
+	UT_ASSERT(sem->count == 1);
+	can_down = uth_semaphore_trydown(sem);
+	UT_ASSERT(can_down);
+	UT_ASSERT(sem->count == 0);
+
+	for (int i = 0; i < count; i++) {
+		uth_semaphore_up(sem);
+		UT_ASSERT(sem->count == i + 1);
+	}
+
+	return TRUE;
+}
+
+bool test_semaphore(void)
+{
+	uth_semaphore_t *sem;
+
+	sem = uth_semaphore_alloc(5);
+	UT_ASSERT(sem);
+	if (!__test_semaphore(sem, 5))
+		return FALSE;
+	uth_semaphore_free(sem);
+
+	return TRUE;
+}
+
+bool test_semaphore_static(void)
+{
+	static uth_semaphore_t static_semaphore = UTH_SEMAPHORE_INIT(5);
+
+	return __test_semaphore(&static_semaphore, 5);
+}
+
 /* <--- End definition of test cases ---> */
 
 struct utest utests[] = {
@@ -215,6 +266,8 @@ struct utest utests[] = {
 	UTEST_REG(broadcast),
 	UTEST_REG(recurse),
 	UTEST_REG(recurse_static),
+	UTEST_REG(semaphore),
+	UTEST_REG(semaphore_static),
 };
 int num_utests = sizeof(utests) / sizeof(struct utest);
 

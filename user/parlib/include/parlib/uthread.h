@@ -168,16 +168,18 @@ static inline struct user_context *get_cur_uth_ctx(void)
 
 /* Uthread Mutexes / CVs / etc. */
 
-typedef struct uth_mutex uth_mutex_t;
+typedef struct uth_semaphore uth_semaphore_t;
+typedef struct uth_semaphore uth_mutex_t;
 typedef struct uth_recurse_mutex uth_recurse_mutex_t;
 typedef struct uth_cond_var uth_cond_var_t;
 
-struct uth_mutex {
+struct uth_semaphore {
 	struct spin_pdr_lock		lock;
 	uth_sync_t					sync_obj;
-	bool						locked;
+	unsigned int				count;
 	parlib_once_t				once_ctl;
 };
+#define UTH_SEMAPHORE_INIT(n) { .once_ctl = PARLIB_ONCE_INIT, .count = (n) }
 #define UTH_MUTEX_INIT { .once_ctl = PARLIB_ONCE_INIT }
 
 struct uth_recurse_mutex {
@@ -194,6 +196,12 @@ struct uth_cond_var {
 	parlib_once_t				once_ctl;
 };
 #define UTH_COND_VAR_INIT { .once_ctl = PARLIB_ONCE_INIT }
+
+uth_semaphore_t *uth_semaphore_alloc(unsigned int count);
+void uth_semaphore_free(uth_semaphore_t *sem);
+void uth_semaphore_down(uth_semaphore_t *sem);
+bool uth_semaphore_trydown(uth_semaphore_t *sem);
+void uth_semaphore_up(uth_semaphore_t *sem);
 
 uth_mutex_t *uth_mutex_alloc(void);
 void uth_mutex_free(uth_mutex_t *m);
