@@ -1,5 +1,5 @@
 #include <utest/utest.h>
-#include <benchutil/alarm.h>
+#include <parlib/alarm.h>
 
 TEST_SUITE("ALARMS");
 

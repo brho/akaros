@@ -2,7 +2,7 @@
 #include <semaphore.h>
 #include <parlib/mcs.h>
 #include <stdio.h>
-#include <benchutil/alarm.h>
+#include <parlib/alarm.h>
 #include <errno.h>
 
 int sem_init (sem_t *__sem, int __pshared, unsigned int __value)

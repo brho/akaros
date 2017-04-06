@@ -8,7 +8,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <benchutil/pvcalarm.h>
+#include <parlib/pvcalarm.h>
 
 static void nothing() {}
 

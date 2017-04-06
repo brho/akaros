@@ -21,7 +21,7 @@
 #include <sys/queue.h>
 #include <pthread.h>
 #include <parlib/mcs.h>
-#include <benchutil/alarm.h>
+#include <parlib/alarm.h>
 
 __BEGIN_DECLS
 

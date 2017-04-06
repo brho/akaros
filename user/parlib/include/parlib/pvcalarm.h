@@ -5,7 +5,7 @@
 #pragma once
 
 #include <stdint.h>
- 
+
 __BEGIN_DECLS
 
 /* Types of per-vcore alarms that can be set */

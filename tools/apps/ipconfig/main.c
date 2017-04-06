@@ -11,7 +11,7 @@
  * ipconfig - configure parameters of an ip stack
  */
 
-#include <benchutil/alarm.h>
+#include <parlib/alarm.h>
 #include <iplib/iplib.h>
 #include <ndblib/ndb.h>
 #include <parlib/common.h>

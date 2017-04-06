@@ -14,7 +14,7 @@
 #include <parlib/ucq.h>
 #include <parlib/arch/trap.h>
 #include <parlib/ros_debug.h>
-#include <benchutil/vcore_tick.h>
+#include <parlib/vcore_tick.h>
 
 int vmm_sched_period_usec = 1000;
 

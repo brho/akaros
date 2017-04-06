@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <parlib/slab.h>
 #include <parlib/mcs.h>
-#include <benchutil/alarm.h>
+#include <parlib/alarm.h>
 
 static inline int futex_wake(int *uaddr, int count);
 static inline int futex_wait(int *uaddr, int val, uint64_t ms_timeout);

@@ -47,7 +47,7 @@
 
 #include <sys/timerfd.h>
 #include <sys/select.h>
-#include <benchutil/alarm.h>
+#include <parlib/alarm.h>
 #include <parlib/uthread.h>
 
 struct tmr_type {

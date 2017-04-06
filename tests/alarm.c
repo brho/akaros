@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <parlib/event.h>
 #include <benchutil/measure.h>
-#include <benchutil/alarm.h>
+#include <parlib/alarm.h>
 #include <parlib/uthread.h>
 #include <parlib/timing.h>
 

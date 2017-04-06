@@ -7,9 +7,6 @@
  * the kernel alarms.  Under the hood, the user alarm uses the #A service for
  * the root of the alarm chain.
  *
- * This is (was) hanging out in benchutil so as to not create a dependency from
- * parlib on benchutil (usec2tsc and friends).
- *
  * There's only one timer chain, unlike in the kernel, for the entire process.
  * If you want one-off timers unrelated to the chain (and sent to other vcores),
  * use #A directly.
@@ -79,6 +76,7 @@ void init_awaiter(struct alarm_waiter *waiter,
 void set_awaiter_abs_unix(struct alarm_waiter *waiter, uint64_t abs_usec);
 void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep);
 void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep);
+
 /* Arms/disarms the alarm */
 void __set_alarm(struct alarm_waiter *waiter);
 void set_alarm(struct alarm_waiter *waiter);

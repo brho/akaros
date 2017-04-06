@@ -24,7 +24,7 @@
 
 #include <sys/queue.h>
 #include <sys/time.h>
-#include <benchutil/alarm.h>
+#include <parlib/alarm.h>
 #include <stdio.h>
 #include <parlib/assert.h>
 #include <stdlib.h>
@@ -34,7 +34,6 @@
 #include <fcntl.h>
 #include <parlib/parlib.h>
 #include <parlib/event.h>
-#include <benchutil/measure.h>
 #include <parlib/uthread.h>
 #include <parlib/spinlock.h>
 #include <parlib/timing.h>
@@ -374,7 +373,7 @@ static bool __insert_awaiter(struct timer_chain *tchain,
  * from alarm handlers, which are called with this lock held from IRQ context */
 static void __tc_locked_set_alarm(struct timer_chain *tchain,
                                   struct alarm_waiter *waiter)
-{	
+{
 	if (__insert_awaiter(tchain, waiter))
 		reset_tchain_interrupt(tchain);
 }

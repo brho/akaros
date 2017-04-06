@@ -13,7 +13,7 @@
 //	RA means Router Advertisement
 //
 
-#include <benchutil/alarm.h>
+#include <parlib/alarm.h>
 #include <iplib/iplib.h>
 #include <parlib/common.h>
 #include <parlib/parlib.h>

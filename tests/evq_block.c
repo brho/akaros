@@ -9,7 +9,7 @@
 #include <parlib/event.h>
 #include <parlib/timing.h>
 #include <parlib/uthread.h>
-#include <benchutil/alarm.h>
+#include <parlib/alarm.h>
 
 static struct event_queue *get_ectlr_evq(void)
 {

@@ -16,8 +16,8 @@
 #include <sys/queue.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <benchutil/pvcalarm.h>
-#include <benchutil/alarm.h>
+#include <parlib/pvcalarm.h>
+#include <parlib/alarm.h>
 
 /* Different states for enabling/disabling the per-vcore alarms. */
 enum {
@@ -159,7 +159,7 @@ int disable_pvcalarms()
 	 * from non-vcore context, this is OK. */
 	while(global_pvcalarm.busy_count != 0)
 		cpu_relax();
-	
+
 	global_pvcalarm.interval = 0;
 	global_pvcalarm.callback = NULL;
 	global_pvcalarm.handler = NULL;
@@ -261,7 +261,7 @@ static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type,
  * alarm to make up the difference. */
 static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type,
                               void *data)
-{ 
+{
 	int vcoreid = vcore_id();
 	struct pvcalarm_data *pvcalarm_data = &global_pvcalarm.data[vcoreid];
 	uint32_t uptime = vcore_account_uptime_ticks(vcoreid);
@@ -275,4 +275,3 @@ static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type,
 		start_pvcalarm(pvcalarm_data, global_pvcalarm.interval);
 	}
 }
-

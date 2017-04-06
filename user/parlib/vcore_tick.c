@@ -9,8 +9,8 @@
 #include <parlib/assert.h>
 #include <parlib/tsc-compat.h>
 #include <parlib/arch/bitmask.h>
-#include <benchutil/alarm.h>
-#include <benchutil/vcore_tick.h>
+#include <parlib/alarm.h>
+#include <parlib/vcore_tick.h>
 
 /* TODO: if we use some other form of per-vcore memory, we can also have a
  * per-vcore init function that we run before the VC spools up, removing the
