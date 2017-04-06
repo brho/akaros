@@ -229,6 +229,7 @@ void uth_cond_var_destroy(uth_cond_var_t *cv);
 uth_cond_var_t *uth_cond_var_alloc(void);
 void uth_cond_var_free(uth_cond_var_t *cv);
 void uth_cond_var_wait(uth_cond_var_t *cv, uth_mutex_t *m);
+void uth_cond_var_wait_recurse(uth_cond_var_t *cv, uth_recurse_mutex_t *r_mtx);
 void uth_cond_var_signal(uth_cond_var_t *cv);
 void uth_cond_var_broadcast(uth_cond_var_t *cv);
 

@@ -399,6 +399,24 @@ void uth_cond_var_wait(uth_cond_var_t *cv, uth_mutex_t *mtx)
 	uth_mutex_lock(mtx);
 }
 
+/* GCC wants this function, though its semantics are a little unclear.  I
+ * imagine you'd want to completely unlock it (say you locked it 3 times), and
+ * when you get it back, that you have your three locks back. */
+void uth_cond_var_wait_recurse(uth_cond_var_t *cv, uth_recurse_mutex_t *r_mtx)
+{
+	unsigned int old_count = r_mtx->count;
+
+	/* In cond_wait, we're going to unlock the internal mutex.  We'll do the
+	 * prep-work for that now.  (invariant is that an unlocked r_mtx has no
+	 * lockholder and count == 0. */
+	r_mtx->lockholder = NULL;
+	r_mtx->count = 0;
+	uth_cond_var_wait(cv, &r_mtx->mtx);
+	/* Now we hold the internal mutex again.  Need to restore the tracking. */
+	r_mtx->lockholder = current_uthread;
+	r_mtx->count = old_count;
+}
+
 void uth_cond_var_signal(uth_cond_var_t *cv)
 {
 	struct uthread *uth;
