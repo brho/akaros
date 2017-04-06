@@ -343,6 +343,11 @@ static void ipifccreate(struct conv *c)
 	ifc->unbinding = 0;
 	ifc->m = NULL;
 	ifc->reassemble = 0;
+	rwinit(&ifc->rwlock);
+	/* These are never used, but we might need them if we ever do "unbind on the
+	 * fly" (see ip.h).  Not sure where the code went that used these vars. */
+	spinlock_init(&ifc->idlock);
+	rendez_init(&ifc->wait);
 }
 
 /*
