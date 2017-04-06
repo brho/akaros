@@ -389,6 +389,7 @@ static void ipifcsetmtu(struct Ipifc *ifc, char **argv, int argc)
 static void ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
                      struct Iplifc *lifcp)
 {
+	ERRSTACK(1);
 	uint8_t ip[IPaddrlen], mask[IPaddrlen], rem[IPaddrlen];
 	uint8_t bcast[IPaddrlen], net[IPaddrlen];
 	struct Iplifc *lifc, **l;
@@ -439,6 +440,11 @@ static void ipifcadd(struct Ipifc *ifc, char **argv, int argc, int tentative,
 	if (isv4(ip))
 		tentative = 0;
 	wlock(&ifc->rwlock);
+	if (waserror()) {
+		warn("Unexpected error thrown: %s", current_errstr());
+		wunlock(&ifc->rwlock);
+		nexterror();
+	}
 
 	/* ignore if this is already a local address for this ifc */
 	for (lifc = ifc->lifc; lifc; lifc = lifc->next) {
@@ -554,6 +560,7 @@ out:
 	wunlock(&ifc->rwlock);
 	if (tentative && sendnbrdisc)
 		icmpns(f, 0, SRC_UNSPEC, ip, TARG_MULTI, ifc->mac);
+	poperror();
 }
 
 /*
