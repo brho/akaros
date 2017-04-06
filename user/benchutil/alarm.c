@@ -187,8 +187,7 @@ static void __attribute__((constructor)) init_alarm_service(void)
 	register_fork_cb(&devalarm_fork_cb);
 }
 
-/* Initializes a new awaiter.  Pass 0 for the function if you want it to be a
- * kthread-alarm, and sleep on it after you set the alarm later. */
+/* Initializes a new awaiter. */
 void init_awaiter(struct alarm_waiter *waiter,
                   void (*func) (struct alarm_waiter *awaiter))
 {
@@ -414,7 +413,10 @@ static bool __remove_awaiter(struct timer_chain *tchain,
 }
 
 /* Removes waiter from the tchain before it goes off.  Returns TRUE if we
- * disarmed before the alarm went off, FALSE if it already fired. */
+ * disarmed before the alarm went off, FALSE if it already fired.  Also, if
+ * FALSE, the alarm has already completed.  Userspace alarms are like kernel IRQ
+ * alarms - they run with the tchain lock held, meaning their execution is
+ * synchronized with operations like unset. */
 static bool __tc_unset_alarm(struct timer_chain *tchain,
                              struct alarm_waiter *waiter)
 {
