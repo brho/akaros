@@ -77,6 +77,15 @@ void set_awaiter_abs_unix(struct alarm_waiter *waiter, uint64_t abs_usec);
 void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep);
 void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep);
 
+/* Helper: converts a timespec to the units of the #alarm service (usec).  A
+ * common usage:
+ * 		set_awaiter_abs_unix(w, timespec_to_alarm_time(abs_ts));
+ */
+static uint64_t timespec_to_alarm_time(const struct timespec *ts)
+{
+	return ts->tv_nsec / 1000 + ts->tv_sec * 1000000ULL;
+}
+
 /* Arms/disarms the alarm */
 void __set_alarm(struct alarm_waiter *waiter);
 void set_alarm(struct alarm_waiter *waiter);
