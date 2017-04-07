@@ -20,7 +20,23 @@ static void __uth_semaphore_init(void *arg)
 	spin_pdr_init(&sem->lock);
 	sem->sync_obj = __uth_sync_alloc();
 	/* If we used a static initializer for a semaphore, count is already set.
-	 * o/w it will be set by _alloc(). */
+	 * o/w it will be set by _alloc() or _init() (via uth_semaphore_init()). */
+}
+
+/* Initializes a sem acquired from somewhere else.  POSIX's sem_init() needs
+ * this. */
+void uth_semaphore_init(uth_semaphore_t *sem, unsigned int count)
+{
+	__uth_semaphore_init(sem);
+	sem->count = count;
+	/* The once is to make sure the object is initialized. */
+	parlib_set_ran_once(&sem->once_ctl);
+}
+
+/* Undoes whatever was done in init. */
+void uth_semaphore_destroy(uth_semaphore_t *sem)
+{
+	__uth_sync_free(sem->sync_obj);
 }
 
 uth_semaphore_t *uth_semaphore_alloc(unsigned int count)
@@ -29,17 +45,13 @@ uth_semaphore_t *uth_semaphore_alloc(unsigned int count)
 
 	sem = malloc(sizeof(struct uth_semaphore));
 	assert(sem);
-	__uth_semaphore_init(sem);
-	sem->count = count;
-	/* The once is to make sure the object is initialized. */
-	parlib_set_ran_once(&sem->once_ctl);
+	uth_semaphore_init(sem, count);
 	return sem;
 }
 
 void uth_semaphore_free(uth_semaphore_t *sem)
 {
-	/* Keep this in sync with uth_recurse_mutex_free(). */
-	__uth_sync_free(sem->sync_obj);
+	uth_semaphore_destroy(sem);
 	free(sem);
 }
 
@@ -117,14 +129,24 @@ static void __uth_mutex_init(void *arg)
 	mtx->count = 1;
 }
 
+void uth_mutex_init(uth_mutex_t *mtx)
+{
+	__uth_mutex_init(mtx);
+	parlib_set_ran_once(&mtx->once_ctl);
+}
+
+void uth_mutex_destroy(uth_mutex_t *mtx)
+{
+	uth_semaphore_destroy(mtx);
+}
+
 uth_mutex_t *uth_mutex_alloc(void)
 {
 	struct uth_semaphore *mtx;
 
 	mtx = malloc(sizeof(struct uth_semaphore));
 	assert(mtx);
-	__uth_mutex_init(mtx);
-	parlib_set_ran_once(&mtx->once_ctl);
+	uth_mutex_init(mtx);
 	return mtx;
 }
 
@@ -165,19 +187,29 @@ static void __uth_recurse_mutex_init(void *arg)
 	r_mtx->count = 0;
 }
 
+void uth_recurse_mutex_init(uth_recurse_mutex_t *r_mtx)
+{
+	__uth_recurse_mutex_init(r_mtx);
+	parlib_set_ran_once(&r_mtx->once_ctl);
+}
+
+void uth_recurse_mutex_destroy(uth_recurse_mutex_t *r_mtx)
+{
+	uth_semaphore_destroy(&r_mtx->mtx);
+}
+
 uth_recurse_mutex_t *uth_recurse_mutex_alloc(void)
 {
 	struct uth_recurse_mutex *r_mtx = malloc(sizeof(struct uth_recurse_mutex));
 
 	assert(r_mtx);
-	__uth_recurse_mutex_init(r_mtx);
-	parlib_set_ran_once(&r_mtx->once_ctl);
+	uth_recurse_mutex_init(r_mtx);
 	return r_mtx;
 }
 
 void uth_recurse_mutex_free(uth_recurse_mutex_t *r_mtx)
 {
-	__uth_sync_free(r_mtx->mtx.sync_obj);
+	uth_recurse_mutex_destroy(r_mtx);
 	free(r_mtx);
 }
 
@@ -243,20 +275,30 @@ static void __uth_cond_var_init(void *arg)
 	cv->sync_obj = __uth_sync_alloc();
 }
 
+void uth_cond_var_init(uth_cond_var_t *cv)
+{
+	__uth_cond_var_init(cv);
+	parlib_set_ran_once(&cv->once_ctl);
+}
+
+void uth_cond_var_destroy(uth_cond_var_t *cv)
+{
+	__uth_sync_free(cv->sync_obj);
+}
+
 uth_cond_var_t *uth_cond_var_alloc(void)
 {
 	struct uth_cond_var *cv;
 
 	cv = malloc(sizeof(struct uth_cond_var));
 	assert(cv);
-	__uth_cond_var_init(cv);
-	parlib_set_ran_once(&cv->once_ctl);
+	uth_cond_var_init(cv);
 	return cv;
 }
 
 void uth_cond_var_free(uth_cond_var_t *cv)
 {
-	__uth_sync_free(cv->sync_obj);
+	uth_cond_var_destroy(cv);
 	free(cv);
 }
 
