@@ -8,7 +8,6 @@
 
 #include <stdio.h>
 #include <sys/types.h>
-#include <pthread.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <parlib/arch/arch.h>
