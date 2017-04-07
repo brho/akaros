@@ -18,42 +18,26 @@
 
 #pragma once
 
-#include <sys/queue.h>
-#include <pthread.h>
-#include <parlib/mcs.h>
-#include <parlib/alarm.h>
+#include <parlib/uthread.h>
 
 __BEGIN_DECLS
 
 /* Value returned if `sem_open' failed.  */
 #define SEM_FAILED      ((sem_t *) 0)
 
-struct sem_queue_element {
-	TAILQ_ENTRY(sem_queue_element) next;
-	struct sem *sem;
-	pthread_t pthread;
-	uint64_t us_timeout;
-	struct alarm_waiter awaiter;
-	bool timedout;
-};
-TAILQ_HEAD(sem_qe_queue, sem_queue_element);
-
-typedef struct sem
-{
-	unsigned int count;
-	struct sem_qe_queue queue;
-	struct spin_pdr_lock lock;
+typedef struct {
+	uth_semaphore_t				real_sem;
 } sem_t;
 
-extern int sem_init (sem_t *__sem, int __pshared, unsigned int __value);
-extern int sem_destroy (sem_t *__sem);
-extern sem_t *sem_open (__const char *__name, int __oflag, ...);
-extern int sem_close (sem_t *__sem);
-extern int sem_unlink (__const char *__name);
-extern int sem_wait (sem_t *__sem);
-extern int sem_timedwait(sem_t *sem, const struct timespec *abs_timeout);
-extern int sem_trywait (sem_t *__sem);
-extern int sem_post (sem_t *__sem);
-extern int sem_getvalue (sem_t *__restrict __sem, int *__restrict __sval);
+int sem_init(sem_t *__sem, int __pshared, unsigned int __value);
+int sem_destroy(sem_t *__sem);
+sem_t *sem_open(__const char *__name, int __oflag, ...);
+int sem_close(sem_t *__sem);
+int sem_unlink(__const char *__name);
+int sem_wait(sem_t *__sem);
+int sem_timedwait(sem_t *sem, const struct timespec *abs_timeout);
+int sem_trywait(sem_t *__sem);
+int sem_post(sem_t *__sem);
+int sem_getvalue(sem_t *__restrict __sem, int *__restrict __sval);
 
 __END_DECLS
