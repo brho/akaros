@@ -1,7 +1,7 @@
 #include <parlib/common.h>
 #include <futex.h>
 #include <sys/queue.h>
-#include <pthread.h>
+#include <parlib/uthread.h>
 #include <parlib/parlib.h>
 #include <parlib/assert.h>
 #include <stdio.h>
@@ -16,7 +16,7 @@ static void *timer_thread(void *arg);
 
 struct futex_element {
   TAILQ_ENTRY(futex_element) link;
-  pthread_t pthread;
+  struct uthread *uthread;
   int *uaddr;
   uint64_t us_timeout;
   struct alarm_waiter awaiter;
@@ -54,7 +54,7 @@ static void __futex_timeout(struct alarm_waiter *awaiter) {
   if (__e != NULL) {
     e->timedout = true;
     //printf("timeout: %p\n", e->uaddr);
-    uthread_runnable((struct uthread*)e->pthread);
+    uthread_runnable(e->uthread);
   }
   // Set this as the very last thing we do whether we successfully woke the
   // thread blocked on the futex or not.  Either we set this or wake() sets
@@ -65,11 +65,10 @@ static void __futex_timeout(struct alarm_waiter *awaiter) {
 }
 
 static void __futex_block(struct uthread *uthread, void *arg) {
-  pthread_t pthread = (pthread_t)uthread;
   struct futex_element *e = (struct futex_element*)arg;
 
   // Set the remaining properties of the futex element
-  e->pthread = pthread;
+  e->uthread = uthread;
   e->timedout = false;
 
   // Insert the futex element into the queue
@@ -85,8 +84,7 @@ static void __futex_block(struct uthread *uthread, void *arg) {
   }
 
   // Notify the scheduler of the type of yield we did
-  __pthread_generic_yield(pthread);
-  pthread->state = PTH_BLK_MUTEX;
+  uthread_has_blocked(uthread, NULL, UTH_EXT_BLK_MUTEX);
 
   // Unlock the pdr_lock 
   mcs_pdr_unlock(&__futex.lock);
@@ -178,7 +176,7 @@ static inline int futex_wake(int *uaddr, int count)
       }
     }
     //printf("wake: %p\n", uaddr);
-    uthread_runnable((struct uthread*)e->pthread);
+    uthread_runnable(e->uthread);
     e = n;
   }
   return max-count;
