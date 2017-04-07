@@ -6,6 +6,7 @@
 #include <parlib/parlib.h>
 #include <ros/syscall.h>
 #include <sys/queue.h>
+#include <time.h>
 
 __BEGIN_DECLS
 
@@ -201,6 +202,8 @@ void uth_semaphore_init(uth_semaphore_t *sem, unsigned int count);
 void uth_semaphore_destroy(uth_semaphore_t *sem);
 uth_semaphore_t *uth_semaphore_alloc(unsigned int count);
 void uth_semaphore_free(uth_semaphore_t *sem);
+bool uth_semaphore_timed_down(uth_semaphore_t *sem,
+                              const struct timespec *abs_timeout);
 void uth_semaphore_down(uth_semaphore_t *sem);
 bool uth_semaphore_trydown(uth_semaphore_t *sem);
 void uth_semaphore_up(uth_semaphore_t *sem);
@@ -209,6 +212,7 @@ void uth_mutex_init(uth_mutex_t *m);
 void uth_mutex_destroy(uth_mutex_t *m);
 uth_mutex_t *uth_mutex_alloc(void);
 void uth_mutex_free(uth_mutex_t *m);
+bool uth_mutex_timed_lock(uth_mutex_t *m, const struct timespec *abs_timeout);
 void uth_mutex_lock(uth_mutex_t *m);
 bool uth_mutex_trylock(uth_mutex_t *m);
 void uth_mutex_unlock(uth_mutex_t *m);
@@ -217,6 +221,8 @@ void uth_recurse_mutex_init(uth_recurse_mutex_t *r_m);
 void uth_recurse_mutex_destroy(uth_recurse_mutex_t *r_m);
 uth_recurse_mutex_t *uth_recurse_mutex_alloc(void);
 void uth_recurse_mutex_free(uth_recurse_mutex_t *r_m);
+bool uth_recurse_mutex_timed_lock(uth_recurse_mutex_t *m,
+                                  const struct timespec *abs_timeout);
 void uth_recurse_mutex_lock(uth_recurse_mutex_t *r_m);
 bool uth_recurse_mutex_trylock(uth_recurse_mutex_t *r_m);
 void uth_recurse_mutex_unlock(uth_recurse_mutex_t *r_m);
@@ -228,7 +234,12 @@ void uth_cond_var_init(uth_cond_var_t *cv);
 void uth_cond_var_destroy(uth_cond_var_t *cv);
 uth_cond_var_t *uth_cond_var_alloc(void);
 void uth_cond_var_free(uth_cond_var_t *cv);
+bool uth_cond_var_timed_wait(uth_cond_var_t *cv, uth_mutex_t *m,
+                             const struct timespec *abs_timeout);
 void uth_cond_var_wait(uth_cond_var_t *cv, uth_mutex_t *m);
+bool uth_cond_var_timed_wait_recurse(uth_cond_var_t *cv,
+                                     uth_recurse_mutex_t *r_mtx,
+                                     const struct timespec *abs_timeout);
 void uth_cond_var_wait_recurse(uth_cond_var_t *cv, uth_recurse_mutex_t *r_mtx);
 void uth_cond_var_signal(uth_cond_var_t *cv);
 void uth_cond_var_broadcast(uth_cond_var_t *cv);

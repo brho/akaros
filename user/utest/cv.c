@@ -5,6 +5,7 @@
 #include <utest/utest.h>
 #include <parlib/uthread.h>
 #include <pthread.h>
+#include <time.h>
 
 TEST_SUITE("CV");
 
@@ -258,6 +259,84 @@ bool test_semaphore_static(void)
 	return __test_semaphore(&static_semaphore, 5);
 }
 
+bool test_semaphore_timeout(void)
+{
+	static uth_semaphore_t sem = UTH_SEMAPHORE_INIT(1);
+	struct timespec timeout[1];
+	int ret;
+	bool got_it;
+
+	ret = clock_gettime(CLOCK_REALTIME, timeout);
+	UT_ASSERT(!ret);
+	timeout->tv_nsec += 500000000;
+	got_it = uth_semaphore_timed_down(&sem, timeout);
+	UT_ASSERT(got_it);
+
+	/* Second time we still hold the sem and would block and should time out. */
+	UT_ASSERT(sem.count == 0);
+	ret = clock_gettime(CLOCK_REALTIME, timeout);
+	UT_ASSERT(!ret);
+	timeout->tv_nsec += 500000000;
+	got_it = uth_semaphore_timed_down(&sem, timeout);
+	UT_ASSERT(!got_it);
+
+	return TRUE;
+}
+
+bool test_cv_timeout(void)
+{
+	static uth_mutex_t mtx = UTH_MUTEX_INIT;
+	static uth_cond_var_t cv = UTH_COND_VAR_INIT;
+	struct timespec timeout[1];
+	int ret;
+	bool was_signalled;
+
+	uth_mutex_lock(&mtx);
+	ret = clock_gettime(CLOCK_REALTIME, timeout);
+	UT_ASSERT(!ret);
+	timeout->tv_nsec += 500000000;
+	was_signalled = uth_cond_var_timed_wait(&cv, &mtx, timeout);
+	UT_ASSERT(!was_signalled);
+	UT_ASSERT(mtx.count == 0);	/* semaphore's count variable */
+	uth_mutex_unlock(&mtx);
+	UT_ASSERT(mtx.count == 1);
+
+	return TRUE;
+}
+
+bool test_cv_recurse_timeout(void)
+{
+	static uth_recurse_mutex_t r_mtx = UTH_RECURSE_MUTEX_INIT;
+	static uth_cond_var_t cv = UTH_COND_VAR_INIT;
+	struct timespec timeout[1];
+	int ret;
+	bool was_signalled;
+
+	/* Get three-deep locks, make sure the bookkeeping is right */
+	uth_recurse_mutex_lock(&r_mtx);
+	uth_recurse_mutex_lock(&r_mtx);
+	uth_recurse_mutex_lock(&r_mtx);
+	UT_ASSERT(r_mtx.count == 3);
+	UT_ASSERT(r_mtx.mtx.count == 0);
+
+	ret = clock_gettime(CLOCK_REALTIME, timeout);
+	UT_ASSERT(!ret);
+	timeout->tv_nsec += 500000000;
+	was_signalled = uth_cond_var_timed_wait_recurse(&cv, &r_mtx, timeout);
+	UT_ASSERT(!was_signalled);
+	UT_ASSERT(r_mtx.count == 3);
+	UT_ASSERT(r_mtx.mtx.count == 0);
+
+	/* Unlock our three locks, then make sure the semaphore/mtx is unlocked. */
+	uth_recurse_mutex_unlock(&r_mtx);
+	uth_recurse_mutex_unlock(&r_mtx);
+	uth_recurse_mutex_unlock(&r_mtx);
+	UT_ASSERT(r_mtx.count == 0);
+	UT_ASSERT(r_mtx.mtx.count == 1);
+
+	return TRUE;
+}
+
 /* <--- End definition of test cases ---> */
 
 struct utest utests[] = {
@@ -268,6 +347,9 @@ struct utest utests[] = {
 	UTEST_REG(recurse_static),
 	UTEST_REG(semaphore),
 	UTEST_REG(semaphore_static),
+	UTEST_REG(semaphore_timeout),
+	UTEST_REG(cv_timeout),
+	UTEST_REG(cv_recurse_timeout),
 };
 int num_utests = sizeof(utests) / sizeof(struct utest);
 

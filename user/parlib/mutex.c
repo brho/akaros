@@ -8,8 +8,50 @@
 #include <parlib/uthread.h>
 #include <sys/queue.h>
 #include <parlib/spinlock.h>
+#include <parlib/alarm.h>
 #include <malloc.h>
 
+struct timeout_blob {
+	bool						timed_out;
+	struct uthread				*uth;
+	uth_sync_t					*sync_ptr;
+	struct spin_pdr_lock		*lock_ptr;
+};
+
+/* When sync primitives want to time out, they can use this alarm handler.  It
+ * needs a timeout_blob, which is independent of any particular sync method. */
+static void timeout_handler(struct alarm_waiter *waiter)
+{
+	struct timeout_blob *blob = (struct timeout_blob*)waiter->data;
+
+	spin_pdr_lock(blob->lock_ptr);
+	if (__uth_sync_get_uth(*blob->sync_ptr, blob->uth))
+		blob->timed_out = TRUE;
+	spin_pdr_unlock(blob->lock_ptr);
+	if (blob->timed_out)
+		uthread_runnable(blob->uth);
+}
+
+/* Minor helper, sets a blob's fields */
+static void set_timeout_blob(struct timeout_blob *blob, uth_sync_t *sync_ptr,
+                             struct spin_pdr_lock *lock_ptr)
+{
+	blob->timed_out = FALSE;
+	blob->uth = current_uthread;
+	blob->sync_ptr = sync_ptr;
+	blob->lock_ptr = lock_ptr;
+}
+
+/* Minor helper, sets an alarm for blob and a timespec */
+static void set_timeout_alarm(struct alarm_waiter *waiter,
+                              struct timeout_blob *blob,
+                              const struct timespec *abs_timeout)
+{
+	init_awaiter(waiter, timeout_handler);
+	waiter->data = blob;
+	set_awaiter_abs_unix(waiter, timespec_to_alarm_time(abs_timeout));
+	set_alarm(waiter);
+}
 
 /************** Semaphores and Mutexes **************/
 
@@ -69,8 +111,12 @@ static void __semaphore_cb(struct uthread *uth, void *arg)
 	spin_pdr_unlock(&sem->lock);
 }
 
-void uth_semaphore_down(uth_semaphore_t *sem)
+bool uth_semaphore_timed_down(uth_semaphore_t *sem,
+                              const struct timespec *abs_timeout)
 {
+	struct alarm_waiter waiter[1];
+	struct timeout_blob blob[1];
+
 	parlib_run_once(&sem->once_ctl, __uth_semaphore_init, sem);
 	spin_pdr_lock(&sem->lock);
 	if (sem->count > 0) {
@@ -79,12 +125,28 @@ void uth_semaphore_down(uth_semaphore_t *sem)
 		 * our timeout function works for sems and CVs. */
 		sem->count--;
 		spin_pdr_unlock(&sem->lock);
-		return;
+		return TRUE;
+	}
+	if (abs_timeout) {
+		set_timeout_blob(blob, &sem->sync_obj, &sem->lock);
+		set_timeout_alarm(waiter, blob, abs_timeout);
 	}
 	/* the unlock and sync enqueuing is done in the yield callback.  as always,
 	 * we need to do this part in vcore context, since as soon as we unlock the
 	 * uthread could restart.  (atomically yield and unlock). */
 	uthread_yield(TRUE, __semaphore_cb, sem);
+	if (abs_timeout) {
+		/* We're guaranteed the alarm will either be cancelled or the handler
+		 * complete when unset_alarm() returns. */
+		unset_alarm(waiter);
+		return blob->timed_out ? FALSE : TRUE;
+	}
+	return TRUE;
+}
+
+void uth_semaphore_down(uth_semaphore_t *sem)
+{
+	uth_semaphore_timed_down(sem, NULL);
 }
 
 bool uth_semaphore_trydown(uth_semaphore_t *sem)
@@ -155,6 +217,12 @@ void uth_mutex_free(uth_mutex_t *mtx)
 	uth_semaphore_free(mtx);
 }
 
+bool uth_mutex_timed_lock(uth_mutex_t *mtx, const struct timespec *abs_timeout)
+{
+	parlib_run_once(&mtx->once_ctl, __uth_mutex_init, mtx);
+	return uth_semaphore_timed_down(mtx, abs_timeout);
+}
+
 void uth_mutex_lock(uth_mutex_t *mtx)
 {
 	parlib_run_once(&mtx->once_ctl, __uth_mutex_init, mtx);
@@ -213,7 +281,8 @@ void uth_recurse_mutex_free(uth_recurse_mutex_t *r_mtx)
 	free(r_mtx);
 }
 
-void uth_recurse_mutex_lock(uth_recurse_mutex_t *r_mtx)
+bool uth_recurse_mutex_timed_lock(uth_recurse_mutex_t *r_mtx,
+                                  const struct timespec *abs_timeout)
 {
 	parlib_run_once(&r_mtx->once_ctl, __uth_recurse_mutex_init, r_mtx);
 	assert(!in_vcore_context());
@@ -228,11 +297,18 @@ void uth_recurse_mutex_lock(uth_recurse_mutex_t *r_mtx)
 	 * we'll have to disable notifs temporarily. */
 	if (r_mtx->lockholder == current_uthread) {
 		r_mtx->count++;
-		return;
+		return TRUE;
 	}
-	uth_mutex_lock(&r_mtx->mtx);
+	if (!uth_mutex_timed_lock(&r_mtx->mtx, abs_timeout))
+		return FALSE;
 	r_mtx->lockholder = current_uthread;
 	r_mtx->count = 1;
+	return TRUE;
+}
+
+void uth_recurse_mutex_lock(uth_recurse_mutex_t *r_mtx)
+{
+	uth_recurse_mutex_timed_lock(r_mtx, NULL);
 }
 
 bool uth_recurse_mutex_trylock(uth_recurse_mutex_t *r_mtx)
@@ -387,16 +463,59 @@ static void __cv_wait_cb(struct uthread *uth, void *arg)
  *
  * Also note that we use the external API for the mutex operations.  A 2LS could
  * have their own mutex ops but still use the generic cv ops. */
-void uth_cond_var_wait(uth_cond_var_t *cv, uth_mutex_t *mtx)
+bool uth_cond_var_timed_wait(uth_cond_var_t *cv, uth_mutex_t *mtx,
+                             const struct timespec *abs_timeout)
 {
 	struct uth_cv_link link;
+	struct alarm_waiter waiter[1];
+	struct timeout_blob blob[1];
+	bool ret = TRUE;
 
 	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
 	link.cv = cv;
 	link.mtx = mtx;
 	spin_pdr_lock(&cv->lock);
+	if (abs_timeout) {
+		set_timeout_blob(blob, &cv->sync_obj, &cv->lock);
+		set_timeout_alarm(waiter, blob, abs_timeout);
+	}
 	uthread_yield(TRUE, __cv_wait_cb, &link);
+	if (abs_timeout) {
+		unset_alarm(waiter);
+		ret = blob->timed_out ? FALSE : TRUE;
+	}
 	uth_mutex_lock(mtx);
+	return ret;
+}
+
+void uth_cond_var_wait(uth_cond_var_t *cv, uth_mutex_t *mtx)
+{
+	uth_cond_var_timed_wait(cv, mtx, NULL);
+}
+
+/* GCC doesn't list this as one of the C++0x functions, but it's easy to do and
+ * implement uth_cond_var_wait_recurse() with it, just like for all the other
+ * 'timed' functions.
+ *
+ * Note the timeout applies to getting the signal on the CV, not on reacquiring
+ * the mutex. */
+bool uth_cond_var_timed_wait_recurse(uth_cond_var_t *cv,
+                                     uth_recurse_mutex_t *r_mtx,
+                                     const struct timespec *abs_timeout)
+{
+	unsigned int old_count = r_mtx->count;
+	bool ret;
+
+	/* In cond_wait, we're going to unlock the internal mutex.  We'll do the
+	 * prep-work for that now.  (invariant is that an unlocked r_mtx has no
+	 * lockholder and count == 0. */
+	r_mtx->lockholder = NULL;
+	r_mtx->count = 0;
+	ret = uth_cond_var_timed_wait(cv, &r_mtx->mtx, abs_timeout);
+	/* Now we hold the internal mutex again.  Need to restore the tracking. */
+	r_mtx->lockholder = current_uthread;
+	r_mtx->count = old_count;
+	return ret;
 }
 
 /* GCC wants this function, though its semantics are a little unclear.  I
@@ -404,17 +523,7 @@ void uth_cond_var_wait(uth_cond_var_t *cv, uth_mutex_t *mtx)
  * when you get it back, that you have your three locks back. */
 void uth_cond_var_wait_recurse(uth_cond_var_t *cv, uth_recurse_mutex_t *r_mtx)
 {
-	unsigned int old_count = r_mtx->count;
-
-	/* In cond_wait, we're going to unlock the internal mutex.  We'll do the
-	 * prep-work for that now.  (invariant is that an unlocked r_mtx has no
-	 * lockholder and count == 0. */
-	r_mtx->lockholder = NULL;
-	r_mtx->count = 0;
-	uth_cond_var_wait(cv, &r_mtx->mtx);
-	/* Now we hold the internal mutex again.  Need to restore the tracking. */
-	r_mtx->lockholder = current_uthread;
-	r_mtx->count = old_count;
+	uth_cond_var_timed_wait_recurse(cv, r_mtx, NULL);
 }
 
 void uth_cond_var_signal(uth_cond_var_t *cv)
