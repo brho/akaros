@@ -618,7 +618,7 @@ static inline struct mlx4_cqe *mlx4_en_get_cqe(void *buf, int idx, int cqe_sz)
 #ifdef CONFIG_NET_RX_BUSY_POLL
 static inline void mlx4_en_cq_init_lock(struct mlx4_en_cq *cq)
 {
-	spinlock_init_irqsave(&cq->poll_lock);
+	spinlock_init(&cq->poll_lock);
 	cq->state = MLX4_EN_CQ_STATE_IDLE;
 }
 

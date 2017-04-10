@@ -933,13 +933,13 @@ static void mlx4_ib_unlock_cqs(struct mlx4_ib_cq *send_cq, struct mlx4_ib_cq *re
 {
 	if (send_cq == recv_cq) {
 		__release(&recv_cq->lock);
-		spin_unlock(&send_cq->lock);
+		spin_unlock_irqsave(&send_cq->lock);
 	} else if (send_cq->mcq.cqn < recv_cq->mcq.cqn) {
-		spin_unlock(&recv_cq->lock);
-		spin_unlock(&send_cq->lock);
+		spin_unlock_irqsave(&recv_cq->lock);
+		spin_unlock_irqsave(&send_cq->lock);
 	} else {
-		spin_unlock(&send_cq->lock);
-		spin_unlock(&recv_cq->lock);
+		spin_unlock_irqsave(&send_cq->lock);
+		spin_unlock_irqsave(&recv_cq->lock);
 	}
 }
 
@@ -2384,9 +2384,9 @@ static int mlx4_wq_overflow(struct mlx4_ib_wq *wq, int nreq, struct ib_cq *ib_cq
 		return 0;
 
 	cq = to_mcq(ib_cq);
-	spin_lock(&cq->lock);
+	spin_lock_irqsave(&cq->lock);
 	cur = wq->head - wq->tail;
-	spin_unlock(&cq->lock);
+	spin_unlock_irqsave(&cq->lock);
 
 	return cur + nreq >= wq->max_post;
 }
@@ -2948,7 +2948,7 @@ out:
 		qp->sq_next_wqe = ind;
 	}
 
-	spin_unlock_irqrestore(&qp->sq.lock, flags);
+	spin_unlock_irqsave(&qp->sq.lock, flags);
 
 	return err;
 }
@@ -3035,7 +3035,7 @@ out:
 		*qp->db.db = cpu_to_be32(qp->rq.head & 0xffff);
 	}
 
-	spin_unlock_irqrestore(&qp->rq.lock, flags);
+	spin_unlock_irqsave(&qp->rq.lock, flags);
 
 	return err;
 }

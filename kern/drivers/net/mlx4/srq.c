@@ -42,13 +42,13 @@ void mlx4_srq_event(struct mlx4_dev *dev, uint32_t srqn, int event_type)
 	struct mlx4_srq_table *srq_table = &mlx4_priv(dev)->srq_table;
 	struct mlx4_srq *srq;
 
-	spin_lock(&srq_table->lock);
+	spin_lock_irqsave(&srq_table->lock);
 
 	srq = radix_tree_lookup(&srq_table->tree, srqn & (dev->caps.num_srqs - 1));
 	if (srq)
 		atomic_inc(&srq->refcount);
 
-	spin_unlock(&srq_table->lock);
+	spin_unlock_irqsave(&srq_table->lock);
 
 	if (!srq) {
 		mlx4_warn(dev, "Async event for bogus SRQ %08x\n", srqn);

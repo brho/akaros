@@ -48,13 +48,13 @@ void mlx4_qp_event(struct mlx4_dev *dev, uint32_t qpn, int event_type)
 	struct mlx4_qp_table *qp_table = &mlx4_priv(dev)->qp_table;
 	struct mlx4_qp *qp;
 
-	spin_lock(&qp_table->lock);
+	spin_lock_irqsave(&qp_table->lock);
 
 	qp = __mlx4_qp_lookup(dev, qpn);
 	if (qp)
 		atomic_inc(&qp->refcount);
 
-	spin_unlock(&qp_table->lock);
+	spin_unlock_irqsave(&qp_table->lock);
 
 	if (!qp) {
 		mlx4_dbg(dev, "Async event for none existent QP %08x\n", qpn);

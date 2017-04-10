@@ -2862,7 +2862,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 
 	priv = netdev_priv(dev);
 	memset(priv, 0, sizeof(struct mlx4_en_priv));
-	spinlock_init_irqsave(&priv->stats_lock);
+	spinlock_init(&priv->stats_lock);
 	INIT_WORK(&priv->rx_mode_task, mlx4_en_do_set_rx_mode);
 	INIT_WORK(&priv->watchdog_task, mlx4_en_restart);
 	INIT_WORK(&priv->linkstate_task, mlx4_en_linkstate);
@@ -2874,7 +2874,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 #endif
 #ifdef CONFIG_RFS_ACCEL
 	INIT_LIST_HEAD(&priv->filters);
-	spinlock_init_irqsave(&priv->filters_lock);
+	spinlock_init(&priv->filters_lock);
 #endif
 
 	priv->dev = dev;

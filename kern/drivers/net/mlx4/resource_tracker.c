@@ -497,7 +497,7 @@ int mlx4_init_resource_tracker(struct mlx4_dev *dev)
 		    !res_alloc->allocated)
 			goto no_mem_err;
 
-		spinlock_init_irqsave(&res_alloc->alloc_lock);
+		spinlock_init(&res_alloc->alloc_lock);
 		for (t = 0; t < dev->persist->num_vfs + 1; t++) {
 			struct mlx4_active_ports actv_ports =
 				mlx4_get_active_ports(dev, t);
@@ -831,14 +831,14 @@ int mlx4_get_slave_from_resource_id(struct mlx4_dev *dev,
 
 	if (type == RES_QP)
 		id &= 0x7fffff;
-	spin_lock(mlx4_tlock(dev));
+	spin_lock_irqsave(mlx4_tlock(dev));
 
 	r = find_res(dev, id, type);
 	if (r) {
 		*slave = r->owner;
 		err = 0;
 	}
-	spin_unlock(mlx4_tlock(dev));
+	spin_unlock_irqsave(mlx4_tlock(dev));
 
 	return err;
 }

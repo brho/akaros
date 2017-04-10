@@ -93,7 +93,7 @@ struct ib_srq *mlx4_ib_create_srq(struct ib_pd *pd,
 		return ERR_PTR(-ENOMEM);
 
 	mutex_init(&srq->mutex);
-	spin_lock_init(&srq->lock);
+	spinlock_init_irqsave(&srq->lock);
 	srq->msrq.max    = roundup_pow_of_two(init_attr->attr.max_wr + 1);
 	srq->msrq.max_gs = init_attr->attr.max_sge;
 
@@ -296,7 +296,10 @@ void mlx4_ib_free_srq_wqe(struct mlx4_ib_srq *srq, int wqe_index)
 {
 	struct mlx4_wqe_srq_next_seg *next;
 
-	/* always called with interrupts disabled. */
+	/* Always called with interrupts disabled.  This lets us
+	 * lock with spin_lock and unlock with spin_unlock; otherwise,
+	 * we would use the _irqsave versions.  Tread carefully when
+	 * modifying this code. */
 	spin_lock(&srq->lock);
 
 	next = get_wqe(srq, srq->tail);

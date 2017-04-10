@@ -12155,7 +12155,7 @@ static int bnx2x_init_bp(struct bnx2x *bp)
 	qlock_init(&bp->fw_mb_mutex);
 	qlock_init(&bp->drv_info_mutex);
 	bp->drv_info_mng_owner = false;
-	spinlock_init_irqsave(&bp->stats_lock);
+	spinlock_init(&bp->stats_lock);
 	sem_init(&bp->stats_sema, 1);
 
 	INIT_DELAYED_WORK(&bp->sp_task, bnx2x_sp_task);
