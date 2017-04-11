@@ -20,10 +20,9 @@ __BEGIN_DECLS
 #define PTH_RUNNING			3
 #define PTH_EXITING			4
 #define PTH_BLK_YIELDING	5	/* brief state btw pth_yield and pth_runnable */
-#define PTH_BLK_JOINING		6	/* joining on a child */
-#define PTH_BLK_SYSC		7	/* blocked on a syscall */
-#define PTH_BLK_MUTEX		8	/* blocked externally, possibly on a mutex */
-#define PTH_BLK_PAUSED		9	/* handed back to us from uthread code */
+#define PTH_BLK_SYSC		6	/* blocked on a syscall */
+#define PTH_BLK_MUTEX		7	/* blocked externally, possibly on a mutex */
+#define PTH_BLK_PAUSED		8	/* handed back to us from uthread code */
 
 /* Entry for a pthread_cleanup_routine on the stack of cleanup handlers. */
 struct pthread_cleanup_routine {
@@ -44,14 +43,11 @@ struct pthread_tcb {
 		SLIST_ENTRY(pthread_tcb) sl_next;
 	};
 	int state;
-	bool detached;
-	struct pthread_tcb *joiner;			/* raced on by exit and join */
 	uint32_t id;
 	uint32_t stacksize;
 	void *stacktop;
 	void *(*start_routine)(void*);
 	void *arg;
-	void *retval;
 	int sched_policy;
 	int sched_priority;		/* careful, GNU #defines this to __sched_priority */
 	struct pthread_cleanup_stack cr_stack;

@@ -41,6 +41,7 @@ static void vmm_thread_has_blocked(struct uthread *uth, uth_sync_t sync_obj,
                                    int flags);
 static void vmm_thread_refl_fault(struct uthread *uth,
                                   struct user_context *ctx);
+static void vmm_thread_exited(struct uthread *uth);
 
 struct schedule_ops vmm_sched_ops = {
 	.sched_entry = vmm_sched_entry,
@@ -49,6 +50,7 @@ struct schedule_ops vmm_sched_ops = {
 	.thread_blockon_sysc = vmm_thread_blockon_sysc,
 	.thread_has_blocked = vmm_thread_has_blocked,
 	.thread_refl_fault = vmm_thread_refl_fault,
+	.thread_exited = vmm_thread_exited,
 };
 
 /* Helpers */
@@ -393,6 +395,20 @@ static void vmm_thread_refl_fault(struct uthread *uth,
 	}
 }
 
+static void vmm_thread_exited(struct uthread *uth)
+{
+	struct vmm_thread *vth = (struct vmm_thread*)uth;
+	struct task_thread *tth = (struct task_thread*)uth;
+
+	/* Catch bugs.  Right now, only tasks threads can exit. */
+	assert(vth->type == VMM_THREAD_TASK);
+
+	acct_thread_blocked((struct vmm_thread*)tth);
+	uthread_cleanup(uth);
+	__free_stack(tth->stacktop, tth->stacksize);
+	free(tth);
+}
+
 static void destroy_guest_thread(struct guest_thread *gth)
 {
 	struct ctlr_thread *cth = gth->buddy;
@@ -476,29 +492,19 @@ void start_guest_thread(struct guest_thread *gth)
 	enqueue_vmm_thread((struct vmm_thread*)gth);
 }
 
-static void __tth_exit_cb(struct uthread *uthread, void *junk)
-{
-	struct task_thread *tth = (struct task_thread*)uthread;
-
-	acct_thread_blocked((struct vmm_thread*)tth);
-	uthread_cleanup(uthread);
-	__free_stack(tth->stacktop, tth->stacksize);
-	free(tth);
-}
-
 static void __task_thread_run(void)
 {
 	struct task_thread *tth = (struct task_thread*)current_uthread;
 
 	tth->func(tth->arg);
-	uthread_yield(FALSE, __tth_exit_cb, 0);
+	uth_2ls_thread_exit(0);
 }
 
 struct task_thread *vmm_run_task(struct virtual_machine *vm,
                                  void (*func)(void *), void *arg)
 {
 	struct task_thread *tth;
-	struct uth_thread_attr tth_attr = {.want_tls = TRUE};
+	struct uth_thread_attr tth_attr = {.want_tls = TRUE, .detached = TRUE};
 
 	tth = (struct task_thread*)alloc_vmm_thread(vm, VMM_THREAD_TASK);
 	if (!tth)

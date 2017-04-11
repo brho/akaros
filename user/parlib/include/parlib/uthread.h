@@ -4,6 +4,7 @@
 #include <parlib/signal.h>
 #include <parlib/spinlock.h>
 #include <parlib/parlib.h>
+#include <parlib/kref.h>
 #include <ros/syscall.h>
 #include <sys/queue.h>
 #include <time.h>
@@ -24,6 +25,26 @@ __BEGIN_DECLS
 #define UTH_EXT_BLK_EVENTQ			2
 #define UTH_EXT_BLK_JUSTICE			3	/* whatever.  might need more options */
 
+/* One per joiner, usually kept on the stack. */
+struct uth_join_kicker {
+	struct kref					kref;
+	struct uthread				*joiner;
+};
+
+/* Join states, stored in the join_ctl */
+#define UTH_JOIN_DETACHED		1
+#define UTH_JOIN_JOINABLE		2
+#define UTH_JOIN_HAS_JOINER		3
+#define UTH_JOIN_EXITED			4
+
+/* One per uthread, to encapsulate all the join fields. */
+struct uth_join_ctl {
+	atomic_t					state;
+	void						*retval;
+	void						**retval_loc;
+	struct uth_join_kicker 		*kicker;
+};
+
 /* Bare necessities of a user thread.  2LSs should allocate a bigger struct and
  * cast their threads to uthreads when talking with vcore code.  Vcore/default
  * 2LS code won't touch udata or beyond. */
@@ -33,6 +54,7 @@ struct uthread {
 	void *tls_desc;
 	int flags;
 	int state;
+	struct uth_join_ctl join_ctl;
 	struct sigstate sigstate;
 	int notif_disabled_depth;
 	TAILQ_ENTRY(uthread) sync_next;
@@ -75,6 +97,7 @@ struct schedule_ops {
 	void (*thread_blockon_sysc)(struct uthread *, void *);
 	void (*thread_has_blocked)(struct uthread *, uth_sync_t, int);
 	void (*thread_refl_fault)(struct uthread *, struct user_context *);
+	void (*thread_exited)(struct uthread *);
 	/**** Defining these functions is optional. ****/
 	uth_sync_t (*sync_alloc)(void);
 	void (*sync_free)(uth_sync_t);
@@ -102,13 +125,24 @@ void uthread_mcp_init(void);
  * pthread_create(), which can wrap these with their own stuff (like attrs,
  * retvals, etc). */
 
+struct uth_thread_attr {
+	bool want_tls;		/* default, no */
+	bool detached;		/* default, no */
+};
+
+struct uth_join_request {
+	struct uthread				*uth;
+	void						**retval_loc;
+};
+
 /* uthread_init() does the uthread initialization of a uthread that the caller
  * created.  Call this whenever you are "starting over" with a thread.  Pass in
  * attr, if you want to override any defaults. */
-struct uth_thread_attr {
-	bool want_tls;		/* default, no */
-};
 void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr);
+void uthread_detach(struct uthread *uth);
+void uthread_join(struct uthread *uth, void **retval_loc);
+void uthread_join_arr(struct uth_join_request reqs[], size_t nr_req);
+
 /* Call this when you are done with a uthread, forever, but before you free it */
 void uthread_cleanup(struct uthread *uthread);
 void uthread_runnable(struct uthread *uthread);
@@ -131,6 +165,7 @@ void highjack_current_uthread(struct uthread *uthread);
 struct uthread *stop_current_uthread(void);
 void __attribute__((noreturn)) run_current_uthread(void);
 void __attribute__((noreturn)) run_uthread(struct uthread *uthread);
+void __attribute__((noreturn)) uth_2ls_thread_exit(void *retval);
 
 /* Asking for trouble with this API, when we just want stacktop (or whatever
  * the SP will be). */

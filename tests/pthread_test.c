@@ -91,6 +91,12 @@ int main(int argc, char** argv)
 			            __procinfo.vcoremap[i].pcoreid);
 		}
 	}
+	struct uth_join_request *join_reqs;
+
+	join_reqs = malloc(nr_yield_threads * sizeof(struct uth_join_request));
+	for (int i = 0; i < nr_yield_threads; i++)
+		join_reqs[i].retval_loc = &my_retvals[i];
+	assert(join_reqs);
 #endif /* __ros__ */
 
 	pthread_barrier_init(&barrier, NULL, nr_yield_threads);
@@ -102,12 +108,19 @@ int main(int argc, char** argv)
 	}
 	if (gettimeofday(&start_tv, 0))
 		perror("Start time error...");
+	/* Akaros supports parallel join */
+#ifdef __ros__
+	for (int i = 0; i < nr_yield_threads; i++)
+		join_reqs[i].uth = (struct uthread*)my_threads[i];
+	uthread_join_arr(join_reqs, nr_yield_threads);
+#else
 	for (int i = 0; i < nr_yield_threads; i++) {
 		printf_safe("[A] About to join on thread %d(%p)\n", i, my_threads[i]);
 		pthread_join(my_threads[i], &my_retvals[i]);
 		printf_safe("[A] Successfully joined on thread %d (retval: %p)\n", i,
 		            my_retvals[i]);
 	}
+#endif
 	if (gettimeofday(&end_tv, 0))
 		perror("End time error...");
 	nr_ctx_switches = nr_yield_threads * nr_yield_loops;

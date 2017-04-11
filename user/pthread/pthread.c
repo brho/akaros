@@ -44,6 +44,7 @@ static void pth_thread_has_blocked(struct uthread *uthread, uth_sync_t sync_obj,
                                    int flags);
 static void pth_thread_refl_fault(struct uthread *uth,
                                   struct user_context *ctx);
+static void pth_thread_exited(struct uthread *uth);
 
 /* Event Handlers */
 static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
@@ -56,6 +57,7 @@ struct schedule_ops pthread_sched_ops = {
 	.thread_blockon_sysc = pth_thread_blockon_sysc,
 	.thread_has_blocked = pth_thread_has_blocked,
 	.thread_refl_fault = pth_thread_refl_fault,
+	.thread_exited = pth_thread_exited,
 };
 
 /* Static helpers */
@@ -138,7 +140,6 @@ static void pth_thread_runnable(struct uthread *uthread)
 	switch (pthread->state) {
 		case (PTH_CREATED):
 		case (PTH_BLK_YIELDING):
-		case (PTH_BLK_JOINING):
 		case (PTH_BLK_SYSC):
 		case (PTH_BLK_PAUSED):
 		case (PTH_BLK_MUTEX):
@@ -333,6 +334,24 @@ static void pth_thread_refl_fault(struct uthread *uth,
 	}
 }
 
+static void pth_thread_exited(struct uthread *uth)
+{
+	struct pthread_tcb *pthread = (struct pthread_tcb*)uth;
+
+	__pthread_generic_yield(pthread);
+	/* Catch some bugs */
+	pthread->state = PTH_EXITING;
+	/* Destroy the pthread */
+	uthread_cleanup(uth);
+	/* Cleanup, mirroring pthread_create() */
+	__pthread_free_stack(pthread);
+	/* If we were the last pthread, we exit for the whole process.  Keep in mind
+	 * that thread0 is counted in this, so this will only happen if that thread
+	 * calls pthread_exit(). */
+	if ((atomic_fetch_and_add(&threads_total, -1) == 1))
+		exit(0);
+}
+
 /* Akaros pthread extensions / hacks */
 
 void pthread_need_tls(bool need)
@@ -422,9 +441,11 @@ int pthread_attr_getstack(const pthread_attr_t *__restrict __attr,
 
 int pthread_getattr_np(pthread_t __th, pthread_attr_t *__attr)
 {
+	struct uthread *uth = (struct uthread*)__th;
+
 	__attr->stackaddr = __th->stacktop - __th->stacksize;
 	__attr->stacksize = __th->stacksize;
-	if (__th->detached)
+	if (atomic_read(&uth->join_ctl.state) == UTH_JOIN_DETACHED)
 		__attr->detachstate = PTHREAD_CREATE_DETACHED;
 	else
 		__attr->detachstate = PTHREAD_CREATE_JOINABLE;
@@ -452,9 +473,7 @@ void __attribute__((constructor)) pthread_lib_init(void)
 	t->id = get_next_pid();
 	t->stacksize = USTACK_NUM_PAGES * PGSIZE;
 	t->stacktop = (void*)USTACKTOP;
-	t->detached = TRUE;
 	t->state = PTH_RUNNING;
-	t->joiner = 0;
 	/* implies that sigmasks are longs, which they are. */
 	assert(t->id == 0);
 	t->sched_policy = SCHED_FIFO;
@@ -554,8 +573,6 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
 	pthread->state = PTH_CREATED;
 	pthread->id = get_next_pid();
-	pthread->detached = FALSE;				/* default */
-	pthread->joiner = 0;
 	/* Might override these later, based on attr && EXPLICIT_SCHED */
 	pthread->sched_policy = parent->sched_policy;
 	pthread->sched_priority = parent->sched_priority;
@@ -565,7 +582,7 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 		if (attr->stacksize)					/* don't set a 0 stacksize */
 			pthread->stacksize = attr->stacksize;
 		if (attr->detachstate == PTHREAD_CREATE_DETACHED)
-			pthread->detached = TRUE;
+			uth_attr.detached = TRUE;
 		if (attr->sched_inherit == PTHREAD_EXPLICIT_SCHED) {
 			pthread->sched_policy = attr->sched_policy;
 			pthread->sched_priority = attr->sched_priority;
@@ -609,101 +626,20 @@ void __pthread_generic_yield(struct pthread_tcb *pthread)
 	mcs_pdr_unlock(&queue_lock);
 }
 
-/* Callback/bottom half of join, called from __uthread_yield (vcore context).
- * join_target is who we are trying to join on (and who is calling exit). */
-static void __pth_join_cb(struct uthread *uthread, void *arg)
-{
-	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	struct pthread_tcb *join_target = (struct pthread_tcb*)arg;
-	struct pthread_tcb *temp_pth = 0;
-	__pthread_generic_yield(pthread);
-	/* We're trying to join, yield til we get woken up */
-	pthread->state = PTH_BLK_JOINING;	/* could do this front-side */
-	/* Put ourselves in the join target's joiner slot.  If we get anything back,
-	 * we lost the race and need to wake ourselves.  Syncs with __pth_exit_cb.*/
-	temp_pth = atomic_swap_ptr((void**)&join_target->joiner, pthread);
-	/* After that atomic swap, the pthread might be woken up (if it succeeded),
-	 * so don't touch pthread again after that (this following if () is okay).*/
-	if (temp_pth) {		/* temp_pth != 0 means they exited first */
-		assert(temp_pth == join_target);	/* Sanity */
-		/* wake ourselves, not the exited one! */
-		printd("[pth] %08p already exit, rewaking ourselves, joiner %08p\n",
-		       temp_pth, pthread);
-		pth_thread_runnable(uthread);	/* wake ourselves */
-	}
-}
-
 int pthread_join(struct pthread_tcb *join_target, void **retval)
 {
-	/* Not sure if this is the right semantics.  There is a race if we deref
-	 * join_target and he is already freed (which would have happened if he was
-	 * detached. */
-	if (join_target->detached) {
-		printf("[pthread] trying to join on a detached pthread");
-		return -1;
-	}
-	/* See if it is already done, to avoid the pain of a uthread_yield() (the
-	 * early check is an optimization, pth_thread_yield() handles the race). */
-	if (!join_target->joiner) {
-		uthread_yield(TRUE, __pth_join_cb, join_target);
-		/* When we return/restart, the thread will be done */
-	} else {
-		assert(join_target->joiner == join_target);	/* sanity check */
-	}
-	if (retval)
-		*retval = join_target->retval;
-	free(join_target);
+	uthread_join((struct uthread*)join_target, retval);
 	return 0;
-}
-
-/* Callback/bottom half of exit.  Syncs with __pth_join_cb.  Here's how it
- * works: the slot for joiner is initially 0.  Joiners try to swap themselves
- * into that spot.  Exiters try to put 'themselves' into it.  Whoever gets 0
- * back won the race.  If the exiter lost the race, it must wake up the joiner
- * (which was the value from temp_pth).  If the joiner lost the race, it must
- * wake itself up, and for sanity reasons can ensure the value from temp_pth is
- * the join target). */
-static void __pth_exit_cb(struct uthread *uthread, void *junk)
-{
-	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	struct pthread_tcb *temp_pth = 0;
-	__pthread_generic_yield(pthread);
-	/* Catch some bugs */
-	pthread->state = PTH_EXITING;
-	/* Destroy the pthread */
-	uthread_cleanup(uthread);
-	/* Cleanup, mirroring pthread_create() */
-	__pthread_free_stack(pthread);
-	/* TODO: race on detach state (see join) */
-	if (pthread->detached) {
-		free(pthread);
-	} else {
-		/* See if someone is joining on us.  If not, we're done (and the
-		 * joiner will wake itself when it saw us there instead of 0). */
-		temp_pth = atomic_swap_ptr((void**)&pthread->joiner, pthread);
-		if (temp_pth) {
-			/* they joined before we exited, we need to wake them */
-			printd("[pth] %08p exiting, waking joiner %08p\n",
-			       pthread, temp_pth);
-			pth_thread_runnable((struct uthread*)temp_pth);
-		}
-	}
-	/* If we were the last pthread, we exit for the whole process.  Keep in mind
-	 * that thread0 is counted in this, so this will only happen if that thread
-	 * calls pthread_exit(). */
-	if ((atomic_fetch_and_add(&threads_total, -1) == 1))
-		exit(0);
 }
 
 static inline void pthread_exit_no_cleanup(void *ret)
 {
 	struct pthread_tcb *pthread = pthread_self();
 
-	pthread->retval = ret;
 	while (SLIST_FIRST(&pthread->cr_stack))
 		pthread_cleanup_pop(FALSE);
 	destroy_dtls();
-	uthread_yield(FALSE, __pth_exit_cb, 0);
+	uth_2ls_thread_exit(ret);
 }
 
 void pthread_exit(void *ret)
@@ -1145,8 +1081,7 @@ int pthread_barrier_destroy(pthread_barrier_t *b)
 
 int pthread_detach(pthread_t thread)
 {
-	/* TODO: race on this state.  Someone could be trying to join now */
-	thread->detached = TRUE;
+	uthread_detach((struct uthread*)thread);
 	return 0;
 }
 
