@@ -40,7 +40,7 @@ void blk_init_fn(struct virtio_vq_dev *vqdev, const char *filename)
 	cfg_d->capacity = len;
 }
 
-void blk_request(void *_vq)
+void *blk_request(void *_vq)
 {
 	struct virtio_vq *vq = _vq;
 
@@ -133,4 +133,5 @@ void blk_request(void *_vq)
 		virtio_mmio_set_vring_irq(dev);
 		dev->poke_guest(dev->vec, dev->dest);
 	}
+	return 0;
 }

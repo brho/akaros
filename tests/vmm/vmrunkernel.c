@@ -49,7 +49,7 @@ void vapic_status_dump(FILE *f, void *vapic);
 #define BITOP_ADDR(x) "+m" (*(volatile long *) (x))
 #endif
 
-void timer_thread(void *arg)
+void *timer_thread(void *arg)
 {
 	uint8_t vector;
 	uint32_t initial_count;
@@ -63,6 +63,7 @@ void timer_thread(void *arg)
 		uthread_usleep(1000);
 	}
 	fprintf(stderr, "SENDING TIMER\n");
+	return 0;
 }
 
 

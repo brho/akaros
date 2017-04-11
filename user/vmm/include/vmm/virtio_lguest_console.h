@@ -25,5 +25,5 @@
  *     e523caa601f4a7c2fa1ecd040db921baf7453798
  */
 
-void cons_receiveq_fn(void *_vq);
-void cons_transmitq_fn(void *_vq);
+void *cons_receiveq_fn(void *_vq);
+void *cons_transmitq_fn(void *_vq);

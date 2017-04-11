@@ -244,5 +244,5 @@ struct virtio_net_ctrl_mq {
 #define VIRTIO_NET_CTRL_GUEST_OFFLOADS_SET        0
 
 void virtio_net_set_mac(struct virtio_vq_dev *vqdev, uint8_t *guest_mac);
-void net_receiveq_fn(void *_vq);
-void net_transmitq_fn(void *_vq);
+void *net_receiveq_fn(void *_vq);
+void *net_transmitq_fn(void *_vq);

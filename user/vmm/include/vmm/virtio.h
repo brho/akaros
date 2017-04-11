@@ -69,7 +69,7 @@ struct virtio_vq {
 	uint16_t last_avail;
 
 	// The service function that processes buffers for this queue
-	void (*srv_fn)(void *arg);
+	void *(*srv_fn)(void *arg);
 
 	// The thread that the service function is running in
 	struct task_thread *srv_th;

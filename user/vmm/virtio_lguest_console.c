@@ -32,7 +32,7 @@
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
 
-void cons_receiveq_fn(void *_vq) // host -> guest
+void *cons_receiveq_fn(void *_vq) // host -> guest
 {
 	struct virtio_vq *vq = _vq;
 	uint32_t head;
@@ -95,9 +95,10 @@ void cons_receiveq_fn(void *_vq) // host -> guest
 				"The host MUST provide a way for device interrupts to be sent to the guest. The 'poke_guest' function pointer on the vq->vqdev->transport_dev (assumed to be a struct virtio_mmio_dev) was not set.");
 	}
 	free(iov);
+	return 0;
 }
 
-void cons_transmitq_fn(void *_vq) // guest -> host
+void *cons_transmitq_fn(void *_vq) // guest -> host
 {
 	struct virtio_vq *vq = _vq;
 	uint32_t head;
@@ -156,4 +157,5 @@ void cons_transmitq_fn(void *_vq) // guest -> host
 				"The host MUST provide a way for device interrupts to be sent to the guest. The 'poke_guest' function pointer on the vq->vqdev->transport_dev (assumed to be a struct virtio_mmio_dev) was not set.");
 	}
 	free(iov);
+	return 0;
 }

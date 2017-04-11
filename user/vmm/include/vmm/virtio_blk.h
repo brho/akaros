@@ -145,5 +145,5 @@ struct virtio_scsi_inhdr {
 #define VIRTIO_BLK_S_IOERR	1
 #define VIRTIO_BLK_S_UNSUPP	2
 
-void blk_request(void *_vq);
+void *blk_request(void *_vq);
 void blk_init_fn(struct virtio_vq_dev *vqdev, const char *filename);

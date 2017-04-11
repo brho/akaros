@@ -46,7 +46,7 @@ struct ctlr_thread {
 
 struct task_thread {
 	struct uthread				uthread;
-	void						(*func)(void *);
+	void						*(*func)(void *);
 	void						*arg;
 	size_t						stacksize;
 	void						*stacktop;
@@ -81,7 +81,7 @@ int vmm_init(struct virtual_machine *vm, int flags);
 void start_guest_thread(struct guest_thread *gth);
 /* Start and run a task thread. */
 struct task_thread *vmm_run_task(struct virtual_machine *vm,
-                                 void (*func)(void *), void *arg);
+                                 void *(*func)(void *), void *arg);
 
 int vthread_attr_init(struct virtual_machine *vm, int vmmflags);
 int vthread_attr_kernel_init(struct virtual_machine *vm, int vmmflags);

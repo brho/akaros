@@ -370,7 +370,7 @@ static struct ip_nat_map *get_map_by_tuple(uint8_t protocol,
 	return map;
 }
 
-static void map_reaper(void *arg)
+static void *map_reaper(void *arg)
 {
 	struct ip_nat_map *i, *temp;
 	struct ip_nat_map_tailq to_release;
@@ -399,6 +399,7 @@ static void map_reaper(void *arg)
 		TAILQ_FOREACH_SAFE(i, &to_release, lookup_tuple, temp)
 			kref_put(&i->kref);
 	}
+	return 0;
 }
 
 static void map_dumper(void)
@@ -640,7 +641,7 @@ static void tap_inbound_conv(int fd)
  * A map who's FD fires might already be on the list - it's possible for an FD
  * to drain to 0 and get another packet (thus triggering a tap) before
  * __poll_inbound() notices and removes it from the list. */
-static void fdtap_watcher(void *arg)
+static void *fdtap_watcher(void *arg)
 {
 	struct event_msg msg[1];
 	struct ip_nat_map *map;
@@ -661,6 +662,7 @@ static void fdtap_watcher(void *arg)
 		}
 		uth_mutex_unlock(rx_mtx);
 	}
+	return 0;
 }
 
 static struct event_queue *get_inbound_evq(void)

@@ -496,12 +496,11 @@ static void __task_thread_run(void)
 {
 	struct task_thread *tth = (struct task_thread*)current_uthread;
 
-	tth->func(tth->arg);
-	uth_2ls_thread_exit(0);
+	uth_2ls_thread_exit(tth->func(tth->arg));
 }
 
 struct task_thread *vmm_run_task(struct virtual_machine *vm,
-                                 void (*func)(void *), void *arg)
+                                 void *(*func)(void *), void *arg)
 {
 	struct task_thread *tth;
 	struct uth_thread_attr tth_attr = {.want_tls = TRUE, .detached = TRUE};

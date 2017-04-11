@@ -49,7 +49,7 @@ void virtio_net_set_mac(struct virtio_vq_dev *vqdev, uint8_t *guest_mac)
 /* net_receiveq_fn receives packets for the guest through the virtio networking
  * device and the _vq virtio queue.
  */
-void net_receiveq_fn(void *_vq)
+void *net_receiveq_fn(void *_vq)
 {
 	struct virtio_vq *vq = _vq;
 	uint32_t head;
@@ -113,12 +113,13 @@ void net_receiveq_fn(void *_vq)
 		virtio_mmio_set_vring_irq(dev);
 		dev->poke_guest(dev->vec, dev->dest);
 	}
+	return 0;
 }
 
 /* net_transmitq_fn transmits packets from the guest through the virtio
  * networking device through the _vq virtio queue.
  */
-void net_transmitq_fn(void *_vq)
+void *net_transmitq_fn(void *_vq)
 {
 	struct virtio_vq *vq = _vq;
 	uint32_t head;
@@ -156,4 +157,5 @@ void net_transmitq_fn(void *_vq)
 		virtio_mmio_set_vring_irq(dev);
 		dev->poke_guest(dev->vec, dev->dest);
 	}
+	return 0;
 }
