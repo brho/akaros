@@ -252,11 +252,17 @@ static void pth_thread_has_blocked(struct uthread *uthread, uth_sync_t sync_obj,
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 
 	__pthread_generic_yield(pthread);
-	/* could imagine doing something with the flags.  For now, we just treat all
-	 * externally blocked reasons as 'MUTEX'.  Whatever we do here, we are
+	/* Could imagine doing something with the flags.  For now, we just treat
+	 * most externally blocked reasons as 'MUTEX'.  Whatever we do here, we are
 	 * mostly communicating to our future selves in pth_thread_runnable(), which
 	 * gets called by whoever triggered this callback */
-	pthread->state = PTH_BLK_MUTEX;
+	switch (flags) {
+	case UTH_EXT_BLK_YIELD:
+		pthread->state = PTH_BLK_YIELDING;
+		break;
+	default:
+		pthread->state = PTH_BLK_MUTEX;
+	};
 	if (sync_obj)
 		__uth_default_sync_enqueue(uthread, sync_obj);
 }
@@ -665,22 +671,10 @@ void pthread_exit(void *ret)
 	pthread_exit_no_cleanup(ret);
 }
 
-/* Callback/bottom half of yield.  For those writing these pth callbacks, the
- * minimum is call generic, set state (communicate with runnable), then do
- * something that causes it to be runnable in the future (or right now). */
-static void __pth_yield_cb(struct uthread *uthread, void *junk)
-{
-	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	__pthread_generic_yield(pthread);
-	pthread->state = PTH_BLK_YIELDING;
-	/* just immediately restart it */
-	pth_thread_runnable(uthread);
-}
-
 /* Cooperative yielding of the processor, to allow other threads to run */
 int pthread_yield(void)
 {
-	uthread_yield(TRUE, __pth_yield_cb, 0);
+	uthread_sched_yield();
 	return 0;
 }
 

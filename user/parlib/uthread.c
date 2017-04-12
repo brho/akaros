@@ -1379,3 +1379,20 @@ void uthread_join(struct uthread *uth, void **retval_loc)
 	req->retval_loc = retval_loc;
 	uthread_join_arr(req, 1);
 }
+
+static void __uth_sched_yield_cb(struct uthread *uth, void *arg)
+{
+	uthread_has_blocked(uth, NULL, UTH_EXT_BLK_YIELD);
+	uthread_runnable(uth);
+}
+
+void uthread_sched_yield(void)
+{
+	if (!uth_2ls_is_multithreaded()) {
+		/* We're an SCP with no other threads, so we want to yield to other
+		 * processes.  For SCPs, this will yield to the OS/other procs. */
+		syscall(SYS_proc_yield, TRUE);
+		return;
+	}
+	uthread_yield(TRUE, __uth_sched_yield_cb, NULL);
+}

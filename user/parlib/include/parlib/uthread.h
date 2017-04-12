@@ -23,7 +23,8 @@ __BEGIN_DECLS
 /* Externally blocked thread reasons (for uthread_has_blocked()) */
 #define UTH_EXT_BLK_MUTEX			1
 #define UTH_EXT_BLK_EVENTQ			2
-#define UTH_EXT_BLK_JUSTICE			3	/* whatever.  might need more options */
+#define UTH_EXT_BLK_YIELD			3
+#define UTH_EXT_BLK_JUSTICE			4	/* whatever.  might need more options */
 
 /* One per joiner, usually kept on the stack. */
 struct uth_join_kicker {
@@ -147,6 +148,7 @@ struct uthread *uthread_create(void *(*func)(void *), void *arg);
 void uthread_detach(struct uthread *uth);
 void uthread_join(struct uthread *uth, void **retval_loc);
 void uthread_join_arr(struct uth_join_request reqs[], size_t nr_req);
+void uthread_sched_yield(void);
 
 /* Call this when you are done with a uthread, forever, but before you free it */
 void uthread_cleanup(struct uthread *uthread);
