@@ -6,6 +6,7 @@
 #include <libc-symbols.h>
 #include <ros/common.h>
 #include <ros/trapframe.h>
+#include <ros/syscall.h>
 #include <parlib/stdio.h>
 #include <parlib/assert.h>
 #include <parlib/spinlock.h>
@@ -105,3 +106,11 @@ void __cpu_relax_vc(uint32_t vcoreid)
 	cpu_relax();
 }
 weak_alias(__cpu_relax_vc, cpu_relax_vc)
+
+void __uthread_sched_yield(void)
+{
+	/* In the off-chance we're called before parlib is available, we'll do the
+	 * single-threaded, SCP yield. */
+	ros_syscall(SYS_proc_yield, TRUE, 0, 0, 0, 0, 0);
+}
+weak_alias(__uthread_sched_yield, uthread_sched_yield)

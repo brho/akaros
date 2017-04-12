@@ -18,15 +18,12 @@
 
 #include <errno.h>
 #include <sched.h>
-#include <ros/syscall.h>
+#include <parlib/uthread.h>
 
-/* Yield the processor.  */
-int
-__sched_yield (void)
+int __sched_yield(void)
 {
-  /* TRUE tells the kernel we simply want to let someone else process, and not
-   * that we are waiting on an event. */
-  return ros_syscall(SYS_proc_yield, TRUE, 0, 0, 0, 0, 0);
+	uthread_sched_yield();
+	return 0;
 }
 libc_hidden_def (__sched_yield)
 weak_alias (__sched_yield, sched_yield)
