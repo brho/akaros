@@ -45,6 +45,7 @@ static void pth_thread_has_blocked(struct uthread *uthread, uth_sync_t sync_obj,
 static void pth_thread_refl_fault(struct uthread *uth,
                                   struct user_context *ctx);
 static void pth_thread_exited(struct uthread *uth);
+static struct uthread *pth_thread_create(void *(*func)(void *), void *arg);
 
 /* Event Handlers */
 static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
@@ -58,6 +59,7 @@ struct schedule_ops pthread_sched_ops = {
 	.thread_has_blocked = pth_thread_has_blocked,
 	.thread_refl_fault = pth_thread_refl_fault,
 	.thread_exited = pth_thread_exited,
+	.thread_create = pth_thread_create,
 };
 
 /* Static helpers */
@@ -352,8 +354,21 @@ static void pth_thread_exited(struct uthread *uth)
 		exit(0);
 }
 
+/* Careful, if someone used the pthread_need_tls() hack to turn off TLS, it will
+ * also be turned off for these threads. */
+static struct uthread *pth_thread_create(void *(*func)(void *), void *arg)
+{
+	struct pthread_tcb *pth;
+	int ret;
+
+	ret = pthread_create(&pth, NULL, func, arg);
+	return ret == 0 ? (struct uthread*)pth : NULL;
+}
+
 /* Akaros pthread extensions / hacks */
 
+/* Careful using this - glibc and gcc are likely to use TLS without you knowing
+ * it. */
 void pthread_need_tls(bool need)
 {
 	need_tls = need;

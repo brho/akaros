@@ -42,6 +42,7 @@ static void vmm_thread_has_blocked(struct uthread *uth, uth_sync_t sync_obj,
 static void vmm_thread_refl_fault(struct uthread *uth,
                                   struct user_context *ctx);
 static void vmm_thread_exited(struct uthread *uth);
+static struct uthread *vmm_thread_create(void *(*func)(void *), void *arg);
 
 struct schedule_ops vmm_sched_ops = {
 	.sched_entry = vmm_sched_entry,
@@ -51,6 +52,7 @@ struct schedule_ops vmm_sched_ops = {
 	.thread_has_blocked = vmm_thread_has_blocked,
 	.thread_refl_fault = vmm_thread_refl_fault,
 	.thread_exited = vmm_thread_exited,
+	.thread_create = vmm_thread_create,
 };
 
 /* Helpers */
@@ -499,11 +501,12 @@ static void __task_thread_run(void)
 	uth_2ls_thread_exit(tth->func(tth->arg));
 }
 
-struct task_thread *vmm_run_task(struct virtual_machine *vm,
-                                 void *(*func)(void *), void *arg)
+/* Helper, creates and starts a task thread. */
+static struct task_thread *__vmm_run_task(struct virtual_machine *vm,
+                                          void *(*func)(void *), void *arg,
+                                          struct uth_thread_attr *tth_attr)
 {
 	struct task_thread *tth;
-	struct uth_thread_attr tth_attr = {.want_tls = TRUE, .detached = TRUE};
 
 	tth = (struct task_thread*)alloc_vmm_thread(vm, VMM_THREAD_TASK);
 	if (!tth)
@@ -518,10 +521,30 @@ struct task_thread *vmm_run_task(struct virtual_machine *vm,
 	tth->arg = arg;
 	init_user_ctx(&tth->uthread.u_ctx, (uintptr_t)&__task_thread_run,
 	              (uintptr_t)(tth->stacktop));
-	uthread_init((struct uthread*)tth, &tth_attr);
+	uthread_init((struct uthread*)tth, tth_attr);
 	acct_thread_unblocked((struct vmm_thread*)tth);
 	enqueue_vmm_thread((struct vmm_thread*)tth);
 	return tth;
+}
+
+struct task_thread *vmm_run_task(struct virtual_machine *vm,
+                                 void *(*func)(void *), void *arg)
+{
+	struct uth_thread_attr tth_attr = {.want_tls = TRUE, .detached = TRUE};
+
+	return __vmm_run_task(vm, func, arg, &tth_attr);
+}
+
+static struct uthread *vmm_thread_create(void *(*func)(void *), void *arg)
+{
+	struct uth_thread_attr tth_attr = {.want_tls = TRUE, .detached = FALSE};
+	struct task_thread *tth;
+
+	/* It's OK to not have a VM for a generic thread */
+	tth = __vmm_run_task(NULL, func, arg, &tth_attr);
+	/* But just in case, let's poison it */
+	((struct vmm_thread*)tth)->vm = (void*)0xdeadbeef;
+	return (struct uthread*)tth;
 }
 
 /* Helpers for tracking nr_unblk_* threads. */

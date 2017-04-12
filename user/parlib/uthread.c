@@ -1214,6 +1214,11 @@ bool uth_2ls_is_multithreaded(void)
 	return sched_ops != &thread0_2ls_ops;
 }
 
+struct uthread *uthread_create(void *(*func)(void *), void *arg)
+{
+	return sched_ops->thread_create(func, arg);
+}
+
 /* Who does the thread_exited callback (2LS-specific cleanup)?  It depends.  If
  * the thread exits first, then join/detach does it.  o/w, the exit path does.
  *

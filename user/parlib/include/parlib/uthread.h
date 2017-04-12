@@ -98,6 +98,7 @@ struct schedule_ops {
 	void (*thread_has_blocked)(struct uthread *, uth_sync_t, int);
 	void (*thread_refl_fault)(struct uthread *, struct user_context *);
 	void (*thread_exited)(struct uthread *);
+	struct uthread *(*thread_create)(void *(*)(void *), void *);
 	/**** Defining these functions is optional. ****/
 	uth_sync_t (*sync_alloc)(void);
 	void (*sync_free)(uth_sync_t);
@@ -139,6 +140,10 @@ struct uth_join_request {
  * created.  Call this whenever you are "starting over" with a thread.  Pass in
  * attr, if you want to override any defaults. */
 void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr);
+/* uthread_create() is a front-end for getting the 2LS to make and run a thread
+ * appropriate for running func(arg) in the GCC/glibc environment.  The thread
+ * will have TLS and not be detached. */
+struct uthread *uthread_create(void *(*func)(void *), void *arg);
 void uthread_detach(struct uthread *uth);
 void uthread_join(struct uthread *uth, void **retval_loc);
 void uthread_join_arr(struct uth_join_request reqs[], size_t nr_req);
