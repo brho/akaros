@@ -92,7 +92,7 @@ enum {
 
 static struct class *uverbs_class;
 
-DEFINE_SPINLOCK(ib_uverbs_idr_lock);
+spinlock_t ib_uverbs_idr_lock = SPINLOCK_INITIALIZER;
 DEFINE_IDR(ib_uverbs_pd_idr);
 DEFINE_IDR(ib_uverbs_mr_idr);
 DEFINE_IDR(ib_uverbs_mw_idr);
@@ -103,7 +103,7 @@ DEFINE_IDR(ib_uverbs_srq_idr);
 DEFINE_IDR(ib_uverbs_xrcd_idr);
 DEFINE_IDR(ib_uverbs_rule_idr);
 
-static DEFINE_SPINLOCK(map_lock);
+static spinlock_t map_lock = SPINLOCK_INITIALIZER;
 static DECLARE_BITMAP(dev_map, IB_UVERBS_MAX_DEVICES);
 
 static ssize_t (*uverbs_cmd_table[])(struct ib_uverbs_file *file,
@@ -186,23 +186,23 @@ void ib_uverbs_release_ucq(struct ib_uverbs_file *file,
 	struct ib_uverbs_event *evt, *tmp;
 
 	if (ev_file) {
-		spin_lock_irq(&ev_file->lock);
+		spin_lock_irqsave(&ev_file->lock);
 		list_for_each_entry_safe(evt, tmp, &uobj->comp_list, obj_list) {
 			list_del(&evt->list);
 			kfree(evt);
 		}
-		spin_unlock_irq(&ev_file->lock);
+		spin_unlock_irqsave(&ev_file->lock);
 
 		kref_put(&ev_file->ref, ib_uverbs_release_event_file);
 	}
 
 #if 0	/* AKAROS */
-	spin_lock_irq(&file->async_file->lock);
+	spin_lock_irqsave(&file->async_file->lock);
 	list_for_each_entry_safe(evt, tmp, &uobj->async_list, obj_list) {
 		list_del(&evt->list);
 		kfree(evt);
 	}
-	spin_unlock_irq(&file->async_file->lock);
+	spin_unlock_irqsave(&file->async_file->lock);
 #endif	/* AKAROS */
 }
 
@@ -212,12 +212,12 @@ void ib_uverbs_release_uevent(struct ib_uverbs_file *file,
 #if 0	/* AKAROS */
 	struct ib_uverbs_event *evt, *tmp;
 
-	spin_lock_irq(&file->async_file->lock);
+	spin_lock_irqsave(&file->async_file->lock);
 	list_for_each_entry_safe(evt, tmp, &uobj->event_list, obj_list) {
 		list_del(&evt->list);
 		kfree(evt);
 	}
-	spin_unlock_irq(&file->async_file->lock);
+	spin_unlock_irqsave(&file->async_file->lock);
 #endif	/* AKAROS */
 }
 
@@ -366,10 +366,10 @@ static ssize_t ib_uverbs_event_read(struct file *filp, char __user *buf,
 	int eventsz;
 	int ret = 0;
 
-	spin_lock_irq(&file->lock);
+	spin_lock_irqsave(&file->lock);
 
 	while (list_empty(&file->event_list)) {
-		spin_unlock_irq(&file->lock);
+		spin_unlock_irqsave(&file->lock);
 
 		if (filp->f_flags & O_NONBLOCK)
 			return -EAGAIN;
@@ -378,7 +378,7 @@ static ssize_t ib_uverbs_event_read(struct file *filp, char __user *buf,
 					     !list_empty(&file->event_list)))
 			return -ERESTARTSYS;
 
-		spin_lock_irq(&file->lock);
+		spin_lock_irqsave(&file->lock);
 	}
 
 	event = list_entry(file->event_list.next, struct ib_uverbs_event, list);
@@ -399,7 +399,7 @@ static ssize_t ib_uverbs_event_read(struct file *filp, char __user *buf,
 		}
 	}
 
-	spin_unlock_irq(&file->lock);
+	spin_unlock_irqsave(&file->lock);
 
 	if (event) {
 		if (copy_to_user(buf, event, eventsz))
@@ -421,10 +421,10 @@ static unsigned int ib_uverbs_event_poll(struct file *filp,
 
 	poll_wait(filp, &file->poll_wait, wait);
 
-	spin_lock_irq(&file->lock);
+	spin_lock_irqsave(&file->lock);
 	if (!list_empty(&file->event_list))
 		pollflags = POLLIN | POLLRDNORM;
-	spin_unlock_irq(&file->lock);
+	spin_unlock_irqsave(&file->lock);
 
 	return pollflags;
 }
@@ -441,14 +441,14 @@ static int ib_uverbs_event_close(struct inode *inode, struct file *filp)
 	struct ib_uverbs_event_file *file = filp->private_data;
 	struct ib_uverbs_event *entry, *tmp;
 
-	spin_lock_irq(&file->lock);
+	spin_lock_irqsave(&file->lock);
 	file->is_closed = 1;
 	list_for_each_entry_safe(entry, tmp, &file->event_list, list) {
 		if (entry->counter)
 			list_del(&entry->obj_list);
 		kfree(entry);
 	}
-	spin_unlock_irq(&file->lock);
+	spin_unlock_irqsave(&file->lock);
 
 	if (file->is_async) {
 		ib_unregister_event_handler(&file->uverbs_file->event_handler);
@@ -475,20 +475,19 @@ void ib_uverbs_comp_handler(struct ib_cq *cq, void *cq_context)
 	struct ib_uverbs_event_file    *file = cq_context;
 	struct ib_ucq_object	       *uobj;
 	struct ib_uverbs_event	       *entry;
-	unsigned long			flags;
 
 	if (!file)
 		return;
 
-	spin_lock_irqsave(&file->lock, flags);
+	spin_lock_irqsave(&file->lock);
 	if (file->is_closed) {
-		spin_unlock_irqrestore(&file->lock, flags);
+		spin_unlock_irqsave(&file->lock);
 		return;
 	}
 
 	entry = kmalloc(sizeof *entry, GFP_ATOMIC);
 	if (!entry) {
-		spin_unlock_irqrestore(&file->lock, flags);
+		spin_unlock_irqsave(&file->lock);
 		return;
 	}
 
@@ -499,7 +498,7 @@ void ib_uverbs_comp_handler(struct ib_cq *cq, void *cq_context)
 
 	list_add_tail(&entry->list, &file->event_list);
 	list_add_tail(&entry->obj_list, &uobj->comp_list);
-	spin_unlock_irqrestore(&file->lock, flags);
+	spin_unlock_irqsave(&file->lock);
 
 	wake_up_interruptible(&file->poll_wait);
 	kill_fasync(&file->async_queue, SIGIO, POLL_IN);
@@ -511,17 +510,16 @@ static void ib_uverbs_async_handler(struct ib_uverbs_file *file,
 				    u32 *counter)
 {
 	struct ib_uverbs_event *entry;
-	unsigned long flags;
 
-	spin_lock_irqsave(&file->async_file->lock, flags);
+	spin_lock_irqsave(&file->async_file->lock);
 	if (file->async_file->is_closed) {
-		spin_unlock_irqrestore(&file->async_file->lock, flags);
+		spin_unlock_irqsave(&file->async_file->lock);
 		return;
 	}
 
 	entry = kmalloc(sizeof *entry, GFP_ATOMIC);
 	if (!entry) {
-		spin_unlock_irqrestore(&file->async_file->lock, flags);
+		spin_unlock_irqsave(&file->async_file->lock);
 		return;
 	}
 
@@ -533,7 +531,7 @@ static void ib_uverbs_async_handler(struct ib_uverbs_file *file,
 	list_add_tail(&entry->list, &file->async_file->event_list);
 	if (obj_list)
 		list_add_tail(&entry->obj_list, obj_list);
-	spin_unlock_irqrestore(&file->async_file->lock, flags);
+	spin_unlock_irqsave(&file->async_file->lock);
 
 	wake_up_interruptible(&file->async_file->poll_wait);
 	kill_fasync(&file->async_file->async_queue, SIGIO, POLL_IN);
@@ -599,7 +597,7 @@ struct file *ib_uverbs_alloc_event_file(struct ib_uverbs_file *uverbs_file,
 		return ERR_PTR(-ENOMEM);
 
 	kref_init(&ev_file->ref);
-	spin_lock_init(&ev_file->lock);
+	spinlock_init_irqsave(&ev_file->lock);
 	INIT_LIST_HEAD(&ev_file->event_list);
 	init_waitqueue_head(&ev_file->poll_wait);
 	ev_file->uverbs_file = uverbs_file;

@@ -383,13 +383,12 @@ EXPORT_SYMBOL(ib_destroy_srq);
 static void __ib_shared_qp_event_handler(struct ib_event *event, void *context)
 {
 	struct ib_qp *qp = context;
-	unsigned long flags;
 
-	spin_lock_irqsave(&qp->device->event_handler_lock, flags);
+	spin_lock_irqsave(&qp->device->event_handler_lock);
 	list_for_each_entry(event->element.qp, &qp->open_list, open_list)
 		if (event->element.qp->event_handler)
 			event->element.qp->event_handler(event, event->element.qp->qp_context);
-	spin_unlock_irqrestore(&qp->device->event_handler_lock, flags);
+	spin_unlock_irqsave(&qp->device->event_handler_lock);
 }
 
 static void __ib_insert_xrcd_qp(struct ib_xrcd *xrcd, struct ib_qp *qp)
@@ -404,7 +403,6 @@ static struct ib_qp *__ib_open_qp(struct ib_qp *real_qp,
 				  void *qp_context)
 {
 	struct ib_qp *qp;
-	unsigned long flags;
 
 	qp = kzalloc(sizeof *qp, GFP_KERNEL);
 	if (!qp)
@@ -418,9 +416,9 @@ static struct ib_qp *__ib_open_qp(struct ib_qp *real_qp,
 	qp->qp_num = real_qp->qp_num;
 	qp->qp_type = real_qp->qp_type;
 
-	spin_lock_irqsave(&real_qp->device->event_handler_lock, flags);
+	spin_lock_irqsave(&real_qp->device->event_handler_lock);
 	list_add(&qp->open_list, &real_qp->open_list);
-	spin_unlock_irqrestore(&real_qp->device->event_handler_lock, flags);
+	spin_unlock_irqsave(&real_qp->device->event_handler_lock);
 
 	return qp;
 }
@@ -940,15 +938,14 @@ EXPORT_SYMBOL(ib_query_qp);
 int ib_close_qp(struct ib_qp *qp)
 {
 	struct ib_qp *real_qp;
-	unsigned long flags;
 
 	real_qp = qp->real_qp;
 	if (real_qp == qp)
 		return -EINVAL;
 
-	spin_lock_irqsave(&real_qp->device->event_handler_lock, flags);
+	spin_lock_irqsave(&real_qp->device->event_handler_lock);
 	list_del(&qp->open_list);
-	spin_unlock_irqrestore(&real_qp->device->event_handler_lock, flags);
+	spin_unlock_irqsave(&real_qp->device->event_handler_lock);
 
 	atomic_dec(&real_qp->usecnt);
 	kfree(qp);

@@ -178,7 +178,7 @@ int idr_alloc(struct idr *idp, void *ptr, int start, int end, gfp_t gfp_mask)
 	/* We use values[] == NULL as an indicator that slot is free */
 	BUG_ON(ptr == NULL);
 
-	spin_lock_irqsave(&idp->lock, f);
+	spin_lock_irqsave(&idp->lock);
 
 	for (i = 0; i < MAXITEMS; i++) {
 		if (idp->values[i] == NULL) {

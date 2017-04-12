@@ -185,7 +185,7 @@ struct ib_cq *mlx4_ib_create_cq(struct ib_device *ibdev, int entries, int vector
 	entries      = roundup_pow_of_two(entries + 1);
 	cq->ibcq.cqe = entries - 1;
 	mutex_init(&cq->resize_mutex);
-	spin_lock_init(&cq->lock);
+	spinlock_init_irqsave(&cq->lock);
 	cq->resize_buf = NULL;
 	cq->resize_umem = NULL;
 	INIT_LIST_HEAD(&cq->send_qp_list);
@@ -422,7 +422,7 @@ int mlx4_ib_resize_cq(struct ib_cq *ibcq, int entries, struct ib_udata *udata)
 		struct mlx4_ib_cq_buf tmp_buf;
 		int tmp_cqe = 0;
 
-		spin_lock_irq(&cq->lock);
+		spin_lock_irqsave(&cq->lock);
 		if (cq->resize_buf) {
 			mlx4_ib_cq_resize_copy_cqes(cq);
 			tmp_buf = cq->buf;
@@ -433,7 +433,7 @@ int mlx4_ib_resize_cq(struct ib_cq *ibcq, int entries, struct ib_udata *udata)
 			kfree(cq->resize_buf);
 			cq->resize_buf = NULL;
 		}
-		spin_unlock_irq(&cq->lock);
+		spin_unlock_irqsave(&cq->lock);
 
 		if (tmp_cqe)
 			mlx4_ib_free_cq_buf(dev, &tmp_buf, tmp_cqe);
@@ -888,7 +888,7 @@ int mlx4_ib_poll_cq(struct ib_cq *ibcq, int num_entries, struct ib_wc *wc)
 	int err = 0;
 	struct mlx4_ib_dev *mdev = to_mdev(cq->ibcq.device);
 
-	spin_lock_irqsave(&cq->lock, flags);
+	spin_lock_irqsave(&cq->lock);
 	if (mdev->dev->persist->state & MLX4_DEVICE_STATE_INTERNAL_ERROR) {
 		mlx4_ib_poll_sw_comp(cq, num_entries, wc, &npolled);
 		goto out;
@@ -903,7 +903,7 @@ int mlx4_ib_poll_cq(struct ib_cq *ibcq, int num_entries, struct ib_wc *wc)
 	mlx4_cq_set_ci(&cq->mcq);
 
 out:
-	spin_unlock_irqrestore(&cq->lock, flags);
+	spin_unlock_irqsave(&cq->lock);
 
 	if (err == 0 || err == -EAGAIN)
 		return npolled;
@@ -977,7 +977,7 @@ void __mlx4_ib_cq_clean(struct mlx4_ib_cq *cq, u32 qpn, struct mlx4_ib_srq *srq)
 
 void mlx4_ib_cq_clean(struct mlx4_ib_cq *cq, u32 qpn, struct mlx4_ib_srq *srq)
 {
-	spin_lock_irq(&cq->lock);
+	spin_lock_irqsave(&cq->lock);
 	__mlx4_ib_cq_clean(cq, qpn, srq);
-	spin_unlock_irq(&cq->lock);
+	spin_unlock_irqsave(&cq->lock);
 }

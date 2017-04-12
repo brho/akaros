@@ -66,7 +66,11 @@
 #define	iboe_get_mtu(v)			IB_MTU_1024	/* TODO */
 
 /* STUB START */
-int mlx4_ib_init_sriov(struct mlx4_ib_dev *dev) { return 0; }
+int mlx4_ib_init_sriov(struct mlx4_ib_dev *dev)
+{
+	spinlock_init_irqsave(&dev->sriov.going_down_lock);
+	return 0;
+}
 int mlx4_ib_mad_init(struct mlx4_ib_dev *dev) { return 0; }
 void mlx4_ib_close_sriov(struct mlx4_ib_dev *dev) {}
 void mlx4_ib_mad_cleanup(struct mlx4_ib_dev *dev) {}
@@ -413,7 +417,7 @@ static int eth_link_query_port(struct ib_device *ibdev, u8 port,
 	props->active_mtu	= IB_MTU_256;
 	if (is_bonded)
 		rtnl_lock(); /* required to get upper dev */
-	spin_lock_bh(&iboe->lock);
+	spin_lock(&iboe->lock);
 #if 0	/* AKAROS */
 	ndev = iboe->netdevs[port - 1];
 	if (ndev && is_bonded)
@@ -429,7 +433,7 @@ static int eth_link_query_port(struct ib_device *ibdev, u8 port,
 					IB_PORT_ACTIVE : IB_PORT_DOWN;
 	props->phys_state	= state_to_phys_state(props->state);
 out_unlock:
-	spin_unlock_bh(&iboe->lock);
+	spin_unlock(&iboe->lock);
 	if (is_bonded)
 		rtnl_unlock();
 out:
@@ -586,9 +590,9 @@ static int mlx4_ib_modify_device(struct ib_device *ibdev, int mask,
 	if (mlx4_is_slave(to_mdev(ibdev)->dev))
 		return -EOPNOTSUPP;
 
-	spin_lock_irqsave(&to_mdev(ibdev)->sm_lock, flags);
+	spin_lock_irqsave(&to_mdev(ibdev)->sm_lock);
 	memcpy(ibdev->node_desc, props->node_desc, 64);
-	spin_unlock_irqrestore(&to_mdev(ibdev)->sm_lock, flags);
+	spin_unlock_irqsave(&to_mdev(ibdev)->sm_lock);
 
 	/*
 	 * If possible, pass node desc to FW, so it can generate
@@ -909,11 +913,11 @@ int mlx4_ib_add_mc(struct mlx4_ib_dev *mdev, struct mlx4_ib_qp *mqp,
 	if (!mqp->port)
 		return 0;
 
-	spin_lock_bh(&mdev->iboe.lock);
+	spin_lock(&mdev->iboe.lock);
 	ndev = mdev->iboe.netdevs[mqp->port - 1];
 	if (ndev)
 		dev_hold(ndev);
-	spin_unlock_bh(&mdev->iboe.lock);
+	spin_unlock(&mdev->iboe.lock);
 
 	if (ndev) {
 		ret = 1;
@@ -1460,11 +1464,11 @@ static int mlx4_ib_mcg_detach(struct ib_qp *ibqp, union ib_gid *gid, u16 lid)
 	mutex_lock(&mqp->mutex);
 	ge = find_gid_entry(mqp, gid->raw);
 	if (ge) {
-		spin_lock_bh(&mdev->iboe.lock);
+		spin_lock(&mdev->iboe.lock);
 		ndev = ge->added ? mdev->iboe.netdevs[ge->port - 1] : NULL;
 		if (ndev)
 			dev_hold(ndev);
-		spin_unlock_bh(&mdev->iboe.lock);
+		spin_unlock(&mdev->iboe.lock);
 		if (ndev)
 			dev_put(ndev);
 		list_del(&ge->list);
@@ -1767,7 +1771,7 @@ static int mlx4_ib_addr_event(int event, struct net_device *event_netdev,
 		return 0;
 
 	iboe = &ibdev->iboe;
-	spin_lock_bh(&iboe->lock);
+	spin_lock(&iboe->lock);
 
 	for (port = 1; port <= ibdev->dev->caps.num_ports; ++port)
 		if ((netif_is_bond_master(real_dev) &&
@@ -1777,7 +1781,7 @@ static int mlx4_ib_addr_event(int event, struct net_device *event_netdev,
 			update_gid_table(ibdev, port, gid,
 					 event == NETDEV_DOWN, 0);
 
-	spin_unlock_bh(&iboe->lock);
+	spin_unlock(&iboe->lock);
 	return 0;
 
 }
@@ -1969,7 +1973,7 @@ static int mlx4_ib_init_gid_table(struct mlx4_ib_dev *ibdev)
 
 #if 0	/* AKAROS */
 	read_lock(&dev_base_lock);
-	spin_lock_bh(&iboe->lock);
+	spin_lock(&iboe->lock);
 
 	for_each_netdev(&init_net, dev) {
 		u8 port = mlx4_ib_get_dev_port(dev, ibdev);
@@ -1980,7 +1984,7 @@ static int mlx4_ib_init_gid_table(struct mlx4_ib_dev *ibdev)
 		}
 	}
 
-	spin_unlock_bh(&iboe->lock);
+	spin_unlock(&iboe->lock);
 	read_unlock(&dev_base_lock);
 #endif	/* AKAROS */
 out:
@@ -2000,7 +2004,7 @@ static void mlx4_ib_scan_netdevs(struct mlx4_ib_dev *ibdev,
 
 	iboe = &ibdev->iboe;
 
-	spin_lock_bh(&iboe->lock);
+	spin_lock(&iboe->lock);
 	mlx4_foreach_ib_transport_port(port, ibdev->dev) {
 		enum ib_port_state	port_state = IB_PORT_NOP;
 		struct net_device *old_master = iboe->masters[port - 1];
@@ -2073,7 +2077,7 @@ static void mlx4_ib_scan_netdevs(struct mlx4_ib_dev *ibdev,
 		}
 	}
 
-	spin_unlock_bh(&iboe->lock);
+	spin_unlock(&iboe->lock);
 
 	if (update_qps_port > 0)
 		mlx4_ib_update_qps(ibdev, dev, update_qps_port);
@@ -2434,10 +2438,10 @@ static void *mlx4_ib_add(struct mlx4_dev *dev)
 	mlx4_foreach_port(i, dev, MLX4_PORT_TYPE_IB)
 		ib_num_ports++;
 
-	spin_lock_init(&ibdev->sm_lock);
+	spinlock_init_irqsave(&ibdev->sm_lock);
 	mutex_init(&ibdev->cap_mask_mutex);
 	INIT_LIST_HEAD(&ibdev->qp_list);
-	spin_lock_init(&ibdev->reset_flow_resource_lock);
+	spinlock_init_irqsave(&ibdev->reset_flow_resource_lock);
 
 	if (ibdev->steering_support == MLX4_STEERING_MODE_DEVICE_MANAGED &&
 	    ib_num_ports) {
@@ -2752,10 +2756,10 @@ static void do_slave_init(struct mlx4_ib_dev *ibdev, int slave, int do_init)
 		dm[i]->slave = slave;
 		dm[i]->do_init = do_init;
 		dm[i]->dev = ibdev;
-		spin_lock_irqsave(&ibdev->sriov.going_down_lock, flags);
+		spin_lock_irqsave(&ibdev->sriov.going_down_lock);
 		if (!ibdev->sriov.is_going_down)
 			queue_work(ibdev->sriov.demux[i].ud_wq, &dm[i]->work);
-		spin_unlock_irqrestore(&ibdev->sriov.going_down_lock, flags);
+		spin_unlock_irqsave(&ibdev->sriov.going_down_lock);
 	}
 out:
 	kfree(dm);
@@ -2776,13 +2780,13 @@ static void mlx4_ib_handle_catas_error(struct mlx4_ib_dev *ibdev)
 	INIT_LIST_HEAD(&cq_notify_list);
 
 	/* Go over qp list reside on that ibdev, sync with create/destroy qp.*/
-	spin_lock_irqsave(&ibdev->reset_flow_resource_lock, flags);
+	spin_lock_irqsave(&ibdev->reset_flow_resource_lock);
 
 	list_for_each_entry(mqp, &ibdev->qp_list, qps_list) {
-		spin_lock_irqsave(&mqp->sq.lock, flags_qp);
+		spin_lock_irqsave(&mqp->sq.lock);
 		if (mqp->sq.tail != mqp->sq.head) {
 			send_mcq = to_mcq(mqp->ibqp.send_cq);
-			spin_lock_irqsave(&send_mcq->lock, flags_cq);
+			spin_lock_irqsave(&send_mcq->lock);
 			if (send_mcq->mcq.comp &&
 			    mqp->ibqp.send_cq->comp_handler) {
 				if (!send_mcq->mcq.reset_notify_added) {
@@ -2791,16 +2795,16 @@ static void mlx4_ib_handle_catas_error(struct mlx4_ib_dev *ibdev)
 						      &cq_notify_list);
 				}
 			}
-			spin_unlock_irqrestore(&send_mcq->lock, flags_cq);
+			spin_unlock_irqsave(&send_mcq->lock);
 		}
-		spin_unlock_irqrestore(&mqp->sq.lock, flags_qp);
+		spin_unlock_irqsave(&mqp->sq.lock);
 		/* Now, handle the QP's receive queue */
-		spin_lock_irqsave(&mqp->rq.lock, flags_qp);
+		spin_lock_irqsave(&mqp->rq.lock);
 		/* no handling is needed for SRQ */
 		if (!mqp->ibqp.srq) {
 			if (mqp->rq.tail != mqp->rq.head) {
 				recv_mcq = to_mcq(mqp->ibqp.recv_cq);
-				spin_lock_irqsave(&recv_mcq->lock, flags_cq);
+				spin_lock_irqsave(&recv_mcq->lock);
 				if (recv_mcq->mcq.comp &&
 				    mqp->ibqp.recv_cq->comp_handler) {
 					if (!recv_mcq->mcq.reset_notify_added) {
@@ -2809,17 +2813,16 @@ static void mlx4_ib_handle_catas_error(struct mlx4_ib_dev *ibdev)
 							      &cq_notify_list);
 					}
 				}
-				spin_unlock_irqrestore(&recv_mcq->lock,
-						       flags_cq);
+				spin_unlock_irqsave(&recv_mcq->lock);
 			}
 		}
-		spin_unlock_irqrestore(&mqp->rq.lock, flags_qp);
+		spin_unlock_irqsave(&mqp->rq.lock);
 	}
 
 	list_for_each_entry(mcq, &cq_notify_list, reset_notify) {
 		mcq->comp(mcq);
 	}
-	spin_unlock_irqrestore(&ibdev->reset_flow_resource_lock, flags);
+	spin_unlock_irqsave(&ibdev->reset_flow_resource_lock);
 	pr_warn("mlx4_ib_handle_catas_error ended\n");
 }
 
@@ -2833,7 +2836,7 @@ static void handle_bonded_port_state_event(struct work_struct *work)
 	struct ib_event ibev;
 
 	kfree(ew);
-	spin_lock_bh(&ibdev->iboe.lock);
+	spin_lock(&ibdev->iboe.lock);
 	for (i = 0; i < MLX4_MAX_PORTS; ++i) {
 		struct net_device *curr_netdev = ibdev->iboe.netdevs[i];
 		enum ib_port_state curr_port_state;
@@ -2849,7 +2852,7 @@ static void handle_bonded_port_state_event(struct work_struct *work)
 		bonded_port_state = (bonded_port_state != IB_PORT_ACTIVE) ?
 			curr_port_state : IB_PORT_ACTIVE;
 	}
-	spin_unlock_bh(&ibdev->iboe.lock);
+	spin_unlock(&ibdev->iboe.lock);
 
 	ibev.device = &ibdev->ib_dev;
 	ibev.element.port_num = 1;

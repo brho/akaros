@@ -51,16 +51,6 @@ typedef atomic_t			atomic64_t;
 #define	mutex_lock(a)			qlock(a)
 #define	mutex_unlock(a)			qunlock(a)
 
-#define	spin_lock_init(E)		spinlock_init_irqsave(E)
-#define	spin_lock_irq(a)		spin_lock_irqsave(a, 0)
-#define	spin_unlock_irq(a)		spin_unlock_irqsave(a)
-#define	spin_lock_irqsave(l, f)		spin_lock_irqsave(l)
-#define	spin_unlock_irqrestore(l, f)	spin_unlock_irqsave(l)
-#define	spin_lock_nested(l, d)		spin_lock(l)
-#define	spin_lock_bh(E)			spin_lock(E)
-#define	spin_unlock_bh(E)		spin_unlock(E)
-#define	DEFINE_SPINLOCK(x)		spinlock_t x = SPINLOCK_INITIALIZER
-
 extern unsigned long pgprot_noncached(int vmprot);
 extern unsigned long pgprot_writecombine(int vmprot);
 

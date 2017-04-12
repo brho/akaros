@@ -221,7 +221,6 @@ EXPORT_SYMBOL(ib_dealloc_device);
 static int add_client_context(struct ib_device *device, struct ib_client *client)
 {
 	struct ib_client_data *context;
-	unsigned long flags;
 
 	context = kmalloc(sizeof *context, GFP_KERNEL);
 	if (!context) {
@@ -233,9 +232,9 @@ static int add_client_context(struct ib_device *device, struct ib_client *client
 	context->client = client;
 	context->data   = NULL;
 
-	spin_lock_irqsave(&device->client_data_lock, flags);
+	spin_lock_irqsave(&device->client_data_lock);
 	list_add(&context->list, &device->client_data_list);
-	spin_unlock_irqrestore(&device->client_data_lock, flags);
+	spin_unlock_irqsave(&device->client_data_lock);
 
 	return 0;
 }
@@ -309,8 +308,8 @@ int ib_register_device(struct ib_device *device,
 
 	INIT_LIST_HEAD(&device->event_handler_list);
 	INIT_LIST_HEAD(&device->client_data_list);
-	spin_lock_init(&device->event_handler_lock);
-	spin_lock_init(&device->client_data_lock);
+	spinlock_init_irqsave(&device->event_handler_lock);
+	spinlock_init_irqsave(&device->client_data_lock);
 
 	ret = read_port_table_lengths(device);
 	if (ret) {
@@ -356,7 +355,6 @@ void ib_unregister_device(struct ib_device *device)
 {
 	struct ib_client *client;
 	struct ib_client_data *context, *tmp;
-	unsigned long flags;
 
 	mutex_lock(&device_mutex);
 
@@ -373,10 +371,10 @@ void ib_unregister_device(struct ib_device *device)
 
 	ib_device_unregister_sysfs(device);
 
-	spin_lock_irqsave(&device->client_data_lock, flags);
+	spin_lock_irqsave(&device->client_data_lock);
 	list_for_each_entry_safe(context, tmp, &device->client_data_list, list)
 		kfree(context);
-	spin_unlock_irqrestore(&device->client_data_lock, flags);
+	spin_unlock_irqsave(&device->client_data_lock);
 
 	device->reg_state = IB_DEV_UNREGISTERED;
 }
@@ -424,7 +422,6 @@ void ib_unregister_client(struct ib_client *client)
 {
 	struct ib_client_data *context, *tmp;
 	struct ib_device *device;
-	unsigned long flags;
 
 	mutex_lock(&device_mutex);
 
@@ -432,13 +429,13 @@ void ib_unregister_client(struct ib_client *client)
 		if (client->remove)
 			client->remove(device);
 
-		spin_lock_irqsave(&device->client_data_lock, flags);
+		spin_lock_irqsave(&device->client_data_lock);
 		list_for_each_entry_safe(context, tmp, &device->client_data_list, list)
 			if (context->client == client) {
 				list_del(&context->list);
 				kfree(context);
 			}
-		spin_unlock_irqrestore(&device->client_data_lock, flags);
+		spin_unlock_irqsave(&device->client_data_lock);
 	}
 	list_del(&client->list);
 
@@ -458,15 +455,14 @@ void *ib_get_client_data(struct ib_device *device, struct ib_client *client)
 {
 	struct ib_client_data *context;
 	void *ret = NULL;
-	unsigned long flags;
 
-	spin_lock_irqsave(&device->client_data_lock, flags);
+	spin_lock_irqsave(&device->client_data_lock);
 	list_for_each_entry(context, &device->client_data_list, list)
 		if (context->client == client) {
 			ret = context->data;
 			break;
 		}
-	spin_unlock_irqrestore(&device->client_data_lock, flags);
+	spin_unlock_irqsave(&device->client_data_lock);
 
 	return ret;
 }
@@ -485,9 +481,8 @@ void ib_set_client_data(struct ib_device *device, struct ib_client *client,
 			void *data)
 {
 	struct ib_client_data *context;
-	unsigned long flags;
 
-	spin_lock_irqsave(&device->client_data_lock, flags);
+	spin_lock_irqsave(&device->client_data_lock);
 	list_for_each_entry(context, &device->client_data_list, list)
 		if (context->client == client) {
 			context->data = data;
@@ -498,7 +493,7 @@ void ib_set_client_data(struct ib_device *device, struct ib_client *client,
 	       device->name, client->name);
 
 out:
-	spin_unlock_irqrestore(&device->client_data_lock, flags);
+	spin_unlock_irqsave(&device->client_data_lock);
 }
 EXPORT_SYMBOL(ib_set_client_data);
 
@@ -513,12 +508,10 @@ EXPORT_SYMBOL(ib_set_client_data);
  */
 int ib_register_event_handler  (struct ib_event_handler *event_handler)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&event_handler->device->event_handler_lock, flags);
+	spin_lock_irqsave(&event_handler->device->event_handler_lock);
 	list_add_tail(&event_handler->list,
 		      &event_handler->device->event_handler_list);
-	spin_unlock_irqrestore(&event_handler->device->event_handler_lock, flags);
+	spin_unlock_irqsave(&event_handler->device->event_handler_lock);
 
 	return 0;
 }
@@ -533,11 +526,9 @@ EXPORT_SYMBOL(ib_register_event_handler);
  */
 int ib_unregister_event_handler(struct ib_event_handler *event_handler)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&event_handler->device->event_handler_lock, flags);
+	spin_lock_irqsave(&event_handler->device->event_handler_lock);
 	list_del(&event_handler->list);
-	spin_unlock_irqrestore(&event_handler->device->event_handler_lock, flags);
+	spin_unlock_irqsave(&event_handler->device->event_handler_lock);
 
 	return 0;
 }
@@ -553,15 +544,14 @@ EXPORT_SYMBOL(ib_unregister_event_handler);
  */
 void ib_dispatch_event(struct ib_event *event)
 {
-	unsigned long flags;
 	struct ib_event_handler *handler;
 
-	spin_lock_irqsave(&event->device->event_handler_lock, flags);
+	spin_lock_irqsave(&event->device->event_handler_lock);
 
 	list_for_each_entry(handler, &event->device->event_handler_list, list)
 		handler->handler(handler, event);
 
-	spin_unlock_irqrestore(&event->device->event_handler_lock, flags);
+	spin_unlock_irqsave(&event->device->event_handler_lock);
 }
 EXPORT_SYMBOL(ib_dispatch_event);
 

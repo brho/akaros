@@ -696,8 +696,8 @@ static int create_qp_common(struct mlx4_ib_dev *dev, struct ib_pd *pd,
 	qp->mlx4_ib_qp_type = qp_type;
 
 	mutex_init(&qp->mutex);
-	spin_lock_init(&qp->sq.lock);
-	spin_lock_init(&qp->rq.lock);
+	spinlock_init_irqsave(&qp->sq.lock);
+	spinlock_init_irqsave(&qp->rq.lock);
 	INIT_LIST_HEAD(&qp->gid_list);
 	INIT_LIST_HEAD(&qp->steering_rules);
 
@@ -842,7 +842,7 @@ static int create_qp_common(struct mlx4_ib_dev *dev, struct ib_pd *pd,
 	if (!*caller_qp)
 		*caller_qp = qp;
 
-	spin_lock_irqsave(&dev->reset_flow_resource_lock, flags);
+	spin_lock_irqsave(&dev->reset_flow_resource_lock);
 	mlx4_ib_lock_cqs(to_mcq(init_attr->send_cq),
 			 to_mcq(init_attr->recv_cq));
 	/* Maintain device to QPs access, needed for further handling
@@ -858,7 +858,7 @@ static int create_qp_common(struct mlx4_ib_dev *dev, struct ib_pd *pd,
 	list_add_tail(&qp->cq_recv_list, &mcq->recv_qp_list);
 	mlx4_ib_unlock_cqs(to_mcq(init_attr->send_cq),
 			   to_mcq(init_attr->recv_cq));
-	spin_unlock_irqrestore(&dev->reset_flow_resource_lock, flags);
+	spin_unlock_irqsave(&dev->reset_flow_resource_lock);
 	return 0;
 
 err_qpn:
@@ -917,14 +917,18 @@ static void mlx4_ib_lock_cqs(struct mlx4_ib_cq *send_cq, struct mlx4_ib_cq *recv
 	__acquires(&send_cq->lock) __acquires(&recv_cq->lock)
 {
 	if (send_cq == recv_cq) {
-		spin_lock(&send_cq->lock);
+		spin_lock_irqsave(&send_cq->lock);
 		__acquire(&recv_cq->lock);
 	} else if (send_cq->mcq.cqn < recv_cq->mcq.cqn) {
-		spin_lock(&send_cq->lock);
-		spin_lock_nested(&recv_cq->lock, SINGLE_DEPTH_NESTING);
+		spin_lock_irqsave(&send_cq->lock);
+		// TODO(dcross): Was nested lock:
+		// spin_lock_nested(&recv_cq->lock, SINGLE_DEPTH_NESTING);
+		spin_lock_irqsave(&recv_cq->lock);
 	} else {
-		spin_lock(&recv_cq->lock);
-		spin_lock_nested(&send_cq->lock, SINGLE_DEPTH_NESTING);
+		spin_lock_irqsave(&recv_cq->lock);
+		// TODO(dcross): Was nested lock:
+		// spin_lock_nested(&send_cq->lock, SINGLE_DEPTH_NESTING);
+		spin_lock_irqsave(&send_cq->lock);
 	}
 }
 
@@ -1016,7 +1020,7 @@ static void destroy_qp_common(struct mlx4_ib_dev *dev, struct mlx4_ib_qp *qp,
 
 	get_cqs(qp, &send_cq, &recv_cq);
 
-	spin_lock_irqsave(&dev->reset_flow_resource_lock, flags);
+	spin_lock_irqsave(&dev->reset_flow_resource_lock);
 	mlx4_ib_lock_cqs(send_cq, recv_cq);
 
 	/* del from lists under both locks above to protect reset flow paths */
@@ -1033,7 +1037,7 @@ static void destroy_qp_common(struct mlx4_ib_dev *dev, struct mlx4_ib_qp *qp,
 	mlx4_qp_remove(dev->dev, &qp->mqp);
 
 	mlx4_ib_unlock_cqs(send_cq, recv_cq);
-	spin_unlock_irqrestore(&dev->reset_flow_resource_lock, flags);
+	spin_unlock_irqsave(&dev->reset_flow_resource_lock);
 
 	mlx4_qp_free(dev->dev, &qp->mqp);
 

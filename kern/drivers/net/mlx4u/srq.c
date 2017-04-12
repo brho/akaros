@@ -321,7 +321,7 @@ int mlx4_ib_post_srq_recv(struct ib_srq *ibsrq, struct ib_recv_wr *wr,
 	int i;
 	struct mlx4_ib_dev *mdev = to_mdev(ibsrq->device);
 
-	spin_lock_irqsave(&srq->lock, flags);
+	spin_lock_irqsave(&srq->lock);
 	if (mdev->dev->persist->state & MLX4_DEVICE_STATE_INTERNAL_ERROR) {
 		err = -EIO;
 		*bad_wr = wr;
@@ -374,7 +374,7 @@ int mlx4_ib_post_srq_recv(struct ib_srq *ibsrq, struct ib_recv_wr *wr,
 	}
 out:
 
-	spin_unlock_irqrestore(&srq->lock, flags);
+	spin_unlock_irqsave(&srq->lock);
 
 	return err;
 }
