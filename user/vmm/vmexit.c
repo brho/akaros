@@ -64,6 +64,43 @@ static void sleep_til_irq(struct guest_thread *gth)
 	uth_mutex_unlock(gth->halt_mtx);
 }
 
+enum {
+		CPUID_0B_LEVEL_SMT = 0,
+		CPUID_0B_LEVEL_CORE
+};
+
+static bool handle_cpuid(struct guest_thread *gth)
+{
+	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
+	struct virtual_machine *vm = gth_to_vm(gth);
+	uint32_t level = vm_tf->tf_rcx & 0x0F;
+
+	if (vm_tf->tf_rax != 0x0B)
+		return FALSE;
+
+	vm_tf->tf_rip += 2;
+	vm_tf->tf_rax = 0;
+	vm_tf->tf_rbx = 0;
+	vm_tf->tf_rcx = level;
+	vm_tf->tf_rdx = gth->gpc_id;
+	if (level == CPUID_0B_LEVEL_SMT) {
+		vm_tf->tf_rax = 0;
+		vm_tf->tf_rbx = 1;
+		vm_tf->tf_rcx |= ((level + 1) << 8);
+	}
+	if (level == CPUID_0B_LEVEL_CORE) {
+		uint32_t shift = LOG2_UP(vm->nr_gpcs);
+
+		if (shift > 0x1F)
+			shift = 0x1F;
+		vm_tf->tf_rax = shift;
+		vm_tf->tf_rbx = vm->nr_gpcs;
+		vm_tf->tf_rcx |= ((level + 1) << 8);
+	}
+
+	return TRUE;
+}
+
 static bool handle_ept_fault(struct guest_thread *gth)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
@@ -283,6 +320,8 @@ bool handle_vmexit(struct guest_thread *gth)
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 
 	switch (vm_tf->tf_exit_reason) {
+	case EXIT_REASON_CPUID:
+		return handle_cpuid(gth);
 	case EXIT_REASON_EPT_VIOLATION:
 		return handle_ept_fault(gth);
 	case EXIT_REASON_VMCALL:

@@ -883,6 +883,9 @@ static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 {
 	uint32_t eax, ebx, ecx, edx;
 
+	if (tf->tf_rax == 0x0B)
+		return FALSE;	// Handle in userspace.
+
 	cpuid(tf->tf_rax, tf->tf_rcx, &eax, &ebx, &ecx, &edx);
 	switch (tf->tf_rax) {
 		case 0x01:
