@@ -529,7 +529,7 @@ void uthread_usleep(unsigned int usecs)
 
 static void __sleep_forever_cb(struct uthread *uth, void *arg)
 {
-	uthread_has_blocked(uth, NULL, UTH_EXT_BLK_JUSTICE);
+	uthread_has_blocked(uth, NULL, UTH_EXT_BLK_MISC);
 }
 
 void __attribute__((noreturn)) uthread_sleep_forever(void)
@@ -1342,7 +1342,7 @@ static void __uth_join_cb(struct uthread *uth, void *arg)
 {
 	struct uth_join_kicker *jk = (struct uth_join_kicker*)arg;
 
-	uthread_has_blocked(uth, NULL, UTH_EXT_BLK_MUTEX);
+	uthread_has_blocked(uth, NULL, UTH_EXT_BLK_MISC);
 	/* After this, and after all threads join, we could be woken up. */
 	kref_put(&jk->kref);
 }

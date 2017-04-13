@@ -24,7 +24,7 @@ __BEGIN_DECLS
 #define UTH_EXT_BLK_MUTEX			1
 #define UTH_EXT_BLK_EVENTQ			2
 #define UTH_EXT_BLK_YIELD			3
-#define UTH_EXT_BLK_JUSTICE			4	/* whatever.  might need more options */
+#define UTH_EXT_BLK_MISC			4
 
 /* One per joiner, usually kept on the stack. */
 struct uth_join_kicker {

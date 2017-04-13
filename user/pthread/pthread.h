@@ -23,6 +23,7 @@ __BEGIN_DECLS
 #define PTH_BLK_SYSC		6	/* blocked on a syscall */
 #define PTH_BLK_MUTEX		7	/* blocked externally, possibly on a mutex */
 #define PTH_BLK_PAUSED		8	/* handed back to us from uthread code */
+#define PTH_BLK_MISC		9	/* catch-all from uthread code */
 
 /* Entry for a pthread_cleanup_routine on the stack of cleanup handlers. */
 struct pthread_cleanup_routine {

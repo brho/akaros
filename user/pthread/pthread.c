@@ -145,6 +145,7 @@ static void pth_thread_runnable(struct uthread *uthread)
 		case (PTH_BLK_SYSC):
 		case (PTH_BLK_PAUSED):
 		case (PTH_BLK_MUTEX):
+		case (PTH_BLK_MISC):
 			/* can do whatever for each of these cases */
 			break;
 		default:
@@ -252,16 +253,18 @@ static void pth_thread_has_blocked(struct uthread *uthread, uth_sync_t sync_obj,
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 
 	__pthread_generic_yield(pthread);
-	/* Could imagine doing something with the flags.  For now, we just treat
-	 * most externally blocked reasons as 'MUTEX'.  Whatever we do here, we are
-	 * mostly communicating to our future selves in pth_thread_runnable(), which
-	 * gets called by whoever triggered this callback */
+	/* Whatever we do here, we are mostly communicating to our future selves in
+	 * pth_thread_runnable(), which gets called by whoever triggered this
+	 * callback */
 	switch (flags) {
 	case UTH_EXT_BLK_YIELD:
 		pthread->state = PTH_BLK_YIELDING;
 		break;
-	default:
+	case UTH_EXT_BLK_MUTEX:
 		pthread->state = PTH_BLK_MUTEX;
+		break;
+	default:
+		pthread->state = PTH_BLK_MISC;
 	};
 	if (sync_obj)
 		__uth_default_sync_enqueue(uthread, sync_obj);
