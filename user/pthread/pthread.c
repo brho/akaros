@@ -956,9 +956,9 @@ int pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock_id)
 	return 0;
 }
 
-pthread_t pthread_self()
+pthread_t pthread_self(void)
 {
-  return (struct pthread_tcb*)current_uthread;
+	return (struct pthread_tcb*)uthread_self();
 }
 
 int pthread_equal(pthread_t t1, pthread_t t2)

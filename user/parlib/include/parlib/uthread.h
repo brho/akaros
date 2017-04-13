@@ -149,6 +149,7 @@ void uthread_detach(struct uthread *uth);
 void uthread_join(struct uthread *uth, void **retval_loc);
 void uthread_join_arr(struct uth_join_request reqs[], size_t nr_req);
 void uthread_sched_yield(void);
+struct uthread *uthread_self(void);
 
 /* Call this when you are done with a uthread, forever, but before you free it */
 void uthread_cleanup(struct uthread *uthread);

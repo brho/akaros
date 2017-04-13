@@ -1396,3 +1396,8 @@ void uthread_sched_yield(void)
 	}
 	uthread_yield(TRUE, __uth_sched_yield_cb, NULL);
 }
+
+struct uthread *uthread_self(void)
+{
+	return current_uthread;
+}
