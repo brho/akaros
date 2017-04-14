@@ -3,11 +3,20 @@
 #include <string>
 #include <errno.h>
 
+#include <memory>
+
 using namespace std;
+
+struct foobar {
+	int x;
+};
 
 int main() {
 	string line;
 	ifstream myfile;
+	/* grep the asm for M_release to verify we're using atomics */
+	std::shared_ptr<foobar> foo = make_shared<foobar>();
+
 	errno = 0;
 	myfile.open("hello.txt", ifstream::in);
 	if (errno)
