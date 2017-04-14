@@ -116,7 +116,7 @@ loop_top:
 			/* spinning on userspace here, specifically, another vcore and we
 			 * don't know who it is.  This will spin a bit, then make sure they
 			 * aren't preeempted */
-			cpu_relax_vc(vcore_id());	/* pass in self to check everyone else*/
+			cpu_relax_any();
 		}
 		/* Now the page is done.  0 its metadata and give it up. */
 		old_page->header.cons_next_pg = 0;

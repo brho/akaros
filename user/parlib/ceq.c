@@ -83,7 +83,7 @@ static int32_t get_ring_idx(struct ceq *ceq)
 	 *
 	 * We're waiting on other vcores, but we don't know which one(s). */
 	while (atomic_read(&ceq->cons_pub_idx) != pvt_idx)
-		cpu_relax_vc(vcore_id());	/* wait on all of them */
+		cpu_relax_any();
 	/* This is the only time we update cons_pub.  We also know no one else is
 	 * updating it at this moment; the while loop acts as a lock, such that
 	 * no one gets to this point until pub == their pvt_idx, all of which are

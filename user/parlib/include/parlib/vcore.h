@@ -52,6 +52,7 @@ static inline void *get_vcpd_tls_desc(uint32_t vcoreid);
 static inline void set_vcpd_tls_desc(uint32_t vcoreid, void *tls_desc);
 static inline uint64_t vcore_account_resume_nsec(uint32_t vcoreid);
 static inline uint64_t vcore_account_total_nsec(uint32_t vcoreid);
+static inline void cpu_relax_any(void);
 void vcore_lib_init(void);
 bool __in_fake_parlib(void);
 void vcore_change_to_m(void);
@@ -202,6 +203,11 @@ static inline uint64_t vcore_account_uptime_ticks(uint32_t vcoreid)
 static inline uint64_t vcore_account_uptime_nsec(uint32_t vcoreid)
 {
 	return tsc2nsec(vcore_account_uptime_ticks(vcoreid));
+}
+
+static inline void cpu_relax_any(void)
+{
+	return cpu_relax_vc(vcore_id());
 }
 
 #ifndef __PIC__
