@@ -216,6 +216,7 @@ typedef struct uth_semaphore uth_semaphore_t;
 typedef struct uth_semaphore uth_mutex_t;
 typedef struct uth_recurse_mutex uth_recurse_mutex_t;
 typedef struct uth_cond_var uth_cond_var_t;
+typedef struct uth_rwlock uth_rwlock_t;
 
 struct uth_semaphore {
 	struct spin_pdr_lock		lock;
@@ -240,6 +241,16 @@ struct uth_cond_var {
 	parlib_once_t				once_ctl;
 };
 #define UTH_COND_VAR_INIT { .once_ctl = PARLIB_ONCE_INIT }
+
+struct uth_rwlock {
+	struct spin_pdr_lock		lock;
+	unsigned int				nr_readers;
+	bool						has_writer;
+	uth_sync_t					readers;
+	uth_sync_t					writers;
+	parlib_once_t				once_ctl;
+};
+#define UTH_RWLOCK_INIT { .once_ctl = PARLIB_ONCE_INIT }
 
 void uth_semaphore_init(uth_semaphore_t *sem, unsigned int count);
 void uth_semaphore_destroy(uth_semaphore_t *sem);
@@ -286,6 +297,16 @@ bool uth_cond_var_timed_wait_recurse(uth_cond_var_t *cv,
 void uth_cond_var_wait_recurse(uth_cond_var_t *cv, uth_recurse_mutex_t *r_mtx);
 void uth_cond_var_signal(uth_cond_var_t *cv);
 void uth_cond_var_broadcast(uth_cond_var_t *cv);
+
+void uth_rwlock_init(uth_rwlock_t *rwl);
+void uth_rwlock_destroy(uth_rwlock_t *rwl);
+uth_rwlock_t *uth_rwlock_alloc(void);
+void uth_rwlock_free(uth_rwlock_t *rwl);
+void uth_rwlock_rdlock(uth_rwlock_t *rwl);
+bool uth_rwlock_try_rdlock(uth_rwlock_t *rwl);
+void uth_rwlock_wrlock(uth_rwlock_t *rwl);
+bool uth_rwlock_try_wrlock(uth_rwlock_t *rwl);
+void uth_rwlock_unlock(uth_rwlock_t *rwl);
 
 /* Called by gcc to see if we are multithreaded. */
 bool uth_2ls_is_multithreaded(void);

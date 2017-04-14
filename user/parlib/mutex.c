@@ -558,6 +558,173 @@ void uth_cond_var_broadcast(uth_cond_var_t *cv)
 }
 
 
+/************** Reader-writer Sleeping Locks **************/
+
+
+static void __uth_rwlock_init(void *arg)
+{
+	struct uth_rwlock *rwl = (struct uth_rwlock*)arg;
+
+	spin_pdr_init(&rwl->lock);
+	rwl->nr_readers = 0;
+	rwl->has_writer = FALSE;
+	rwl->readers = __uth_sync_alloc();
+	rwl->writers = __uth_sync_alloc();
+}
+
+void uth_rwlock_init(uth_rwlock_t *rwl)
+{
+	__uth_rwlock_init(rwl);
+	parlib_set_ran_once(&rwl->once_ctl);
+}
+
+void uth_rwlock_destroy(uth_rwlock_t *rwl)
+{
+	__uth_sync_free(rwl->readers);
+	__uth_sync_free(rwl->writers);
+}
+
+uth_rwlock_t *uth_rwlock_alloc(void)
+{
+	struct uth_rwlock *rwl;
+
+	rwl = malloc(sizeof(struct uth_rwlock));
+	assert(rwl);
+	uth_rwlock_init(rwl);
+	return rwl;
+}
+
+void uth_rwlock_free(uth_rwlock_t *rwl)
+{
+	uth_rwlock_destroy(rwl);
+	free(rwl);
+}
+
+/* Readers and writers block until they have the lock.  The delicacies are dealt
+ * with by the unlocker. */
+static void __rwlock_rd_cb(struct uthread *uth, void *arg)
+{
+	struct uth_rwlock *rwl = (struct uth_rwlock*)arg;
+
+	uthread_has_blocked(uth, rwl->readers, UTH_EXT_BLK_MUTEX);
+	spin_pdr_unlock(&rwl->lock);
+}
+
+void uth_rwlock_rdlock(uth_rwlock_t *rwl)
+{
+	parlib_run_once(&rwl->once_ctl, __uth_rwlock_init, rwl);
+	spin_pdr_lock(&rwl->lock);
+	/* Readers always make progress when there is no writer */
+	if (!rwl->has_writer) {
+		rwl->nr_readers++;
+		spin_pdr_unlock(&rwl->lock);
+		return;
+	}
+	uthread_yield(TRUE, __rwlock_rd_cb, rwl);
+}
+
+bool uth_rwlock_try_rdlock(uth_rwlock_t *rwl)
+{
+	bool ret = FALSE;
+
+	parlib_run_once(&rwl->once_ctl, __uth_rwlock_init, rwl);
+	spin_pdr_lock(&rwl->lock);
+	if (!rwl->has_writer) {
+		rwl->nr_readers++;
+		ret = TRUE;
+	}
+	spin_pdr_unlock(&rwl->lock);
+	return ret;
+}
+
+static void __rwlock_wr_cb(struct uthread *uth, void *arg)
+{
+	struct uth_rwlock *rwl = (struct uth_rwlock*)arg;
+
+	uthread_has_blocked(uth, rwl->writers, UTH_EXT_BLK_MUTEX);
+	spin_pdr_unlock(&rwl->lock);
+}
+
+void uth_rwlock_wrlock(uth_rwlock_t *rwl)
+{
+	parlib_run_once(&rwl->once_ctl, __uth_rwlock_init, rwl);
+	spin_pdr_lock(&rwl->lock);
+	/* Writers require total mutual exclusion - no writers or readers */
+	if (!rwl->has_writer && !rwl->nr_readers) {
+		rwl->has_writer = TRUE;
+		spin_pdr_unlock(&rwl->lock);
+		return;
+	}
+	uthread_yield(TRUE, __rwlock_wr_cb, rwl);
+}
+
+bool uth_rwlock_try_wrlock(uth_rwlock_t *rwl)
+{
+	bool ret = FALSE;
+
+	parlib_run_once(&rwl->once_ctl, __uth_rwlock_init, rwl);
+	spin_pdr_lock(&rwl->lock);
+	if (!rwl->has_writer && !rwl->nr_readers) {
+		rwl->has_writer = TRUE;
+		ret = TRUE;
+	}
+	spin_pdr_unlock(&rwl->lock);
+	return ret;
+}
+
+/* Let's try to wake writers (yes, this is a policy decision), and if none, wake
+ * all the readers.  The invariant there is that if there is no writer, then
+ * there are no waiting readers. */
+static void __rw_unlock_writer(struct uth_rwlock *rwl,
+                               struct uth_tailq *restartees)
+{
+	struct uthread *uth;
+
+	uth = __uth_sync_get_next(rwl->writers);
+	if (uth) {
+		TAILQ_INSERT_TAIL(restartees, uth, sync_next);
+	} else {
+		rwl->has_writer = FALSE;
+		while ((uth = __uth_sync_get_next(rwl->readers))) {
+			TAILQ_INSERT_TAIL(restartees, uth, sync_next);
+			rwl->nr_readers++;
+		}
+	}
+}
+
+static void __rw_unlock_reader(struct uth_rwlock *rwl,
+                               struct uth_tailq *restartees)
+{
+	struct uthread *uth;
+
+	rwl->nr_readers--;
+	if (!rwl->nr_readers) {
+		uth = __uth_sync_get_next(rwl->writers);
+		if (uth) {
+			TAILQ_INSERT_TAIL(restartees, uth, sync_next);
+			rwl->has_writer = TRUE;
+		}
+	}
+}
+
+/* Unlock works for either readers or writer locks.  You can tell which you were
+ * based on whether has_writer is set or not. */
+void uth_rwlock_unlock(uth_rwlock_t *rwl)
+{
+	struct uth_tailq restartees = TAILQ_HEAD_INITIALIZER(restartees);
+	struct uthread *i, *safe;
+
+	spin_pdr_lock(&rwl->lock);
+	if (rwl->has_writer)
+		__rw_unlock_writer(rwl, &restartees);
+	else
+		__rw_unlock_reader(rwl, &restartees);
+	spin_pdr_unlock(&rwl->lock);
+	TAILQ_FOREACH_SAFE(i, &restartees, sync_next, safe)
+		uthread_runnable(i);
+}
+
+
 /************** Default Sync Obj Implementation **************/
 
 static uth_sync_t uth_default_sync_alloc(void)
