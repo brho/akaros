@@ -456,17 +456,24 @@ void ensure_vcore_runs(uint32_t vcoreid)
 }
 
 #define NR_RELAX_SPINS 1000
-/* If you are spinning in vcore context and it is likely that you don't know who
- * you are waiting on, call this.  It will spin for a bit before firing up the
- * potentially expensive __ensure_all_run().  Don't call this from uthread
- * context.  sys_change_vcore will probably mess you up. */
-void cpu_relax_vc(uint32_t vcoreid)
+/* If you are spinning and waiting on another vcore, call this.  Pass in the
+ * vcoreid of the core you are waiting on, or your own vcoreid if you don't
+ * know.  It will spin for a bit before firing up the potentially expensive
+ * __ensure_all_run(). */
+void cpu_relax_vc(uint32_t other_vcoreid)
 {
 	static __thread unsigned int __vc_relax_spun = 0;
-	assert(!notif_is_enabled(vcore_id()));
+
+	/* Uthreads with notifs enabled can just spin normally.  This actually
+	 * depends on the 2LS preemption policy.  Currently, we receive notifs
+	 * whenever another core is preempted, so we don't need to poll. */
+	if (notif_is_enabled(vcore_id())) {
+		cpu_relax();
+		return;
+	}
 	if (__vc_relax_spun++ >= NR_RELAX_SPINS) {
-		/* if vcoreid == vcore_id(), this might be expensive */
-		ensure_vcore_runs(vcoreid);
+		/* if other_vcoreid == vcore_id(), this might be expensive */
+		ensure_vcore_runs(other_vcoreid);
 		__vc_relax_spun = 0;
 	}
 	cpu_relax();

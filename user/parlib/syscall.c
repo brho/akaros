@@ -126,6 +126,9 @@ int sys_change_vcore(uint32_t vcoreid, bool enable_my_notif)
 	 * unlocking the proc, before finish_sysc()), and the act of finishing would
 	 * write onto our stack.  Thus we use the per-vcore struct. */
 	int flags;
+
+	/* Sanity check.  Uthreads can call this, but only when notifs disabled. */
+	assert(!notif_is_enabled(vcore_id()));
 	/* Need to wait while a previous syscall is not done or locked.  Since this
 	 * should only be called from VC ctx, we'll just spin.  Should be extremely
 	 * rare.  Note flags is initialized to SC_DONE. */
