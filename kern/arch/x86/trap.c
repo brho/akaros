@@ -896,8 +896,9 @@ static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 			ecx &= ~(1 << 15);
 
 			/* Set the guest pcore id into the apic ID field in CPUID. */
-			ebx &= 0x00ffffff;
-			ebx |= tf->tf_guest_pcoreid << 24;
+			ebx &= 0x0000ffff;
+			ebx |= (current->vmm.nr_guest_pcores & 0xff) << 16;
+			ebx |= (tf->tf_guest_pcoreid & 0xff) << 24;
 			break;
 		case 0x0A:
 			eax = 0;
