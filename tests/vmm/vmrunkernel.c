@@ -167,7 +167,7 @@ void timer_thread(void *arg)
 			if (vector && initial_count)
 				vmm_interrupt_guest(vm, i, vector);
 		}
-		uthread_usleep(100000);
+		uthread_usleep(1000);
 	}
 	fprintf(stderr, "SENDING TIMER\n");
 }
