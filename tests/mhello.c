@@ -13,6 +13,7 @@
 #include <parlib/assert.h>
 #include <parlib/event.h>
 #include <parlib/uthread.h>
+#include <unistd.h>
 
 __thread int temp;
 void *core0_tls = 0;

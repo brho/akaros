@@ -31,6 +31,7 @@
 #include <sys/uio.h>
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>
+#include <parlib/stdio.h>
 
 void *cons_receiveq_fn(void *_vq) // host -> guest
 {

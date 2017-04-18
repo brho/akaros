@@ -32,6 +32,7 @@
 #include <parlib/signal.h>
 #include <parlib/uthread.h>
 #include <parlib/event.h>
+#include <parlib/ros_debug.h>
 #include <errno.h>
 #include <parlib/assert.h>
 #include <ros/procinfo.h>

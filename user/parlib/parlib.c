@@ -3,6 +3,7 @@
  * See LICENSE for details. */
 
 #include <parlib/parlib.h>
+#include <parlib/ros_debug.h>
 #include <stdlib.h>
 
 /* Control variables */

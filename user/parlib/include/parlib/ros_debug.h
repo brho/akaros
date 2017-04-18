@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdio.h>
 
 __BEGIN_DECLS
 
@@ -29,5 +30,10 @@ void __print_func_exit(const char *func, const char *file);
 
 /* user/parlib/hexdump.c */
 void hexdump(FILE *f, void *v, int length);
+
+void fprintf_hw_tf(FILE *f, struct hw_trapframe *hw_tf);
+void fprintf_sw_tf(FILE *f, struct sw_trapframe *sw_tf);
+void fprintf_vm_tf(FILE *f, struct vm_trapframe *vm_tf);
+void print_user_context(struct user_context *ctx);
 
 __END_DECLS

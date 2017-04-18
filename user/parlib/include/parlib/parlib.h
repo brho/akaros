@@ -17,7 +17,6 @@
 #include <signal.h>
 #include <stdint.h>
 #include <errno.h>
-#include <parlib/ros_debug.h>
 #include <ros/fdtap.h>
 
 __BEGIN_DECLS

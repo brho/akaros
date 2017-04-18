@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <parlib/parlib.h>

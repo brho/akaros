@@ -18,6 +18,7 @@
 #include <parlib/timing.h>
 #include <parlib/tsc-compat.h>
 #include <parlib/printf-ext.h>
+#include <parlib/stdio.h>
 #include <parlib/alarm.h>
 #include <ndblib/ndb.h>
 

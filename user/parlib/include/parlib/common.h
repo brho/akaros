@@ -7,7 +7,5 @@
 #pragma once
 
 #include <ros/common.h>
-#include <parlib/assert.h>
-#include <parlib/stdio.h>
 
 #define IS_PWR2(x) ((x) && !((x) & (x - 1)))

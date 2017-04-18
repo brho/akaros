@@ -12,6 +12,7 @@
 #include <parlib/spinlock.h>
 #include <sys/mman.h>
 #include <parlib/assert.h>
+#include <parlib/stdio.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <parlib/vcore.h>

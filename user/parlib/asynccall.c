@@ -1,6 +1,8 @@
 #include <stdlib.h>
 
 #include <parlib/common.h>
+#include <parlib/assert.h>
+#include <parlib/stdio.h>
 #include <ros/syscall.h>
 #include <ros/ring_syscall.h>
 #include <ros/sysevent.h>

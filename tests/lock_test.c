@@ -27,6 +27,7 @@
 #ifdef __ros__
 
 #include <parlib/parlib.h>
+#include <parlib/stdio.h>
 #include <parlib/vcore.h>
 #include <parlib/timing.h>
 #include <parlib/spinlock.h>

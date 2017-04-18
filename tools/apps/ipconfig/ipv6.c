@@ -27,6 +27,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdarg.h>
 
 #include "icmp.h"
 #include "ipconfig.h"

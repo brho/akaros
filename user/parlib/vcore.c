@@ -15,6 +15,8 @@
 #include <ros/arch/membar.h>
 #include <parlib/printf-ext.h>
 #include <parlib/poke.h>
+#include <parlib/assert.h>
+#include <parlib/stdio.h>
 
 __thread int __vcoreid = 0;
 __thread bool __vcore_context = FALSE;

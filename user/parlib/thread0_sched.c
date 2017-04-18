@@ -14,6 +14,7 @@
 #include <parlib/uthread.h>
 #include <parlib/event.h>
 #include <parlib/arch/trap.h>
+#include <parlib/ros_debug.h>
 #include <stdlib.h>
 
 static void thread0_sched_entry(void);

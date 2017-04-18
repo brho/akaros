@@ -1,4 +1,6 @@
 #include <parlib/common.h>
+#include <parlib/assert.h>
+#include <parlib/stdio.h>
 #include <parlib/parlib.h>
 #include <stdio.h>
 #include <unistd.h>

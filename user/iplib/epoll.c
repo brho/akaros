@@ -34,6 +34,7 @@
 #include <parlib/uthread.h>
 #include <parlib/timing.h>
 #include <parlib/slab.h>
+#include <parlib/assert.h>
 #include <sys/user_fd.h>
 #include <sys/close_cb.h>
 #include <stdio.h>

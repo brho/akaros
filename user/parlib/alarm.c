@@ -27,6 +27,7 @@
 #include <parlib/alarm.h>
 #include <stdio.h>
 #include <parlib/assert.h>
+#include <parlib/stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>

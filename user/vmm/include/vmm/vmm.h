@@ -9,6 +9,7 @@
 #include <ros/vmm.h>
 #include <vmm/sched.h>
 #include <vmm/linux_bootparam.h>
+#include <parlib/stdio.h>
 
 // We need to reserve an area of the low 4G for thinks like tables, APIC, and
 // so on. So far, 256 MiB has been more than enough, so ...

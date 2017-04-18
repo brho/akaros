@@ -17,6 +17,8 @@
 #include <parlib/ucq.h>
 #include <parlib/signal.h>
 #include <parlib/arch/trap.h>
+#include <parlib/ros_debug.h>
+#include <parlib/stdio.h>
 
 struct pthread_queue ready_queue = TAILQ_HEAD_INITIALIZER(ready_queue);
 struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);

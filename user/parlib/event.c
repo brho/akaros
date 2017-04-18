@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <parlib/assert.h>
+#include <parlib/stdio.h>
 #include <errno.h>
 #include <parlib/parlib.h>
 #include <parlib/event.h>

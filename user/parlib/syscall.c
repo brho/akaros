@@ -3,6 +3,8 @@
 #include <parlib/parlib.h>
 #include <parlib/vcore.h>
 #include <parlib/serialize.h>
+#include <parlib/assert.h>
+#include <parlib/stdio.h>
 
 int sys_proc_destroy(int pid, int exitcode)
 {
@@ -86,7 +88,7 @@ int sys_self_notify(uint32_t vcoreid, unsigned int ev_type,
 int sys_send_event(struct event_queue *ev_q, struct event_msg *ev_msg,
                    uint32_t vcoreid)
 {
-	return syscall(SYS_send_event, ev_q, ev_msg, vcoreid);
+	return ros_syscall(SYS_send_event, ev_q, ev_msg, vcoreid, 0, 0, 0);
 }
 
 int sys_halt_core(unsigned long usec)

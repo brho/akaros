@@ -45,6 +45,7 @@
 #include <parlib/parlib.h>
 #include <parlib/vcore.h>
 #include <parlib/timing.h>
+#include <parlib/stdio.h>
 
 static uint32_t __get_pcoreid(void)
 {

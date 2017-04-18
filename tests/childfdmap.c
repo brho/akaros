@@ -1,6 +1,6 @@
 #define _LARGEFILE64_SOURCE /* needed to use lseek64 */
 
-#include <stdio.h> 
+#include <parlib/stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>

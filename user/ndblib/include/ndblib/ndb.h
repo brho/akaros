@@ -9,6 +9,7 @@
 #pragma once
 
 #include <fcall.h>
+#include <stdio.h>
 
 __BEGIN_DECLS
 
