@@ -39,10 +39,9 @@
 #include <sys/uio.h>
 #include <parlib/opts.h>
 
-struct virtual_machine local_vm, *vm = &local_vm;
-
 #define APIC_GPA			0xfee00000ULL
 
+struct virtual_machine local_vm, *vm = &local_vm;
 struct vmm_gpcore_init *gpcis;
 
 /* By 1999, you could just scan the hardware
@@ -115,32 +114,9 @@ struct acpi_madt_interrupt_override isor[] = {
 	 */
 };
 
-
-/* this test will run the "kernel" in the negative address space. We hope. */
-void *low1m;
-volatile int shared = 0;
-volatile int quit = 0;
-
-/* total hack. If the vm runs away we want to get control again. */
-unsigned int maxresume = (unsigned int) -1;
-
-unsigned long long memsize = GiB;
-uintptr_t memstart = MinMemory;
-uintptr_t stack;
-
 typedef struct {
 	uint64_t pte[512];
 } ptp;
-
-ptp *p512, *p1, *p2m;
-
-void **my_retvals;
-int nr_threads = 4;
-int debug = 0;
-int resumeprompt = 0;
-/* unlike Linux, this shared struct is for both host and guest. */
-//	struct virtqueue *constoguest =
-//		vring_new_virtqueue(0, 512, 8192, 0, inpages, NULL, NULL, "test");
 
 void vapic_status_dump(FILE *f, void *vapic);
 
@@ -149,12 +125,6 @@ void vapic_status_dump(FILE *f, void *vapic);
 #else
 #define BITOP_ADDR(x) "+m" (*(volatile long *) (x))
 #endif
-
-#define LOCK_PREFIX "lock "
-#define ADDR				BITOP_ADDR(addr)
-static inline int test_and_set_bit(int nr, volatile unsigned long *addr);
-
-pthread_t timerthread_struct;
 
 void timer_thread(void *arg)
 {
@@ -172,9 +142,6 @@ void timer_thread(void *arg)
 	fprintf(stderr, "SENDING TIMER\n");
 }
 
-
-// FIXME.
-volatile int consdata = 0;
 
 static void virtio_poke_guest(uint8_t vec, uint32_t dest)
 {
@@ -317,16 +284,6 @@ static void gencsum(uint8_t *target, void *data, int len)
 	csum  = acpi_tb_checksum((uint8_t *)data, len);
 	*target = ~csum + 1;
 	fprintf(stderr, "Cmoputed is %02x\n", *target);
-}
-
-static inline int test_and_set_bit(int nr, volatile unsigned long *addr)
-{
-	int oldbit;
-
-	asm volatile(LOCK_PREFIX "bts %2,%1\n\t"
-	             "sbb %0,%0" : "=r" (oldbit), ADDR : "Ir" (nr) : "memory");
-
-	return oldbit;
 }
 
 /* TODO: put this in a library somewhere */
@@ -521,6 +478,12 @@ void alloc_intr_pages(void)
 
 int main(int argc, char **argv)
 {
+	ptp *p512, *p1, *p2m;
+	int debug = 0;
+	void *low1m;
+	unsigned long long memsize = GiB;
+	uintptr_t memstart = MinMemory;
+	uintptr_t stack;
 	struct boot_params *bp;
 	char cmdline_default[512] = {0};
 	char *cmdline_extra = "\0";
@@ -605,9 +568,6 @@ int main(int argc, char **argv)
 			break;
 		case 'S':
 			stack = strtoull(optarg, 0, 0);
-			break;
-		case 'R':
-			maxresume = strtoull(optarg, 0, 0);
 			break;
 		case 'c':
 			cmdline_extra = optarg;
