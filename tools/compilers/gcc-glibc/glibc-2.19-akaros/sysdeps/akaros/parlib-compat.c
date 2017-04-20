@@ -27,10 +27,11 @@
  * functions that ld.so calls.  See the notes below for more info. */
 
 __thread int __weak_vcoreid = 0;
-weak_alias(__weak_vcoreid, __vcoreid);
+extern __thread int __vcoreid __attribute__ ((weak, alias ("__weak_vcoreid")));
 
 __thread bool __weak_vcore_context = FALSE;
-weak_alias(__weak_vcore_context, __vcore_context);
+extern __thread bool __vcore_context
+       __attribute__ ((weak, alias ("__weak_vcore_context")));
 
 int __akaros_printf(const char *format, ...)
 {
