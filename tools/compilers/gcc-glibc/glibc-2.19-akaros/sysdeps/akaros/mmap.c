@@ -37,7 +37,7 @@ __mmap (__ptr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
   if(offset % PGSIZE)
   {
     errno = EINVAL;
-    return -1;
+    return MAP_FAILED;
   }
   offset /= PGSIZE;
 
