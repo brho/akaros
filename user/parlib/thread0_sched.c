@@ -22,14 +22,14 @@ static void thread0_thread_blockon_sysc(struct uthread *uthread, void *sysc);
 static void thread0_thread_refl_fault(struct uthread *uth,
                                       struct user_context *ctx);
 static void thread0_thread_runnable(struct uthread *uth);
-static void thread0_thread_has_blocked(struct uthread *uth, uth_sync_t sync,
+static void thread0_thread_has_blocked(struct uthread *uth, uth_sync_t *sync,
                                        int flags);
 static void thread0_thread_exited(struct uthread *uth);
 static struct uthread *thread0_thread_create(void *(*func)(void *), void *arg);
-static uth_sync_t thread0_sync_alloc(void);
-static void thread0_sync_free(uth_sync_t);
-static struct uthread *thread0_sync_get_next(uth_sync_t);
-static bool thread0_sync_get_uth(uth_sync_t s, struct uthread *uth);
+static void thread0_sync_init(uth_sync_t *s);
+static void thread0_sync_destroy(uth_sync_t *s);
+static struct uthread *thread0_sync_get_next(uth_sync_t *s);
+static bool thread0_sync_get_uth(uth_sync_t *s, struct uthread *uth);
 
 /* externed into uthread.c */
 struct schedule_ops thread0_2ls_ops = {
@@ -41,8 +41,8 @@ struct schedule_ops thread0_2ls_ops = {
 	.thread_has_blocked = thread0_thread_has_blocked,
 	.thread_exited = thread0_thread_exited,
 	.thread_create = thread0_thread_create,
-	.sync_alloc = thread0_sync_alloc,
-	.sync_free = thread0_sync_free,
+	.sync_init = thread0_sync_init,
+	.sync_destroy = thread0_sync_destroy,
 	.sync_get_next = thread0_sync_get_next,
 	.sync_get_uth = thread0_sync_get_uth,
 };
@@ -146,7 +146,7 @@ static void thread0_thread_runnable(struct uthread *uth)
 	thread0_info.is_blocked = FALSE;
 }
 
-static void thread0_thread_has_blocked(struct uthread *uth, uth_sync_t sync,
+static void thread0_thread_has_blocked(struct uthread *uth, uth_sync_t *sync,
                                        int flags)
 {
 	assert(!thread0_info.is_blocked);
@@ -165,16 +165,16 @@ static struct uthread *thread0_thread_create(void *(*func)(void *), void *arg)
 	panic("Thread0 sched asked to create more threads!");
 }
 
-static uth_sync_t thread0_sync_alloc(void)
+static void thread0_sync_init(uth_sync_t *s)
 {
-	return (void*)0xf00baa;
+	memset(s, 0x5a, sizeof(uth_sync_t));
 }
 
-static void thread0_sync_free(uth_sync_t s)
+static void thread0_sync_destroy(uth_sync_t *s)
 {
 }
 
-static struct uthread *thread0_sync_get_next(uth_sync_t s)
+static struct uthread *thread0_sync_get_next(uth_sync_t *s)
 {
 	if (thread0_info.is_blocked) {
 		/* Note we don't clear is_blocked.  Runnable does that, which should be
@@ -185,7 +185,7 @@ static struct uthread *thread0_sync_get_next(uth_sync_t s)
 	}
 }
 
-static bool thread0_sync_get_uth(uth_sync_t s, struct uthread *uth)
+static bool thread0_sync_get_uth(uth_sync_t *s, struct uthread *uth)
 {
 	assert(uth == thread0_uth);
 	if (thread0_info.is_blocked) {

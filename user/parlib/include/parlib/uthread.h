@@ -70,23 +70,32 @@ TAILQ_HEAD(uth_tailq, uthread);
 
 extern __thread struct uthread *current_uthread;
 
-
-/* This struct is undefined.  We use it instead of void * so we can get
- * compiler warnings if someone passes the wrong pointer type.  Internally, 2LSs
- * and the default implementation use another object type. */
-typedef struct __uth_sync_opaque * uth_sync_t;
+/* This struct is a blob of sufficient storage to be whatever a 2LS wants for
+ * its thread list structure (e.g., TAILQ, priority queue, RB tree, etc).
+ * Internally, 2LSs and the default implementation use another object type.
+ *
+ * If a 2LS overrides the sync ops and uses its own synchronization, it can
+ * either use the uthread->sync_next field, or add its own field to its thread
+ * structure.
+ *
+ * If we need to increase the size, then do a full rebuild (with a make clean)
+ * of the toolchain.  libgomp and probably c++ threads care about the size of
+ * objects that contain uth_sync_t. */
+typedef struct __uth_sync_opaque {
+	uint8_t						foo[sizeof(uintptr_t) * 2];
+} __attribute__ ((aligned(sizeof(uintptr_t)))) uth_sync_t;
 
 /* 2LS-independent synchronization code (e.g. uthread mutexes) uses these
  * helpers to access 2LS-specific functions.
  *
  * Note the spinlock associated with the higher-level sync primitive is held for
  * these (where applicable). */
-uth_sync_t __uth_sync_alloc(void);
-void __uth_sync_free(uth_sync_t sync);
-struct uthread *__uth_sync_get_next(uth_sync_t sync);
-bool __uth_sync_get_uth(uth_sync_t sync, struct uthread *uth);
+void __uth_sync_init(uth_sync_t *sync);
+void __uth_sync_destroy(uth_sync_t *sync);
+struct uthread *__uth_sync_get_next(uth_sync_t *sync);
+bool __uth_sync_get_uth(uth_sync_t *sync, struct uthread *uth);
 /* 2LSs that use default sync objs will call this in their has_blocked op. */
-void __uth_default_sync_enqueue(struct uthread *uth, uth_sync_t sync);
+void __uth_default_sync_enqueue(struct uthread *uth, uth_sync_t *sync);
 
 /* 2L-Scheduler operations.  Examples in pthread.c. */
 struct schedule_ops {
@@ -96,16 +105,15 @@ struct schedule_ops {
 	void (*thread_runnable)(struct uthread *);
 	void (*thread_paused)(struct uthread *);
 	void (*thread_blockon_sysc)(struct uthread *, void *);
-	void (*thread_has_blocked)(struct uthread *, uth_sync_t, int);
+	void (*thread_has_blocked)(struct uthread *, uth_sync_t *, int);
 	void (*thread_refl_fault)(struct uthread *, struct user_context *);
 	void (*thread_exited)(struct uthread *);
 	struct uthread *(*thread_create)(void *(*)(void *), void *);
 	/**** Defining these functions is optional. ****/
-	uth_sync_t (*sync_alloc)(void);
-	void (*sync_free)(uth_sync_t);
-	struct uthread *(*sync_get_next)(uth_sync_t);
-	bool (*sync_get_uth)(uth_sync_t, struct uthread *);
-	/* Functions event handling wants */
+	void (*sync_init)(uth_sync_t *);
+	void (*sync_destroy)(uth_sync_t *);
+	struct uthread *(*sync_get_next)(uth_sync_t *);
+	bool (*sync_get_uth)(uth_sync_t *, struct uthread *);
 	void (*preempt_pending)(void);
 };
 extern struct schedule_ops *sched_ops;
@@ -159,7 +167,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 void uthread_sleep(unsigned int seconds);
 void uthread_usleep(unsigned int usecs);
 void __attribute__((noreturn)) uthread_sleep_forever(void);
-void uthread_has_blocked(struct uthread *uthread, uth_sync_t sync, int flags);
+void uthread_has_blocked(struct uthread *uthread, uth_sync_t *sync, int flags);
 void uthread_paused(struct uthread *uthread);
 
 /* Utility functions */
@@ -220,8 +228,8 @@ typedef struct uth_rwlock uth_rwlock_t;
 
 struct uth_semaphore {
 	struct spin_pdr_lock		lock;
-	uth_sync_t					sync_obj;
 	unsigned int				count;
+	uth_sync_t					sync_obj;
 	parlib_once_t				once_ctl;
 };
 #define UTH_SEMAPHORE_INIT(n) { .once_ctl = PARLIB_ONCE_INIT, .count = (n) }

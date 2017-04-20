@@ -37,7 +37,7 @@ static void vmm_sched_entry(void);
 static void vmm_thread_runnable(struct uthread *uth);
 static void vmm_thread_paused(struct uthread *uth);
 static void vmm_thread_blockon_sysc(struct uthread *uth, void *sysc);
-static void vmm_thread_has_blocked(struct uthread *uth, uth_sync_t sync_obj,
+static void vmm_thread_has_blocked(struct uthread *uth, uth_sync_t *sync_obj,
                                    int flags);
 static void vmm_thread_refl_fault(struct uthread *uth,
                                   struct user_context *ctx);
@@ -274,7 +274,7 @@ static void vmm_thread_blockon_sysc(struct uthread *uth, void *syscall)
 	/* GIANT WARNING: do not touch the thread after this point. */
 }
 
-static void vmm_thread_has_blocked(struct uthread *uth, uth_sync_t sync_obj,
+static void vmm_thread_has_blocked(struct uthread *uth, uth_sync_t *sync_obj,
                                    int flags)
 {
 	/* The thread blocked on something like a mutex.  It's not runnable, so we

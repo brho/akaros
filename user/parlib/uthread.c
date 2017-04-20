@@ -386,7 +386,7 @@ void uthread_runnable(struct uthread *uthread)
  * 2LS should do regarding sync; it'll be told when the thread is runnable.
  *
  * AKA: obviously_a_uthread_has_blocked_in_lincoln_park() */
-void uthread_has_blocked(struct uthread *uthread, uth_sync_t sync, int flags)
+void uthread_has_blocked(struct uthread *uthread, uth_sync_t *sync, int flags)
 {
 	assert(sched_ops->thread_has_blocked);
 	sched_ops->thread_has_blocked(uthread, sync, flags);

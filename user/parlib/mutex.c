@@ -9,6 +9,7 @@
 #include <sys/queue.h>
 #include <parlib/spinlock.h>
 #include <parlib/alarm.h>
+#include <parlib/assert.h>
 #include <malloc.h>
 
 struct timeout_blob {
@@ -25,7 +26,7 @@ static void timeout_handler(struct alarm_waiter *waiter)
 	struct timeout_blob *blob = (struct timeout_blob*)waiter->data;
 
 	spin_pdr_lock(blob->lock_ptr);
-	if (__uth_sync_get_uth(*blob->sync_ptr, blob->uth))
+	if (__uth_sync_get_uth(blob->sync_ptr, blob->uth))
 		blob->timed_out = TRUE;
 	spin_pdr_unlock(blob->lock_ptr);
 	if (blob->timed_out)
@@ -60,7 +61,7 @@ static void __uth_semaphore_init(void *arg)
 	struct uth_semaphore *sem = (struct uth_semaphore*)arg;
 
 	spin_pdr_init(&sem->lock);
-	sem->sync_obj = __uth_sync_alloc();
+	__uth_sync_init(&sem->sync_obj);
 	/* If we used a static initializer for a semaphore, count is already set.
 	 * o/w it will be set by _alloc() or _init() (via uth_semaphore_init()). */
 }
@@ -78,7 +79,7 @@ void uth_semaphore_init(uth_semaphore_t *sem, unsigned int count)
 /* Undoes whatever was done in init. */
 void uth_semaphore_destroy(uth_semaphore_t *sem)
 {
-	__uth_sync_free(sem->sync_obj);
+	__uth_sync_destroy(&sem->sync_obj);
 }
 
 uth_semaphore_t *uth_semaphore_alloc(unsigned int count)
@@ -107,7 +108,7 @@ static void __semaphore_cb(struct uthread *uth, void *arg)
 	 *
 	 * Also note the lock-ordering rule.  The sem lock is grabbed before any
 	 * locks the 2LS might grab. */
-	uthread_has_blocked(uth, sem->sync_obj, UTH_EXT_BLK_MUTEX);
+	uthread_has_blocked(uth, &sem->sync_obj, UTH_EXT_BLK_MUTEX);
 	spin_pdr_unlock(&sem->lock);
 }
 
@@ -170,7 +171,7 @@ void uth_semaphore_up(uth_semaphore_t *sem)
 	/* once-ing the 'up', unlike mtxs 'unlock', since sems can be special. */
 	parlib_run_once(&sem->once_ctl, __uth_semaphore_init, sem);
 	spin_pdr_lock(&sem->lock);
-	uth = __uth_sync_get_next(sem->sync_obj);
+	uth = __uth_sync_get_next(&sem->sync_obj);
 	/* If there was a waiter, we pass our resource/count to them. */
 	if (!uth)
 		sem->count++;
@@ -348,7 +349,7 @@ static void __uth_cond_var_init(void *arg)
 	struct uth_cond_var *cv = (struct uth_cond_var*)arg;
 
 	spin_pdr_init(&cv->lock);
-	cv->sync_obj = __uth_sync_alloc();
+	__uth_sync_init(&cv->sync_obj);
 }
 
 void uth_cond_var_init(uth_cond_var_t *cv)
@@ -359,7 +360,7 @@ void uth_cond_var_init(uth_cond_var_t *cv)
 
 void uth_cond_var_destroy(uth_cond_var_t *cv)
 {
-	__uth_sync_free(cv->sync_obj);
+	__uth_sync_destroy(&cv->sync_obj);
 }
 
 uth_cond_var_t *uth_cond_var_alloc(void)
@@ -395,7 +396,7 @@ static void __cv_wait_cb(struct uthread *uth, void *arg)
 	 *
 	 * Also note the lock-ordering rule.  The cv lock is grabbed before any
 	 * locks the 2LS might grab. */
-	uthread_has_blocked(uth, cv->sync_obj, UTH_EXT_BLK_MUTEX);
+	uthread_has_blocked(uth, &cv->sync_obj, UTH_EXT_BLK_MUTEX);
 	spin_pdr_unlock(&cv->lock);
 	/* This looks dangerous, since both the CV and MTX could use the
 	 * uth->sync_next TAILQ_ENTRY (or whatever the 2LS uses), but the uthread
@@ -532,7 +533,7 @@ void uth_cond_var_signal(uth_cond_var_t *cv)
 
 	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
 	spin_pdr_lock(&cv->lock);
-	uth = __uth_sync_get_next(cv->sync_obj);
+	uth = __uth_sync_get_next(&cv->sync_obj);
 	spin_pdr_unlock(&cv->lock);
 	if (uth)
 		uthread_runnable(uth);
@@ -547,7 +548,7 @@ void uth_cond_var_broadcast(uth_cond_var_t *cv)
 	spin_pdr_lock(&cv->lock);
 	/* If this turns out to be slow or painful for 2LSs, we can implement a
 	 * get_all or something (default used to use TAILQ_SWAP). */
-	while ((i = __uth_sync_get_next(cv->sync_obj))) {
+	while ((i = __uth_sync_get_next(&cv->sync_obj))) {
 		/* Once the uth is out of the sync obj, we can reuse sync_next. */
 		TAILQ_INSERT_TAIL(&restartees, i, sync_next);
 	}
@@ -568,8 +569,8 @@ static void __uth_rwlock_init(void *arg)
 	spin_pdr_init(&rwl->lock);
 	rwl->nr_readers = 0;
 	rwl->has_writer = FALSE;
-	rwl->readers = __uth_sync_alloc();
-	rwl->writers = __uth_sync_alloc();
+	__uth_sync_init(&rwl->readers);
+	__uth_sync_init(&rwl->writers);
 }
 
 void uth_rwlock_init(uth_rwlock_t *rwl)
@@ -580,8 +581,8 @@ void uth_rwlock_init(uth_rwlock_t *rwl)
 
 void uth_rwlock_destroy(uth_rwlock_t *rwl)
 {
-	__uth_sync_free(rwl->readers);
-	__uth_sync_free(rwl->writers);
+	__uth_sync_destroy(&rwl->readers);
+	__uth_sync_destroy(&rwl->writers);
 }
 
 uth_rwlock_t *uth_rwlock_alloc(void)
@@ -606,7 +607,7 @@ static void __rwlock_rd_cb(struct uthread *uth, void *arg)
 {
 	struct uth_rwlock *rwl = (struct uth_rwlock*)arg;
 
-	uthread_has_blocked(uth, rwl->readers, UTH_EXT_BLK_MUTEX);
+	uthread_has_blocked(uth, &rwl->readers, UTH_EXT_BLK_MUTEX);
 	spin_pdr_unlock(&rwl->lock);
 }
 
@@ -641,7 +642,7 @@ static void __rwlock_wr_cb(struct uthread *uth, void *arg)
 {
 	struct uth_rwlock *rwl = (struct uth_rwlock*)arg;
 
-	uthread_has_blocked(uth, rwl->writers, UTH_EXT_BLK_MUTEX);
+	uthread_has_blocked(uth, &rwl->writers, UTH_EXT_BLK_MUTEX);
 	spin_pdr_unlock(&rwl->lock);
 }
 
@@ -680,12 +681,12 @@ static void __rw_unlock_writer(struct uth_rwlock *rwl,
 {
 	struct uthread *uth;
 
-	uth = __uth_sync_get_next(rwl->writers);
+	uth = __uth_sync_get_next(&rwl->writers);
 	if (uth) {
 		TAILQ_INSERT_TAIL(restartees, uth, sync_next);
 	} else {
 		rwl->has_writer = FALSE;
-		while ((uth = __uth_sync_get_next(rwl->readers))) {
+		while ((uth = __uth_sync_get_next(&rwl->readers))) {
 			TAILQ_INSERT_TAIL(restartees, uth, sync_next);
 			rwl->nr_readers++;
 		}
@@ -699,7 +700,7 @@ static void __rw_unlock_reader(struct uth_rwlock *rwl,
 
 	rwl->nr_readers--;
 	if (!rwl->nr_readers) {
-		uth = __uth_sync_get_next(rwl->writers);
+		uth = __uth_sync_get_next(&rwl->writers);
 		if (uth) {
 			TAILQ_INSERT_TAIL(restartees, uth, sync_next);
 			rwl->has_writer = TRUE;
@@ -727,25 +728,22 @@ void uth_rwlock_unlock(uth_rwlock_t *rwl)
 
 /************** Default Sync Obj Implementation **************/
 
-static uth_sync_t uth_default_sync_alloc(void)
+static void uth_default_sync_init(uth_sync_t *sync)
 {
-	struct uth_tailq *tq;
+	struct uth_tailq *tq = (struct uth_tailq*)sync;
 
-	tq = malloc(sizeof(struct uth_tailq));
-	assert(tq);
+	parlib_static_assert(sizeof(struct uth_tailq) <= sizeof(uth_sync_t));
 	TAILQ_INIT(tq);
-	return (uth_sync_t)tq;
 }
 
-static void uth_default_sync_free(uth_sync_t sync)
+static void uth_default_sync_destroy(uth_sync_t *sync)
 {
 	struct uth_tailq *tq = (struct uth_tailq*)sync;
 
 	assert(TAILQ_EMPTY(tq));
-	free(tq);
 }
 
-static struct uthread *uth_default_sync_get_next(uth_sync_t sync)
+static struct uthread *uth_default_sync_get_next(uth_sync_t *sync)
 {
 	struct uth_tailq *tq = (struct uth_tailq*)sync;
 	struct uthread *first;
@@ -756,7 +754,7 @@ static struct uthread *uth_default_sync_get_next(uth_sync_t sync)
 	return first;
 }
 
-static bool uth_default_sync_get_uth(uth_sync_t sync, struct uthread *uth)
+static bool uth_default_sync_get_uth(uth_sync_t *sync, struct uthread *uth)
 {
 	struct uth_tailq *tq = (struct uth_tailq*)sync;
 	struct uthread *i;
@@ -773,33 +771,35 @@ static bool uth_default_sync_get_uth(uth_sync_t sync, struct uthread *uth)
 /************** External uthread sync interface **************/
 
 /* Called by the 2LS->has_blocked op, if they are using the default sync.*/
-void __uth_default_sync_enqueue(struct uthread *uth, uth_sync_t sync)
+void __uth_default_sync_enqueue(struct uthread *uth, uth_sync_t *sync)
 {
 	struct uth_tailq *tq = (struct uth_tailq*)sync;
 
 	TAILQ_INSERT_TAIL(tq, uth, sync_next);
 }
 
-/* Called by 2LS-independent sync code when a sync object is created. */
-uth_sync_t __uth_sync_alloc(void)
+/* Called by 2LS-independent sync code when a sync object needs initialized. */
+void __uth_sync_init(uth_sync_t *sync)
 {
-	if (sched_ops->sync_alloc)
-		return sched_ops->sync_alloc();
-	return uth_default_sync_alloc();
+	if (sched_ops->sync_init) {
+		sched_ops->sync_init(sync);
+		return;
+	}
+	uth_default_sync_init(sync);
 }
 
 /* Called by 2LS-independent sync code when a sync object is destroyed. */
-void __uth_sync_free(uth_sync_t sync)
+void __uth_sync_destroy(uth_sync_t *sync)
 {
-	if (sched_ops->sync_free) {
-		sched_ops->sync_free(sync);
+	if (sched_ops->sync_destroy) {
+		sched_ops->sync_destroy(sync);
 		return;
 	}
-	uth_default_sync_free(sync);
+	uth_default_sync_destroy(sync);
 }
 
 /* Called by 2LS-independent sync code when a thread needs to be woken. */
-struct uthread *__uth_sync_get_next(uth_sync_t sync)
+struct uthread *__uth_sync_get_next(uth_sync_t *sync)
 {
 	if (sched_ops->sync_get_next)
 		return sched_ops->sync_get_next(sync);
@@ -808,7 +808,7 @@ struct uthread *__uth_sync_get_next(uth_sync_t sync)
 
 /* Called by 2LS-independent sync code when a specific thread needs to be woken.
  * Returns TRUE if the uthread was blocked on the object, FALSE o/w. */
-bool __uth_sync_get_uth(uth_sync_t sync, struct uthread *uth)
+bool __uth_sync_get_uth(uth_sync_t *sync, struct uthread *uth)
 {
 	if (sched_ops->sync_get_uth)
 		return sched_ops->sync_get_uth(sync, uth);

@@ -42,8 +42,8 @@ static void pth_sched_entry(void);
 static void pth_thread_runnable(struct uthread *uthread);
 static void pth_thread_paused(struct uthread *uthread);
 static void pth_thread_blockon_sysc(struct uthread *uthread, void *sysc);
-static void pth_thread_has_blocked(struct uthread *uthread, uth_sync_t sync_obj,
-                                   int flags);
+static void pth_thread_has_blocked(struct uthread *uthread,
+                                   uth_sync_t *sync_obj, int flags);
 static void pth_thread_refl_fault(struct uthread *uth,
                                   struct user_context *ctx);
 static void pth_thread_exited(struct uthread *uth);
@@ -249,8 +249,8 @@ static void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 	/* GIANT WARNING: do not touch the thread after this point. */
 }
 
-static void pth_thread_has_blocked(struct uthread *uthread, uth_sync_t sync_obj,
-                                   int flags)
+static void pth_thread_has_blocked(struct uthread *uthread,
+                                   uth_sync_t *sync_obj, int flags)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 
