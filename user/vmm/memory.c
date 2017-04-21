@@ -33,6 +33,8 @@
 #include <sys/param.h>
 #include <parlib/opts.h>
 
+#define ALIGNED(p, a)	(!(((uintptr_t)(p)) & ((a)-1)))
+
 static char *entrynames[] = {
 	[E820_RAM] "E820_RAM",
 	[E820_RESERVED] "E820_RESERVED",
@@ -105,10 +107,25 @@ void *init_e820map(struct boot_params *bp,
 	return (void *)bp + PGSIZE;
 }
 
+/* checkmemaligned verifies alignment attributes of your memory space.
+ * It terminates your process with extreme prejudice if they are
+ * incorrect in some way. */
+void checkmemaligned(unsigned long long memstart, unsigned long long memsize)
+{
+	if (!ALIGNED(memstart, PML1_REACH))
+		errx(1, "memstart (%#x) wrong: must be aligned to %#x",
+                     memstart, PML1_REACH);
+	if (!ALIGNED(memsize, PML1_REACH))
+		errx(1, "memsize (%#x) wrong: must be aligned to %#x",
+                     memsize, PML1_REACH);
+}
+
 // memory allocates memory for the VM. It's a complicated mess because of the
 // break for APIC and other things. We just go ahead and leave the region from
 // RESERVED to _4GiB for that.  The memory is either split, all low, or all
-// high.
+// high. This code is designed for a kernel. Dune-style code does not need it
+// as it does not have the RESERVED restrictions. Dune-style code can use this,
+// however, by setting memstart to 4 GiB.
 void mmap_memory(unsigned long long memstart, unsigned long long memsize)
 {
 	void *r1, *r2;
@@ -116,6 +133,7 @@ void mmap_memory(unsigned long long memstart, unsigned long long memsize)
 
 	// Let's do some minimal validation, so we don't drive
 	// people crazy.
+	checkmemaligned(memstart, memsize);
 	if ((memstart >= RESERVED) && (memstart < _4GiB))
 		errx(1, "memstart (%#x) wrong: must be < %#x or >= %#x\n",
 		     memstart, RESERVED, _4GiB);

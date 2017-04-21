@@ -114,4 +114,5 @@ static struct virtual_machine *get_my_vm(void)
 void *init_e820map(struct boot_params *bp,
                    unsigned long long memstart,
                    unsigned long long memsize);
+void checkmemaligned(unsigned long long memstart, unsigned long long memsize);
 void mmap_memory(unsigned long long memstart, unsigned long long memsize);

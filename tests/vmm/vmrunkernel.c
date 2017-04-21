@@ -900,29 +900,32 @@ int main(int argc, char **argv)
 	 * mappings. */
 
 	p2m->pte[PML2(0)] = (uint64_t)0 | PTE_KERN_RW | PTE_PS;
-	memsize = GiB;
+
 	fprintf(stderr, "Map %p for %zu bytes\n", memstart, memsize);
-	for (uintptr_t p4 = memstart; p4 < memstart + memsize;
-	     p4 += PML4_PTE_REACH, p1++) {
+	for (uintptr_t p4 = memstart, i4 = PML4(p4);
+		 p4 < memstart + memsize && i4 < NPTENTRIES;
+	     p4 = ROUNDUP(p4 + 1, PML4_PTE_REACH), p1++, i4++) {
 		p512->pte[PML4(p4)] = (uint64_t)p1 | PTE_KERN_RW;
 		if (debug)
 			fprintf(stderr, "l4@%p: %p set index 0x%x to 0x%llx\n",
-				&p512->pte[PML4(p4)],
-				p4, PML4(p4), p512->pte[PML4(p4)]);
-		for (uintptr_t p3 = p4; p3 < memstart + memsize;
-		     p3 += PML3_PTE_REACH, p2m++) {
+					&p512->pte[PML4(p4)],
+					p4, PML4(p4), p512->pte[PML4(p4)]);
+		for (uintptr_t p3 = p4, i3 = PML3(p3);
+			 p3 < memstart + memsize && i3 < NPTENTRIES;
+		     p3 = ROUNDUP(p3 + 1, PML3_PTE_REACH), p2m++, i3++) {
 			p1->pte[PML3(p3)] = (uint64_t)p2m | PTE_KERN_RW;
 			if (debug)
 				fprintf(stderr, "\tl3@%p: %p set index 0x%x to 0x%llx\n",
-				&p1->pte[PML3(p3)],
-				p3, PML3(p3), p1->pte[PML3(p3)]);
-			for (uintptr_t p2 = p3; p2 < memstart + memsize;
-			     p2 += PML2_PTE_REACH) {
+						&p1->pte[PML3(p3)],
+						p3, PML3(p3), p1->pte[PML3(p3)]);
+			for (uintptr_t p2 = p3, i2 = PML2(p2);
+				 p2 < memstart + memsize && i2 < NPTENTRIES;
+			     p2 += PML2_PTE_REACH, i2++) {
 				p2m->pte[PML2(p2)] = (uint64_t)p2 | PTE_KERN_RW | PTE_PS;
 				if (debug)
 					fprintf(stderr, "\t\tl2@%p: %p set index 0x%x to 0x%llx\n",
-						&p2m->pte[PML2(p2)],
-						p2, PML2(p2), p2m->pte[PML2(p2)]);
+							&p2m->pte[PML2(p2)],
+							p2, PML2(p2), p2m->pte[PML2(p2)]);
 			}
 		}
 
