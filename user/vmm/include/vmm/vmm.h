@@ -28,6 +28,9 @@
 
 #define VM_PAGE_FAULT			14
 
+// APIC Guest Physical Address, a well known constant.
+#define APIC_GPA			0xfee00000ULL
+
 /* The listing of VIRTIO MMIO devices. We currently only expect to have 2,
  * console and network. Only the console is fully implemented right now.*/
 enum {
@@ -118,3 +121,5 @@ void checkmemaligned(unsigned long long memstart, unsigned long long memsize);
 void mmap_memory(unsigned long long memstart, unsigned long long memsize);
 void *setup_paging(unsigned long long memstart, unsigned long long memsize,
                    bool debug);
+void *setup_biostables(struct virtual_machine *vm,
+                       void *a, void *smbiostable);
