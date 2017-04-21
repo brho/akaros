@@ -4,34 +4,11 @@
  * Memory, paging, e820, bootparams and other helpers */
 
 #include <stdio.h>
-#include <pthread.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <parlib/arch/arch.h>
-#include <parlib/ros_debug.h>
-#include <unistd.h>
-#include <errno.h>
-#include <dirent.h>
 #include <stdlib.h>
-#include <string.h>
-#include <ros/syscall.h>
 #include <sys/mman.h>
-#include <vmm/vmm.h>
-#include <vmm/acpi/acpi.h>
 #include <ros/arch/mmu.h>
-#include <ros/arch/membar.h>
-#include <ros/vmm.h>
-#include <parlib/uthread.h>
 #include <vmm/linux_bootparam.h>
-#include <getopt.h>
-
-#include <vmm/sched.h>
-#include <vmm/net.h>
-#include <sys/eventfd.h>
-#include <sys/uio.h>
-#include <sys/param.h>
-#include <parlib/opts.h>
+#include <vmm/vmm.h>
 
 #define ALIGNED(p, a)	(!(((uintptr_t)(p)) & ((a)-1)))
 

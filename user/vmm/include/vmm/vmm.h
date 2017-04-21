@@ -116,3 +116,5 @@ void *init_e820map(struct boot_params *bp,
                    unsigned long long memsize);
 void checkmemaligned(unsigned long long memstart, unsigned long long memsize);
 void mmap_memory(unsigned long long memstart, unsigned long long memsize);
+void *setup_paging(unsigned long long memstart, unsigned long long memsize,
+                   bool debug);
