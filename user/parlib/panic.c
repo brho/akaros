@@ -7,6 +7,15 @@
 
 char *argv0;
 
+static void __attribute__((constructor)) parlib_stdio_init(void)
+{
+	/* This isn't ideal, since it might affect some stdout streams where our
+	 * parent tried to do something else.  Note that isatty() always returns
+	 * TRUE, due to how we fake tcgetattr(), and that doesn't affect whatever
+	 * our shells are doing to set us up. */
+	setlinebuf(stdout);
+}
+
 /*
  * Panic is called on unresolvable fatal errors.
  * It prints "panic: <message>", then causes a breakpoint exception,
