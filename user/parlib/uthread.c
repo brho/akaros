@@ -912,6 +912,22 @@ void uth_enable_notifs(void)
 	}
 }
 
+void assert_can_block(void)
+{
+	if (in_vcore_context())
+		panic("Vcore context tried to block!");
+	if (!current_uthread) {
+		/* Pre-parlib SCPs can do whatever. */
+		if (atomic_read(&vcpd_of(0)->flags) & VC_SCP_NOVCCTX)
+			return;
+		panic("No current_uthread and tried to block!");
+	}
+	if (current_uthread->notif_disabled_depth)
+		panic("Uthread tried to block with notifs disabled!");
+	if (current_uthread->flags & UTHREAD_DONT_MIGRATE)
+		panic("Uthread tried to block with DONT_MIGRATE!");
+}
+
 /* Helper: returns TRUE if it succeeded in starting the uth stealing process. */
 static bool start_uth_stealing(struct preempt_data *vcpd)
 {

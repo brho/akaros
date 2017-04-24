@@ -118,6 +118,7 @@ bool uth_semaphore_timed_down(uth_semaphore_t *sem,
 	struct alarm_waiter waiter[1];
 	struct timeout_blob blob[1];
 
+	assert_can_block();
 	parlib_run_once(&sem->once_ctl, __uth_semaphore_init, sem);
 	spin_pdr_lock(&sem->lock);
 	if (sem->count > 0) {
@@ -154,6 +155,7 @@ bool uth_semaphore_trydown(uth_semaphore_t *sem)
 {
 	bool ret = FALSE;
 
+	assert_can_block();
 	parlib_run_once(&sem->once_ctl, __uth_semaphore_init, sem);
 	spin_pdr_lock(&sem->lock);
 	if (sem->count > 0) {
@@ -285,9 +287,8 @@ void uth_recurse_mutex_free(uth_recurse_mutex_t *r_mtx)
 bool uth_recurse_mutex_timed_lock(uth_recurse_mutex_t *r_mtx,
                                   const struct timespec *abs_timeout)
 {
+	assert_can_block();
 	parlib_run_once(&r_mtx->once_ctl, __uth_recurse_mutex_init, r_mtx);
-	assert(!in_vcore_context());
-	assert(current_uthread);
 	/* We don't have to worry about races on current_uthread or count.  They are
 	 * only written by the initial lockholder, and this check will only be true
 	 * for the initial lockholder, which cannot concurrently call this function
@@ -316,9 +317,8 @@ bool uth_recurse_mutex_trylock(uth_recurse_mutex_t *r_mtx)
 {
 	bool ret;
 
+	assert_can_block();
 	parlib_run_once(&r_mtx->once_ctl, __uth_recurse_mutex_init, r_mtx);
-	assert(!in_vcore_context());
-	assert(current_uthread);
 	if (r_mtx->lockholder == current_uthread) {
 		r_mtx->count++;
 		return TRUE;
@@ -472,6 +472,7 @@ bool uth_cond_var_timed_wait(uth_cond_var_t *cv, uth_mutex_t *mtx,
 	struct timeout_blob blob[1];
 	bool ret = TRUE;
 
+	assert_can_block();
 	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
 	link.cv = cv;
 	link.mtx = mtx;
@@ -613,6 +614,7 @@ static void __rwlock_rd_cb(struct uthread *uth, void *arg)
 
 void uth_rwlock_rdlock(uth_rwlock_t *rwl)
 {
+	assert_can_block();
 	parlib_run_once(&rwl->once_ctl, __uth_rwlock_init, rwl);
 	spin_pdr_lock(&rwl->lock);
 	/* Readers always make progress when there is no writer */
@@ -628,6 +630,7 @@ bool uth_rwlock_try_rdlock(uth_rwlock_t *rwl)
 {
 	bool ret = FALSE;
 
+	assert_can_block();
 	parlib_run_once(&rwl->once_ctl, __uth_rwlock_init, rwl);
 	spin_pdr_lock(&rwl->lock);
 	if (!rwl->has_writer) {
@@ -648,6 +651,7 @@ static void __rwlock_wr_cb(struct uthread *uth, void *arg)
 
 void uth_rwlock_wrlock(uth_rwlock_t *rwl)
 {
+	assert_can_block();
 	parlib_run_once(&rwl->once_ctl, __uth_rwlock_init, rwl);
 	spin_pdr_lock(&rwl->lock);
 	/* Writers require total mutual exclusion - no writers or readers */
@@ -663,6 +667,7 @@ bool uth_rwlock_try_wrlock(uth_rwlock_t *rwl)
 {
 	bool ret = FALSE;
 
+	assert_can_block();
 	parlib_run_once(&rwl->once_ctl, __uth_rwlock_init, rwl);
 	spin_pdr_lock(&rwl->lock);
 	if (!rwl->has_writer && !rwl->nr_readers) {
