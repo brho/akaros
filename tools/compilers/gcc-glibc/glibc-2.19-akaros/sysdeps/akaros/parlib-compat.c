@@ -48,7 +48,8 @@ weak_alias(__print_user_context, print_user_context)
 
 void ___assert_failed(const char *file, int line, const char *msg)
 {
-	assert(0);
+	breakpoint();
+	abort();
 }
 weak_alias(___assert_failed, _assert_failed)
 

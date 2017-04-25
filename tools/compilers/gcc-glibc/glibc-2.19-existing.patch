@@ -475,3 +475,23 @@ diff -ruB --unidirectional-new-file ../glibc-2.19/sysdeps/x86_64/tlsdesc.sym ../
  
  TLSDESC_ARG			offsetof(struct tlsdesc, arg)
  
+--- glibc-2.19/assert/assert.c	2017-04-25 12:52:32.624619029 -0400
++++ glibc-2.19-akaros/assert/assert.c	2017-04-25 12:53:43.872966850 -0400
+@@ -24,6 +24,7 @@
+ #include <sysdep.h>
+ #include <unistd.h>
+ #include <sys/mman.h>
++#include <parlib/assert.h>
+ 
+ 
+ extern const char *__progname;
+@@ -98,7 +99,7 @@
+ __assert_fail (const char *assertion, const char *file, unsigned int line,
+ 	       const char *function)
+ {
+-  __assert_fail_base (_("%s%s%s:%u: %s%sAssertion `%s' failed.\n%n"),
+-		      assertion, file, line, function);
++  /* Calls out to parlib, and this never returns */
++  _assert_failed(file, line, assertion);
+ }
+ hidden_def(__assert_fail)
