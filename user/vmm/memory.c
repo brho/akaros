@@ -9,6 +9,7 @@
 #include <ros/arch/mmu.h>
 #include <vmm/linux_bootparam.h>
 #include <vmm/vmm.h>
+#include <err.h>
 
 #define ALIGNED(p, a)	(!(((uintptr_t)(p)) & ((a)-1)))
 

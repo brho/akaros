@@ -5,8 +5,6 @@
 #include <stdlib.h>
 #include <parlib/ros_debug.h>
 
-char *argv0;
-
 static void __attribute__((constructor)) parlib_stdio_init(void)
 {
 	/* This isn't ideal, since it might affect some stdout streams where our
@@ -16,33 +14,38 @@ static void __attribute__((constructor)) parlib_stdio_init(void)
 	setlinebuf(stdout);
 }
 
-/*
- * Panic is called on unresolvable fatal errors.
- * It prints "panic: <message>", then causes a breakpoint exception,
- * which causes ROS to enter the ROS kernel monitor.
- */
-void
-_panic(const char *file, int line, const char *fmt,...)
+static void __attribute__((noreturn)) fatal_backtrace(void)
 {
+	/* This will cause the kernel to print out a backtrace to the console.
+	 * Short of reading /proc/self/maps or other stuff, userspace would have a
+	 * hard time backtracing itself. */
+	breakpoint();
+	abort();
+}
+
+void _panic(const char *file, int line, const char *fmt, ...)
+{
+	char buf[128];
+	int ret = 0;
 	va_list ap;
 
 	va_start(ap, fmt);
-
-	// Print the panic message
-	if (argv0)
-		printf("%s: ", argv0);
-	printf("user panic at %s:%d: ", file, line);
-	vprintf(fmt, ap);
-	printf("\n");
-
-	// Cause a breakpoint exception
-	while (1)
-		breakpoint();
+	ret += snprintf(buf + ret, sizeof(buf) - ret,
+	                "[user] panic: PID %d, vcore %d, %s:%d: ",
+	                getpid(), vcore_id(), __FILE__, __LINE__);
+	/* ignore errors (ret < 0) by setting ret to be at least 0 */
+	ret = MAX(ret, 0);
+	ret += vsnprintf(buf + ret, sizeof(buf) - ret, fmt, ap);
+	ret = MAX(ret, 0);
+	ret += snprintf(buf + ret, sizeof(buf) - ret, "\n");
+	ret = MAX(ret, 0);
+	write(2, buf, ret);
+	fatal_backtrace();
 }
 
 void _assert_failed(const char *file, int line, const char *msg)
 {
-	printf("[user] %s:%d, vcore %d, Assertion failed: %s\n", file, line,
-	       vcore_id(), msg);
-	abort();
+	debug_printf("[user] %s:%d, vcore %d, Assertion failed: %s\n", file, line,
+	             vcore_id(), msg);
+	fatal_backtrace();
 }

@@ -5,20 +5,15 @@
 #include <assert.h>
 /* For __BEGIN_DECLS.  Most every header gets it already from features.h. */
 #include <sys/cdefs.h>
-/* So we can undefine warn */
-#include <err.h>
 
 __BEGIN_DECLS
 
 #undef assert
-#undef warn
 
-void _warn(const char*, int, const char*, ...);
 void _panic(const char*, int, const char*, ...) __attribute__((noreturn));
 void _assert_failed(const char *file, int line, const char *msg)
      __attribute__((noreturn));
 
-#define warn(...) _warn(__FILE__, __LINE__, __VA_ARGS__)
 #define panic(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
 
 #define assert(x)	                                                           \
