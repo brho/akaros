@@ -613,7 +613,7 @@ $(BINARY_PREFIX)glibc-stage2-builddir: glibc-$(GLIBC_VERSION)
 .$(BINARY_PREFIX)akaros-libs-install:
 	cd $(AKAROSDIR); \
 	make ARCH=$(AKAROS_ARCH_DIR) userclean; \
-	make ARCH=$(AKAROS_ARCH_DIR) -j $(MAKE_JOBS) install-libs
+	make ARCH=$(AKAROS_ARCH_DIR) -j $(MAKE_JOBS) install-base-libs
 
 ##################################
 ########### Gcc Stage 3 ##########

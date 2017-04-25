@@ -591,15 +591,23 @@ endif #ifeq ($(mixed-targets),1)
 # List all userspace directories here, and state any dependencies between them,
 # such as how pthread depends on parlib.
 
-user-dirs = parlib pthread benchutil iplib ndblib vmm perfmon
+# Critical libraries, also built during the toolchain install
+user-base-dirs = parlib pthread benchutil iplib ndblib perfmon
 benchutil: parlib
 pthread: parlib benchutil
 iplib: parlib
 ndblib: iplib
-vmm: parlib benchutil iplib ndblib
 
-PHONY += install-libs $(user-dirs)
-install-libs: $(user-dirs) symlinks cc-exists
+# Higher-level libraries.  Built before tests/, but after apps-install.
+# TODO: would like to move perfmon here, since it's not meant to be low-level.
+# But the apps-install has perf, which depends on user/perfmon.
+user-extra-dirs = vmm
+$(user-extra-dirs): $(user-base-dirs)
+
+user-dirs = $(user-base-dirs) $(user-extra-dirs)
+
+PHONY += install-base-libs $(user-dirs)
+install-base-libs: $(user-base-dirs) symlinks cc-exists
 
 $(user-dirs):
 	@$(MAKE) -C user/$@ DEPLIBS="$^" && $(MAKE) -C user/$@ install
@@ -614,7 +622,7 @@ $(clean-user-dirs):
 	@$(MAKE) -C user/$(patsubst _clean_user_%,%,$@) clean
 
 tests/: tests
-tests: install-libs
+tests: user
 	@$(MAKE) -f tests/Makefile
 
 PHONY += utest
@@ -642,7 +650,7 @@ $(OBJDIR)/.dont-force-fill-kfs:
 	@echo "User space tests removed from KFS"
 	@touch $(OBJDIR)/.dont-force-fill-kfs
 
-fill-kfs: $(OBJDIR)/.dont-force-fill-kfs install-libs tests
+fill-kfs: $(OBJDIR)/.dont-force-fill-kfs user tests
 	@mkdir -p $(FIRST_KFS_PATH)/lib
 	$(Q)cp -uP $(xcc-so-files) $(FIRST_KFS_PATH)/lib
 	@echo "Cross Compiler 'so' files installed to KFS"
@@ -737,7 +745,7 @@ $(xcc_subcmd_goals):
 PHONY += xcc-upgrade
 xcc-upgrade: xcc
 	@$(MAKE) userclean
-	@$(MAKE) install-libs
+	@$(MAKE) install-base-libs
 	@$(MAKE) testclean utestclean
 	@$(call make_as_parent, apps-clean)
 	@$(call make_as_parent, apps-install)
