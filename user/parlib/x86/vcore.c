@@ -395,7 +395,7 @@ void print_user_context(struct user_context *ctx)
 		fprintf_vm_tf(stdout, &ctx->tf.vm_tf);
 		break;
 	default:
-		printf("Unknown context type %d\n", ctx->type);
+		fprintf(stderr, "Unknown context type %d\n", ctx->type);
 	}
 }
 

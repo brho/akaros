@@ -1,9 +1,9 @@
 #include <parlib/arch/arch.h>
-#include <stdio.h>
-#include <stdarg.h>
+#include <parlib/stdio.h>
 #include <parlib/assert.h>
-#include <stdlib.h>
 #include <parlib/ros_debug.h>
+#include <stdarg.h>
+#include <stdlib.h>
 
 static void __attribute__((constructor)) parlib_stdio_init(void)
 {
@@ -45,7 +45,7 @@ void _panic(const char *file, int line, const char *fmt, ...)
 
 void _assert_failed(const char *file, int line, const char *msg)
 {
-	debug_printf("[user] %s:%d, vcore %d, Assertion failed: %s\n", file, line,
-	             vcore_id(), msg);
+	fprintf(stderr, "[user] %s:%d, vcore %d, Assertion failed: %s\n", file,
+	        line, vcore_id(), msg);
 	fatal_backtrace();
 }

@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <parlib/parlib.h>
 #include <unistd.h>
 #include <signal.h>

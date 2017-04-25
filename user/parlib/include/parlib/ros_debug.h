@@ -2,23 +2,9 @@
 
 #include <parlib/common.h>
 #include <parlib/parlib.h>
-#include <parlib/vcore.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 
 __BEGIN_DECLS
-
-#define debug_printf(...) {                                                    \
-	char buf[128];                                                             \
-	int ret = snprintf(buf, sizeof(buf), __VA_ARGS__);                         \
-	write(2, buf, ret);                                                        \
-}
-
-#define I_AM_HERE debug_printf("PID %d, vcore %d is in %s() at %s:%d\n",       \
-                               getpid(), vcore_id(), __FUNCTION__, __FILE__,   \
-                               __LINE__);
 
 void trace_printf(const char *fmt, ...);
 
