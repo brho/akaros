@@ -612,6 +612,7 @@ install-base-libs: $(user-base-dirs) symlinks cc-exists
 $(user-dirs):
 	@$(MAKE) -C user/$@ DEPLIBS="$^" && $(MAKE) -C user/$@ install
 
+PHONY += user
 user: $(user-dirs)
 
 PHONY += userclean $(clean-user-dirs)
