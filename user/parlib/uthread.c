@@ -396,6 +396,7 @@ __uthread_yield(void)
 	/* Any locks that were held before the yield must be unlocked in the
 	 * callback.  That callback won't get a chance to update our disabled depth.
 	 * This sets us up for the next time the uthread runs. */
+	assert(uthread->notif_disabled_depth <= 1);
 	uthread->notif_disabled_depth = 0;
 	/* Do whatever the yielder wanted us to do */
 	assert(uthread->yield_func);
