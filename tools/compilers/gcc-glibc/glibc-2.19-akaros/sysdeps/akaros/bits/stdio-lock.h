@@ -19,62 +19,24 @@
 #ifndef _BITS_STDIO_LOCK_H
 #define _BITS_STDIO_LOCK_H 1
 
+/* AKAROS: upper half from bits/stdio-lock.h */
+
 #include <bits/libc-lock.h>
-#include <lowlevellock.h>
 
+__libc_lock_define_recursive (typedef, _IO_lock_t)
 
-/* The locking here is very inexpensive, even for inlining.  */
-#define _IO_lock_inexpensive	1
+/* We need recursive (counting) mutexes.  */
+#ifdef _LIBC_LOCK_RECURSIVE_INITIALIZER
+# define _IO_lock_initializer _LIBC_LOCK_RECURSIVE_INITIALIZER
+#elif _IO_MTSAFE_IO
+ #error libio needs recursive mutexes for _IO_MTSAFE_IO
+#endif
 
-typedef struct { int lock; int cnt; void *owner; } _IO_lock_t;
-
-#define _IO_lock_initializer { LLL_LOCK_INITIALIZER, 0, NULL }
-
-#define _IO_lock_init(_name) \
-  ((_name) = (_IO_lock_t) _IO_lock_initializer , 0)
-
-#define _IO_lock_fini(_name) \
-  ((void) 0)
-
-#define _IO_lock_lock(_name) \
-  do {									      \
-    void *__self = THREAD_SELF;						      \
-    if ((_name).owner != __self)					      \
-      {									      \
-	lll_lock ((_name).lock, LLL_PRIVATE);				      \
-        (_name).owner = __self;						      \
-      }									      \
-    ++(_name).cnt;							      \
-  } while (0)
-
-#define _IO_lock_trylock(_name) \
-  ({									      \
-    int __result = 0;							      \
-    void *__self = THREAD_SELF;						      \
-    if ((_name).owner != __self)					      \
-      {									      \
-        if (lll_trylock ((_name).lock) == 0)				      \
-          {								      \
-            (_name).owner = __self;					      \
-            (_name).cnt = 1;						      \
-          }								      \
-        else								      \
-          __result = EBUSY;						      \
-      }									      \
-    else								      \
-      ++(_name).cnt;							      \
-    __result;								      \
-  })
-
-#define _IO_lock_unlock(_name) \
-  do {									      \
-    if (--(_name).cnt == 0)						      \
-      {									      \
-        (_name).owner = NULL;						      \
-	lll_unlock ((_name).lock, LLL_PRIVATE);				      \
-      }									      \
-  } while (0)
-
+#define _IO_lock_init(_name)	__libc_lock_init_recursive (_name)
+#define _IO_lock_fini(_name)	__libc_lock_fini_recursive (_name)
+#define _IO_lock_lock(_name)	__libc_lock_lock_recursive (_name)
+#define _IO_lock_trylock(_name)	__libc_lock_trylock_recursive (_name)
+#define _IO_lock_unlock(_name)	__libc_lock_unlock_recursive (_name)
 
 
 #define _IO_cleanup_region_start(_fct, _fp) \
@@ -83,6 +45,11 @@ typedef struct { int lock; int cnt; void *owner; } _IO_lock_t;
   __libc_cleanup_region_start (1, _fct, NULL)
 #define _IO_cleanup_region_end(_doit) \
   __libc_cleanup_region_end (_doit)
+
+
+/* AKAROS: lower half from nptl/sysdeps/pthreads/bits/stdio-lock.h.  Not sure if
+ * this is critical or not.  won't build with the standard bits/stdio-lock.h. */
+
 
 #if defined _LIBC && !defined NOT_IN_libc
 

@@ -24,9 +24,15 @@
 #include <ros/memlayout.h>
 #include <ros/procdata.h>
 #include <sys/mman.h>
+#include <parlib/spinlock.h>
 
 static uintptr_t curbrk = BRK_START;
-__libc_lock_define_initialized(static, __brk_lock);
+
+/* brk() is called by malloc, which holds spinlocks.  So we need to use
+ * spinlocks too.  It is possible that the kernel will block in the mmap() call,
+ * in which case the process would spin.  That's already the case for malloc,
+ * regardless of what we do here in brk() (since ultimately, brk() can block. */
+static struct spin_pdr_lock __brk_lock = SPINPDR_INITIALIZER;
 
 static bool is_early_scp(void)
 {
@@ -42,14 +48,14 @@ static void brk_lock(void)
 {
 	if (is_early_scp())
 		return;
-	__libc_lock_lock(__brk_lock);
+	spin_pdr_lock(&__brk_lock);
 }
 
 static void brk_unlock(void)
 {
 	if (is_early_scp())
 		return;
-	__libc_lock_unlock(__brk_lock);
+	spin_pdr_unlock(&__brk_lock);
 }
 
 static uintptr_t

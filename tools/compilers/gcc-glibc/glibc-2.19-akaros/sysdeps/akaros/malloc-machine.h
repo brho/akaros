@@ -21,15 +21,16 @@
 #define _MALLOC_MACHINE_H
 
 #include <atomic.h>
-#include <bits/libc-lock.h>
+#include <lowlevellock.h>
 
-__libc_lock_define (typedef, mutex_t)
+typedef struct spin_pdr_lock mutex_t;
 
-#define mutex_init(m)		__libc_lock_init (*(m))
-#define mutex_lock(m)		__libc_lock_lock (*(m))
-#define mutex_trylock(m)	__libc_lock_trylock (*(m))
-#define mutex_unlock(m)		__libc_lock_unlock (*(m))
-#define MUTEX_INITIALIZER	LLL_LOCK_INITIALIZER
+/* These macros expect to take a pointer to the object */
+#define mutex_init(m)		spin_pdr_init(m)
+#define mutex_lock(m)		spin_pdr_lock(m)
+#define mutex_trylock(m)	({ spin_pdr_trylock(m) ? 0 : EBUSY; })
+#define mutex_unlock(m)		spin_pdr_unlock(m)
+#define MUTEX_INITIALIZER	SPINPDR_INITIALIZER
 
 /* thread specific data for glibc */
 
@@ -41,6 +42,8 @@ __libc_tsd_define (static, void *, MALLOC)	/* declaration/common definition */
 #define tsd_setspecific(key, data)	__libc_tsd_set (void *, MALLOC, (data))
 #define tsd_getspecific(key, vptr)	((vptr) = __libc_tsd_get (void *, MALLOC))
 
+/* TODO: look into pthread's version.  We might need this, and it could be that
+ * glibc has the fork_cbs already. */
 #define thread_atfork(prepare, parent, child) do {} while(0)
 
 #include <sysdeps/generic/malloc-machine.h>

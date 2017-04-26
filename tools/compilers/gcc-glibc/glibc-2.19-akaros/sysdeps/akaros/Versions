@@ -87,10 +87,31 @@ libc {
     _assert_failed;
     nsec2tsc;
     tsc2nsec;
+    spin_pdr_init;
     spin_pdr_trylock;
     spin_pdr_lock;
     spin_pdr_unlock;
     cpu_relax_vc;
     uthread_sched_yield;
+    uth_mutex_init;
+    uth_mutex_destroy;
+    uth_mutex_lock;
+    uth_mutex_trylock;
+    uth_mutex_unlock;
+    uth_recurse_mutex_init;
+    uth_recurse_mutex_destroy;
+    uth_recurse_mutex_lock;
+    uth_recurse_mutex_trylock;
+    uth_recurse_mutex_unlock;
+    uth_rwlock_init;
+    uth_rwlock_destroy;
+    uth_rwlock_rdlock;
+    uth_rwlock_try_rdlock;
+    uth_rwlock_wrlock;
+    uth_rwlock_try_wrlock;
+    uth_rwlock_unlock;
+    dtls_key_create;
+    set_dtls;
+    get_dtls;
   }
 }
