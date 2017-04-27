@@ -337,6 +337,61 @@ bool test_cv_recurse_timeout(void)
 	return TRUE;
 }
 
+static uth_rwlock_t rwl = UTH_RWLOCK_INIT;
+static int rw_value;
+
+static void *rw_reader(void *arg)
+{
+	int val;
+
+	uth_rwlock_rdlock(&rwl);
+	if (!rw_value) {
+		/* We won, let's wait a while to let the writer block (racy) */
+		uthread_usleep(5000);
+	}
+	uth_rwlock_unlock(&rwl);
+	while (1) {
+		uth_rwlock_rdlock(&rwl);
+		val = rw_value;
+		uth_rwlock_unlock(&rwl);
+		if (val)
+			break;
+		uthread_usleep(1000);
+	}
+	return 0;
+}
+
+static void *rw_writer(void *arg)
+{
+	/* Let the readers get a head start */
+	uthread_usleep(1000);
+	/* This might fail, but can't hurt to try it */
+	if (uth_rwlock_try_wrlock(&rwl))
+		uth_rwlock_unlock(&rwl);
+	/* Eventually we'll get the lock */
+	uth_rwlock_wrlock(&rwl);
+	rw_value = 1;
+	uth_rwlock_unlock(&rwl);
+	return 0;
+}
+
+bool test_rwlock(void)
+{
+	#define NR_THREADS 3
+	struct uth_join_request joinees[NR_THREADS];
+	void *retvals[NR_THREADS];
+
+	joinees[0].uth = uthread_create(rw_reader, NULL);
+	joinees[1].uth = uthread_create(rw_reader, NULL);
+	joinees[2].uth = uthread_create(rw_writer, NULL);
+	for (int i = 0; i < NR_THREADS; i++)
+		joinees[i].retval_loc = &retvals[i];
+	uthread_join_arr(joinees, NR_THREADS);
+	for (int i = 0; i < NR_THREADS; i++)
+		UT_ASSERT(retvals[i] == 0);
+	return TRUE;
+}
+
 /* <--- End definition of test cases ---> */
 
 struct utest utests[] = {
@@ -350,6 +405,7 @@ struct utest utests[] = {
 	UTEST_REG(semaphore_timeout),
 	UTEST_REG(cv_timeout),
 	UTEST_REG(cv_recurse_timeout),
+	UTEST_REG(rwlock),
 };
 int num_utests = sizeof(utests) / sizeof(struct utest);
 
