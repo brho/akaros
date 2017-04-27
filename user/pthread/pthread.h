@@ -66,28 +66,41 @@ struct sysc_mgmt {
 
 #define PTHREAD_ONCE_INIT PARLIB_ONCE_INIT
 #define PTHREAD_BARRIER_SERIAL_THREAD 12345
-#define PTHREAD_MUTEX_INITIALIZER {0,0}
-#define PTHREAD_RWLOCK_INITIALIZER PTHREAD_MUTEX_INITIALIZER
-#define PTHREAD_MUTEX_NORMAL 0
-#define PTHREAD_MUTEX_RECURSIVE 1
-#define PTHREAD_MUTEX_DEFAULT PTHREAD_MUTEX_NORMAL
-#define PTHREAD_MUTEX_SPINS 100 // totally arbitrary
 #define PTHREAD_BARRIER_SPINS 100 // totally arbitrary
-#define PTHREAD_COND_INITIALIZER {/* SLIST_HEAD_INITIALIZER */ {NULL},         \
-                                  SPINPDR_INITIALIZER, 0, 0}
 #define PTHREAD_PROCESS_PRIVATE 0
 #define PTHREAD_PROCESS_SHARED 1
 
-typedef struct
-{
-  int type;
+#define PTHREAD_MUTEX_NORMAL 0
+#define PTHREAD_MUTEX_RECURSIVE 1
+#define PTHREAD_MUTEX_DEFAULT PTHREAD_MUTEX_NORMAL
+typedef struct {
+	int type;
 } pthread_mutexattr_t;
 
-typedef struct
-{
-  const pthread_mutexattr_t* attr;
-  atomic_t lock;
+typedef struct {
+	int							type;
+	uth_mutex_t					mtx;
+	uth_recurse_mutex_t			r_mtx;
 } pthread_mutex_t;
+#define PTHREAD_MUTEX_INITIALIZER { PTHREAD_MUTEX_DEFAULT, UTH_MUTEX_INIT, \
+                                    UTH_RECURSE_MUTEX_INIT }
+
+typedef int clockid_t;
+typedef struct {
+	int							pshared;
+	clockid_t					clock;
+} pthread_condattr_t;
+#define PTHREAD_COND_INITIALIZER UTH_COND_VAR_INIT
+
+/* Regarding the spinlock vs MCS, I don't expect this lock to be heavily
+ * contended.  Most of the time, the caller already holds the mutex associated
+ * with the cond var. */
+typedef uth_cond_var_t pthread_cond_t;
+
+typedef uth_rwlock_t pthread_rwlock_t;
+#define PTHREAD_RWLOCK_INITIALIZER UTH_RWLOCK_INIT
+/* Will try to avoid the rwlockattr_t business for now */
+typedef void * pthread_rwlockattr_t;
 
 typedef struct
 {
@@ -98,11 +111,6 @@ typedef struct
 	struct pthread_list			waiters;
 	int							nr_waiters;
 } pthread_barrier_t;
-
-#define WAITER_CLEARED 0
-#define WAITER_WAITING 1
-#define SLOT_FREE 0
-#define SLOT_IN_USE 1
 
 /* Detach state.  */
 enum
@@ -116,24 +124,6 @@ enum
 #define PTHREAD_STACK_PAGES 1024
 #define PTHREAD_STACK_SIZE (PTHREAD_STACK_PAGES*PGSIZE)
 #define PTHREAD_STACK_MIN PTHREAD_STACK_SIZE
-
-typedef int clockid_t;
-typedef struct
-{
-  int pshared;
-  clockid_t clock;
-} pthread_condattr_t;
-
-/* Regarding the spinlock vs MCS, I don't expect this lock to be heavily
- * contended.  Most of the time, the caller already holds the mutex associated
- * with the cond var. */
-typedef struct
-{
-	struct pthread_list			waiters;
-	struct spin_pdr_lock 		spdr_lock;
-	int 						attr_pshared;
-	int 						attr_clock;
-} pthread_cond_t;
 
 typedef struct 
 {
@@ -202,15 +192,13 @@ int pthread_condattr_getclock(const pthread_condattr_t *attr,
                               clockid_t *clock_id);
 int pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock_id);
 
-#define pthread_rwlock_t pthread_mutex_t
-#define pthread_rwlockattr_t pthread_mutexattr_t
-#define pthread_rwlock_destroy pthread_mutex_destroy
-#define pthread_rwlock_init pthread_mutex_init
-#define pthread_rwlock_unlock pthread_mutex_unlock
-#define pthread_rwlock_rdlock pthread_mutex_lock
-#define pthread_rwlock_wrlock pthread_mutex_lock
-#define pthread_rwlock_tryrdlock pthread_mutex_trylock
-#define pthread_rwlock_trywrlock pthread_mutex_trylock
+int pthread_rwlock_init(pthread_rwlock_t *rwl, const pthread_rwlockattr_t *a);
+int pthread_rwlock_destroy(pthread_rwlock_t *rwl);
+int pthread_rwlock_rdlock(pthread_rwlock_t *rwl);
+int pthread_rwlock_tryrdlock(pthread_rwlock_t *rwl);
+int pthread_rwlock_wrlock(pthread_rwlock_t *rwl);
+int pthread_rwlock_trywrlock(pthread_rwlock_t *rwl);
+int pthread_rwlock_unlock(pthread_rwlock_t *rwl);
 
 pthread_t pthread_self();
 int pthread_equal(pthread_t t1, pthread_t t2);

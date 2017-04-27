@@ -34,7 +34,6 @@ struct sysc_mgmt *sysc_mgmt = 0;
 
 /* Helper / local functions */
 static int get_next_pid(void);
-static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
 static inline void pthread_exit_no_cleanup(void *ret);
 
 /* Pthread 2LS operations */
@@ -709,15 +708,15 @@ void pthread_cleanup_pop(int execute)
 	}
 }
 
-int pthread_mutexattr_init(pthread_mutexattr_t* attr)
+int pthread_mutexattr_init(pthread_mutexattr_t *attr)
 {
-  attr->type = PTHREAD_MUTEX_DEFAULT;
-  return 0;
+	attr->type = PTHREAD_MUTEX_DEFAULT;
+	return 0;
 }
 
-int pthread_mutexattr_destroy(pthread_mutexattr_t* attr)
+int pthread_mutexattr_destroy(pthread_mutexattr_t *attr)
 {
-  return 0;
+	return 0;
 }
 
 int pthread_attr_setdetachstate(pthread_attr_t *__attr, int __detachstate)
@@ -726,141 +725,145 @@ int pthread_attr_setdetachstate(pthread_attr_t *__attr, int __detachstate)
 	return 0;
 }
 
-int pthread_mutexattr_gettype(const pthread_mutexattr_t* attr, int* type)
+int pthread_mutexattr_gettype(const pthread_mutexattr_t *attr, int *type)
 {
-  *type = attr ? attr->type : PTHREAD_MUTEX_DEFAULT;
-  return 0;
-}
-
-int pthread_mutexattr_settype(pthread_mutexattr_t* attr, int type)
-{
-  if(type != PTHREAD_MUTEX_NORMAL)
-    return EINVAL;
-  attr->type = type;
-  return 0;
-}
-
-int pthread_mutex_init(pthread_mutex_t* m, const pthread_mutexattr_t* attr)
-{
-  m->attr = attr;
-  atomic_init(&m->lock, 0);
-  return 0;
-}
-
-/* Helper for spinning sync, returns TRUE if it is okay to keep spinning.
- *
- * Alternatives include:
- * 		old_count <= num_vcores() (barrier code, pass in old_count as *state, 
- * 		                           but this only works if every awake pthread
- * 		                           will belong to the barrier).
- * 		just spin for a bit       (use *state to track spins)
- * 		FALSE                     (always is safe)
- * 		etc...
- * 'threads_ready' isn't too great since sometimes it'll be non-zero when it is
- * about to become 0.  We really want "I have no threads waiting to run that
- * aren't going to run on their on unless this core yields instead of spins". */
-/* TODO: consider making this a 2LS op */
-static inline bool safe_to_spin(unsigned int *state)
-{
-	return !threads_ready;
-}
-
-/* Set *spun to 0 when calling this the first time.  It will yield after 'spins'
- * calls.  Use this for adaptive mutexes and such. */
-static inline void spin_to_sleep(unsigned int spins, unsigned int *spun)
-{
-	if ((*spun)++ == spins) {
-		pthread_yield();
-		*spun = 0;
-	}
-}
-
-int pthread_mutex_lock(pthread_mutex_t* m)
-{
-	unsigned int spinner = 0;
-	while(pthread_mutex_trylock(m))
-		while(*(volatile size_t*)&m->lock) {
-			cpu_relax();
-			spin_to_sleep(PTHREAD_MUTEX_SPINS, &spinner);
-		}
-	/* normally we'd need a wmb() and a wrmb() after locking, but the
-	 * atomic_swap handles the CPU mb(), so just a cmb() is necessary. */
-	cmb();
+	*type = attr ? attr->type : PTHREAD_MUTEX_DEFAULT;
 	return 0;
 }
 
-int pthread_mutex_trylock(pthread_mutex_t* m)
+static bool __pthread_mutex_type_ok(int type)
 {
-  return atomic_swap(&m->lock, 1) == 0 ? 0 : EBUSY;
+	switch (type) {
+	case PTHREAD_MUTEX_NORMAL:
+	case PTHREAD_MUTEX_RECURSIVE:
+		return TRUE;
+	}
+	return FALSE;
 }
 
-int pthread_mutex_unlock(pthread_mutex_t* m)
+int pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type)
 {
-  /* keep reads and writes inside the protected region */
-  rwmb();
-  wmb();
-  atomic_set(&m->lock, 0);
-  return 0;
+	if (!__pthread_mutex_type_ok(type))
+		return EINVAL;
+	attr->type = type;
+	return 0;
 }
 
-int pthread_mutex_destroy(pthread_mutex_t* m)
+int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *attr)
 {
-  return 0;
+	if (!__pthread_mutex_type_ok(attr->type))
+		return EINVAL;
+	m->type = attr->type;
+	switch (m->type) {
+	case PTHREAD_MUTEX_NORMAL:
+		uth_mutex_init(&m->mtx);
+		break;
+	case PTHREAD_MUTEX_RECURSIVE:
+		uth_recurse_mutex_init(&m->r_mtx);
+		break;
+	}
+	return 0;
+}
+
+int pthread_mutex_lock(pthread_mutex_t *m)
+{
+	switch (m->type) {
+	case PTHREAD_MUTEX_NORMAL:
+		uth_mutex_lock(&m->mtx);
+		break;
+	case PTHREAD_MUTEX_RECURSIVE:
+		uth_recurse_mutex_lock(&m->r_mtx);
+		break;
+	default:
+		panic("Bad pth mutex type %d!", m->type);
+	}
+	return 0;
+}
+
+int pthread_mutex_trylock(pthread_mutex_t *m)
+{
+	bool got_it;
+
+	switch (m->type) {
+	case PTHREAD_MUTEX_NORMAL:
+		got_it = uth_mutex_trylock(&m->mtx);
+		break;
+	case PTHREAD_MUTEX_RECURSIVE:
+		got_it = uth_recurse_mutex_trylock(&m->r_mtx);
+		break;
+	default:
+		panic("Bad pth mutex type %d!", m->type);
+	}
+	return got_it ? 0 : EBUSY;
+}
+
+int pthread_mutex_unlock(pthread_mutex_t *m)
+{
+	switch (m->type) {
+	case PTHREAD_MUTEX_NORMAL:
+		uth_mutex_unlock(&m->mtx);
+		break;
+	case PTHREAD_MUTEX_RECURSIVE:
+		uth_recurse_mutex_unlock(&m->r_mtx);
+		break;
+	default:
+		panic("Bad pth mutex type %d!", m->type);
+	}
+	return 0;
+}
+
+int pthread_mutex_destroy(pthread_mutex_t *m)
+{
+	switch (m->type) {
+	case PTHREAD_MUTEX_NORMAL:
+		uth_mutex_destroy(&m->mtx);
+		break;
+	case PTHREAD_MUTEX_RECURSIVE:
+		uth_recurse_mutex_destroy(&m->r_mtx);
+		break;
+	default:
+		panic("Bad pth mutex type %d!", m->type);
+	}
+	return 0;
+}
+
+int pthread_mutex_timedlock(pthread_mutex_t *m, const struct timespec *abstime)
+{
+	bool got_it;
+
+	switch (m->type) {
+	case PTHREAD_MUTEX_NORMAL:
+		got_it = uth_mutex_timed_lock(&m->mtx, abstime);
+		break;
+	case PTHREAD_MUTEX_RECURSIVE:
+		got_it = uth_recurse_mutex_timed_lock(&m->r_mtx, abstime);
+		break;
+	default:
+		panic("Bad pth mutex type %d!", m->type);
+	}
+	return got_it ? 0 : ETIMEDOUT;
 }
 
 int pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a)
 {
-	SLIST_INIT(&c->waiters);
-	spin_pdr_init(&c->spdr_lock);
 	if (a) {
-		c->attr_pshared = a->pshared;
-		c->attr_clock = a->clock;
-	} else {
-		c->attr_pshared = PTHREAD_PROCESS_PRIVATE;
-		c->attr_clock = 0;
+		if (a->pshared != PTHREAD_PROCESS_PRIVATE)
+			fprintf(stderr, "pthreads only supports private condvars");
+		/* We also ignore clock_id */
 	}
+	uth_cond_var_init(c);
 	return 0;
 }
 
 int pthread_cond_destroy(pthread_cond_t *c)
 {
+	uth_cond_var_destroy(c);
 	return 0;
-}
-
-static void swap_slists(struct pthread_list *a, struct pthread_list *b)
-{
-	struct pthread_list temp;
-	temp = *a;
-	*a = *b;
-	*b = temp;
-}
-
-static void wake_slist(struct pthread_list *to_wake)
-{
-	unsigned int nr_woken = 0;	/* assuming less than 4 bil threads */
-	struct pthread_tcb *pthread_i, *pth_temp;
-	/* Amortize the lock grabbing over all restartees */
-	mcs_pdr_lock(&queue_lock);
-	/* Do the work of pth_thread_runnable().  We're in uth context here, but I
-	 * think it's okay.  When we need to (when locking) we drop into VC ctx, as
-	 * far as the kernel and other cores are concerned. */
-	SLIST_FOREACH_SAFE(pthread_i, to_wake, sl_next, pth_temp) {
-		pthread_i->state = PTH_RUNNABLE;
-		nr_woken++;
-		TAILQ_INSERT_TAIL(&ready_queue, pthread_i, tq_next);
-	}
-	threads_ready += nr_woken;
-	mcs_pdr_unlock(&queue_lock);
-	vcore_request_more(threads_ready);
 }
 
 int pthread_cond_broadcast(pthread_cond_t *c)
 {
-	struct pthread_list restartees = SLIST_HEAD_INITIALIZER(restartees);
-	spin_pdr_lock(&c->spdr_lock);
-	swap_slists(&restartees, &c->waiters);
-	spin_pdr_unlock(&c->spdr_lock);
-	wake_slist(&restartees);
+	uth_cond_var_broadcast(c);
 	return 0;
 }
 
@@ -868,50 +871,41 @@ int pthread_cond_broadcast(pthread_cond_t *c)
  * already. */
 int pthread_cond_signal(pthread_cond_t *c)
 {
-	struct pthread_tcb *pthread;
-	spin_pdr_lock(&c->spdr_lock);
-	pthread = SLIST_FIRST(&c->waiters);
-	if (!pthread) {
-		spin_pdr_unlock(&c->spdr_lock);
-		return 0;
-	}
-	SLIST_REMOVE_HEAD(&c->waiters, sl_next);
-	spin_pdr_unlock(&c->spdr_lock);
-	pth_thread_runnable((struct uthread*)pthread);
+	uth_cond_var_signal(c);
 	return 0;
-}
-
-/* Communicate btw cond_wait and its callback */
-struct cond_junk {
-	pthread_cond_t				*c;
-	pthread_mutex_t				*m;
-};
-
-/* Callback/bottom half of cond wait.  For those writing these pth callbacks,
- * the minimum is call generic, set state (communicate with runnable), then do
- * something that causes it to be runnable in the future (or right now). */
-static void __pth_wait_cb(struct uthread *uthread, void *junk)
-{
-	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	pthread_cond_t *c = ((struct cond_junk*)junk)->c;
-	pthread_mutex_t *m = ((struct cond_junk*)junk)->m;
-	/* this removes us from the active list; we can reuse next below */
-	__pthread_generic_yield(pthread);
-	pthread->state = PTH_BLK_MUTEX;
-	spin_pdr_lock(&c->spdr_lock);
-	SLIST_INSERT_HEAD(&c->waiters, pthread, sl_next);
-	spin_pdr_unlock(&c->spdr_lock);
-	pthread_mutex_unlock(m);
 }
 
 int pthread_cond_wait(pthread_cond_t *c, pthread_mutex_t *m)
 {
-	struct cond_junk local_junk;
-	local_junk.c = c;
-	local_junk.m = m;
-	uthread_yield(TRUE, __pth_wait_cb, &local_junk);
-	pthread_mutex_lock(m);
+	switch (m->type) {
+	case PTHREAD_MUTEX_NORMAL:
+		uth_cond_var_wait(c, &m->mtx);
+		break;
+	case PTHREAD_MUTEX_RECURSIVE:
+		uth_cond_var_wait_recurse(c, &m->r_mtx);
+		break;
+	default:
+		panic("Bad pth mutex type %d!", m->type);
+	}
 	return 0;
+}
+
+int pthread_cond_timedwait(pthread_cond_t *c, pthread_mutex_t *m,
+                           const struct timespec *abstime)
+{
+	bool got_it;
+
+	switch (m->type) {
+	case PTHREAD_MUTEX_NORMAL:
+		got_it = uth_cond_var_timed_wait(c, &m->mtx, abstime);
+		break;
+	case PTHREAD_MUTEX_RECURSIVE:
+		got_it = uth_cond_var_timed_wait_recurse(c, &m->r_mtx, abstime);
+		break;
+	default:
+		panic("Bad pth mutex type %d!", m->type);
+	}
+	return got_it ? 0 : ETIMEDOUT;
 }
 
 int pthread_condattr_init(pthread_condattr_t *a)
@@ -956,6 +950,46 @@ int pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock_id)
 	return 0;
 }
 
+int pthread_rwlock_init(pthread_rwlock_t *rwl, const pthread_rwlockattr_t *a)
+{
+	uth_rwlock_init(rwl);
+	return 0;
+}
+
+int pthread_rwlock_destroy(pthread_rwlock_t *rwl)
+{
+	uth_rwlock_destroy(rwl);
+	return 0;
+}
+
+int pthread_rwlock_rdlock(pthread_rwlock_t *rwl)
+{
+	uth_rwlock_rdlock(rwl);
+	return 0;
+}
+
+int pthread_rwlock_tryrdlock(pthread_rwlock_t *rwl)
+{
+	return uth_rwlock_try_rdlock(rwl) ? 0 : EBUSY;
+}
+
+int pthread_rwlock_wrlock(pthread_rwlock_t *rwl)
+{
+	uth_rwlock_wrlock(rwl);
+	return 0;
+}
+
+int pthread_rwlock_trywrlock(pthread_rwlock_t *rwl)
+{
+	return uth_rwlock_try_wrlock(rwl) ? 0 : EBUSY;
+}
+
+int pthread_rwlock_unlock(pthread_rwlock_t *rwl)
+{
+	uth_rwlock_unlock(rwl);
+	return 0;
+}
+
 pthread_t pthread_self(void)
 {
 	return (struct pthread_tcb*)uthread_self();
@@ -977,6 +1011,34 @@ int pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
 	return 0;
 }
 
+static void swap_slists(struct pthread_list *a, struct pthread_list *b)
+{
+	struct pthread_list temp;
+
+	temp = *a;
+	*a = *b;
+	*b = temp;
+}
+
+static void wake_slist(struct pthread_list *to_wake)
+{
+	unsigned int nr_woken = 0;	/* assuming less than 4 bil threads */
+	struct pthread_tcb *pthread_i, *pth_temp;
+	/* Amortize the lock grabbing over all restartees */
+	mcs_pdr_lock(&queue_lock);
+	/* Do the work of pth_thread_runnable().  We're in uth context here, but I
+	 * think it's okay.  When we need to (when locking) we drop into VC ctx, as
+	 * far as the kernel and other cores are concerned. */
+	SLIST_FOREACH_SAFE(pthread_i, to_wake, sl_next, pth_temp) {
+		pthread_i->state = PTH_RUNNABLE;
+		nr_woken++;
+		TAILQ_INSERT_TAIL(&ready_queue, pthread_i, tq_next);
+	}
+	threads_ready += nr_woken;
+	mcs_pdr_unlock(&queue_lock);
+	vcore_request_more(threads_ready);
+}
+
 int pthread_barrier_init(pthread_barrier_t *b,
                          const pthread_barrierattr_t *a, int count)
 {
@@ -993,6 +1055,24 @@ struct barrier_junk {
 	pthread_barrier_t				*b;
 	int								ls;
 };
+
+/* Helper for spinning sync, returns TRUE if it is okay to keep spinning.
+ *
+ * Alternatives include:
+ * 		old_count <= num_vcores() (barrier code, pass in old_count as *state,
+ * 		                           but this only works if every awake pthread
+ * 		                           will belong to the barrier).
+ * 		just spin for a bit       (use *state to track spins)
+ * 		FALSE                     (always is safe)
+ * 		etc...
+ * 'threads_ready' isn't too great since sometimes it'll be non-zero when it is
+ * about to become 0.  We really want "I have no threads waiting to run that
+ * aren't going to run on their on unless this core yields instead of spins". */
+/* TODO: consider making this a 2LS op */
+static inline bool safe_to_spin(unsigned int *state)
+{
+	return !threads_ready;
+}
 
 /* Callback/bottom half of barrier. */
 static void __pth_barrier_cb(struct uthread *uthread, void *junk)
@@ -1242,25 +1322,4 @@ int pthread_getschedparam(pthread_t thread, int *policy,
 	*policy = thread->sched_policy;
 	param->sched_priority = thread->sched_priority;
 	return 0;
-}
-
-
-/* Unsupported Stuff */
-
-int pthread_mutex_timedlock (pthread_mutex_t *__restrict __mutex,
-					const struct timespec *__restrict
-					__abstime)
-{
-	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
-	abort();
-	return -1;
-}
-
-int pthread_cond_timedwait (pthread_cond_t *__restrict __cond,
-				   pthread_mutex_t *__restrict __mutex,
-				   const struct timespec *__restrict __abstime)
-{
-	fprintf(stderr, "Unsupported %s!", __FUNCTION__);
-	abort();
-	return -1;
 }
