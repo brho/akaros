@@ -226,38 +226,38 @@ typedef struct uth_cond_var uth_cond_var_t;
 typedef struct uth_rwlock uth_rwlock_t;
 
 struct uth_semaphore {
-	struct spin_pdr_lock		lock;
-	unsigned int				count;
-	uth_sync_t					sync_obj;
 	parlib_once_t				once_ctl;
+	unsigned int				count;
+	struct spin_pdr_lock		lock;
+	uth_sync_t					sync_obj;
 };
-#define UTH_SEMAPHORE_INIT(n) { .once_ctl = PARLIB_ONCE_INIT, .count = (n) }
-#define UTH_MUTEX_INIT { .once_ctl = PARLIB_ONCE_INIT }
+#define UTH_SEMAPHORE_INIT(n) { PARLIB_ONCE_INIT, (n) }
+#define UTH_MUTEX_INIT { PARLIB_ONCE_INIT }
 
 struct uth_recurse_mutex {
+	parlib_once_t				once_ctl;
 	uth_mutex_t					mtx;
 	struct uthread				*lockholder;
 	unsigned int				count;
-	parlib_once_t				once_ctl;
 };
-#define UTH_RECURSE_MUTEX_INIT { .once_ctl = PARLIB_ONCE_INIT }
+#define UTH_RECURSE_MUTEX_INIT { PARLIB_ONCE_INIT }
 
 struct uth_cond_var {
+	parlib_once_t				once_ctl;
 	struct spin_pdr_lock		lock;
 	uth_sync_t					sync_obj;
-	parlib_once_t				once_ctl;
 };
-#define UTH_COND_VAR_INIT { .once_ctl = PARLIB_ONCE_INIT }
+#define UTH_COND_VAR_INIT { PARLIB_ONCE_INIT }
 
 struct uth_rwlock {
+	parlib_once_t				once_ctl;
 	struct spin_pdr_lock		lock;
 	unsigned int				nr_readers;
 	bool						has_writer;
 	uth_sync_t					readers;
 	uth_sync_t					writers;
-	parlib_once_t				once_ctl;
 };
-#define UTH_RWLOCK_INIT { .once_ctl = PARLIB_ONCE_INIT }
+#define UTH_RWLOCK_INIT { PARLIB_ONCE_INIT }
 
 void uth_semaphore_init(uth_semaphore_t *sem, unsigned int count);
 void uth_semaphore_destroy(uth_semaphore_t *sem);
