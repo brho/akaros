@@ -45,8 +45,6 @@ struct pthread_tcb {
 	void *stacktop;
 	void *(*start_routine)(void*);
 	void *arg;
-	int sched_policy;
-	int sched_priority;		/* careful, GNU #defines this to __sched_priority */
 	struct pthread_cleanup_stack cr_stack;
 };
 typedef struct pthread_tcb* pthread_t;

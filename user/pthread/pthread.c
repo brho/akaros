@@ -20,6 +20,17 @@
 #include <parlib/ros_debug.h>
 #include <parlib/stdio.h>
 
+/* TODO: eventually, we probably want to split this into the pthreads interface
+ * and a default 2LS.  That way, apps can use the pthreads interface and use any
+ * 2LS.  Here's a few blockers:
+ * - pthread_cleanup(): probably support at the uthread level
+ * - attrs and creation: probably use a default stack size and handle detached
+ * - getattrs_np: return -1, mostly due to the stackaddr.  Callers probably want
+ *   a real 2LS operation.
+ * Then we can split pthreads into parlib/default_sched.c (replaces thread0) and
+ * pthread.c.  After that, we can have a signal handling thread (even for
+ * 'thread0'), which allows us to close() or do other vcore-ctx-unsafe ops. */
+
 struct pthread_queue ready_queue = TAILQ_HEAD_INITIALIZER(ready_queue);
 struct pthread_queue active_queue = TAILQ_HEAD_INITIALIZER(active_queue);
 struct mcs_pdr_lock queue_lock;
@@ -516,8 +527,6 @@ void pth_sched_init(void)
 	t->state = PTH_RUNNING;
 	/* implies that sigmasks are longs, which they are. */
 	assert(t->id == 0);
-	t->sched_policy = SCHED_FIFO;
-	t->sched_priority = 0;
 	SLIST_INIT(&t->cr_stack);
 	/* Put the new pthread (thread0) on the active queue */
 	mcs_pdr_lock(&queue_lock);
@@ -611,9 +620,6 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
 	pthread->state = PTH_CREATED;
 	pthread->id = get_next_pid();
-	/* Might override these later, based on attr && EXPLICIT_SCHED */
-	pthread->sched_policy = parent->sched_policy;
-	pthread->sched_priority = parent->sched_priority;
 	SLIST_INIT(&pthread->cr_stack);
 	/* Respect the attributes */
 	if (attr) {
@@ -621,10 +627,6 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 			pthread->stacksize = attr->stacksize;
 		if (attr->detachstate == PTHREAD_CREATE_DETACHED)
 			uth_attr.detached = TRUE;
-		if (attr->sched_inherit == PTHREAD_EXPLICIT_SCHED) {
-			pthread->sched_policy = attr->sched_policy;
-			pthread->sched_priority = attr->sched_priority;
-		}
 	}
 	/* allocate a stack */
 	if (__pthread_allocate_stack(pthread))
@@ -1205,18 +1207,8 @@ int pthread_setspecific(pthread_key_t key, const void *value)
 }
 
 
-/* Scheduling Stuff */
-
-static bool policy_is_supported(int policy)
-{
-	/* As our scheduler changes, we can add more policies here */
-	switch (policy) {
-		case SCHED_FIFO:
-			return TRUE;
-		default:
-			return FALSE;
-	}
-}
+/* Scheduling Stuff.  Actually, these don't tell the 2LS anything - they just
+ * pretend to muck with attrs and params, as expected by pthreads apps. */
 
 int pthread_attr_setschedparam(pthread_attr_t *attr,
                                const struct sched_param *param)
@@ -1238,8 +1230,6 @@ int pthread_attr_getschedparam(pthread_attr_t *attr,
 
 int pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy)
 {
-	if (!policy_is_supported(policy))
-		return -EINVAL;
 	attr->sched_policy = policy;
 	return 0;
 }
@@ -1289,19 +1279,14 @@ int pthread_attr_getinheritsched(const pthread_attr_t *attr,
 int pthread_setschedparam(pthread_t thread, int policy,
                            const struct sched_param *param)
 {
-	if (!policy_is_supported(policy))
-		return -EINVAL;
-	thread->sched_policy = policy;
-	/* We actually could check if the priority falls in the range of the
-	 * specified policy here, since we have both policy and priority. */
-	thread->sched_priority = param->sched_priority;
 	return 0;
 }
 
 int pthread_getschedparam(pthread_t thread, int *policy,
                            struct sched_param *param)
 {
-	*policy = thread->sched_policy;
-	param->sched_priority = thread->sched_priority;
+	/* Faking {FIFO, 0}.  It's up to the 2LS to do whatever it wants. */
+	*policy = SCHED_FIFO;
+	param->sched_priority = 0;
 	return 0;
 }
