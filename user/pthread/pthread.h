@@ -38,11 +38,7 @@ SLIST_HEAD(pthread_cleanup_stack, pthread_cleanup_routine);
 struct pthread_tcb;
 struct pthread_tcb {
 	struct uthread uthread;
-	union {
-		/* Only on one list at a time */
-		TAILQ_ENTRY(pthread_tcb) tq_next;
-		SLIST_ENTRY(pthread_tcb) sl_next;
-	};
+	TAILQ_ENTRY(pthread_tcb) tq_next;
 	int state;
 	uint32_t id;
 	uint32_t stacksize;
@@ -54,7 +50,6 @@ struct pthread_tcb {
 	struct pthread_cleanup_stack cr_stack;
 };
 typedef struct pthread_tcb* pthread_t;
-SLIST_HEAD(pthread_list, pthread_tcb);
 TAILQ_HEAD(pthread_queue, pthread_tcb);
 
 /* Per-vcore data structures to manage syscalls.  The ev_q is where we tell the
@@ -108,7 +103,7 @@ typedef struct
 	volatile int				sense;	/* state of barrier, flips btw runs */
 	atomic_t					count;
 	struct spin_pdr_lock		lock;
-	struct pthread_list			waiters;
+	uth_sync_t					waiters;
 	int							nr_waiters;
 } pthread_barrier_t;
 

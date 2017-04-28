@@ -1026,34 +1026,6 @@ int pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
 	return 0;
 }
 
-static void swap_slists(struct pthread_list *a, struct pthread_list *b)
-{
-	struct pthread_list temp;
-
-	temp = *a;
-	*a = *b;
-	*b = temp;
-}
-
-static void wake_slist(struct pthread_list *to_wake)
-{
-	unsigned int nr_woken = 0;	/* assuming less than 4 bil threads */
-	struct pthread_tcb *pthread_i, *pth_temp;
-	/* Amortize the lock grabbing over all restartees */
-	mcs_pdr_lock(&queue_lock);
-	/* Do the work of pth_thread_runnable().  We're in uth context here, but I
-	 * think it's okay.  When we need to (when locking) we drop into VC ctx, as
-	 * far as the kernel and other cores are concerned. */
-	SLIST_FOREACH_SAFE(pthread_i, to_wake, sl_next, pth_temp) {
-		pthread_i->state = PTH_RUNNABLE;
-		nr_woken++;
-		TAILQ_INSERT_TAIL(&ready_queue, pthread_i, tq_next);
-	}
-	threads_ready += nr_woken;
-	mcs_pdr_unlock(&queue_lock);
-	vcore_request_more(threads_ready);
-}
-
 int pthread_barrier_init(pthread_barrier_t *b,
                          const pthread_barrierattr_t *a, int count)
 {
@@ -1061,7 +1033,7 @@ int pthread_barrier_init(pthread_barrier_t *b,
 	b->sense = 0;
 	atomic_set(&b->count, count);
 	spin_pdr_init(&b->lock);
-	SLIST_INIT(&b->waiters);
+	__uth_sync_init(&b->waiters);
 	b->nr_waiters = 0;
 	return 0;
 }
@@ -1086,30 +1058,26 @@ struct barrier_junk {
 /* TODO: consider making this a 2LS op */
 static inline bool safe_to_spin(unsigned int *state)
 {
-	return !threads_ready;
+	return (*state)++ % PTHREAD_BARRIER_SPINS;
 }
 
 /* Callback/bottom half of barrier. */
 static void __pth_barrier_cb(struct uthread *uthread, void *junk)
 {
-	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 	pthread_barrier_t *b = ((struct barrier_junk*)junk)->b;
 	int ls = ((struct barrier_junk*)junk)->ls;
-	/* Removes from active list, we can reuse.  must also restart */
-	__pthread_generic_yield(pthread);
+
+	uthread_has_blocked(uthread, UTH_EXT_BLK_MUTEX);
 	/* TODO: if we used a trylock, we could bail as soon as we see sense */
 	spin_pdr_lock(&b->lock);
 	/* If sense is ls (our free value), we lost the race and shouldn't sleep */
 	if (b->sense == ls) {
-		/* TODO: i'd like to fast-path the wakeup, skipping pth_runnable */
-		pthread->state = PTH_BLK_YIELDING;	/* not sure which state for this */
 		spin_pdr_unlock(&b->lock);
-		pth_thread_runnable(uthread);
+		uthread_runnable(uthread);
 		return;
 	}
 	/* otherwise, we sleep */
-	pthread->state = PTH_BLK_MUTEX;	/* TODO: consider ignoring this */
-	SLIST_INSERT_HEAD(&b->waiters, pthread, sl_next);
+	__uth_sync_enqueue(uthread, &b->waiters);
 	b->nr_waiters++;
 	spin_pdr_unlock(&b->lock);
 }
@@ -1132,15 +1100,13 @@ int pthread_barrier_wait(pthread_barrier_t *b)
 {
 	unsigned int spin_state = 0;
 	int ls = !b->sense;	/* when b->sense is the value we read, then we're free*/
-	struct pthread_list restartees = SLIST_HEAD_INITIALIZER(restartees);
-	struct pthread_tcb *pthread_i;
+	uth_sync_t restartees;
+	struct uthread *uth_i;
 	struct barrier_junk local_junk;
 	
 	long old_count = atomic_fetch_and_add(&b->count, -1);
 
 	if (old_count == 1) {
-		printd("Thread %d is last to hit the barrier, resetting...\n",
-		       pthread_self()->id);
 		/* TODO: we might want to grab the lock right away, so a few short
 		 * circuit faster? */
 		atomic_set(&b->count, b->total_threads);
@@ -1156,10 +1122,11 @@ int pthread_barrier_wait(pthread_barrier_t *b)
 			spin_pdr_unlock(&b->lock);
 			return PTHREAD_BARRIER_SERIAL_THREAD;
 		}
-		swap_slists(&restartees, &b->waiters);
+		__uth_sync_init(&restartees);
+		__uth_sync_swap(&restartees, &b->waiters);
 		b->nr_waiters = 0;
 		spin_pdr_unlock(&b->lock);
-		wake_slist(&restartees);
+		__uth_sync_wake_all(&restartees);
 		return PTHREAD_BARRIER_SERIAL_THREAD;
 	} else {
 		/* Spin if there are no other threads to run.  No sense sleeping */
@@ -1180,8 +1147,8 @@ int pthread_barrier_wait(pthread_barrier_t *b)
 
 int pthread_barrier_destroy(pthread_barrier_t *b)
 {
-	assert(SLIST_EMPTY(&b->waiters));
 	assert(!b->nr_waiters);
+	__uth_sync_destroy(&b->waiters);
 	/* Free any locks (if we end up using an MCS) */
 	return 0;
 }
