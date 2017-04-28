@@ -31,6 +31,8 @@ static void thread0_sync_destroy(uth_sync_t *s);
 static void thread0_sync_enqueue(struct uthread *uth, uth_sync_t *s);
 static struct uthread *thread0_sync_get_next(uth_sync_t *s);
 static bool thread0_sync_get_uth(uth_sync_t *s, struct uthread *uth);
+static void thread0_sync_swap(uth_sync_t *a, uth_sync_t *b);
+static bool thread0_sync_is_empty(uth_sync_t *s);
 
 /* externed into uthread.c */
 struct schedule_ops thread0_2ls_ops = {
@@ -48,6 +50,8 @@ struct schedule_ops thread0_2ls_ops = {
 	.sync_enqueue = thread0_sync_enqueue,
 	.sync_get_next = thread0_sync_get_next,
 	.sync_get_uth = thread0_sync_get_uth,
+	.sync_swap = thread0_sync_swap,
+	.sync_is_empty = thread0_sync_is_empty,
 };
 
 struct schedule_ops *sched_ops __attribute__((weak)) = &thread0_2ls_ops;
@@ -208,4 +212,13 @@ static bool thread0_sync_get_uth(uth_sync_t *s, struct uthread *uth)
 		return TRUE;
 	}
 	return FALSE;
+}
+
+static void thread0_sync_swap(uth_sync_t *a, uth_sync_t *b)
+{
+}
+
+static bool thread0_sync_is_empty(uth_sync_t *s)
+{
+	return !thread0_info.is_blocked;
 }

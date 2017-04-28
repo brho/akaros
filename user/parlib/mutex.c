@@ -784,6 +784,21 @@ static bool uth_default_sync_get_uth(uth_sync_t *sync, struct uthread *uth)
 	return FALSE;
 }
 
+static void uth_default_sync_swap(uth_sync_t *a, uth_sync_t *b)
+{
+	struct uth_tailq *tq_a = (struct uth_tailq*)a;
+	struct uth_tailq *tq_b = (struct uth_tailq*)b;
+
+	TAILQ_SWAP(tq_a, tq_b, uthread, sync_next);
+}
+
+static bool uth_default_sync_is_empty(uth_sync_t *sync)
+{
+	struct uth_tailq *tq = (struct uth_tailq*)sync;
+
+	return TAILQ_EMPTY(tq);
+}
+
 /************** External uthread sync interface **************/
 
 /* Called by 2LS-independent sync code when a sync object needs initialized. */
@@ -831,4 +846,22 @@ bool __uth_sync_get_uth(uth_sync_t *sync, struct uthread *uth)
 	if (sched_ops->sync_get_uth)
 		return sched_ops->sync_get_uth(sync, uth);
 	return uth_default_sync_get_uth(sync, uth);
+}
+
+/* Called by 2LS-independent sync code to swap members of sync objects. */
+void __uth_sync_swap(uth_sync_t *a, uth_sync_t *b)
+{
+	if (sched_ops->sync_swap) {
+		sched_ops->sync_swap(a, b);
+		return;
+	}
+	uth_default_sync_swap(a, b);
+}
+
+/* Called by 2LS-independent sync code */
+bool __uth_sync_is_empty(uth_sync_t *sync)
+{
+	if (sched_ops->sync_is_empty)
+		return sched_ops->sync_is_empty(sync);
+	return uth_default_sync_is_empty(sync);
 }
