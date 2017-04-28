@@ -23,12 +23,12 @@ static void thread0_thread_blockon_sysc(struct uthread *uthread, void *sysc);
 static void thread0_thread_refl_fault(struct uthread *uth,
                                       struct user_context *ctx);
 static void thread0_thread_runnable(struct uthread *uth);
-static void thread0_thread_has_blocked(struct uthread *uth, uth_sync_t *sync,
-                                       int flags);
+static void thread0_thread_has_blocked(struct uthread *uth, int flags);
 static void thread0_thread_exited(struct uthread *uth);
 static struct uthread *thread0_thread_create(void *(*func)(void *), void *arg);
 static void thread0_sync_init(uth_sync_t *s);
 static void thread0_sync_destroy(uth_sync_t *s);
+static void thread0_sync_enqueue(struct uthread *uth, uth_sync_t *s);
 static struct uthread *thread0_sync_get_next(uth_sync_t *s);
 static bool thread0_sync_get_uth(uth_sync_t *s, struct uthread *uth);
 
@@ -45,6 +45,7 @@ struct schedule_ops thread0_2ls_ops = {
 	.thread_create = thread0_thread_create,
 	.sync_init = thread0_sync_init,
 	.sync_destroy = thread0_sync_destroy,
+	.sync_enqueue = thread0_sync_enqueue,
 	.sync_get_next = thread0_sync_get_next,
 	.sync_get_uth = thread0_sync_get_uth,
 };
@@ -107,7 +108,7 @@ static void thread0_sched_entry(void)
 static void thread0_thread_blockon_sysc(struct uthread *uthread, void *arg)
 {
 	struct syscall *sysc = (struct syscall*)arg;
-	thread0_thread_has_blocked(uthread, NULL, 0);
+	thread0_thread_has_blocked(uthread, 0);
 	if (!register_evq(sysc, sysc_evq))
 		thread0_thread_runnable(uthread);
 }
@@ -157,8 +158,7 @@ static void thread0_thread_runnable(struct uthread *uth)
 	thread0_info.is_blocked = FALSE;
 }
 
-static void thread0_thread_has_blocked(struct uthread *uth, uth_sync_t *sync,
-                                       int flags)
+static void thread0_thread_has_blocked(struct uthread *uth, int flags)
 {
 	assert(!thread0_info.is_blocked);
 	thread0_info.is_blocked = TRUE;
@@ -182,6 +182,10 @@ static void thread0_sync_init(uth_sync_t *s)
 }
 
 static void thread0_sync_destroy(uth_sync_t *s)
+{
+}
+
+static void thread0_sync_enqueue(struct uthread *uth, uth_sync_t *s)
 {
 }
 

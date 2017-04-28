@@ -84,7 +84,7 @@ static void __futex_block(struct uthread *uthread, void *arg) {
   }
 
   // Notify the scheduler of the type of yield we did
-  uthread_has_blocked(uthread, NULL, UTH_EXT_BLK_MUTEX);
+  uthread_has_blocked(uthread, UTH_EXT_BLK_MUTEX);
 
   // Unlock the pdr_lock 
   mcs_pdr_unlock(&__futex.lock);

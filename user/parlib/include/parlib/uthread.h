@@ -92,10 +92,9 @@ typedef struct __uth_sync_opaque {
  * these (where applicable). */
 void __uth_sync_init(uth_sync_t *sync);
 void __uth_sync_destroy(uth_sync_t *sync);
+void __uth_sync_enqueue(struct uthread *uth, uth_sync_t *sync);
 struct uthread *__uth_sync_get_next(uth_sync_t *sync);
 bool __uth_sync_get_uth(uth_sync_t *sync, struct uthread *uth);
-/* 2LSs that use default sync objs will call this in their has_blocked op. */
-void __uth_default_sync_enqueue(struct uthread *uth, uth_sync_t *sync);
 
 /* 2L-Scheduler operations.  Examples in pthread.c. */
 struct schedule_ops {
@@ -105,13 +104,14 @@ struct schedule_ops {
 	void (*thread_runnable)(struct uthread *);
 	void (*thread_paused)(struct uthread *);
 	void (*thread_blockon_sysc)(struct uthread *, void *);
-	void (*thread_has_blocked)(struct uthread *, uth_sync_t *, int);
+	void (*thread_has_blocked)(struct uthread *, int);
 	void (*thread_refl_fault)(struct uthread *, struct user_context *);
 	void (*thread_exited)(struct uthread *);
 	struct uthread *(*thread_create)(void *(*)(void *), void *);
 	/**** Defining these functions is optional. ****/
 	void (*sync_init)(uth_sync_t *);
 	void (*sync_destroy)(uth_sync_t *);
+	void (*sync_enqueue)(struct uthread *, uth_sync_t *);
 	struct uthread *(*sync_get_next)(uth_sync_t *);
 	bool (*sync_get_uth)(uth_sync_t *, struct uthread *);
 	void (*preempt_pending)(void);
@@ -165,7 +165,7 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
 void uthread_sleep(unsigned int seconds);
 void uthread_usleep(unsigned int usecs);
 void __attribute__((noreturn)) uthread_sleep_forever(void);
-void uthread_has_blocked(struct uthread *uthread, uth_sync_t *sync, int flags);
+void uthread_has_blocked(struct uthread *uthread, int flags);
 void uthread_paused(struct uthread *uthread);
 
 /* Utility functions */

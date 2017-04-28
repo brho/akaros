@@ -358,15 +358,11 @@ void uthread_runnable(struct uthread *uthread)
  * own callback/yield_func instead of some 2LS code, that callback needs to
  * call this.
  *
- * If sync is set, then the 2LS must save the uthread in the sync object.  Using
- * the default implementatin is fine.  If sync is NULL, then there's nothing the
- * 2LS should do regarding sync; it'll be told when the thread is runnable.
- *
  * AKA: obviously_a_uthread_has_blocked_in_lincoln_park() */
-void uthread_has_blocked(struct uthread *uthread, uth_sync_t *sync, int flags)
+void uthread_has_blocked(struct uthread *uthread, int flags)
 {
 	assert(sched_ops->thread_has_blocked);
-	sched_ops->thread_has_blocked(uthread, sync, flags);
+	sched_ops->thread_has_blocked(uthread, flags);
 }
 
 /* Function indicating an external event has temporarily paused a uthread, but
@@ -509,7 +505,7 @@ void uthread_usleep(unsigned int usecs)
 
 static void __sleep_forever_cb(struct uthread *uth, void *arg)
 {
-	uthread_has_blocked(uth, NULL, UTH_EXT_BLK_MISC);
+	uthread_has_blocked(uth, UTH_EXT_BLK_MISC);
 }
 
 void __attribute__((noreturn)) uthread_sleep_forever(void)
@@ -1340,7 +1336,7 @@ static void __uth_join_cb(struct uthread *uth, void *arg)
 {
 	struct uth_join_kicker *jk = (struct uth_join_kicker*)arg;
 
-	uthread_has_blocked(uth, NULL, UTH_EXT_BLK_MISC);
+	uthread_has_blocked(uth, UTH_EXT_BLK_MISC);
 	/* After this, and after all threads join, we could be woken up. */
 	kref_put(&jk->kref);
 }
@@ -1380,7 +1376,7 @@ void uthread_join(struct uthread *uth, void **retval_loc)
 
 static void __uth_sched_yield_cb(struct uthread *uth, void *arg)
 {
-	uthread_has_blocked(uth, NULL, UTH_EXT_BLK_YIELD);
+	uthread_has_blocked(uth, UTH_EXT_BLK_YIELD);
 	uthread_runnable(uth);
 }
 
