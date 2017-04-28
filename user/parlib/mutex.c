@@ -544,21 +544,18 @@ void uth_cond_var_signal(uth_cond_var_t *cv)
 
 void uth_cond_var_broadcast(uth_cond_var_t *cv)
 {
-	struct uth_tailq restartees = TAILQ_HEAD_INITIALIZER(restartees);
-	struct uthread *i, *safe;
+	uth_sync_t restartees;
 
 	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
 	spin_pdr_lock(&cv->lock);
-	/* If this turns out to be slow or painful for 2LSs, we can implement a
-	 * get_all or something (default used to use TAILQ_SWAP). */
-	while ((i = __uth_sync_get_next(&cv->sync_obj))) {
-		/* Once the uth is out of the sync obj, we can reuse sync_next. */
-		TAILQ_INSERT_TAIL(&restartees, i, sync_next);
+	if (__uth_sync_is_empty(&cv->sync_obj)) {
+		spin_pdr_unlock(&cv->lock);
+		return;
 	}
+	__uth_sync_init(&restartees);
+	__uth_sync_swap(&restartees, &cv->sync_obj);
 	spin_pdr_unlock(&cv->lock);
-	/* Need the SAFE, since we can't touch the linkage once the uth could run */
-	TAILQ_FOREACH_SAFE(i, &restartees, sync_next, safe)
-		uthread_runnable(i);
+	__uth_sync_wake_all(&restartees);
 }
 
 
@@ -864,4 +861,19 @@ bool __uth_sync_is_empty(uth_sync_t *sync)
 	if (sched_ops->sync_is_empty)
 		return sched_ops->sync_is_empty(sync);
 	return uth_default_sync_is_empty(sync);
+}
+
+/* Called by 2LS-independent sync code to wake up all uths on sync.  You should
+ * probably not hold locks while you do this - swap the items to a local sync
+ * object first. */
+void __uth_sync_wake_all(uth_sync_t *wakees)
+{
+	struct uthread *uth_i;
+
+	if (sched_ops->thread_bulk_runnable) {
+		sched_ops->thread_bulk_runnable(wakees);
+	} else {
+		while ((uth_i = __uth_sync_get_next(wakees)))
+			uthread_runnable(uth_i);
+	}
 }

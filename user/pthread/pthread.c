@@ -47,6 +47,7 @@ static void pth_thread_refl_fault(struct uthread *uth,
                                   struct user_context *ctx);
 static void pth_thread_exited(struct uthread *uth);
 static struct uthread *pth_thread_create(void *(*func)(void *), void *arg);
+static void pth_thread_bulk_runnable(uth_sync_t *wakees);
 
 /* Event Handlers */
 static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
@@ -62,6 +63,7 @@ struct schedule_ops pthread_sched_ops = {
 	.thread_refl_fault = pth_thread_refl_fault,
 	.thread_exited = pth_thread_exited,
 	.thread_create = pth_thread_create,
+	.thread_bulk_runnable = pth_thread_bulk_runnable,
 };
 
 struct schedule_ops *sched_ops = &pthread_sched_ops;
@@ -373,6 +375,23 @@ static struct uthread *pth_thread_create(void *(*func)(void *), void *arg)
 
 	ret = pthread_create(&pth, NULL, func, arg);
 	return ret == 0 ? (struct uthread*)pth : NULL;
+}
+
+static void pth_thread_bulk_runnable(uth_sync_t *wakees)
+{
+	struct uthread *uth_i;
+	struct pthread_tcb *pth_i;
+
+	/* Amortize the lock grabbing over all restartees */
+	mcs_pdr_lock(&queue_lock);
+	while ((uth_i = __uth_sync_get_next(wakees))) {
+		pth_i = (struct pthread_tcb*)uth_i;
+		pth_i->state = PTH_RUNNABLE;
+		TAILQ_INSERT_TAIL(&ready_queue, pth_i, tq_next);
+		threads_ready++;
+	}
+	mcs_pdr_unlock(&queue_lock);
+	vcore_request_more(threads_ready);
 }
 
 /* Akaros pthread extensions / hacks */

@@ -97,6 +97,7 @@ struct uthread *__uth_sync_get_next(uth_sync_t *sync);
 bool __uth_sync_get_uth(uth_sync_t *sync, struct uthread *uth);
 void __uth_sync_swap(uth_sync_t *a, uth_sync_t *b);
 bool __uth_sync_is_empty(uth_sync_t *sync);
+void __uth_sync_wake_all(uth_sync_t *wakees);
 
 /* 2L-Scheduler operations.  Examples in pthread.c. */
 struct schedule_ops {
@@ -119,6 +120,7 @@ struct schedule_ops {
 	void (*sync_swap)(uth_sync_t *, uth_sync_t *);
 	bool (*sync_is_empty)(uth_sync_t *);
 	void (*preempt_pending)(void);
+	void (*thread_bulk_runnable)(uth_sync_t *);
 };
 extern struct schedule_ops *sched_ops;
 
