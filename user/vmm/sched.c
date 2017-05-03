@@ -33,6 +33,7 @@ static atomic_t nr_unblk_guests;
 /* Global evq for all syscalls.  Could make this per vcore or whatever. */
 static struct event_queue *sysc_evq;
 
+static void vmm_sched_init(void);
 static void vmm_sched_entry(void);
 static void vmm_thread_runnable(struct uthread *uth);
 static void vmm_thread_paused(struct uthread *uth);
@@ -45,6 +46,7 @@ static void vmm_thread_exited(struct uthread *uth);
 static struct uthread *vmm_thread_create(void *(*func)(void *), void *arg);
 
 struct schedule_ops vmm_sched_ops = {
+	.sched_init = vmm_sched_init,
 	.sched_entry = vmm_sched_entry,
 	.thread_runnable = vmm_thread_runnable,
 	.thread_paused = vmm_thread_paused,
@@ -54,6 +56,8 @@ struct schedule_ops vmm_sched_ops = {
 	.thread_exited = vmm_thread_exited,
 	.thread_create = vmm_thread_create,
 };
+
+struct schedule_ops *sched_ops = &vmm_sched_ops;
 
 /* Helpers */
 static void vmm_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
@@ -110,12 +114,9 @@ static struct event_queue *setup_sysc_evq(int vcoreid)
 	return evq;
 }
 
-static void __attribute__((constructor)) vmm_lib_init(void)
+static void vmm_sched_init(void)
 {
 	struct task_thread *thread0;
-
-	parlib_init_once_racy(return);
-	uthread_lib_init();
 
 	/* Note that thread0 doesn't belong to a VM.  We can set this during
 	 * vmm_init() if we need to. */
@@ -126,8 +127,7 @@ static void __attribute__((constructor)) vmm_lib_init(void)
 	thread0->stacktop = (void*)USTACKTOP;
 	/* for lack of a better vcore, might as well send to 0 */
 	sysc_evq = setup_sysc_evq(0);
-	uthread_2ls_init((struct uthread*)thread0, &vmm_sched_ops,
-                     vmm_handle_syscall, NULL);
+	uthread_2ls_init((struct uthread*)thread0, vmm_handle_syscall, NULL);
 }
 
 /* The scheduling policy is encapsulated in the next few functions (from here

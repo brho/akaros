@@ -14,11 +14,6 @@
 #include <parlib/arch/trap.h>
 #include <parlib/ros_debug.h>
 
-/* SCPs have a default 2LS that only manages thread 0.  Any other 2LS, such as
- * pthreads, should override sched_ops in its init code. */
-extern struct schedule_ops thread0_2ls_ops;
-struct schedule_ops *sched_ops = &thread0_2ls_ops;
-
 __thread struct uthread *current_uthread = 0;
 /* ev_q for all preempt messages (handled here to keep 2LSs from worrying
  * extensively about the details.  Will call out when necessary. */
@@ -74,17 +69,7 @@ static void uthread_track_thread0(struct uthread *uthread)
 {
 	set_tls_desc(get_vcpd_tls_desc(0));
 	begin_safe_access_tls_vars();
-	/* We might have a basic uthread already installed (from a prior call), so
-	 * free it before installing the new one. */
-	if (current_uthread)
-		free(current_uthread);
 	current_uthread = uthread;
-	/* We may not be an MCP at this point (and thus not really working with
-	 * vcores), but there is still the notion of something vcore_context-like
-	 * even when running as an SCP (i.e. its more of a scheduler_context than a
-	 * vcore_context).  Threfore we need to set __vcore_context to TRUE here to
-	 * represent this (otherwise we will hit some asserts of not being in
-	 * vcore_context when running in scheduler_context for the SCP. */
 	__vcore_context = TRUE;
 	end_safe_access_tls_vars();
 	set_tls_desc(uthread->tls_desc);
@@ -138,58 +123,6 @@ void uthread_mcp_init()
 	vcore_change_to_m();
 }
 
-/* The real 2LS calls this, passing in a uthread representing thread0, its 2LS
- * ops, and its syscall handling routine.  (NULL is fine).
- *
- * When we're called, thread0 has it's handler installed.  We need to remove it
- * and install our own (if they want one).  All of the actual changes  must be
- * done atomically with respect to syscalls (i.e., no syscalls in between).  If
- * the user did something like have an outstanding async syscall while we're in
- * here, then they'll crash hard. */
-void uthread_2ls_init(struct uthread *uthread, struct schedule_ops *ops,
-                      void (*handle_sysc)(struct event_msg *, unsigned int,
-                                          void *),
-                      void *data)
-{
-	struct ev_handler *old_h, *new_h = NULL;
-
-	if (handle_sysc) {
-		new_h = malloc(sizeof(struct ev_handler));
-		assert(new_h);
-		new_h->func = handle_sysc;
-		new_h->data = data;
-		new_h->next = NULL;
-	}
-	uthread_init_thread0(uthread);
-	/* We need to *atomically* change the current_uthread and the schedule_ops
-	 * to the new 2LSs thread0 and ops, such that there is no moment when only
-	 * one is changed and that we call a sched_ops.  There are sources of
-	 * implicit calls to sched_ops.  Two big ones are sched_entry, called
-	 * whenever we receive a notif (so we need to disable notifs), and
-	 * syscall_blockon, called whenver we had a syscall that blocked (so we say
-	 * tell the *uthread* that *it* is in vc ctx (TLS var).
-	 *
-	 * When disabling notifs, don't use a helper.  We're changing
-	 * current_uthread under the hood, which messes with the helpers.  When
-	 * setting __vcore_context, we're in thread0's TLS.  Even when we change
-	 * current_uthread, we're still in the *same* TLS. */
-	__disable_notifs(0);
-	__vcore_context = TRUE;
-	cmb();
-	/* Under the hood, this function will free any previously allocated uthread
-	 * structs representing thread0 (e.g. the one set up by uthread_lib_init()
-	 * previously). */
-	uthread_track_thread0(uthread);
-	sched_ops = ops;
-	/* Racy, but we shouldn't be concurrent */
-	old_h = ev_handlers[EV_SYSCALL];
-	ev_handlers[EV_SYSCALL] = new_h;
-	cmb();
-	__vcore_context = FALSE;
-	enable_notifs(0);	/* will trigger a self_notif if we missed a notif */
-	free(old_h);
-}
-
 /* Helper: tells the kernel our SCP is capable of going into vcore context on
  * vcore 0.  Pairs with k/s/process.c scp_is_vcctx_ready(). */
 static void scp_vcctx_ready(void)
@@ -226,49 +159,93 @@ static char *__ros_errstr_loc(void)
 		return current_uthread->err_str;
 }
 
-/* Sets up basic uthreading for when we are in _S mode and before we set up the
- * 2LS.  Some apps may not have a 2LS and thus never do the full
- * vcore/2LS/uthread init. */
-void __attribute__((constructor)) uthread_lib_init(void)
+static void __attribute__((constructor)) uthread_lib_init(void)
 {
-	/* Use the thread0 sched's uth */
-	extern struct uthread *thread0_uth;
-	extern void thread0_lib_init(void);
-	extern void thread0_handle_syscall(struct event_msg *ev_msg,
-	                                   unsigned int ev_type, void *data);
-	int ret;
-
 	/* Surprise!  Parlib's ctors also run in shared objects.  We can't have
 	 * multiple versions of parlib (with multiple data structures). */
 	if (__in_fake_parlib())
 		return;
-	/* Only run once, but make sure that vcore_lib_init() has run already. */
-	parlib_init_once_racy(return);
+	/* Need to make sure the vcore_lib_init() ctor runs first */
 	vcore_lib_init();
+	/* Instead of relying on ctors for the specific 2LS, we make sure they are
+	 * called next.  They will call uthread_2ls_init().
+	 *
+	 * The potential issue here is that C++ ctors might make use of the GCC/C++
+	 * threading callbacks, which require the full 2LS.  There's no linkage
+	 * dependency  between C++ and the specific 2LS, so there's no way to be
+	 * sure the 2LS actually turned on before we started calling into it.
+	 *
+	 * Hopefully, the uthread ctor was called in time, since the GCC threading
+	 * functions link against parlib.  Note that, unlike parlib-compat.c, there
+	 * are no stub functions available to GCC that could get called by
+	 * accident and prevent the linkage. */
+	sched_ops->sched_init();
+}
 
-	ret = posix_memalign((void**)&thread0_uth, __alignof__(struct uthread),
-	                     sizeof(struct uthread));
-	assert(!ret);
-	memset(thread0_uth, 0, sizeof(struct uthread));	/* aggressively 0 for bugs*/
-	/* Need to do thread0_lib_init() first, since it sets up evq's referred to
-	 * in thread0_handle_syscall(). */
-	thread0_lib_init();
-	uthread_2ls_init(thread0_uth, &thread0_2ls_ops, thread0_handle_syscall,
-	                 NULL);
+/* The 2LS calls this, passing in a uthread representing thread0 and its
+ * syscall handling routine.  (NULL is fine).  The 2LS sched_ops is known
+ * statically (via symbol overrides).
+ *
+ * This is where parlib (and whatever 2LS is linked in) takes over control of
+ * scheduling, including handling notifications, having sched_entry() called,
+ * blocking syscalls, and handling syscall completion events.  Before this
+ * call, these things are handled by slim functions in glibc (e.g. early
+ * function pointers for ros_blockon) and by the kernel.  The kerne's role was
+ * to treat the process specially until we call scp_vcctx_ready(): things like
+ * no __notify, no sched_entry, etc.
+ *
+ * We need to be careful to not start using the 2LS before it is fully ready.
+ * For instance, once we change ros_blockon, we could have a blocking syscall
+ * (e.g. for something glibc does) and the rest of the 2LS code expects things
+ * to be in place.
+ *
+ * In older versions of this code, we would hop from the thread0 sched to the
+ * real 2LSs sched, which meant we had to be very careful.  But now that we
+ * only do this once, we can do all the prep work and then take over from
+ * glibc's early SCP setup.  Specifically, notifs are disabled (due to the
+ * early SCP ctx) and syscalls won't use the __ros_uth_syscall_blockon, so we
+ * shouldn't get a syscall event.
+ *
+ * Still, if you have things like an outstanding async syscall, then you'll
+ * have issues.  Most likely it would complete and you'd never hear about it.
+ *
+ * Note that some 2LS ops can be called even before we've initialized the 2LS!
+ * Some ops, like the sync_obj ops, are called when initializing an uncontested
+ * mutex, which could be called from glibc (e.g. malloc).  Hopefully that's
+ * fine - we'll see!  I imagine a contested mutex would be a disaster (during
+ * the unblock), which shouldn't happen as we are single threaded. */
+void uthread_2ls_init(struct uthread *uthread,
+                      void (*handle_sysc)(struct event_msg *, unsigned int,
+                                          void *),
+                      void *data)
+{
+	struct ev_handler *new_h = NULL;
+
+	if (handle_sysc) {
+		new_h = malloc(sizeof(struct ev_handler));
+		assert(new_h);
+		new_h->func = handle_sysc;
+		new_h->data = data;
+		new_h->next = NULL;
+		assert(!ev_handlers[EV_SYSCALL]);
+		ev_handlers[EV_SYSCALL] = new_h;
+	}
+	uthread_init_thread0(uthread);
+	uthread_track_thread0(uthread);
 	/* Switch our errno/errstr functions to be uthread-aware.  See glibc's
 	 * errno.c for more info. */
 	ros_errno_loc = __ros_errno_loc;
 	ros_errstr_loc = __ros_errstr_loc;
 	register_ev_handler(EV_EVENT, handle_ev_ev, 0);
-	/* Now that we're ready (I hope) to operate as an MCP, we tell the kernel.
-	 * We must set vcctx and blockon atomically with respect to syscalls,
-	 * meaning no syscalls in between. */
 	cmb();
+	/* Now that we're ready (I hope) to operate as a full process, we tell the
+	 * kernel.  We must set vcctx and blockon atomically with respect to
+	 * syscalls, meaning no syscalls in between. */
 	scp_vcctx_ready();
 	/* Change our blockon from glibc's internal one to the regular one, which
 	 * uses vcore context and works for SCPs (with or without 2LS) and MCPs.
-	 * Once we tell the kernel we are ready to utilize vcore context, we need
-	 * our blocking syscalls to utilize it as well. */
+	 * Now that we told the kernel we are ready to utilize vcore context, we
+	 * need our blocking syscalls to utilize it as well. */
 	ros_syscall_blockon = __ros_uth_syscall_blockon;
 	cmb();
 	init_posix_signals();
@@ -1213,6 +1190,8 @@ bool uth_2ls_is_multithreaded(void)
 {
 	/* thread 0 is single threaded.  For the foreseeable future, every other 2LS
 	 * will be multithreaded. */
+	extern struct schedule_ops thread0_2ls_ops;
+
 	return sched_ops != &thread0_2ls_ops;
 }
 

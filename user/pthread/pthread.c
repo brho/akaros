@@ -38,6 +38,7 @@ static inline void spin_to_sleep(unsigned int spins, unsigned int *spun);
 static inline void pthread_exit_no_cleanup(void *ret);
 
 /* Pthread 2LS operations */
+static void pth_sched_init(void);
 static void pth_sched_entry(void);
 static void pth_thread_runnable(struct uthread *uthread);
 static void pth_thread_paused(struct uthread *uthread);
@@ -54,6 +55,7 @@ static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
                                void *data);
 
 struct schedule_ops pthread_sched_ops = {
+	.sched_init = pth_sched_init,
 	.sched_entry = pth_sched_entry,
 	.thread_runnable = pth_thread_runnable,
 	.thread_paused = pth_thread_paused,
@@ -63,6 +65,8 @@ struct schedule_ops pthread_sched_ops = {
 	.thread_exited = pth_thread_exited,
 	.thread_create = pth_thread_create,
 };
+
+struct schedule_ops *sched_ops = &pthread_sched_ops;
 
 /* Static helpers */
 static void __pthread_free_stack(struct pthread_tcb *pt);
@@ -480,15 +484,11 @@ int pthread_getattr_np(pthread_t __th, pthread_attr_t *__attr)
 
 /* Do whatever init you want.  At some point call uthread_2ls_init() and pass it
  * a uthread representing thread0 (int main()) */
-void __attribute__((constructor)) pthread_lib_init(void)
+void pth_sched_init(void)
 {
 	uintptr_t mmap_block;
 	struct pthread_tcb *t;
 	int ret;
-
-	/* Only run once, but make sure that uthread_lib_init() has run already. */
-	parlib_init_once_racy(return);
-	uthread_lib_init();
 
 	mcs_pdr_init(&queue_lock);
 	/* Create a pthread_tcb for the main thread */
@@ -560,9 +560,7 @@ void __attribute__((constructor)) pthread_lib_init(void)
 		sysc_mgmt[i].ev_q->ev_mbox = sysc_mbox;
 	}
 #endif
-	/* Sched ops is set by 2ls_init */
-	uthread_2ls_init((struct uthread*)t, &pthread_sched_ops, pth_handle_syscall,
-	                 NULL);
+	uthread_2ls_init((struct uthread*)t, pth_handle_syscall, NULL);
 	atomic_init(&threads_total, 1);			/* one for thread0 */
 }
 

@@ -100,7 +100,7 @@ void __uth_default_sync_enqueue(struct uthread *uth, uth_sync_t *sync);
 /* 2L-Scheduler operations.  Examples in pthread.c. */
 struct schedule_ops {
 	/**** These functions must be defined ****/
-	/* Functions supporting thread ops */
+	void (*sched_init)(void);
 	void (*sched_entry)(void);
 	void (*thread_runnable)(struct uthread *);
 	void (*thread_paused)(struct uthread *);
@@ -118,13 +118,11 @@ struct schedule_ops {
 };
 extern struct schedule_ops *sched_ops;
 
-/* Low-level _S code calls this for basic uthreading without a 2LS */
-void uthread_lib_init(void);
 /* Call this from your 2LS init routines.  Pass it a uthread representing
  * thread0, your 2LS ops, and your syscall handler + data.
  *
  * When it returns, you're in _M mode (thread0 on vcore0) */
-void uthread_2ls_init(struct uthread *uthread, struct schedule_ops *ops,
+void uthread_2ls_init(struct uthread *uthread,
                       void (*handle_sysc)(struct event_msg *, unsigned int,
                                           void *),
                       void *data);

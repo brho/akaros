@@ -17,6 +17,7 @@
 #include <parlib/ros_debug.h>
 #include <stdlib.h>
 
+static void thread0_sched_init(void);
 static void thread0_sched_entry(void);
 static void thread0_thread_blockon_sysc(struct uthread *uthread, void *sysc);
 static void thread0_thread_refl_fault(struct uthread *uth,
@@ -33,6 +34,7 @@ static bool thread0_sync_get_uth(uth_sync_t *s, struct uthread *uth);
 
 /* externed into uthread.c */
 struct schedule_ops thread0_2ls_ops = {
+	.sched_init = thread0_sched_init,
 	.sched_entry = thread0_sched_entry,
 	.thread_blockon_sysc = thread0_thread_blockon_sysc,
 	.thread_refl_fault = thread0_thread_refl_fault,
@@ -46,6 +48,8 @@ struct schedule_ops thread0_2ls_ops = {
 	.sync_get_next = thread0_sync_get_next,
 	.sync_get_uth = thread0_sync_get_uth,
 };
+
+struct schedule_ops *sched_ops __attribute__((weak)) = &thread0_2ls_ops;
 
 /* externed into uthread.c */
 struct uthread *thread0_uth;
@@ -65,12 +69,19 @@ void thread0_handle_syscall(struct event_msg *ev_msg,
 	thread0_info.is_blocked = FALSE;
 }
 
-void thread0_lib_init(void)
+void thread0_sched_init(void)
 {
+	int ret;
+
+	ret = posix_memalign((void**)&thread0_uth, __alignof__(struct uthread),
+	                     sizeof(struct uthread));
+	assert(!ret);
+	memset(thread0_uth, 0, sizeof(struct uthread));	/* aggressively 0 for bugs*/
 	memset(&thread0_info, 0, sizeof(thread0_info));
 	/* we don't care about the message, so don't bother with a UCQ */
 	sysc_evq = get_eventq(EV_MBOX_BITMAP);
 	sysc_evq->ev_flags = EVENT_INDIR | EVENT_WAKEUP;
+	uthread_2ls_init(thread0_uth, thread0_handle_syscall, NULL);
 }
 
 /* Thread0 scheduler ops (for processes that haven't linked in a full 2LS) */

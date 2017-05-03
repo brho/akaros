@@ -66,7 +66,6 @@ bool test_sigperf(void)
 		__sync_fetch_and_add(__count, 1);
 	}
 
-	pthread_lib_init();
 	parlib_never_yield = FALSE;
 	parlib_never_vc_request = FALSE;
 
