@@ -179,14 +179,38 @@ static bool should_strace(struct proc *p, struct syscall *sysc)
 	return test_bit(sysc_num, p->strace->trace_set);
 }
 
+/* Helper, copies len bytes from u_data to the trace->data, if there's room. */
+static void copy_tracedata_from_user(struct systrace_record *trace,
+                                     long u_data, size_t len)
+{
+	size_t copy_amt;
+
+	copy_amt = MIN(sizeof(trace->data) - trace->datalen, len);
+	copy_from_user(trace->data + trace->datalen, (void*)u_data, copy_amt);
+	trace->datalen += copy_amt;
+}
+
+/* Helper, snprintfs to the trace, if there's room. */
+static void snprintf_to_trace(struct systrace_record *trace, const char *fmt,
+                              ...)
+{
+	va_list ap;
+	int rc;
+
+	va_start(ap, fmt);
+	rc = vsnprintf((char*)trace->data + trace->datalen,
+	               sizeof(trace->data) - trace->datalen, fmt, ap);
+	va_end(ap);
+	if (!snprintf_error(rc, sizeof(trace->data) - trace->datalen))
+		trace->datalen += rc;
+}
+
 /* Starts a trace for p running sysc, attaching it to kthread.  Pairs with
  * systrace_finish_trace(). */
 static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 {
 	struct proc *p = current;
 	struct systrace_record *trace;
-	uintreg_t data_arg;
-	size_t data_len = 0;
 
 	kthread->strace = 0;
 	if (!should_strace(p, sysc))
@@ -229,12 +253,32 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 
 	switch (sysc->num) {
 	case SYS_write:
-		data_arg = sysc->arg1;
-		data_len = sysc->arg2;
+		copy_tracedata_from_user(trace, sysc->arg1, sysc->arg2);
 		break;
 	case SYS_openat:
-		data_arg = sysc->arg1;
-		data_len = sysc->arg2;
+	case SYS_chdir:
+	case SYS_rmdir:
+	case SYS_nmount:
+		copy_tracedata_from_user(trace, sysc->arg1, sysc->arg2);
+		break;
+	case SYS_stat:
+	case SYS_lstat:
+	case SYS_access:
+	case SYS_unlink:
+	case SYS_mkdir:
+	case SYS_wstat:
+		copy_tracedata_from_user(trace, sysc->arg0, sysc->arg1);
+		break;
+	case SYS_link:
+	case SYS_symlink:
+	case SYS_rename:
+	case SYS_nbind:
+		copy_tracedata_from_user(trace, sysc->arg0, sysc->arg1);
+		snprintf_to_trace(trace, " -> ");
+		copy_tracedata_from_user(trace, sysc->arg2, sysc->arg3);
+		break;
+	case SYS_nunmount:
+		copy_tracedata_from_user(trace, sysc->arg2, sysc->arg3);
 		break;
 	case SYS_exec:
 		trace->datalen = execargs_stringer(current,
@@ -255,11 +299,6 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 						   sysc->arg3);
 		break;
 	}
-	if (data_len) {
-		trace->datalen = MIN(sizeof(trace->data), data_len);
-		copy_from_user(trace->data, (void*)data_arg, trace->datalen);
-	}
-
 	systrace_output(trace, p->strace, TRUE);
 
 	kthread->strace = trace;
@@ -271,8 +310,6 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 {
 	struct proc *p = current;
 	struct systrace_record *trace;
-	long data_arg;
-	size_t data_len = 0;
 
 	if (!kthread->strace)
 		return;
@@ -284,13 +321,18 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 	if (!trace->datalen) {
 		switch (trace->syscallno) {
 		case SYS_read:
-			data_arg = trace->arg1;
-			data_len = retval < 0 ? 0 : retval;
+			if (retval <= 0)
+				break;
+			copy_tracedata_from_user(trace, trace->arg1, retval);
+			break;
+		case SYS_readlink:
+			if (retval <= 0)
+				break;
+			copy_tracedata_from_user(trace, trace->arg0, trace->arg1);
+			snprintf_to_trace(trace, " -> ");
+			copy_tracedata_from_user(trace, trace->arg2, trace->arg3);
 			break;
 		}
-		trace->datalen = MIN(sizeof(trace->data), data_len);
-		if (trace->datalen)
-			copy_from_user(trace->data, (void*)data_arg, trace->datalen);
 	}
 
 	systrace_output(trace, p->strace, FALSE);
