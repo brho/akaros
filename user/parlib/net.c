@@ -42,7 +42,7 @@ int cheap_dial(char *addr, char *local, char *dir, int *cfdp)
 	*hostname++ = '\0';
 	prefix = (addr[0] == '/' ? "" : "/net/");
 	ret = snprintf(buf, buf_len, "%s%s/clone", prefix, addr);
-	if (snprintf_overflow(ret, buf, buf_len)) {
+	if (snprintf_error(ret, buf_len)) {
 		perror("Clone chan path too long");
 		ret = -1;
 		goto out_readdr;
@@ -65,7 +65,7 @@ int cheap_dial(char *addr, char *local, char *dir, int *cfdp)
 	buf[ret] = 0;
 	conv_id = atoi(buf);
 	ret = snprintf(buf, buf_len, "connect %s", hostname);
-	if (snprintf_overflow(ret, buf, buf_len)) {
+	if (snprintf_error(ret, buf_len)) {
 		perror("Connect string too long");
 		ret = -1;
 		goto out_ctlfd;
@@ -76,7 +76,7 @@ int cheap_dial(char *addr, char *local, char *dir, int *cfdp)
 		goto out_ctlfd;
 	}
 	ret = snprintf(buf, buf_len, "%s%s/%d/data", prefix, addr, conv_id);
-	if (snprintf_overflow(ret, buf, buf_len)) {
+	if (snprintf_error(ret, buf_len)) {
 		perror("Data chan path too long");
 		ret = -1;
 		goto out_ctlfd;

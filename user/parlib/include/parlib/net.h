@@ -6,11 +6,13 @@
 
 #pragma once
 
+#include <stdbool.h>
+
 __BEGIN_DECLS
 
-static inline int snprintf_overflow(int ret, char *buf, size_t buf_len)
+static inline bool snprintf_error(int ret, size_t buf_len)
 {
-	return (ret == buf_len) && (buf[buf_len - 1] != 0);
+	return ret < 0 || ret >= buf_len;
 }
 
 int cheap_dial(char *addr, char *local, char *dir, int *cfdp);

@@ -34,8 +34,14 @@ int	( cprintf)(const char *fmt, ...);
 int	vcprintf(const char *fmt, va_list);
 
 // lib/sprintf.c
-int	snprintf(char *str, int size, const char *fmt, ...);
-int	vsnprintf(char *str, int size, const char *fmt, va_list);
+
+static inline bool snprintf_error(int ret, size_t buf_len)
+{
+	return ret < 0 || ret >= buf_len;
+}
+
+int snprintf(char *str, size_t size, const char *fmt, ...);
+int vsnprintf(char *str, size_t size, const char *fmt, va_list);
 
 // lib/fprintf.c
 int	printf(const char *fmt, ...);

@@ -18,7 +18,7 @@ static bool test_read_var(const char *name, const char *val)
 	int fd, ret;
 
 	ret = snprintf(buf, sizeof(buf), "#vars/%s", name);
-	if (snprintf_overflow(ret, buf, sizeof(buf)))
+	if (snprintf_error(ret, sizeof(buf)))
 		UT_ASSERT_FMT("snprintf failed!", FALSE);
 	fd = open(buf, O_READ);
 	UT_ASSERT_FMT("Could not open vars file %s, check CONFIG_DEVVARS_TEST",
@@ -78,7 +78,7 @@ static bool test_new_var(const char *name, const char *val)
 	int fd, ret;
 
 	ret = snprintf(path, sizeof(path), "#vars/%s", name);
-	if (snprintf_overflow(ret, path, sizeof(path)))
+	if (snprintf_error(ret, sizeof(path)))
 		UT_ASSERT_FMT("snprintf failed!", FALSE);
 	fd = open(path, O_READ | O_CREATE, S_IRUSR);
 	UT_ASSERT_FMT("Could not open vars file %s, check CONFIG_DEVVARS_TEST",

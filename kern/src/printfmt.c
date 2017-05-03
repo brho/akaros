@@ -273,13 +273,22 @@ static void sprintputch(int ch, sprintbuf_t **b)
 	(*b)->cnt++;
 }
 
-int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
+int vsnprintf(char *buf, size_t n, const char *fmt, va_list ap)
 {
 	sprintbuf_t b;// = {buf, buf+n-1, 0};
 	sprintbuf_t *bp = &b;
 
 	/* this isn't quite the snprintf 'spec', but errors aren't helpful */
-	if (buf == NULL || n < 1)
+	assert(buf);
+	/* We might get large, 'negative' values for code that repeatedly calls
+	 * snprintf(), e.g.:
+	 * 		len += snprintf(buf + len, bufsz - len, "foo");
+	 * 		len += snprintf(buf + len, bufsz - len, "bar");
+	 * If len > bufsz, that will appear as a large value.  This is not quite the
+	 * glibc semantics (we aren't returning the size we would have printed), but
+	 * it short circuits the rest of the function and avoids potential errors in
+	 * the putch() functions. */
+	if (!n || (n > INT32_MAX))
 		return 0;
 
 	b.buf = NULL; // zra : help out the Deputy optimizer a bit
@@ -295,7 +304,7 @@ int vsnprintf(char *buf, int n, const char *fmt, va_list ap)
 	return b.cnt;
 }
 
-int snprintf(char *buf, int n, const char *fmt, ...)
+int snprintf(char *buf, size_t n, const char *fmt, ...)
 {
 	va_list ap;
 	int rc;
@@ -307,22 +316,29 @@ int snprintf(char *buf, int n, const char *fmt, ...)
 	return rc;
 }
 
-/* convenience function: do a print, return the pointer to the end. */
+/* Convenience function: do a print, return the pointer to the null at the end.
+ *
+ * Unlike snprintf(), when we overflow, this doesn't return the 'end' where we
+ * would have written to.  Instead, we'll return 'end - 1', which is the last
+ * byte, and enforce the null-termination.  */
 char *seprintf(char *buf, char *end, const char *fmt, ...)
 {
 	va_list ap;
 	int rc;
-	int n = end - buf;
-
-	if (n <= 0)
-		return buf;
+	size_t n = end - buf;
 
 	va_start(ap, fmt);
 	rc = vsnprintf(buf, n, fmt, ap);
 	va_end(ap);
 
-	if (rc >= 0)
-		return buf + rc;
-	else
+	/* Some error - leave them where they were. */
+	if (rc < 0)
 		return buf;
+	/* Overflow - put them at the end */
+	if (rc >= n) {
+		*(end - 1) = '\0';
+		return end - 1;
+	}
+	assert(buf[rc] == '\0');
+	return buf + rc;
 }

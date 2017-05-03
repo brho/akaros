@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 	printf("Trying to access http://%s:%s/%s\n", host, port, page);
 	/* manually making our own addr (no mkaddr, which was racy anyway) */
 	ret = snprintf(addr, sizeof(addr), "tcp!%s!%s", host, port);
-	if (snprintf_overflow(ret, addr, sizeof(addr))) {
+	if (snprintf_error(ret, sizeof(addr))) {
 		perror("Addr string too long");
 		exit(-1);
 	}

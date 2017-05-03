@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 	ret = snprintf(buf, buf_len, "#srv/%s", srvname);
-	if (snprintf_overflow(ret, buf, buf_len)) {
+	if (snprintf_error(ret, buf_len)) {
 		printf("srvname too long\n");
 		exit(-1);
 	}
