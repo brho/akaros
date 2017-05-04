@@ -27,6 +27,7 @@ sysdep_headers += sys/syscall.h sys/tls.h
 # lack the subdir, we need to include the C files and headers manually.
 ifeq ($(subdir),inet)
 sysdep_routines += inet_addr inet_ntop inet_pton
+sysdep_headers += netpacket/packet.h
 endif
 sysdep_headers += netdb.h resolv.h
 sysdep_headers += arpa/nameser.h arpa/nameser_compat.h sys/bitypes.h
