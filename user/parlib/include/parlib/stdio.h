@@ -40,6 +40,9 @@ do {                                                                           \
 	else                                                                       \
 		panic("__vc_ctx tried to fprintf to non-std stream!");                 \
 	ret = snprintf(buf, sizeof(buf), __VA_ARGS__);                             \
+	/* Just print whatever we can */                                           \
+	ret = MAX(ret, 0);                                                         \
+	ret = MIN(ret, sizeof(buf));                                               \
 	write(fd, buf, ret);                                                       \
 } while (0)
 

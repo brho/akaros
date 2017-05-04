@@ -10,14 +10,20 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+/* This is called from glibc in delicate places, like signal handlers.  We might
+ * as well just write any valid output to FD 2. */
 int akaros_printf(const char *format, ...)
 {
+	char buf[128];
 	va_list ap;
 	int ret;
 
 	va_start(ap, format);
-	ret = vprintf(format, ap);
+	ret = vsnprintf(buf, sizeof(buf), format, ap);
 	va_end(ap);
+	if (ret < 0)
+		return ret;
+	write(2, buf, MIN(sizeof(buf), ret));
 	return ret;
 }
 
