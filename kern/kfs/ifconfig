@@ -39,6 +39,13 @@ fi
 /bin/bind -a '#ip' /net
 /bin/bind -a '#ether'.$NIC /net
 
+# Need to set /dev/sysname before ipconfig.  ipconfig will grab this and put it
+# in ndb.
+if [ "x$HOST" != "x" ]
+then
+	echo "$HOST" > /dev/sysname
+fi
+
 if [ -x /bin/ipconfig ]
 then
 	if [ -n "$me" ]
