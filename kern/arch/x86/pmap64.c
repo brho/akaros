@@ -468,16 +468,16 @@ void vm_init(void)
 	if (KERNBASE + PML3_REACH < (uintptr_t)KADDR(max_paddr)) {
 		map_segment(boot_pgdir, KERNBASE + PML3_REACH,
 		            max_paddr - PML3_REACH, 0x0 + PML3_REACH,
-		            PTE_W | PTE_G, max_jumbo_shift);
+		            PTE_KERN_RW | PTE_G, max_jumbo_shift);
 	}
 	/* For the LAPIC and IOAPIC, we use PAT (but not *the* PAT flag) to make
 	 * these type UC */
 	map_segment(boot_pgdir, IOAPIC_BASE, APIC_SIZE, IOAPIC_PBASE,
 	            PTE_NOCACHE | PTE_KERN_RW | PTE_G, max_jumbo_shift);
 	/* VPT mapping: recursive PTE inserted at the VPT spot */
-	boot_kpt[PML4(VPT)] = PADDR(boot_kpt) | PTE_W | PTE_P;
+	boot_kpt[PML4(VPT)] = PADDR(boot_kpt) | PTE_KERN_RW;
 	/* same for UVPT, accessible by userspace (RO). */
-	boot_kpt[PML4(UVPT)] = PADDR(boot_kpt) | PTE_U | PTE_P;
+	boot_kpt[PML4(UVPT)] = PADDR(boot_kpt) | PTE_USER_RO;
 	/* set up core0s now (mostly for debugging) */
 	setup_default_mtrrs(0);
 	/* Our current gdt_pd (gdt64desc) is pointing to a physical address for the
