@@ -21,7 +21,6 @@
 #include <process.h>
 #include <trap.h>
 #include <syscall.h>
-#include <kclock.h>
 #include <manager.h>
 #include <testing.h>
 #include <kmalloc.h>

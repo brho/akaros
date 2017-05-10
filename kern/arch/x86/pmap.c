@@ -16,16 +16,10 @@
 #include <string.h>
 #include <assert.h>
 #include <pmap.h>
-#include <kclock.h>
 #include <env.h>
 #include <stdio.h>
 #include <kmalloc.h>
 #include <page_alloc.h>
-
-static int nvram_read(int r)
-{
-	return mc146818_read(r) | (mc146818_read(r + 1) << 8);
-}
 
 bool enable_pse(void)
 {

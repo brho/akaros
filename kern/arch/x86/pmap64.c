@@ -25,7 +25,6 @@
 #include <string.h>
 #include <assert.h>
 #include <pmap.h>
-#include <kclock.h>
 #include <env.h>
 #include <stdio.h>
 #include <kmalloc.h>

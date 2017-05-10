@@ -16,7 +16,6 @@
 #include <string.h>
 #include <assert.h>
 #include <pmap.h>
-#include <kclock.h>
 #include <process.h>
 #include <stdio.h>
 #include <mm.h>
