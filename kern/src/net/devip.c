@@ -1046,12 +1046,18 @@ void Fsstdconnect(struct conv *c, char *argv[], int argc)
 			break;
 	}
 
+	/* TODO: why is an IPnoaddr (in v6 format, equivalent to v6Unspecified),
+	 * a v4 format? */
 	if ((memcmp(c->raddr, v4prefix, IPv4off) == 0 &&
 		 memcmp(c->laddr, v4prefix, IPv4off) == 0)
 		|| ipcmp(c->raddr, IPnoaddr) == 0)
 		c->ipversion = V4;
 	else
 		c->ipversion = V6;
+	/* Linux has taught people to use zeros for local interfaces.  TODO: We
+	 * might need this for v6 in the future. */
+	if (!ipcmp(c->raddr, IPv4_zeroes))
+		ipmove(c->raddr, IPv4_loopback);
 }
 
 /*

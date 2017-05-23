@@ -599,6 +599,8 @@ static inline long ipcmp(unsigned char *x, unsigned char *y)
 }
 
 
+extern uint8_t IPv4_loopback[IPaddrlen];
+extern uint8_t IPv4_zeroes[IPaddrlen];
 extern uint8_t IPv4bcast[IPaddrlen];
 extern uint8_t IPv4bcastobs[IPaddrlen];
 extern uint8_t IPv4allsys[IPaddrlen];

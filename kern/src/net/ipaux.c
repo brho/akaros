@@ -44,6 +44,20 @@
 /*
  *  well known IP addresses
  */
+uint8_t IPv4_loopback[IPaddrlen] = {
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0xff, 0xff,
+	0x7f, 0x00, 0x00, 0x01
+};
+
+uint8_t IPv4_zeroes[IPaddrlen] = {
+	0, 0, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0xff, 0xff,
+	0x00, 0x00, 0x00, 0x00
+};
+
 uint8_t IPv4bcast[IPaddrlen] = {
 	0, 0, 0, 0,
 	0, 0, 0, 0,
