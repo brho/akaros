@@ -2067,7 +2067,8 @@ void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
 
 	/* s, the conv matching the n-tuple, was set above */
 	if (s == NULL) {
-		netlog(f, Logtcp, "iphtlook failed\n");
+		netlog(f, Logtcp, "iphtlook failed: src %I:%u, dst %I:%u\n",
+		       source, seg.source, dest, seg.dest);
 reset:
 		sndrst(tcp, source, dest, length, &seg, version, "no conversation");
 		freeblist(bp);

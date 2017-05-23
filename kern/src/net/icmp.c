@@ -207,6 +207,10 @@ static void icmpkick(void *x, struct block *bp)
 	memset(p->cksum, 0, sizeof(p->cksum));
 	hnputs(p->cksum, ptclcsum(bp, ICMP_IPSIZE, blocklen(bp) - ICMP_IPSIZE));
 	ipriv->stats[OutMsgs]++;
+	netlog(c->p->f, Logicmp,
+	       "icmp output: Type %s (%d,%d), To %V, TTL %d, ID %d, SEQ %d\n",
+	       icmpnames[MIN(p->type, Maxtype)],
+	       p->type, p->code, p->dst, p->ttl, nhgets(p->icmpid), nhgets(p->seq));
 	ipoput4(c->p->f, bp, 0, c->ttl, c->tos, NULL);
 }
 
@@ -255,6 +259,9 @@ static void icmpunreachable(struct Fs *f, struct block *bp, int code, int seq)
 	if (i != 0 && (i & Runi) == 0)
 		return;
 
+	/* TODO: Clean this up or remove it.  This is for things like UDP port
+	 * unreachable.  But we might not be UDP, due to how the code is built.
+	 * Check the UDP netlog if you see this. */
 	netlog(f, Logicmp, "sending icmpnoconv -> %V\n", p->src);
 	nbp = block_alloc(ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8, MEM_WAIT);
 	nbp->wp += ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8;
@@ -307,7 +314,7 @@ static void goticmpkt(struct Proto *icmp, struct block *bp)
 	freeblist(bp);
 }
 
-static struct block *mkechoreply(struct block *bp)
+static struct block *mkechoreply(struct Proto *icmp, struct block *bp)
 {
 	Icmp *q;
 	uint8_t ip[4];
@@ -323,7 +330,9 @@ static struct block *mkechoreply(struct block *bp)
 	q->type = EchoReply;
 	memset(q->cksum, 0, sizeof(q->cksum));
 	hnputs(q->cksum, ptclcsum(bp, ICMP_IPSIZE, blocklen(bp) - ICMP_IPSIZE));
-
+	netlog(icmp->f, Logicmp,
+	       "icmp echo reply: To %V, TTL %d, ID %d, SEQ %d\n",
+	       q->dst, q->ttl, nhgets(q->icmpid), nhgets(q->seq));
 	return bp;
 }
 
@@ -355,9 +364,15 @@ static void icmpiput(struct Proto *icmp, struct Ipifc *unused, struct block *bp)
 	ipriv->stats[InMsgs]++;
 
 	p = (Icmp *) bp->rp;
-	netlog(icmp->f, Logicmp, "icmpiput %d %d\n", p->type, p->code);
+	/* The ID and SEQ are only for Echo Request and Reply, but close enough. */
+	netlog(icmp->f, Logicmp,
+	       "icmp input: Type %s (%d,%d), From %V, TTL %d, ID %d, SEQ %d\n",
+	       icmpnames[MIN(p->type, Maxtype)],
+	       p->type, p->code, p->src, p->ttl, nhgets(p->icmpid), nhgets(p->seq));
 	n = blocklen(bp);
 	if (n < ICMP_IPSIZE + ICMP_HDRSIZE) {
+		/* pullupblock should fail if dlen < size.  b->len >= b->dlen. */
+		panic("We did a pullupblock and thought we had enough!");
 		ipriv->stats[InErrors]++;
 		ipriv->stats[HlenErrs]++;
 		netlog(icmp->f, Logicmp, "icmp hlen %d\n", n);
@@ -383,7 +398,7 @@ static void icmpiput(struct Proto *icmp, struct Ipifc *unused, struct block *bp)
 		case EchoRequest:
 			if (iplen < n)
 				bp = trimblock(bp, 0, iplen);
-			r = mkechoreply(bp);
+			r = mkechoreply(icmp, bp);
 			ipriv->out[EchoReply]++;
 			ipoput4(icmp->f, r, 0, MAXTTL, DFLTTOS, NULL);
 			break;
