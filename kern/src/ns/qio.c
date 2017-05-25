@@ -1617,12 +1617,22 @@ static struct block *build_block(void *from, size_t len, int mem_flags)
 static ssize_t __qwrite(struct queue *q, void *vp, size_t len, int mem_flags,
                         int qio_flags)
 {
-	size_t n, sofar;
+	ERRSTACK(1);
+	size_t n;
+	volatile size_t sofar = 0;	/* volatile for the waserror */
 	struct block *b;
 	uint8_t *p = vp;
 	void *ext_buf;
 
-	sofar = 0;
+	/* Only some callers can throw.  Others might be in a context where waserror
+	 * isn't safe. */
+	if ((qio_flags & QIO_CAN_ERR_SLEEP) && waserror()) {
+		/* Any error (EAGAIN for nonblock, syscall aborted, even EPIPE) after
+		 * some data has been sent should be treated as a partial write. */
+		if (sofar)
+			goto out_ok;
+		nexterror();
+	}
 	do {
 		n = len - sofar;
 		/* This is 64K, the max amount per single block.  Still a good value? */
@@ -1635,6 +1645,9 @@ static ssize_t __qwrite(struct queue *q, void *vp, size_t len, int mem_flags,
 			break;
 		sofar += n;
 	} while ((sofar < len) && (q->state & Qmsg) == 0);
+out_ok:
+	if (qio_flags & QIO_CAN_ERR_SLEEP)
+		poperror();
 	return sofar;
 }
 
