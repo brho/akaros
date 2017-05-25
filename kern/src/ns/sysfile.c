@@ -1019,7 +1019,7 @@ static long rwrite(int fd, void *va, long n, int64_t * offp)
 	cclose(c);
 
 	poperror();
-	return n;
+	return m;
 }
 
 long syswrite(int fd, void *va, long n)
