@@ -288,6 +288,7 @@ void iphtadd(struct Ipht *, struct conv *);
 void iphtrem(struct Ipht *, struct conv *);
 struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 					  uint16_t dp);
+void dump_ipht(struct Ipht *ht);
 
 /*
  *  one per multiplexed Protocol

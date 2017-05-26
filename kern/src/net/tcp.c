@@ -3209,6 +3209,17 @@ void tcpsettimer(Tcpctl * tcb)
 	tcb->timer.start = x;
 }
 
+static struct tcppriv *debug_priv;
+
+/* Kfunc this */
+int dump_tcp_ht(void)
+{
+	if (!debug_priv)
+		return -1;
+	dump_ipht(&debug_priv->ht);
+	return 0;
+}
+
 void tcpinit(struct Fs *fs)
 {
 	struct Proto *tcp;
@@ -3216,6 +3227,7 @@ void tcpinit(struct Fs *fs)
 
 	tcp = kzmalloc(sizeof(struct Proto), 0);
 	tpriv = tcp->priv = kzmalloc(sizeof(struct tcppriv), 0);
+	debug_priv = tpriv;
 	qlock_init(&tpriv->tl);
 	qlock_init(&tpriv->apl);
 	tcp->name = "tcp";

@@ -730,3 +730,19 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 	spin_unlock(&ht->lock);
 	return NULL;
 }
+
+void dump_ipht(struct Ipht *ht)
+{
+	struct Iphash *h;
+	struct conv *c;
+
+	spin_lock(&ht->lock);
+	for (int i = 0; i < Nipht; i++) {
+		for (h = ht->tab[i]; h != NULL; h = h->next) {
+			c = h->c;
+			printk("Conv proto %s, idx %d: local %I:%d, remote %I:%d\n",
+			       c->p->name, c->x, c->laddr, c->lport, c->raddr, c->rport);
+		}
+	}
+	spin_unlock(&ht->lock);
+}
