@@ -526,18 +526,20 @@ static char *pipechaninfo(struct chan *chan, char *ret, size_t ret_l)
 		snprintf(ret, ret_l, "Qctl, ID %d", p->path);
 		break;
 	case Qdata0:
-		snprintf(ret, ret_l, "Qdata%d, ID %d, %s, rq len %d, wq len %d",
+		snprintf(ret, ret_l,
+		         "Qdata%d, ID %d, %s, rq len %d, wq len %d, total read %llu",
 		         0, p->path,
 		         SLIST_EMPTY(&p->data_taps) ? "untapped" : "tapped",
 		         qlen(p->q[0]),
-		         qlen(p->q[1]));
+		         qlen(p->q[1]), q_bytes_read(p->q[0]));
 		break;
 	case Qdata1:
-		snprintf(ret, ret_l, "Qdata%d, ID %d, %s, rq len %d, wq len %d",
+		snprintf(ret, ret_l,
+		         "Qdata%d, ID %d, %s, rq len %d, wq len %d, total read %llu",
 		         1, p->path,
 		         SLIST_EMPTY(&p->data_taps) ? "untapped" : "tapped",
 		         qlen(p->q[1]),
-		         qlen(p->q[0]));
+		         qlen(p->q[0]), q_bytes_read(p->q[1]));
 		break;
 	default:
 		ret = "Unknown type";

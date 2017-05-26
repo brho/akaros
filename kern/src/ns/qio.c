@@ -76,6 +76,7 @@ struct queue {
 	int inilim;				/* initial limit */
 	int state;
 	int eof;					/* number of eofs read by user */
+	size_t bytes_read;
 
 	void (*kick) (void *);		/* restart output */
 	void (*bypass) (void *, struct block *);	/* bypass queue altogether */
@@ -610,6 +611,7 @@ static struct block *pop_first_block(struct queue *q)
 	struct block *b = q->bfirst;
 
 	q->dlen -= BLEN(b);
+	q->bytes_read += BLEN(b);
 	q->bfirst = b->next;
 	b->next = 0;
 	return b;
@@ -629,6 +631,7 @@ static void block_and_q_lost_extra(struct block *b, struct queue *q, size_t amt)
 {
 	b->extra_len -= amt;
 	q->dlen -= amt;
+	q->bytes_read += amt;
 }
 
 /* Helper: moves ebd from a block (in from_q) to another block.  The *ebd is
@@ -671,6 +674,7 @@ static size_t copy_from_first_block(struct queue *q, struct block *to,
 		/* We only change dlen, (data len), not q->len, since the q still has
 		 * the same block memory allocation (no kfrees happened) */
 		q->dlen -= copy_amt;
+		q->bytes_read += copy_amt;
 	}
 	/* Try to extract the remainder from the extra data */
 	len -= copy_amt;
@@ -1413,6 +1417,8 @@ void qputback(struct queue *q, struct block *b)
 		q->blast = b;
 	q->bfirst = b;
 	q->dlen += BLEN(b);
+	/* qputback seems to undo a read, so we can undo the accounting too. */
+	q->bytes_read -= BLEN(b);
 }
 
 /*
@@ -1778,6 +1784,11 @@ void qreopen(struct queue *q)
 int qlen(struct queue *q)
 {
 	return q->dlen;
+}
+
+size_t q_bytes_read(struct queue *q)
+{
+	return q->bytes_read;
 }
 
 /*

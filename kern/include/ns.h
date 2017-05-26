@@ -837,6 +837,7 @@ void qhangup(struct queue *, char *unused_char_p_t);
 int qisclosed(struct queue *);
 ssize_t qiwrite(struct queue *, void *, int);
 int qlen(struct queue *);
+size_t q_bytes_read(struct queue *q);
 void qdropoverflow(struct queue *, bool);
 void q_toggle_qmsg(struct queue *q, bool onoff);
 void q_toggle_qcoalesce(struct queue *q, bool onoff);
