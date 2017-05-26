@@ -826,31 +826,46 @@ out_ok:
  * containing up to len bytes.  It may contain less than len even if q has more
  * data.
  *
- * Returns 0 if the q is closed or would require blocking and !CAN_BLOCK.
+ * Returns 0 if the q is closed, if it would require blocking and !CAN_BLOCK, or
+ * if it required a spare and the memory allocation failed.
  *
  * Technically, there's a weird corner case with !Qcoalesce and Qmsg where you
  * could get a zero length block back. */
 static struct block *__qbread(struct queue *q, size_t len, int qio_flags,
                               int mem_flags)
 {
+	ERRSTACK(1);
 	struct block *ret = 0;
-	struct block *spare = 0;
+	struct block *volatile spare = 0;	/* volatile for the waserror */
 
+	/* __try_qbread can throw, based on qio flags. */
+	if ((qio_flags & QIO_CAN_ERR_SLEEP) && waserror()) {
+		if (spare)
+			freeb(spare);
+		nexterror();
+	}
 	while (1) {
 		switch (__try_qbread(q, len, qio_flags, &ret, spare)) {
 		case QBR_OK:
 		case QBR_FAIL:
 			if (spare && (ret != spare))
 				freeb(spare);
-			return ret;
+			goto out_ret;
 		case QBR_SPARE:
 			assert(!spare);
 			/* Due to some nastiness, we need a fresh block so we can read out
 			 * anything from the queue.  'len' seems like a reasonable amount.
 			 * Maybe we can get away with less. */
 			spare = block_alloc(len, mem_flags);
-			if (!spare)
-				return 0;
+			if (!spare) {
+				/* Careful here: a memory failure (possible with MEM_ATOMIC)
+				 * could look like 'no data in the queue' (QBR_FAIL).  The only
+				 * one who does is this qget(), who happens to know that we
+				 * won't need a spare, due to the len argument.  Spares are only
+				 * needed when we need to split a block. */
+				ret = 0;
+				goto out_ret;
+			}
 			break;
 		case QBR_AGAIN:
 			/* if the first block is 0 and we are Qcoalesce, then we'll need to
@@ -859,6 +874,11 @@ static struct block *__qbread(struct queue *q, size_t len, int qio_flags,
 			break;
 		}
 	}
+	assert(0);
+out_ret:
+	if (qio_flags & QIO_CAN_ERR_SLEEP)
+		poperror();
+	return ret;
 }
 
 /*
