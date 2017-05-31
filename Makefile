@@ -601,7 +601,7 @@ ndblib: iplib
 # Higher-level libraries.  Built before tests/, but after apps-install.
 # TODO: would like to move perfmon here, since it's not meant to be low-level.
 # But the apps-install has perf, which depends on user/perfmon.
-user-extra-dirs = vmm
+user-extra-dirs = vmm electric-fence
 $(user-extra-dirs): $(user-base-dirs)
 
 user-dirs = $(user-base-dirs) $(user-extra-dirs)

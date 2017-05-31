@@ -57,5 +57,9 @@ main(int argc, char * * argv)
 			*element = malloc(size);
 		}
 	}
+
+	// now let's be dumb.
+	char *c = malloc(4096);
+	c[4097] = 0;
 	return 0;
 }

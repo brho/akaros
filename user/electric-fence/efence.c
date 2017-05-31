@@ -193,18 +193,18 @@ static size_t		bytesPerPage = 0;
  /*
  * mutex to enable multithreaded operation
  */
-static pthread_mutex_t mutex ;
+static uth_mutex_t mutex;
 static pid_t mutexpid=0;
 static int locknr=0;
 
 
 static void lock() {
-    if (pthread_mutex_trylock(&mutex)) {
+    if (uth_mutex_trylock(&mutex)) {
        if (mutexpid==getpid()) {
            locknr++;
            return;
        } else {
-           pthread_mutex_lock(&mutex);
+           uth_mutex_lock(&mutex);
        }
     } 
     mutexpid=getpid();
@@ -215,7 +215,7 @@ static void unlock() {
     locknr--;
     if (!locknr) {
        mutexpid=0;
-       pthread_mutex_unlock(&mutex);
+       uth_mutex_unlock(&mutex);
     }
 }
 
@@ -814,7 +814,7 @@ malloc(size_t size)
         void  *allocation;   
  
         if ( allocationList == 0 ) {
-                pthread_mutex_init(&mutex, NULL); 
+		uth_mutex_init(&mutex);
                 initialize();   /* This sets EF_ALIGNMENT */
         }       
         lock();
