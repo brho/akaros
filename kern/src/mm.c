@@ -789,6 +789,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	bool shootdown_needed = FALSE;
 	int pte_prot = (prot & PROT_WRITE) ? PTE_USER_RW :
 	               (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : PTE_NONE;
+
 	/* TODO: this is aggressively splitting, when we might not need to if the
 	 * prots are the same as the previous.  Plus, there are three excessive
 	 * scans.  Finally, we might be able to merge when we are done. */
@@ -796,7 +797,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	vmr = find_first_vmr(p, addr);
 	while (vmr && vmr->vm_base < addr + len) {
 		if (vmr->vm_prot == prot)
-			continue;
+			goto next_vmr;
 		if (vmr->vm_file && !check_file_perms(vmr, vmr->vm_file, prot)) {
 			set_errno(EACCES);
 			return -1;
@@ -817,6 +818,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 		}
 		spin_unlock(&p->pte_lock);
 		vmr = merge_me(vmr);
+next_vmr:
 		next_vmr = TAILQ_NEXT(vmr, vm_link);
 		vmr = next_vmr;
 	}
