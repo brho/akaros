@@ -998,6 +998,8 @@ struct block *htontcp6(Tcp * tcph, struct block *data, Tcp6hdr * ph,
 			return NULL;
 		data->wp += hdrlen + TCP6_PKT;
 	}
+	/* relative to the block start (bp->rp) */
+	data->transport_header_end = hdrlen + TCP4_PKT;
 
 	/* copy in pseudo ip header plus port numbers */
 	h = (Tcp6hdr *) (data->rp);
@@ -1082,6 +1084,8 @@ struct block *htontcp4(Tcp * tcph, struct block *data, Tcp4hdr * ph,
 			return NULL;
 		data->wp += hdrlen + TCP4_PKT;
 	}
+	/* relative to the block start (bp->rp) */
+	data->transport_header_end = hdrlen + TCP4_PKT;
 
 	/* copy in pseudo ip header plus port numbers */
 	h = (Tcp4hdr *) (data->rp);

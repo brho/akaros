@@ -135,11 +135,13 @@ struct block *padblock(struct block *bp, int size)
 	uint16_t checksum_start = bp->checksum_start;
 	uint16_t checksum_offset = bp->checksum_offset;
 	uint16_t mss = bp->mss;
+	uint16_t transport_header_end = bp->transport_header_end;
 
 	QDEBUG checkb(bp, "padblock 1");
 	if (size >= 0) {
 		if (bp->rp - bp->base >= size) {
 			bp->checksum_start += size;
+			bp->transport_header_end += size;
 			bp->rp -= size;
 			return bp;
 		}
@@ -179,6 +181,7 @@ struct block *padblock(struct block *bp, int size)
 		nbp->checksum_start = checksum_start;
 		nbp->checksum_offset = checksum_offset;
 		nbp->mss = mss;
+		nbp->transport_header_end = transport_header_end;
 	}
 	QDEBUG checkb(nbp, "padblock 1");
 	return nbp;
@@ -269,6 +272,7 @@ struct block *copyblock(struct block *bp, int mem_flags)
 		newb->checksum_start = bp->checksum_start;
 		newb->checksum_offset = bp->checksum_offset;
 		newb->mss = bp->mss;
+		newb->transport_header_end = bp->transport_header_end;
 	}
 	copyblockcnt++;
 	QDEBUG checkb(newb, "copyblock 1");
