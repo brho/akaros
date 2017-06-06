@@ -19,6 +19,7 @@ load_elf(char *filename)
 	size_t phnum = 0;
 	Elf64_Phdr *hdrs;
 	int fd;
+	uintptr_t ret;
 
 	elf_version(EV_CURRENT);
 	fd = open(filename, O_RDONLY);
@@ -100,8 +101,9 @@ load_elf(char *filename)
 	}
 
 	close(fd);
+	ret = ehdr->e_entry;
 	elf_end(elf);
-	return ehdr->e_entry;
+	return ret;
 fail:
 	close(fd);
 	elf_end(elf);
