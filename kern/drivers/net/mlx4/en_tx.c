@@ -718,6 +718,16 @@ static void mlx4_bf_copy(void __iomem *dst, const void *src,
 }
 #endif
 
+/* Akaros's TCP stack always puts the TCP header in the block main body, so we
+ * don't need to worry about those being in extra_data.  Linux stores the
+ * location of the transport header and whatnot in the SKB - we do the same. */
+static size_t get_lso_hdr_size(struct block *block)
+{
+	if (!(block->flag & Btso))
+		return 0;
+	return block->transport_header_end;
+}
+
 netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
@@ -735,12 +745,16 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 	bool bounce = false;
 	dma_addr_t dma = 0;
 	uint32_t byte_count = 0;
+	size_t lso_header_size;
+	/* linear there is something to send in the block header */
+	bool is_linear;
 
 	if (!priv->port_up)
 		goto tx_drop;
 
 	ring = priv->tx_ring[0]; /* TODO multi-queue support */
 
+	lso_header_size = get_lso_hdr_size(block);
 	for (i_frag = 0; i_frag < block->nr_extra_bufs; i_frag++) {
 		const struct extra_bdata *ebd;
 
@@ -748,8 +762,17 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 		if (ebd->base && ebd->len > 0)
 			nr_frags++;
 	}
+	/* Transport stack should always put the packet headers in the main body. */
+	assert(!(lso_header_size > BHLEN(block)));
+	/* == means there is nothing in the block main body other than the headers.
+	 * in which case, we won't need an extra data_seg. */
+	is_linear = lso_header_size < BHLEN(block);
 
-	real_size = CTRL_SIZE + (nr_frags + 1) * DS_SIZE;
+	real_size = CTRL_SIZE + nr_frags * DS_SIZE;
+	if (is_linear)
+		real_size += DS_SIZE;
+	if (lso_header_size)
+		real_size += ALIGN(lso_header_size + 4, DS_SIZE);
 	if (unlikely(!real_size))
 		goto tx_drop;
 
@@ -778,12 +801,15 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 	tx_info->nr_txbb = nr_txbb;
 
 	data = &tx_desc->data;
+	if (lso_header_size)
+		data = ((void *)&tx_desc->lso + ALIGN(lso_header_size + 4,
+						      DS_SIZE));
 
 	/* valid only for none inline segments */
 	tx_info->data_offset = (void *)data - (void *)tx_desc;
 	tx_info->inl = 0;
-	tx_info->linear = 1;
-	tx_info->nr_maps = nr_frags + 1;
+	tx_info->linear = is_linear ? 1 : 0;
+	tx_info->nr_maps = nr_frags + tx_info->linear;
 	data += tx_info->nr_maps - 1;
 
 	/* Map fragments if any */
@@ -807,16 +833,19 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 		--data;
 	}
 
-	byte_count = BHLEN(block);
+	if (tx_info->linear) {
+		byte_count = BHLEN(block) - lso_header_size;
 
-	dma = dma_map_single(0, block->rp, byte_count, DMA_TO_DEVICE);
-	if (unlikely(dma_mapping_error(0, dma)))
-		goto tx_drop_unmap;
+		dma = dma_map_single(0, block->rp + lso_header_size, byte_count,
+		                     DMA_TO_DEVICE);
+		if (unlikely(dma_mapping_error(0, dma)))
+			goto tx_drop_unmap;
 
-	data->addr = cpu_to_be64(dma);
-	data->lkey = ring->mr_key;
-	bus_wmb();
-	data->byte_count = cpu_to_be32(byte_count);
+		data->addr = cpu_to_be64(dma);
+		data->lkey = ring->mr_key;
+		bus_wmb();
+		data->byte_count = cpu_to_be32(byte_count);
+	}
 
 	/* tx completion can avoid cache line miss for common cases */
 	tx_info->map0_dma = dma;
@@ -831,10 +860,10 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 	/* Prepare ctrl segement apart opcode+ownership */
 	tx_desc->ctrl.srcrb_flags = priv->ctrl_flags;
 	if (likely(block->flag & BCKSUM_FLAGS)) {
-		if (block->flag & Bipck)
-			tx_desc->ctrl.srcrb_flags |= cpu_to_be32(MLX4_WQE_CTRL_IP_CSUM);
-		if (block->flag & (Budpck | Btcpck))
-			tx_desc->ctrl.srcrb_flags |= cpu_to_be32(MLX4_WQE_CTRL_TCP_UDP_CSUM);
+		assert(block->flag & (Budpck | Btcpck));
+		tx_desc->ctrl.srcrb_flags |= cpu_to_be32(MLX4_WQE_CTRL_IP_CSUM |
+		                                         MLX4_WQE_CTRL_TCP_UDP_CSUM);
+		ring->tx_csum++;
 	}
 
 	if (priv->flags & MLX4_EN_FLAG_ENABLE_HW_LOOPBACK) {
@@ -848,12 +877,39 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 		tx_desc->ctrl.imm = get_unaligned((__be32 *)(ethh->h_dest + 2));
 	}
 
-	/* Normal (Non LSO) packet */
-	op_own = cpu_to_be32(MLX4_OPCODE_SEND) |
-		((ring->prod & ring->size) ?
-		 cpu_to_be32(MLX4_EN_BIT_DESC_OWN) : 0);
-	tx_info->nr_bytes = MAX_T(unsigned int, BLEN(block), ETH_ZLEN);
-	ring->packets++;
+	/* Handle LSO (TSO) packets */
+	if (lso_header_size) {
+		int i;
+
+		/* Mark opcode as LSO */
+		op_own = cpu_to_be32(MLX4_OPCODE_LSO | (1 << 6)) |
+			((ring->prod & ring->size) ?
+				cpu_to_be32(MLX4_EN_BIT_DESC_OWN) : 0);
+
+		/* Fill in the LSO prefix */
+		tx_desc->lso.mss_hdr_size = cpu_to_be32(block->mss << 16 |
+		                                        lso_header_size);
+
+		/* Copy headers;
+		 * note that we already verified that it is linear.
+		 * brho - meaning that the lso_header_size is within block->rp. */
+		memcpy(tx_desc->lso.header, block->rp, lso_header_size);
+
+		ring->tso_packets++;
+
+		i = ((BLEN(block) - lso_header_size) / block->mss) +
+			!!((BLEN(block) - lso_header_size) % block->mss);
+		tx_info->nr_bytes = BLEN(block) + (i - 1) * lso_header_size;
+		ring->packets += i;
+	} else {
+
+		/* Normal (Non LSO) packet */
+		op_own = cpu_to_be32(MLX4_OPCODE_SEND) |
+			((ring->prod & ring->size) ?
+			 cpu_to_be32(MLX4_EN_BIT_DESC_OWN) : 0);
+		tx_info->nr_bytes = MAX_T(unsigned int, BLEN(block), ETH_ZLEN);
+		ring->packets++;
+	}
 	ring->bytes += tx_info->nr_bytes;
 	AVG_PERF_COUNTER(priv->pstats.tx_pktsz_avg, BLEN(block));
 

@@ -2995,7 +2995,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 			NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX |
 			NETIF_F_HW_VLAN_CTAG_FILTER;
 #else
-	dev->feat = NETIF_F_SG | NETIF_F_IP_CSUM | NETF_PADMIN;
+	dev->feat = dev->hw_features | NETIF_F_SG | NETIF_F_IP_CSUM | NETF_PADMIN;
 #endif
 	dev->hw_features |= NETIF_F_LOOPBACK |
 			NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX;
