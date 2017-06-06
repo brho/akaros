@@ -41,16 +41,8 @@
 #include <pthread.h>
 #include <errno.h>
 
-#ifdef	malloc
-#undef	malloc
-#endif
-
-#ifdef	calloc
-#undef	calloc
-#endif
-
-static const char	version[] = "\n  Electric Fence 2.2"
- " Copyright (C) 1987-2014 Bruce Perens.\n";
+#include <parlib/spinlock.h>
+#include <parlib/stdio.h>
 
 /*
  * MEMORY_CREATION_SIZE is the amount of memory to get from the operating
@@ -83,14 +75,6 @@ struct _Slot {
 	Mode		mode;
 };
 typedef struct _Slot	Slot;
-
- /*
- * EF_DISABLE_BANNER is a global variable used to control whether
- * Electric Fence prints its usual startup message.  If the value is
- * -1, it will be set from the environment default to 0 at run time.
- */
-int            EF_DISABLE_BANNER = -1;
-
 
 /*
  * EF_ALIGNMENT is a global variable used to control the default alignment
@@ -193,30 +177,41 @@ static size_t		bytesPerPage = 0;
  /*
  * mutex to enable multithreaded operation
  */
-static uth_mutex_t mutex;
-static pid_t mutexpid=0;
-static int locknr=0;
+static struct spin_pdr_lock pdr_lock = SPINPDR_INITIALIZER;
+#define RECURSE_UNLOCKED -1
+static long lockholder = RECURSE_UNLOCKED;
+static int lock_depth;
 
-
-static void lock() {
-    if (uth_mutex_trylock(&mutex)) {
-       if (mutexpid==getpid()) {
-           locknr++;
-           return;
-       } else {
-           uth_mutex_lock(&mutex);
-       }
-    } 
-    mutexpid=getpid();
-    locknr=1;
+static long who_am_i(void)
+{
+	if (in_vcore_context())
+		return vcore_id();
+	else
+		return (long)current_uthread;
 }
 
-static void unlock() {
-    locknr--;
-    if (!locknr) {
-       mutexpid=0;
-       uth_mutex_unlock(&mutex);
-    }
+static void lock(void)
+{
+	long me = who_am_i();
+
+	if (!spin_pdr_trylock(&pdr_lock)) {
+		if (lockholder == me) {
+			lock_depth++;
+			return;
+		}
+		spin_pdr_lock(&pdr_lock);
+	}
+	lockholder = me;
+	lock_depth = 1;
+}
+
+static void unlock(void)
+{
+	lock_depth--;
+	if (!lock_depth) {
+		lockholder = RECURSE_UNLOCKED;
+		spin_pdr_unlock(&pdr_lock);
+	}
 }
 
 /*
@@ -240,16 +235,6 @@ initialize(void)
 	size_t	slack;
 	char *	string;
 	Slot *	slot;
-
-       if ( EF_DISABLE_BANNER == -1 ) {
-               if ( (string = getenv("EF_DISABLE_BANNER")) != 0 )
-                       EF_DISABLE_BANNER = atoi(string);
-               else
-                       EF_DISABLE_BANNER = 0;
-       }
-
-       if ( EF_DISABLE_BANNER == 0 )
-               EF_Print(version);
 
 	/*
 	 * Import the user's environment specification of the default
@@ -437,6 +422,7 @@ memalign(size_t alignment, size_t userSize)
 	if ( allocationList == 0 )
 		initialize();
 
+	lock();
 	if ( userSize == 0 && !EF_ALLOW_MALLOC_0 )
 		EF_Abort("Allocating 0 bytes, probably a bug.");
 
@@ -620,6 +606,7 @@ memalign(size_t alignment, size_t userSize)
 	if ( !internalUse )
 		Page_DenyAccess(allocationList, allocationListSize);
 
+	unlock();
 	return address;
 }
 
@@ -811,18 +798,9 @@ realloc(void * oldBuffer, size_t newSize)
 extern C_LINKAGE void *
 malloc(size_t size)
 {
-        void  *allocation;   
- 
-        if ( allocationList == 0 ) {
-		uth_mutex_init(&mutex);
-                initialize();   /* This sets EF_ALIGNMENT */
-        }       
-        lock();
-        allocation=memalign(EF_ALIGNMENT, size); 
-
-        unlock();
-
-	return allocation;
+	if (!allocationList)
+		initialize();	/* This sets EF_ALIGNMENT */
+	return memalign(EF_ALIGNMENT, size);
 }
 
 extern C_LINKAGE char *
@@ -869,11 +847,8 @@ calloc(size_t nelem, size_t elsize)
 	size_t	size = nelem * elsize;
         void * allocation;
         
-        lock();
-       
         allocation = malloc(size);
         memset(allocation, 0, size);
-        unlock();
 
 	return allocation;
 }
@@ -885,11 +860,22 @@ calloc(size_t nelem, size_t elsize)
 extern C_LINKAGE void *
 valloc (size_t size)
 {
-        void * allocation;
-       
-        lock();
-        allocation= memalign(bytesPerPage, size);
-        unlock();
-       
-        return allocation;
+	return memalign(bytesPerPage, size);
+}
+
+extern C_LINKAGE int
+posix_memalign(void **memptr, size_t alignment, size_t size)
+{
+	*memptr = memalign(alignment, size);
+	if (!*memptr) {
+		errno = ENOMEM;
+		return -1;
+	}
+	return 0;
+}
+
+extern C_LINKAGE void *
+aligned_alloc(size_t alignment, size_t size)
+{
+	return memalign(alignment, size);
 }
