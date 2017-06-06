@@ -1,9 +1,9 @@
 #include "efence.h"
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdarg.h>
-#include <string.h>
 #include <signal.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 /*
  * These routines do their printing without using stdio. Stdio can't
@@ -15,50 +15,48 @@
  * NUMBER_BUFFER_SIZE is the longest character string that could be needed
  * to represent an unsigned integer, assuming we might print in base 2.
  */
-#define	NUMBER_BUFFER_SIZE	(sizeof(ef_number) * NBBY)
+#define NUMBER_BUFFER_SIZE (sizeof(ef_number) * NBBY)
 
-static void
-printNumber(ef_number number, ef_number base)
+static void printNumber(ef_number number, ef_number base)
 {
-	char		buffer[NUMBER_BUFFER_SIZE];
-	char *		s = &buffer[NUMBER_BUFFER_SIZE];
-	int		size;
-	
-	do {
-		ef_number	digit;
+	char buffer[NUMBER_BUFFER_SIZE];
+	char *s = &buffer[NUMBER_BUFFER_SIZE];
+	int size;
 
-		if ( --s == buffer )
+	do {
+		ef_number digit;
+
+		if (--s == buffer)
 			EF_Abort("Internal error printing number.");
 
 		digit = number % base;
 
-		if ( digit < 10 )
+		if (digit < 10)
 			*s = '0' + digit;
 		else
 			*s = 'a' + digit - 10;
 
-	} while ( (number /= base) > 0 );
+	} while ((number /= base) > 0);
 
 	size = &buffer[NUMBER_BUFFER_SIZE] - s;
 
-	if ( size > 0 )
+	if (size > 0)
 		write(2, s, size);
 }
 
-static void
-vprint(const char * pattern, va_list args)
+static void vprint(const char *pattern, va_list args)
 {
-	static const char	bad_pattern[] =
-	 "\nBad pattern specifier %%%c in EF_Print().\n";
-	const char *	s = pattern;
-	char		c;
+	static const char bad_pattern[] =
+	    "\nBad pattern specifier %%%c in EF_Print().\n";
+	const char *s = pattern;
+	char c;
 
-	while ( (c = *s++) != '\0' ) {
-		if ( c == '%' ) {
+	while ((c = *s++) != '\0') {
+		if (c == '%') {
 			c = *s++;
-			switch ( c ) {
+			switch (c) {
 			case '%':
-				(void) write(2, &c, 1);
+				(void)write(2, &c, 1);
 				break;
 			case 'a':
 				/*
@@ -67,59 +65,47 @@ vprint(const char * pattern, va_list args)
 				 * it is large enough to contain all of the
 				 * bits of a void pointer.
 				 */
-				printNumber(
-				 (ef_number)va_arg(args, void *)
-				,0x10);
+				printNumber((ef_number)va_arg(args, void *), 0x10);
 				break;
-			case 's':
-				{
-					const char *	string;
-					size_t		length;
+			case 's': {
+				const char *string;
+				size_t length;
 
-					string = va_arg(args, char *);
-					length = strlen(string);
+				string = va_arg(args, char *);
+				length = strlen(string);
 
-					(void) write(2, string, length);
+				(void)write(2, string, length);
+			} break;
+			case 'd': {
+				int n = va_arg(args, int);
+
+				if (n < 0) {
+					char c = '-';
+					write(2, &c, 1);
+					n = -n;
 				}
-				break;
-			case 'd':
-				{
-					int	n = va_arg(args, int);
-
-					if ( n < 0 ) {
-						char	c = '-';
-						write(2, &c, 1);
-						n = -n;
-					}
-					printNumber(n, 10);
-				}
-				break;
+				printNumber(n, 10);
+			} break;
 			case 'x':
 				printNumber(va_arg(args, u_int), 0x10);
 				break;
-			case 'c':
-			        { /*Cast used, since char gets promoted to int in ... */
-					char	c = (char) va_arg(args, int);
-					
-					(void) write(2, &c, 1);
-				}
-				break;
-			default:
-				{
-					EF_Print(bad_pattern, c);
-				}
-		
+			case 'c': { /*Cast used, since char gets promoted to int in ... */
+				char c = (char)va_arg(args, int);
+
+				(void)write(2, &c, 1);
+			} break;
+			default: {
+				EF_Print(bad_pattern, c);
 			}
-		}
-		else
-			(void) write(2, &c, 1);
+			}
+		} else
+			(void)write(2, &c, 1);
 	}
 }
 
-void
-EF_Abort(const char * pattern, ...)
+void EF_Abort(const char *pattern, ...)
 {
-	va_list	args;
+	va_list args;
 
 	va_start(args, pattern);
 
@@ -139,10 +125,9 @@ EF_Abort(const char * pattern, ...)
 	_exit(-1);
 }
 
-void
-EF_Exit(const char * pattern, ...)
+void EF_Exit(const char *pattern, ...)
 {
-	va_list	args;
+	va_list args;
 
 	va_start(args, pattern);
 
@@ -159,10 +144,9 @@ EF_Exit(const char * pattern, ...)
 	_exit(-1);
 }
 
-void
-EF_Print(const char * pattern, ...)
+void EF_Print(const char *pattern, ...)
 {
-	va_list	args;
+	va_list args;
 
 	va_start(args, pattern);
 	vprint(pattern, args);
