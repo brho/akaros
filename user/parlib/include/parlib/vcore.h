@@ -9,18 +9,6 @@
 
 __BEGIN_DECLS
 
-/*****************************************************************************/
-/* TODO: This is a complete hack, but necessary for vcore stuff to work for now
- * The issue is that exit sometimes calls sys_yield(), and we can't recover from
- * that properly under our vcore model (we shouldn't though).  We really need to
- * rethink what sys_yield 'should' do when in multicore mode, or else come up 
- * with a different syscall entirely. */
-#undef exit
-extern void _exit (int status);
-extern void exit (int __status) __THROW __attribute__ ((__noreturn__));
-#define exit(status) _exit(status)
-/*****************************************************************************/
-
 #define TRANSITION_STACK_PAGES 2
 #define TRANSITION_STACK_SIZE (TRANSITION_STACK_PAGES*PGSIZE)
 

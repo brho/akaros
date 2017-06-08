@@ -34,6 +34,7 @@
 #include <parlib/event.h>
 #include <parlib/ros_debug.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <parlib/assert.h>
 #include <ros/procinfo.h>
 #include <ros/syscall.h>

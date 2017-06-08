@@ -495,3 +495,22 @@ diff -ruB --unidirectional-new-file ../glibc-2.19/sysdeps/x86_64/tlsdesc.sym ../
 +  _assert_failed(file, line, assertion);
  }
  hidden_def(__assert_fail)
+--- glibc-2.19/stdlib/exit.c	2017-06-08 17:05:17.558550998 -0400
++++ glibc-2.19-akaros/stdlib/exit.c	2017-06-08 17:04:50.574432434 -0400
+@@ -19,6 +19,7 @@
+ #include <stdlib.h>
+ #include <unistd.h>
+ #include <sysdep.h>
++#include <parlib/vcore.h>
+ #include "exit.h"
+ 
+ #include "set-hooks.h"
+@@ -101,6 +102,8 @@
+ void
+ exit (int status)
+ {
++  if (in_vcore_context())
++    _exit(status);
+   __run_exit_handlers (status, &__exit_funcs, true);
+ }
+ libc_hidden_def (exit)
