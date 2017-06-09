@@ -105,7 +105,7 @@ endif
 ifeq ($(ARCH),riscv)
     AKAROS_ARCH_DIR := riscv
     ARCH_CFLAGS :=
-    GLIBC_CONFIGURE_FLAGS := 
+    GLIBC_CONFIGURE_FLAGS :=
     GCC_BUILD_FLAGS :=
 endif
 ifeq ($(CONFIG),cross)
@@ -168,7 +168,7 @@ define BUILD_ERROR
     for this variable in there.
 endef
 BUILD_ERRORS := $(call add_error, $(BUILD_ERROR))
-endif 
+endif
 
 ifeq ($(CONFIG),native)
 ifeq ($(shell which $(ARCH)-ucb-akaros-gcc 2>/dev/null),)
@@ -234,25 +234,32 @@ unexport LD_LIBRARY_PATH
 check-env-real:
 	@echo "    Your environment checks out. Build away!"
 
+define make_and_log
+	$(MAKE) $(1) > build_logs/$(2).log 2>&1
+	@echo "make $(2) succeeded"
+endef
+
 ifeq ($(CONFIG),cross)
 build-real:
-	$(MAKE) .$(BINARY_PREFIX)binutils-install
-	$(MAKE) .$(BINARY_PREFIX)gcc-stage1-install
-	$(MAKE) .$(BINARY_PREFIX)headers-clean
-	$(MAKE) .$(BINARY_PREFIX)akaros-headers-install
-	$(MAKE) .$(BINARY_PREFIX)dummy-libs-install
-	$(MAKE) .$(BINARY_PREFIX)glibc-stage1-install
-	$(MAKE) .$(BINARY_PREFIX)gcc-stage2-install
-	$(MAKE) .$(BINARY_PREFIX)glibc-stage2-install
-	$(MAKE) .$(BINARY_PREFIX)akaros-libs-install
-	$(MAKE) .$(BINARY_PREFIX)gcc-stage3-install
-	$(MAKE) .$(BINARY_PREFIX)gmp-install
-	$(MAKE) .$(BINARY_PREFIX)mpfr-install
-	$(MAKE) .$(BINARY_PREFIX)mpc-install
+	$(shell mkdir -p build_logs)
+	$(call make_and_log,.$(BINARY_PREFIX)binutils-install,$(BINARY_PREFIX)binutils-install)
+	$(call make_and_log,.$(BINARY_PREFIX)gcc-stage1-install,$(BINARY_PREFIX)gcc-stage1-install)
+	$(call make_and_log,.$(BINARY_PREFIX)headers-clean,$(BINARY_PREFIX)headers-clean)
+	$(call make_and_log,.$(BINARY_PREFIX)akaros-headers-install,$(BINARY_PREFIX)akaros-headers-install)
+	$(call make_and_log,.$(BINARY_PREFIX)dummy-libs-install,$(BINARY_PREFIX)dummy-libs-install)
+	$(call make_and_log,.$(BINARY_PREFIX)glibc-stage1-install,$(BINARY_PREFIX)glibc-stage1-install)
+	$(call make_and_log,.$(BINARY_PREFIX)gcc-stage2-install,$(BINARY_PREFIX)gcc-stage2-install)
+	$(call make_and_log,.$(BINARY_PREFIX)glibc-stage2-install,$(BINARY_PREFIX)glibc-stage2-install)
+	$(call make_and_log,.$(BINARY_PREFIX)akaros-libs-install,$(BINARY_PREFIX)akaros-libs-install)
+	$(call make_and_log,.$(BINARY_PREFIX)gcc-stage3-install,$(BINARY_PREFIX)gcc-stage3-install)
+	$(call make_and_log,.$(BINARY_PREFIX)gmp-install,$(BINARY_PREFIX)gmp-install)
+	$(call make_and_log,.$(BINARY_PREFIX)mpfr-install,$(BINARY_PREFIX)mpfr-install)
+	$(call make_and_log,.$(BINARY_PREFIX)mpc-install,$(BINARY_PREFIX)mpc-install)
 else
 build-real:
-	$(MAKE) .$(BINARY_PREFIX)binutils-install
-	$(MAKE) .$(BINARY_PREFIX)gcc-stage3-install
+	$(shell mkdir -p build_logs)
+	$(call make_and_log,.$(BINARY_PREFIX)binutils-install,$(BINARY_PREFIX)binutils-install)
+	$(call make_and_log,.$(BINARY_PREFIX)gcc-stage3-install,$(BINARY_PREFIX)gcc-stage3-install)
 endif
 
 uninstall-real:
@@ -317,8 +324,8 @@ cross-binutils-configure:
 		--disable-nls \
 		--with-sysroot=$(SYSROOT)
 
-.$(BINARY_PREFIX)binutils-configure: 
-	$(MAKE) $(BINARY_PREFIX)binutils-builddir 
+.$(BINARY_PREFIX)binutils-configure:
+	$(MAKE) $(BINARY_PREFIX)binutils-builddir
 	if [ "$(CONFIG)" = "native" ]; then \
 		$(MAKE) native-binutils-configure; \
 	else \
@@ -370,7 +377,7 @@ $(BINARY_PREFIX)gcc-stage1-builddir: gcc-$(GCC_VERSION)
 	rm -rf $@
 	mkdir -p $@
 
-.$(BINARY_PREFIX)gcc-stage1-configure: 
+.$(BINARY_PREFIX)gcc-stage1-configure:
 	$(MAKE) $(BINARY_PREFIX)gcc-stage1-builddir
 	cd $(BINARY_PREFIX)gcc-stage1-builddir; \
 	CFLAGS="-O2 -g -pipe" \
@@ -418,7 +425,7 @@ $(BINARY_PREFIX)gcc-stage2-builddir: gcc-$(GCC_VERSION)
 	rm -rf $@
 	mkdir -p $@
 
-.$(BINARY_PREFIX)gcc-stage2-configure: 
+.$(BINARY_PREFIX)gcc-stage2-configure:
 	$(MAKE) $(BINARY_PREFIX)gcc-stage2-builddir
 	cd $(BINARY_PREFIX)gcc-stage2-builddir; \
 	CFLAGS="-O2 -g -pipe" \
@@ -515,7 +522,7 @@ $(BINARY_PREFIX)glibc-stage1-builddir: glibc-$(GLIBC_VERSION)
 	rm -rf $@
 	mkdir -p $@
 
-.$(BINARY_PREFIX)glibc-stage1-configure: 
+.$(BINARY_PREFIX)glibc-stage1-configure:
 	$(MAKE) $(BINARY_PREFIX)glibc-stage1-builddir;
 	cd $(BINARY_PREFIX)glibc-stage1-builddir; \
 	CFLAGS="$(ARCH_CFLAGS) -U_FORTIFY_SOURCE -g -O2 -pipe" \
@@ -567,7 +574,7 @@ $(BINARY_PREFIX)glibc-stage2-builddir: glibc-$(GLIBC_VERSION)
 	rm -rf $@
 	mkdir -p $@
 
-.$(BINARY_PREFIX)glibc-stage2-configure: 
+.$(BINARY_PREFIX)glibc-stage2-configure:
 	$(MAKE) $(BINARY_PREFIX)glibc-stage2-builddir
 	cd $(BINARY_PREFIX)glibc-stage2-builddir; \
 	CFLAGS="$(ARCH_CFLAGS) -U_FORTIFY_SOURCE -g -O2 -pipe" \
