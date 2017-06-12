@@ -650,7 +650,8 @@ void tcpkick(void *x)
 }
 
 void tcprcvwin(struct conv *s)
-{	/* Call with tcb locked */
+{
+	/* Call with tcb locked */
 	int w;
 	Tcpctl *tcb;
 
@@ -658,8 +659,21 @@ void tcprcvwin(struct conv *s)
 	w = tcb->window - qlen(s->rq);
 	if (w < 0)
 		w = 0;
-	tcb->rcv.wnd = w;
-	if (w == 0)
+
+	/* RFC 813: Avoid SWS.  We'll always reduce the window (because the qio
+	 * increased - that's legit), and we'll always advertise the window
+	 * increases (corresponding to qio drains) when those are greater than MSS.
+	 * But we don't advertise increases less than MSS.
+	 *
+	 * Note we don't shrink the window at all - that'll result in tcptrim()
+	 * dropping packets that were sent before the sender gets our update. */
+	if ((w < tcb->rcv.wnd) || (w >= tcb->mss))
+		tcb->rcv.wnd = w;
+	/* We've delayed sending an update to rcv.wnd, and we might never get
+	 * another ACK to drive the TCP stack after the qio is drained.  We could
+	 * replace this stuff with qio kicks or callbacks, but that might be
+	 * trickier with the MSS limitation.  (and 'edge' isn't empty or not). */
+	if (w < tcb->mss)
 		tcb->rcv.blocked = 1;
 }
 
@@ -3269,7 +3283,7 @@ void tcpoutput(struct conv *s)
 		}
 
 		/* force an ack when a window has opened up */
-		if (tcb->rcv.blocked && tcb->rcv.wnd > 0) {
+		if (tcb->rcv.blocked && tcb->rcv.wnd >= tcb->mss) {
 			tcb->rcv.blocked = 0;
 			tcb->flags |= FORCE;
 		}
@@ -3297,8 +3311,11 @@ void tcpoutput(struct conv *s)
 		tcb->flags &= ~FORCE;
 		tcprcvwin(s);
 
-		/* By default we will generate an ack */
-		tcphalt(tpriv, &tcb->acktimer);
+		/* By default we will generate an ack, so we can normally turn off the
+		 * timer.  If we're blocked, we'll want the timer so we can send a
+		 * window update. */
+		if (!tcb->rcv.blocked)
+			tcphalt(tpriv, &tcb->acktimer);
 		tcb->rcv.una = 0;
 		seg.source = s->lport;
 		seg.dest = s->rport;
