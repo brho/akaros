@@ -1,0 +1,38 @@
+sudo: required
+language: c
+before_install:
+  - sudo apt-get install -y --force-yes flex bison git qemu-kvm
+
+script:
+  - set -e
+  - set +x
+  - cd $AKAROS_ROOT
+  - cd $AKAROS_ROOT && make ARCH=x86 defconfig
+  - cd $AKAROS_ROOT && make xcc-clean
+  - cd $AKAROS_ROOT && make xcc-uninstall
+  - cd $AKAROS_ROOT && travis_wait 50 make xcc-build
+  - cd $AKAROS_ROOT && make userclean
+  - cd $AKAROS_ROOT && make install-base-libs
+  - cd $AKAROS_ROOT && make testclean utestclean
+  - cd $AKAROS_ROOT && make apps-clean
+  - cd $AKAROS_ROOT && make apps-install
+  - cd $AKAROS_ROOT && make tests utest
+  - cd $AKAROS_ROOT && make fill-kfs
+  - cd $AKAROS_ROOT && make
+  - echo "Build SUCCESS"
+
+env:
+  global:
+  - ARCH=x86
+  - AKAROS_ROOT=$TRAVIS_BUILD_DIR
+  - X86_64_INSTDIR="$AKAROS_ROOT/install/x86_64-ucb-akaros-gcc"
+  - PATH=$X86_64_INSTDIR/bin:$PATH
+  - AKAROS_XCC_ROOT=$X86_64_INSTDIR
+  - MAKE_JOBS=4
+
+notifications:
+  email:
+    recipients:
+      - akaros-travis@googlegroups.com
+    on_success: never
+    on_failure: always
