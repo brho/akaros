@@ -87,9 +87,9 @@ enum {
 	EOLOPT = 0,
 	NOOPOPT = 1,
 	MSSOPT = 2,
-	MSS_LENGTH = 4,	/* Mean segment size */
+	MSS_LENGTH = 4,	/* max segment size header option length */
 	WSOPT = 3,
-	WS_LENGTH = 3,	/* Bits to scale window size by */
+	WS_LENGTH = 3,	/* WS header option length */
 	MSL2 = 10,
 	MSPTICK = 50,	/* Milliseconds per timer tick */
 	DEF_MSS = 1460,	/* Default mean segment */
@@ -101,6 +101,7 @@ enum {
 	SYNACK_RXTIMER = 250,	/* ms between SYNACK retransmits */
 
 	TCPREXMTTHRESH = 3,	/* dupack threshhold for rxt */
+	CWIND_SCALE = 10,	/* initial CWIND will be MSS * this */
 
 	FORCE = 1,
 	CLONE = 2,
@@ -263,7 +264,7 @@ struct Tcpctl {
 	int sawwsopt;				/* true if we saw a wsopt on the incoming SYN */
 	uint32_t cwind;				/* Congestion window */
 	int scale;					/* desired snd.scale */
-	uint16_t ssthresh;			/* Slow start threshold */
+	uint32_t ssthresh;			/* Slow start threshold */
 	int resent;					/* Bytes just resent */
 	int irs;					/* Initial received squence */
 	uint16_t mss;				/* Mean segment size */
@@ -841,7 +842,7 @@ void inittcpctl(struct conv *s, int mode)
 
 	memset(tcb, 0, sizeof(Tcpctl));
 
-	tcb->ssthresh = 65535;
+	tcb->ssthresh = UINT32_MAX;
 	tcb->srtt = tcp_irtt << LOGAGAIN;
 	tcb->mdev = 0;
 
@@ -889,7 +890,8 @@ void inittcpctl(struct conv *s, int mode)
 		}
 	}
 
-	tcb->mss = tcb->cwind = mss;
+	tcb->mss = mss;
+	tcb->cwind = mss * CWIND_SCALE;
 
 	/* default is no window scaling */
 	tcb->window = QMAX;
@@ -1710,9 +1712,8 @@ static struct conv *tcpincoming(struct conv *s, Tcp * segp, uint8_t * src,
 	/* window scaling */
 	tcpsetscale(new, tcb, lp->rcvscale, lp->sndscale);
 
-	/* the congestion window always starts out as a single segment */
 	tcb->snd.wnd = segp->wnd;
-	tcb->cwind = tcb->mss;
+	tcb->cwind = tcb->mss * CWIND_SCALE;
 
 	/* set initial round trip time */
 	tcb->sndsyntime = lp->lastsend + lp->rexmits * SYNACK_RXTIMER;
@@ -1890,11 +1891,21 @@ void update(struct conv *s, Tcp * seg)
 	/* slow start as long as we're not recovering from lost packets */
 	if (tcb->cwind < tcb->snd.wnd && !tcb->snd.recovery) {
 		if (tcb->cwind < tcb->ssthresh) {
-			expand = tcb->mss;
-			if (acked < expand)
-				expand = acked;
-		} else
-			expand = ((int)tcb->mss * tcb->mss) / tcb->cwind;
+			/* We increase the cwind by every byte we receive.  We want to
+			 * increase the cwind by one MSS for every MSS that gets ACKed.
+			 * Note that multiple MSSs can be ACKed in a single ACK.  If we had
+			 * a remainder of acked / MSS, we'd add just that remainder - not 0
+			 * or 1 MSS. */
+			expand = acked;
+		} else {
+			/* Every RTT, which consists of CWND bytes, we're supposed to expand
+			 * by MSS bytes.  The classic algorithm was
+			 * 		expand = (tcb->mss * tcb->mss) / tcb->cwind;
+			 * which assumes the ACK was for MSS bytes.  Instead, for every
+			 * 'acked' bytes, we increase the window by acked / CWND (in units
+			 * of MSS). */
+			expand = MAX(acked, tcb->mss) * tcb->mss / tcb->cwind;
+		}
 
 		if (tcb->cwind + expand < tcb->cwind)
 			expand = tcb->snd.wnd - tcb->cwind;
@@ -2829,16 +2840,9 @@ void tcprxmit(struct conv *s)
 	tcb->flags |= RETRAN | FORCE;
 	tcb->snd.ptr = tcb->snd.una;
 
-	/*
-	 *  We should be halving the slow start threshhold (down to one
-	 *  mss) but leaving it at mss seems to work well enough
-	 */
-	tcb->ssthresh = tcb->mss;
-
-	/*
-	 *  pull window down to a single packet
-	 */
-	tcb->cwind = tcb->mss;
+	/* Reno */
+	tcb->ssthresh = tcb->cwind / 2;
+	tcb->cwind = tcb->ssthresh;
 	tcpoutput(s);
 }
 
@@ -2911,9 +2915,8 @@ void procsyn(struct conv *s, Tcp * seg)
 	if (seg->mss != 0 && seg->mss < tcb->mss)
 		tcb->mss = seg->mss;
 
-	/* the congestion window always starts out as a single segment */
 	tcb->snd.wnd = seg->wnd;
-	tcb->cwind = tcb->mss;
+	tcb->cwind = tcb->mss * CWIND_SCALE;
 }
 
 int
