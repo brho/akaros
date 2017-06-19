@@ -90,6 +90,9 @@ enum {
 	MSS_LENGTH = 4,	/* max segment size header option length */
 	WSOPT = 3,
 	WS_LENGTH = 3,	/* WS header option length */
+	TS_OPT = 8,
+	TS_LENGTH = 10,
+	TS_SEND_PREPAD = 2,	/* For non-SYNs, pre-pad 2 nops for 32 byte alignment */
 	MSL2 = 10,
 	MSPTICK = 50,	/* Milliseconds per timer tick */
 	DEF_MSS = 1460,	/* Default mean segment */
@@ -217,6 +220,8 @@ struct Tcp {
 	uint16_t urg;
 	uint16_t mss;				/* max segment size option (if not zero) */
 	uint16_t len;				/* size of data */
+	uint32_t ts_val;			/* timestamp val from sender */
+	uint32_t ts_ecr;			/* timestamp echo response from sender */
 };
 
 /*
@@ -287,6 +292,8 @@ struct Tcpctl {
 	uint64_t time;				/* time Finwait2 or Syn_received was sent */
 	int nochecksum;				/* non-zero means don't send checksums */
 	int flgcnt;					/* number of flags in the sequence (FIN,SEQ) */
+	uint32_t ts_recent;			/* timestamp received around last_ack_sent */
+	uint32_t last_ack_sent;		/* to determine when to update timestamp */
 
 	union {
 		Tcp4hdr tcp4hdr;
@@ -323,6 +330,7 @@ struct Limbo {
 	uint64_t lastsend;			/* last time we sent a synack */
 	uint8_t version;			/* v4 or v6 */
 	uint8_t rexmits;			/* number of retransmissions */
+	uint32_t ts_val;			/* timestamp val from sender */
 };
 
 int tcp_irtt = DEF_RTT;			/* Initial guess at round trip time */
@@ -969,6 +977,13 @@ static char *tcpflag(uint16_t flag)
 	return buf;
 }
 
+/* Helper, determine if we should send a TCP timestamp.  ts_val was the
+ * timestamp from our distant end.  We'll also send a TS on SYN (no ACK). */
+static bool tcp_seg_has_ts(Tcp *tcph)
+{
+	return tcph->ts_val || ((tcph->flags & SYN) && !(tcph->flags & ACK));
+}
+
 /* Given a TCP header/segment and default header size (e.g. TCP4_HDRSIZE),
  * return the actual hdr_len and opt_pad */
 static void compute_hdrlen_optpad(Tcp *tcph, uint16_t default_hdrlen,
@@ -983,11 +998,17 @@ static void compute_hdrlen_optpad(Tcp *tcph, uint16_t default_hdrlen,
 			hdrlen += MSS_LENGTH;
 		if (tcph->ws)
 			hdrlen += WS_LENGTH;
-		optpad = hdrlen & 3;
-		if (optpad)
-			optpad = 4 - optpad;
-		hdrlen += optpad;
 	}
+	if (tcp_seg_has_ts(tcph)) {
+		hdrlen += TS_LENGTH;
+		/* SYNs have other opts, don't do the PREPAD NOOP optimization. */
+		if (!(tcph->flags & SYN))
+			hdrlen += TS_SEND_PREPAD;
+	}
+	optpad = hdrlen & 3;
+	if (optpad)
+		optpad = 4 - optpad;
+	hdrlen += optpad;
 	*ret_hdrlen = hdrlen;
 	*ret_optpad = optpad;
 }
@@ -1007,9 +1028,23 @@ static void write_opts(Tcp *tcph, uint8_t *opt, uint16_t optpad, Tcpctl *tcb)
 			*opt++ = WS_LENGTH;
 			*opt++ = tcph->ws;
 		}
-		while (optpad-- > 0)
-			*opt++ = NOOPOPT;
 	}
+	if (tcp_seg_has_ts(tcph)) {
+		if (!(tcph->flags & SYN)) {
+			*opt++ = NOOPOPT;
+			*opt++ = NOOPOPT;
+		}
+		*opt++ = TS_OPT;
+		*opt++ = TS_LENGTH;
+		/* Setting TSval, our time */
+		hnputl(opt, milliseconds());
+		opt += 4;
+		/* Setting TSecr, the time we last saw from them, stored in ts_val */
+		hnputl(opt, tcph->ts_val);
+		opt += 4;
+	}
+	while (optpad-- > 0)
+		*opt++ = NOOPOPT;
 }
 
 /* Given a data block (or NULL) returns a block with enough header room that we
@@ -1147,6 +1182,12 @@ static void parse_inbound_opts(Tcp *tcph, uint8_t *opt, uint16_t optsize)
 				if (optlen == WS_LENGTH && *(opt + 2) <= 14)
 					tcph->ws = HaveWS | *(opt + 2);
 				break;
+			case TS_OPT:
+				if (optlen == TS_LENGTH) {
+					tcph->ts_val = nhgetl(opt + 2);
+					tcph->ts_ecr = nhgetl(opt + 6);
+				}
+				break;
 		}
 		optsize -= optlen;
 		opt += optlen;
@@ -1178,6 +1219,8 @@ int ntohtcp6(Tcp * tcph, struct block **bpp)
 	tcph->urg = nhgets(h->tcpurg);
 	tcph->mss = 0;
 	tcph->ws = 0;
+	tcph->ts_val = 0;
+	tcph->ts_ecr = 0;
 	tcph->len = nhgets(h->ploadlen) - hdrlen;
 
 	*bpp = pullupblock(*bpp, hdrlen + TCP6_PKT);
@@ -1213,6 +1256,8 @@ int ntohtcp4(Tcp * tcph, struct block **bpp)
 	tcph->urg = nhgets(h->tcpurg);
 	tcph->mss = 0;
 	tcph->ws = 0;
+	tcph->ts_val = 0;
+	tcph->ts_ecr = 0;
 	tcph->len = nhgets(h->length) - (hdrlen + TCP4_PKT);
 
 	*bpp = pullupblock(*bpp, hdrlen + TCP4_PKT);
@@ -1308,6 +1353,7 @@ sndrst(struct Proto *tcp, uint8_t * source, uint8_t * dest,
 	seg->urg = 0;
 	seg->mss = 0;
 	seg->ws = 0;
+	/* seg->ts_val is already set with their timestamp */
 	switch (version) {
 		case V4:
 			hbp = htontcp4(seg, NULL, &ph4, NULL);
@@ -1343,12 +1389,14 @@ static void tcphangup(struct conv *s)
 		if (!waserror()) {
 			seg.flags = RST | ACK;
 			seg.ack = tcb->rcv.nxt;
+			tcb->last_ack_sent = seg.ack;
 			tcb->rcv.una = 0;
 			seg.seq = tcb->snd.ptr;
 			seg.wnd = 0;
 			seg.urg = 0;
 			seg.mss = 0;
 			seg.ws = 0;
+			seg.ts_val = tcb->ts_recent;
 			switch (s->ipversion) {
 				case V4:
 					tcb->protohdr.tcp4hdr.vihl = IP_VER4;
@@ -1413,6 +1461,7 @@ int sndsynack(struct Proto *tcp, Limbo * lp)
 	seg.urg = 0;
 	seg.mss = tcpmtu(tcp, lp->laddr, lp->version, &scale, &flag);
 	seg.wnd = QMAX;
+	seg.ts_val = lp->ts_val;
 
 	/* if the other side set scale, we should too */
 	if (lp->rcvscale) {
@@ -1495,6 +1544,7 @@ limbo(struct conv *s, uint8_t * source, uint8_t * dest, Tcp * seg, int version)
 		lp->mss = seg->mss;
 		lp->rcvscale = seg->ws;
 		lp->irs = seg->seq;
+		lp->ts_val = seg->ts_val;
 		urandom_read(&lp->iss, sizeof(lp->iss));
 	}
 
@@ -1597,6 +1647,12 @@ limborst(struct conv *s, Tcp * segp, uint8_t * src, uint8_t * dst,
  * typical_mss, which will affect the cwnd. */
 static void adjust_typical_mss_for_opts(Tcp *tcph, Tcpctl *tcb)
 {
+	uint16_t opt_size = 0;
+
+	if (tcph->ts_val)
+		opt_size += TS_LENGTH + TS_SEND_PREPAD;
+	opt_size = ROUNDUP(opt_size, 4);
+	tcb->typical_mss -= opt_size;
 }
 
 /*
@@ -1967,6 +2023,18 @@ done:
 	tcb->backedoff = 0;
 }
 
+static void update_tcb_ts(Tcpctl *tcb, Tcp *seg)
+{
+	/* Get timestamp info from the tcp header.  Even though the timestamps
+	 * aren't sequence numbers, we still need to protect for wraparound.  Though
+	 * if the values were 0, assume that means we need an update.  We could have
+	 * an initial ts_val that appears negative (signed). */
+	if (!tcb->ts_recent || !tcb->last_ack_sent ||
+	    (seq_ge(seg->ts_val, tcb->ts_recent) &&
+	     seq_le(seg->seq, tcb->last_ack_sent)))
+		tcb->ts_recent = seg->ts_val;
+}
+
 void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
 {
 	ERRSTACK(1);
@@ -2139,6 +2207,7 @@ reset:
 	qlock(&s->qlock);
 	qunlock(&tcp->qlock);
 
+	update_tcb_ts(tcb, &seg);
 	/* fix up window */
 	seg.wnd <<= tcb->rcv.scale;
 
@@ -2471,6 +2540,12 @@ static uint16_t derive_payload_mss(Tcpctl *tcb)
 	uint16_t payload_mss = tcb->mss;
 	uint16_t opt_size = 0;
 
+	if (tcb->ts_recent) {
+		opt_size += TS_LENGTH;
+		/* Note that when we're a SYN, we overestimate slightly.  This is safe,
+		 * and not really a problem. */
+		opt_size += TS_SEND_PREPAD;
+	}
 	opt_size = ROUNDUP(opt_size, 4);
 	payload_mss -= opt_size;
 	return payload_mss;
@@ -2620,7 +2695,9 @@ void tcpoutput(struct conv *s)
 		}
 		seg.seq = tcb->snd.ptr;
 		seg.ack = tcb->rcv.nxt;
+		tcb->last_ack_sent = seg.ack;
 		seg.wnd = tcb->rcv.wnd;
+		seg.ts_val = tcb->ts_recent;
 
 		/* Pull out data to send */
 		bp = NULL;
@@ -2748,8 +2825,10 @@ void tcpsendka(struct conv *s)
 	else
 		seg.seq = tcb->snd.una - 1;
 	seg.ack = tcb->rcv.nxt;
+	tcb->last_ack_sent = seg.ack;
 	tcb->rcv.una = 0;
 	seg.wnd = tcb->rcv.wnd;
+	seg.ts_val = tcb->ts_recent;
 	if (tcb->state == Finwait2) {
 		seg.flags |= FIN;
 	} else {
