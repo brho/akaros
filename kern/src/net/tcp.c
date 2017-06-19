@@ -2692,15 +2692,11 @@ void tcpoutput(struct conv *s)
 			if (tcb->timer.state != TcptimerON)
 				tcpgo(tpriv, &tcb->timer);
 
-			/*  If round trip timer isn't running, start it.
-			 *  measure the longest packet only in case the
-			 *  transmission time dominates RTT
-			 */
-			if (tcb->rtt_timer.state != TcptimerON)
-				if (ssize == tcb->mss) {
-					tcpgo(tpriv, &tcb->rtt_timer);
-					tcb->rttseq = tcb->snd.ptr;
-				}
+			/* If round trip timer isn't running, start it. */
+			if (tcb->rtt_timer.state != TcptimerON) {
+				tcpgo(tpriv, &tcb->rtt_timer);
+				tcb->rttseq = tcb->snd.ptr;
+			}
 		}
 
 		tpriv->stats[OutSegs]++;
