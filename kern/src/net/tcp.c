@@ -1805,6 +1805,29 @@ void tcpsynackrtt(struct conv *s)
 	tcphalt(tpriv, &tcb->rtt_timer);
 }
 
+/* For LFNs (long/fat), our default tx queue doesn't hold enough data, and TCP
+ * blocks on the application - even if the app already has the data ready to go.
+ * We need to hold the sent, unacked data (1x cwnd), plus all the data we might
+ * send next RTT (1x cwnd).  Note this is called after cwnd was expanded. */
+static void adjust_tx_qio_limit(struct conv *s)
+{
+	Tcpctl *tcb = (Tcpctl *) s->ptcl;
+	size_t ideal_limit = tcb->cwind * 2;
+
+	/* This is called for every ACK, and it's not entirely free to update the
+	 * limit (locks, CVs, taps).  Updating in chunks of mss seems reasonable.
+	 * During SS, we'll update this on most ACKs (given each ACK increased the
+	 * cwind by > MSS).
+	 *
+	 * We also don't want a lot of tiny blocks from the user, but the way qio
+	 * works, you can put in as much as you want (Maxatomic) and then get
+	 * flow-controlled. */
+	if (qgetlimit(s->wq) + tcb->mss < ideal_limit)
+		qsetlimit(s->wq, ideal_limit);
+	/* TODO: we could shrink the qio limit too, if we had a better idea what the
+	 * actual threshold was.  We want the limit to be the 'stable' cwnd * 2. */
+}
+
 void update(struct conv *s, Tcp * seg)
 {
 	int rtt, delta;
@@ -1913,6 +1936,7 @@ void update(struct conv *s, Tcp * seg)
 			expand = tcb->snd.wnd - tcb->cwind;
 		tcb->cwind += expand;
 	}
+	adjust_tx_qio_limit(s);
 
 	/* Adjust the timers according to the round trip time */
 	if (tcb->rtt_timer.state == TcptimerON && seq_ge(seg->ack, tcb->rttseq)) {
