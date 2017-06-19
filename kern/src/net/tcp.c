@@ -267,7 +267,8 @@ struct Tcpctl {
 	uint32_t ssthresh;			/* Slow start threshold */
 	int resent;					/* Bytes just resent */
 	int irs;					/* Initial received squence */
-	uint16_t mss;				/* Mean segment size */
+	uint16_t mss;				/* Max segment size */
+	uint16_t typical_mss;		/* MSS for most packets (< MSS for some opts) */
 	int rerecv;					/* Overlap of data rerecevived */
 	uint32_t window;			/* Recevive window */
 	uint8_t backoff;			/* Exponential backoff counter */
@@ -891,7 +892,8 @@ void inittcpctl(struct conv *s, int mode)
 	}
 
 	tcb->mss = mss;
-	tcb->cwind = mss * CWIND_SCALE;
+	tcb->typical_mss = mss;
+	tcb->cwind = tcb->typical_mss * CWIND_SCALE;
 
 	/* default is no window scaling */
 	tcb->window = QMAX;
@@ -1623,6 +1625,14 @@ limborst(struct conv *s, Tcp * segp, uint8_t * src, uint8_t * dst,
 	}
 }
 
+/* The advertised MSS (e.g. 1460) includes any per-packet TCP options, such as
+ * TCP timestamps.  A given packet will contain mss bytes, but only typical_mss
+ * bytes of *data*.  If we know we'll use those options, we should adjust our
+ * typical_mss, which will affect the cwnd. */
+static void adjust_typical_mss_for_opts(Tcp *tcph, Tcpctl *tcb)
+{
+}
+
 /*
  *  come here when we finally get an ACK to our SYN-ACK.
  *  lookup call in limbo.  if found, create a new conversation
@@ -1706,14 +1716,17 @@ static struct conv *tcpincoming(struct conv *s, Tcp * segp, uint8_t * src,
 	tcb->flags |= SYNACK;
 
 	/* our sending max segment size cannot be bigger than what he asked for */
-	if (lp->mss != 0 && lp->mss < tcb->mss)
+	if (lp->mss != 0 && lp->mss < tcb->mss) {
 		tcb->mss = lp->mss;
+		tcb->typical_mss = tcb->mss;
+	}
+	adjust_typical_mss_for_opts(segp, tcb);
 
 	/* window scaling */
 	tcpsetscale(new, tcb, lp->rcvscale, lp->sndscale);
 
 	tcb->snd.wnd = segp->wnd;
-	tcb->cwind = tcb->mss * CWIND_SCALE;
+	tcb->cwind = tcb->typical_mss * CWIND_SCALE;
 
 	/* set initial round trip time */
 	tcb->sndsyntime = lp->lastsend + lp->rexmits * SYNACK_RXTIMER;
@@ -1822,7 +1835,7 @@ static void adjust_tx_qio_limit(struct conv *s)
 	 * We also don't want a lot of tiny blocks from the user, but the way qio
 	 * works, you can put in as much as you want (Maxatomic) and then get
 	 * flow-controlled. */
-	if (qgetlimit(s->wq) + tcb->mss < ideal_limit)
+	if (qgetlimit(s->wq) + tcb->typical_mss < ideal_limit)
 		qsetlimit(s->wq, ideal_limit);
 	/* TODO: we could shrink the qio limit too, if we had a better idea what the
 	 * actual threshold was.  We want the limit to be the 'stable' cwnd * 2. */
@@ -1927,7 +1940,8 @@ void update(struct conv *s, Tcp * seg)
 			 * which assumes the ACK was for MSS bytes.  Instead, for every
 			 * 'acked' bytes, we increase the window by acked / CWND (in units
 			 * of MSS). */
-			expand = MAX(acked, tcb->mss) * tcb->mss / tcb->cwind;
+			expand = MAX(acked, tcb->typical_mss) * tcb->typical_mss
+			         / tcb->cwind;
 		}
 
 		if (tcb->cwind + expand < tcb->cwind)
@@ -2485,6 +2499,17 @@ raise:
 	tcpkick(s);
 }
 
+/* The advertised mss = data + TCP headers */
+static uint16_t derive_payload_mss(Tcpctl *tcb)
+{
+	uint16_t payload_mss = tcb->mss;
+	uint16_t opt_size = 0;
+
+	opt_size = ROUNDUP(opt_size, 4);
+	payload_mss -= opt_size;
+	return payload_mss;
+}
+
 /*
  *  always enters and exits with the s locked.  We drop
  *  the lock to ipoput the packet so some care has to be
@@ -2501,6 +2526,7 @@ void tcpoutput(struct conv *s)
 	struct Fs *f;
 	struct tcppriv *tpriv;
 	uint8_t version;
+	uint16_t payload_mss;
 
 	f = s->p->f;
 	tpriv = s->p->priv;
@@ -2551,11 +2577,16 @@ void tcpoutput(struct conv *s)
 				   tcb->snd.wnd, tcb->cwind);
 		if (usable < ssize)
 			ssize = usable;
-		if (ssize > tcb->mss) {
+		/* payload_mss is the actual amount of data in the packet, which is the
+		 * advertised mss - header opts.  This varies from packet to packet,
+		 * based on the options that might be present (e.g. always timestamps,
+		 * sometimes SACKs) */
+		payload_mss = derive_payload_mss(tcb);
+		if (ssize > payload_mss) {
 			if ((tcb->flags & TSO) == 0) {
-				ssize = tcb->mss;
+				ssize = payload_mss;
 			} else {
-				int segs, window;
+				int segs;
 
 				/*  Don't send too much.  32K is arbitrary..
 				 */
@@ -2570,8 +2601,8 @@ void tcpoutput(struct conv *s)
 				 * next multiple of 4, to ensure we
 				 * still yeild.
 				 */
-				segs = ssize / tcb->mss;
-				ssize = segs * tcb->mss;
+				segs = ssize / payload_mss;
+				ssize = segs * payload_mss;
 				msgs += segs;
 				if (segs > 3)
 					msgs = (msgs + 4) & ~3;
@@ -2633,9 +2664,9 @@ void tcpoutput(struct conv *s)
 				seg.flags |= FIN;
 				dsize--;
 			}
-			if (BLEN(bp) > tcb->mss) {
+			if (BLEN(bp) > payload_mss) {
 				bp->flag |= Btso;
-				bp->mss = tcb->mss;
+				bp->mss = payload_mss;
 			}
 		}
 
@@ -2932,11 +2963,14 @@ void procsyn(struct conv *s, Tcp * seg)
 	tcb->irs = seg->seq;
 
 	/* our sending max segment size cannot be bigger than what he asked for */
-	if (seg->mss != 0 && seg->mss < tcb->mss)
+	if (seg->mss != 0 && seg->mss < tcb->mss) {
 		tcb->mss = seg->mss;
+		tcb->typical_mss = tcb->mss;
+	}
+	adjust_typical_mss_for_opts(seg, tcb);
 
 	tcb->snd.wnd = seg->wnd;
-	tcb->cwind = tcb->mss * CWIND_SCALE;
+	tcb->cwind = tcb->typical_mss * CWIND_SCALE;
 }
 
 int
