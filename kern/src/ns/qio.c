@@ -1829,9 +1829,20 @@ int qcanread(struct queue *q)
 /*
  *  change queue limit
  */
-void qsetlimit(struct queue *q, int limit)
+void qsetlimit(struct queue *q, size_t limit)
 {
+	bool was_writable = qwritable(q);
+
 	q->limit = limit;
+	if (!was_writable && qwritable(q)) {
+		rendez_wakeup(&q->wr);
+		qwake_cb(q, FDTAP_FILT_WRITABLE);
+	}
+}
+
+size_t qgetlimit(struct queue *q)
+{
+	return q->limit;
 }
 
 /*
