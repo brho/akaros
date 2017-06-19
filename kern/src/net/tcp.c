@@ -969,16 +969,15 @@ static char *tcpflag(uint16_t flag)
 	return buf;
 }
 
-struct block *htontcp6(Tcp * tcph, struct block *data, Tcp6hdr * ph,
-					   Tcpctl * tcb)
+/* Given a TCP header/segment and default header size (e.g. TCP4_HDRSIZE),
+ * return the actual hdr_len and opt_pad */
+static void compute_hdrlen_optpad(Tcp *tcph, uint16_t default_hdrlen,
+                                  uint16_t *ret_hdrlen, uint16_t *ret_optpad,
+                                  Tcpctl *tcb)
 {
-	int dlen;
-	Tcp6hdr *h;
-	uint16_t csum;
-	uint16_t hdrlen, optpad = 0;
-	uint8_t *opt;
+	uint16_t hdrlen = default_hdrlen;
+	uint16_t optpad = 0;
 
-	hdrlen = TCP6_HDRSIZE;
 	if (tcph->flags & SYN) {
 		if (tcph->mss)
 			hdrlen += MSS_LENGTH;
@@ -989,22 +988,65 @@ struct block *htontcp6(Tcp * tcph, struct block *data, Tcp6hdr * ph,
 			optpad = 4 - optpad;
 		hdrlen += optpad;
 	}
+	*ret_hdrlen = hdrlen;
+	*ret_optpad = optpad;
+}
 
+/* Writes the TCP options for tcph to opt. */
+static void write_opts(Tcp *tcph, uint8_t *opt, uint16_t optpad, Tcpctl *tcb)
+{
+	if (tcph->flags & SYN) {
+		if (tcph->mss != 0) {
+			*opt++ = MSSOPT;
+			*opt++ = MSS_LENGTH;
+			hnputs(opt, tcph->mss);
+			opt += 2;
+		}
+		if (tcph->ws != 0) {
+			*opt++ = WSOPT;
+			*opt++ = WS_LENGTH;
+			*opt++ = tcph->ws;
+		}
+		while (optpad-- > 0)
+			*opt++ = NOOPOPT;
+	}
+}
+
+/* Given a data block (or NULL) returns a block with enough header room that we
+ * can send out.  block->wp is set to the beginning of the payload.  Returns
+ * NULL on some sort of error. */
+static struct block *alloc_or_pad_block(struct block *data,
+                                        uint16_t total_hdr_size)
+{
 	if (data) {
-		dlen = blocklen(data);
-		data = padblock(data, hdrlen + TCP6_PKT);
+		data = padblock(data, total_hdr_size);
 		if (data == NULL)
 			return NULL;
 	} else {
-		dlen = 0;
 		/* the 64 pad is to meet mintu's */
-		data = block_alloc(hdrlen + TCP6_PKT + 64, MEM_WAIT);
+		data = block_alloc(total_hdr_size + 64, MEM_WAIT);
 		if (data == NULL)
 			return NULL;
-		data->wp += hdrlen + TCP6_PKT;
+		data->wp += total_hdr_size;
 	}
+	return data;
+}
+
+struct block *htontcp6(Tcp *tcph, struct block *data, Tcp6hdr *ph,
+					   Tcpctl *tcb)
+{
+	int dlen = blocklen(data);
+	Tcp6hdr *h;
+	uint16_t csum;
+	uint16_t hdrlen, optpad;
+
+	compute_hdrlen_optpad(tcph, TCP6_HDRSIZE, &hdrlen, &optpad, tcb);
+
+	data = alloc_or_pad_block(data, hdrlen + TCP6_PKT);
+	if (data == NULL)
+		return NULL;
 	/* relative to the block start (bp->rp) */
-	data->transport_header_end = hdrlen + TCP4_PKT;
+	data->transport_header_end = hdrlen + TCP6_PKT;
 
 	/* copy in pseudo ip header plus port numbers */
 	h = (Tcp6hdr *) (data->rp);
@@ -1022,22 +1064,7 @@ struct block *htontcp6(Tcp * tcph, struct block *data, Tcp6hdr * ph,
 	hnputs(h->tcpwin, tcph->wnd >> (tcb != NULL ? tcb->snd.scale : 0));
 	hnputs(h->tcpurg, tcph->urg);
 
-	if (tcph->flags & SYN) {
-		opt = h->tcpopt;
-		if (tcph->mss != 0) {
-			*opt++ = MSSOPT;
-			*opt++ = MSS_LENGTH;
-			hnputs(opt, tcph->mss);
-			opt += 2;
-		}
-		if (tcph->ws != 0) {
-			*opt++ = WSOPT;
-			*opt++ = WS_LENGTH;
-			*opt++ = tcph->ws;
-		}
-		while (optpad-- > 0)
-			*opt++ = NOOPOPT;
-	}
+	write_opts(tcph, h->tcpopt, optpad, tcb);
 
 	if (tcb != NULL && tcb->nochecksum) {
 		h->tcpcksum[0] = h->tcpcksum[1] = 0;
@@ -1055,40 +1082,19 @@ struct block *htontcp6(Tcp * tcph, struct block *data, Tcp6hdr * ph,
 	return data;
 }
 
-struct block *htontcp4(Tcp * tcph, struct block *data, Tcp4hdr * ph,
-					   Tcpctl * tcb)
+struct block *htontcp4(Tcp *tcph, struct block *data, Tcp4hdr *ph,
+					   Tcpctl *tcb)
 {
-	int dlen;
+	int dlen = blocklen(data);
 	Tcp4hdr *h;
 	uint16_t csum;
-	uint16_t hdrlen, optpad = 0;
-	uint8_t *opt;
+	uint16_t hdrlen, optpad;
 
-	hdrlen = TCP4_HDRSIZE;
-	if (tcph->flags & SYN) {
-		if (tcph->mss)
-			hdrlen += MSS_LENGTH;
-		if (tcph->ws)
-			hdrlen += WS_LENGTH;
-		optpad = hdrlen & 3;
-		if (optpad)
-			optpad = 4 - optpad;
-		hdrlen += optpad;
-	}
+	compute_hdrlen_optpad(tcph, TCP4_HDRSIZE, &hdrlen, &optpad, tcb);
 
-	if (data) {
-		dlen = blocklen(data);
-		data = padblock(data, hdrlen + TCP4_PKT);
-		if (data == NULL)
-			return NULL;
-	} else {
-		dlen = 0;
-		/* the 64 pad is to meet mintu's */
-		data = block_alloc(hdrlen + TCP4_PKT + 64, MEM_WAIT);
-		if (data == NULL)
-			return NULL;
-		data->wp += hdrlen + TCP4_PKT;
-	}
+	data = alloc_or_pad_block(data, hdrlen + TCP4_PKT);
+	if (data == NULL)
+		return NULL;
 	/* relative to the block start (bp->rp) */
 	data->transport_header_end = hdrlen + TCP4_PKT;
 
@@ -1104,22 +1110,7 @@ struct block *htontcp4(Tcp * tcph, struct block *data, Tcp4hdr * ph,
 	hnputs(h->tcpwin, tcph->wnd >> (tcb != NULL ? tcb->snd.scale : 0));
 	hnputs(h->tcpurg, tcph->urg);
 
-	if (tcph->flags & SYN) {
-		opt = h->tcpopt;
-		if (tcph->mss != 0) {
-			*opt++ = MSSOPT;
-			*opt++ = MSS_LENGTH;
-			hnputs(opt, tcph->mss);
-			opt += 2;
-		}
-		if (tcph->ws != 0) {
-			*opt++ = WSOPT;
-			*opt++ = WS_LENGTH;
-			*opt++ = tcph->ws;
-		}
-		while (optpad-- > 0)
-			*opt++ = NOOPOPT;
-	}
+	write_opts(tcph, h->tcpopt, optpad, tcb);
 
 	if (tcb != NULL && tcb->nochecksum) {
 		h->tcpcksum[0] = h->tcpcksum[1] = 0;
@@ -1134,13 +1125,38 @@ struct block *htontcp4(Tcp * tcph, struct block *data, Tcp4hdr * ph,
 	return data;
 }
 
+static void parse_inbound_opts(Tcp *tcph, uint8_t *opt, uint16_t optsize)
+{
+	uint16_t optlen;
+
+	while (optsize > 0 && *opt != EOLOPT) {
+		if (*opt == NOOPOPT) {
+			optsize--;
+			opt++;
+			continue;
+		}
+		optlen = opt[1];
+		if (optlen < 2 || optlen > optsize)
+			break;
+		switch (*opt) {
+			case MSSOPT:
+				if (optlen == MSS_LENGTH)
+					tcph->mss = nhgets(opt + 2);
+				break;
+			case WSOPT:
+				if (optlen == WS_LENGTH && *(opt + 2) <= 14)
+					tcph->ws = HaveWS | *(opt + 2);
+				break;
+		}
+		optsize -= optlen;
+		opt += optlen;
+	}
+}
+
 int ntohtcp6(Tcp * tcph, struct block **bpp)
 {
 	Tcp6hdr *h;
-	uint8_t *optr;
 	uint16_t hdrlen;
-	uint16_t optlen;
-	int n;
 
 	*bpp = pullupblock(*bpp, TCP6_PKT + TCP6_HDRSIZE);
 	if (*bpp == NULL)
@@ -1167,41 +1183,14 @@ int ntohtcp6(Tcp * tcph, struct block **bpp)
 	*bpp = pullupblock(*bpp, hdrlen + TCP6_PKT);
 	if (*bpp == NULL)
 		return -1;
-
-	optr = h->tcpopt;
-	n = hdrlen - TCP6_HDRSIZE;
-	while (n > 0 && *optr != EOLOPT) {
-		if (*optr == NOOPOPT) {
-			n--;
-			optr++;
-			continue;
-		}
-		optlen = optr[1];
-		if (optlen < 2 || optlen > n)
-			break;
-		switch (*optr) {
-			case MSSOPT:
-				if (optlen == MSS_LENGTH)
-					tcph->mss = nhgets(optr + 2);
-				break;
-			case WSOPT:
-				if (optlen == WS_LENGTH && *(optr + 2) <= 14)
-					tcph->ws = HaveWS | *(optr + 2);
-				break;
-		}
-		n -= optlen;
-		optr += optlen;
-	}
+	parse_inbound_opts(tcph, h->tcpopt, hdrlen - TCP6_HDRSIZE);
 	return hdrlen;
 }
 
 int ntohtcp4(Tcp * tcph, struct block **bpp)
 {
 	Tcp4hdr *h;
-	uint8_t *optr;
 	uint16_t hdrlen;
-	uint16_t optlen;
-	int n;
 
 	*bpp = pullupblock(*bpp, TCP4_PKT + TCP4_HDRSIZE);
 	if (*bpp == NULL)
@@ -1229,31 +1218,7 @@ int ntohtcp4(Tcp * tcph, struct block **bpp)
 	*bpp = pullupblock(*bpp, hdrlen + TCP4_PKT);
 	if (*bpp == NULL)
 		return -1;
-
-	optr = h->tcpopt;
-	n = hdrlen - TCP4_HDRSIZE;
-	while (n > 0 && *optr != EOLOPT) {
-		if (*optr == NOOPOPT) {
-			n--;
-			optr++;
-			continue;
-		}
-		optlen = optr[1];
-		if (optlen < 2 || optlen > n)
-			break;
-		switch (*optr) {
-			case MSSOPT:
-				if (optlen == MSS_LENGTH)
-					tcph->mss = nhgets(optr + 2);
-				break;
-			case WSOPT:
-				if (optlen == WS_LENGTH && *(optr + 2) <= 14)
-					tcph->ws = HaveWS | *(optr + 2);
-				break;
-		}
-		n -= optlen;
-		optr += optlen;
-	}
+	parse_inbound_opts(tcph, h->tcpopt, hdrlen - TCP4_HDRSIZE);
 	return hdrlen;
 }
 
