@@ -910,14 +910,15 @@ void tcpstart(struct conv *s, int mode)
 {
 	Tcpctl *tcb;
 	struct tcppriv *tpriv;
-	/* tcpackproc needs to free this if it ever exits */
-	char *kpname = kmalloc(KNAMELEN, MEM_WAIT);
+	char *kpname;
 
 	tpriv = s->p->priv;
 
 	if (tpriv->ackprocstarted == 0) {
 		qlock(&tpriv->apl);
 		if (tpriv->ackprocstarted == 0) {
+			/* tcpackproc needs to free this if it ever exits */
+			kpname = kmalloc(KNAMELEN, MEM_WAIT);
 			snprintf(kpname, KNAMELEN, "#I%dtcpack", s->p->f->dev);
 			ktask(kpname, tcpackproc, s->p);
 			tpriv->ackprocstarted = 1;
