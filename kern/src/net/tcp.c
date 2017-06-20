@@ -119,7 +119,6 @@ enum {
 	Closed = 0,	/* Connection states */
 	Listen,
 	Syn_sent,
-	Syn_received,
 	Established,
 	Finwait1,
 	Finwait2,
@@ -137,7 +136,7 @@ enum {
 
 /* Must correspond to the enumeration above */
 char *tcpstates[] = {
-	"Closed", "Listen", "Syn_sent", "Syn_received",
+	"Closed", "Listen", "Syn_sent",
 	"Established", "Finwait1", "Finwait2", "Close_wait",
 	"Closing", "Last_ack", "Time_wait"
 };
@@ -289,7 +288,7 @@ struct Tcpctl {
 	int mdev;					/* Mean deviation of round trip */
 	int kacounter;				/* count down for keep alive */
 	uint64_t sndsyntime;		/* time syn sent */
-	uint64_t time;				/* time Finwait2 or Syn_received was sent */
+	uint64_t time;				/* time Finwait2 was sent */
 	int nochecksum;				/* non-zero means don't send checksums */
 	int flgcnt;					/* number of flags in the sequence (FIN,SEQ) */
 	uint32_t ts_recent;			/* timestamp received around last_ack_sent */
@@ -530,7 +529,6 @@ static void tcpshutdown(struct conv *c, int how)
 	 * issues, since we'll never send the FIN.  We'll be shutdown on our end,
 	 * but we'll never tell the distant end.  Might just be an app issue. */
 	switch (tcb->state) {
-	case Syn_received:
 	case Established:
 		tcb->flgcnt++;
 		tcb->snd.nxt++;
@@ -567,7 +565,6 @@ static void tcpclose(struct conv *c)
 		case Syn_sent:
 			localclose(c, NULL);
 			break;
-		case Syn_received:
 		case Established:
 			tcb->flgcnt++;
 			tcb->snd.nxt++;
@@ -599,7 +596,6 @@ void tcpkick(void *x)
 
 	switch (tcb->state) {
 		case Syn_sent:
-		case Syn_received:
 		case Established:
 		case Close_wait:
 			/*
@@ -2184,10 +2180,7 @@ reset:
 			return;
 		}
 
-		/*
-		 *  if there's a matching call in limbo, tcpincoming will
-		 *  return it in state Syn_received
-		 */
+		/* if there's a matching call in limbo, tcpincoming will return it */
 		s = tcpincoming(s, &seg, source, dest, version);
 		if (s == NULL) {
 			qunlock(&tcp->qlock);
@@ -2241,8 +2234,9 @@ reset:
 					tcpsetstate(s, Established);
 					tcpsetscale(s, tcb, seg.ws, tcb->scale);
 				} else {
-					tcb->time = NOW;
-					tcpsetstate(s, Syn_received);	/* DLP - shouldn't this be a reset? */
+					sndrst(tcp, source, dest, length, &seg, version,
+						   "Got SYN with no ACK");
+					goto raise;
 				}
 
 				if (length != 0 || (seg.flags & FIN))
@@ -2256,11 +2250,6 @@ reset:
 			qunlock(&s->qlock);
 			poperror();
 			return;
-		case Syn_received:
-			/* doesn't matter if it's the correct ack, we're just trying to set timing */
-			if (seg.flags & ACK)
-				tcpsynackrtt(s);
-			break;
 	}
 
 	/*
@@ -2269,7 +2258,7 @@ reset:
 	 *  This is an attempt to defeat these stateless DOS attacks.  See
 	 *  corresponding code in tcpsendka().
 	 */
-	if (tcb->state != Syn_received && (seg.flags & RST) == 0) {
+	if ((seg.flags & RST) == 0) {
 		if (tcpporthogdefense
 			&& seq_within(seg.ack, tcb->snd.una - (1 << 31),
 						  tcb->snd.una - (1 << 29))) {
@@ -2342,14 +2331,6 @@ reset:
 			goto raise;
 
 		switch (tcb->state) {
-			case Syn_received:
-				if (!seq_within(seg.ack, tcb->snd.una + 1, tcb->snd.nxt)) {
-					sndrst(tcp, source, dest, length, &seg, version,
-						   "bad seq in Syn_received");
-					goto raise;
-				}
-				update(s, &seg);
-				tcpsetstate(s, Established);
 			case Established:
 			case Close_wait:
 				update(s, &seg);
@@ -2411,7 +2392,6 @@ reset:
 						freeblist(bp);
 					break;
 
-				case Syn_received:
 				case Established:
 				case Finwait1:
 					/* If we still have some data place on
@@ -2469,7 +2449,6 @@ reset:
 			tcb->flags |= FORCE;
 
 			switch (tcb->state) {
-				case Syn_received:
 				case Established:
 					tcb->rcv.nxt++;
 					tcpsetstate(s, Close_wait);
@@ -2668,30 +2647,14 @@ void tcpoutput(struct conv *s)
 		seg.flags = ACK;
 		seg.mss = 0;
 		seg.ws = 0;
-		switch (tcb->state) {
-			case Syn_sent:
-				seg.flags = 0;
-				if (tcb->snd.ptr == tcb->iss) {
-					seg.flags |= SYN;
-					dsize--;
-					seg.mss = tcb->mss;
-					seg.ws = tcb->scale;
-				}
-				break;
-			case Syn_received:
-				/*
-				 *  don't send any data with a SYN/ACK packet
-				 *  because Linux rejects the packet in its
-				 *  attempt to solve the SYN attack problem
-				 */
-				if (tcb->snd.ptr == tcb->iss) {
-					seg.flags |= SYN;
-					dsize = 0;
-					ssize = 1;
-					seg.mss = tcb->mss;
-					seg.ws = tcb->scale;
-				}
-				break;
+		if (tcb->state == Syn_sent) {
+			seg.flags = 0;
+			if (tcb->snd.ptr == tcb->iss) {
+				seg.flags |= SYN;
+				dsize--;
+				seg.mss = tcb->mss;
+				seg.ws = tcb->scale;
+			}
 		}
 		seg.seq = tcb->snd.ptr;
 		seg.ack = tcb->rcv.nxt;
@@ -3280,19 +3243,11 @@ int tcpgc(struct Proto *tcp)
 		if (!canqlock(&c->qlock))
 			continue;
 		tcb = (Tcpctl *) c->ptcl;
-		switch (tcb->state) {
-			case Syn_received:
-				if (NOW - tcb->time > 5000) {
-					localclose(c, "timed out");
-					n++;
-				}
-				break;
-			case Finwait2:
-				if (NOW - tcb->time > 5 * 60 * 1000) {
-					localclose(c, "timed out");
-					n++;
-				}
-				break;
+		if (tcb->state == Finwait2) {
+			if (NOW - tcb->time > 5 * 60 * 1000) {
+				localclose(c, "timed out");
+				n++;
+			}
 		}
 		qunlock(&c->qlock);
 	}
