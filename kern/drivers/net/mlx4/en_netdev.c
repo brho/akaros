@@ -1675,7 +1675,7 @@ int mlx4_en_start_port(struct ether *dev)
 #if 0 // AKAROS_PORT
 		tx_ring->tx_queue = netdev_get_tx_queue(dev, i);
 #else
-		tx_ring->tx_queue = 0; // TODO
+		tx_ring->tx_queue = 0; /* TODO multi-queue support. */
 #endif
 
 		/* Arm CQ for TX completions */

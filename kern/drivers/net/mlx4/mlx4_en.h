@@ -257,6 +257,7 @@ struct mlx4_en_tx_ring {
 	unsigned long		xmit_more;
 	struct mlx4_bf		bf;
 	unsigned long		queue_stopped;
+	struct poke_tracker	poker;
 
 	/* Following part should be mostly read */
 	cpumask_t		affinity_mask;
@@ -281,6 +282,14 @@ struct mlx4_en_tx_ring {
 	struct netdev_queue	*tx_queue;
 	int			hwtstamp_tx_type;
 } ____cacheline_aligned_in_smp;
+
+struct mlx4_poke_args {
+	struct ether			*edev;
+	struct mlx4_en_priv		*priv;
+	struct mlx4_en_tx_ring	*ring;
+};
+
+void __mlx4_xmit_poke(void *args);
 
 struct mlx4_en_rx_desc {
 	/* actual number of entries depends on rx ring stride */
@@ -613,6 +622,13 @@ struct mlx4_mac_entry {
 static inline struct mlx4_cqe *mlx4_en_get_cqe(void *buf, int idx, int cqe_sz)
 {
 	return buf + idx * cqe_sz;
+}
+
+static inline bool mlx4_en_ring_is_full(struct mlx4_en_tx_ring *ring)
+{
+	/* Check available TXBBs And 2K spare for prefetch */
+	return (int)(ring->prod - ring->cons) >
+	       ring->size - HEADROOM - MAX_DESC_TXBBS;
 }
 
 #ifdef CONFIG_NET_RX_BUSY_POLL

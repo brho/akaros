@@ -219,6 +219,7 @@ int mlx4_en_activate_tx_ring(struct mlx4_en_priv *priv,
 		netif_set_xps_queue(priv->dev, &ring->affinity_mask,
 				    ring->queue_index);
 #endif
+	poke_init(&ring->poker, __mlx4_xmit_poke);
 
 	return err;
 }
@@ -490,6 +491,15 @@ static bool mlx4_en_process_tx_cq(struct ether *dev,
 		netif_tx_wake_queue(ring->tx_queue);
 		ring->wake_queue++;
 	}
+#else
+	struct mlx4_poke_args args;
+
+	if (txbbs_skipped > 0) {
+		args.edev = dev;
+		args.priv = priv;
+		args.ring = ring;
+		poke(&ring->poker, &args);
+	}
 #endif
 	return done < budget;
 }
@@ -728,10 +738,9 @@ static size_t get_lso_hdr_size(struct block *block)
 	return block->transport_header_end;
 }
 
-netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
+netdev_tx_t mlx4_send_packet(struct block *block, struct mlx4_en_priv *priv,
+                             struct mlx4_en_tx_ring *ring)
 {
-	struct mlx4_en_priv *priv = netdev_priv(dev);
-	struct mlx4_en_tx_ring *ring;
 	struct mlx4_en_tx_desc *tx_desc;
 	struct mlx4_wqe_data_seg *data;
 	struct mlx4_en_tx_info *tx_info;
@@ -751,8 +760,6 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 
 	if (!priv->port_up)
 		goto tx_drop;
-
-	ring = priv->tx_ring[0]; /* TODO multi-queue support */
 
 	lso_header_size = get_lso_hdr_size(block);
 	for (i_frag = 0; i_frag < block->nr_extra_bufs; i_frag++) {
@@ -918,6 +925,8 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev)
 	/* If we used a bounce buffer then copy descriptor back into place */
 	if (unlikely(bounce))
 		tx_desc = mlx4_en_bounce_to_desc(priv, ring, index, desc_size);
+
+	/* Flow control is handled by the mlx4_transmit function in main.c */
 
 	real_size = (real_size / 16) & 0x3f; /* Clear fence bit. */
 
@@ -1274,3 +1283,31 @@ tx_drop:
 }
 #endif
 
+void __mlx4_xmit_poke(void *args)
+{
+	struct ether *edev = ((struct mlx4_poke_args*)args)->edev;
+	struct mlx4_en_priv *priv = ((struct mlx4_poke_args*)args)->priv;
+	struct mlx4_en_tx_ring *ring = ((struct mlx4_poke_args*)args)->ring;
+	struct block *block;
+
+	while (!mlx4_en_ring_is_full(ring)) {
+		block = qget(edev->oq);
+		if (!block)
+			break;
+		mlx4_send_packet(block, priv, ring);
+	}
+}
+
+void mlx4_transmit(struct ether *edev)
+{
+	struct mlx4_en_priv *priv = netdev_priv(edev);
+	struct mlx4_en_tx_ring *ring;
+	struct mlx4_poke_args args;
+
+	/* TODO multi-queue support. */
+	ring = priv->tx_ring[0];
+	args.edev = edev;
+	args.priv = priv;
+	args.ring = ring;
+	poke(&ring->poker, &args);
+}

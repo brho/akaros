@@ -3736,6 +3736,7 @@ end:
 #endif
 }
 
+#if 0 // AKAROS_PORT
 static void mlx4_shutdown(struct pci_device *pdev)
 {
 	struct mlx4_dev_persistent *persist = pci_get_drvdata(pdev);
@@ -3746,6 +3747,12 @@ static void mlx4_shutdown(struct pci_device *pdev)
 		mlx4_unload_one(pdev);
 	qunlock(&persist->interface_state_mutex);
 }
+#else
+static void mlx4_shutdown(struct ether *edev)
+{
+	panic("Not implemented");
+}
+#endif
 
 #if 0 // AKAROS_PORT
 static const struct pci_error_handlers mlx4_err_handler = {
@@ -3854,7 +3861,6 @@ module_exit(mlx4_cleanup);
 
 extern int mlx4_en_init(void);
 extern int mlx4_en_open(struct ether *dev);
-extern netdev_tx_t mlx4_send_packet(struct block *block, struct ether *dev);
 
 static const struct pci_device_id *search_pci_table(struct pci_device *needle)
 {
@@ -3870,31 +3876,21 @@ static const struct pci_device_id *search_pci_table(struct pci_device *needle)
 	return NULL;
 }
 
-static void ether_attach(struct ether *edev)
+static void mlx4_attach(struct ether *edev)
 {
 	mlx4_en_open(edev);
 }
 
-static void ether_transmit(struct ether *edev)
-{
-	struct block *block;
+/* The organization of this driver is a fucking catastrophe */
+extern void mlx4_transmit(struct ether *edev);
 
-	while ((block = qget(edev->oq)))
-		mlx4_send_packet(block, edev);
-}
-
-static long ether_ifstat(struct ether *edev, void *a, long n, uint32_t offset)
+static long mlx4_ifstat(struct ether *edev, void *a, long n, uint32_t offset)
 {
 	printk("edev %p a %p n %d offset %u\n", edev, a, n, offset);
 	return 0;
 }
 
-static long ether_ctl(struct ether *edev, void *buf, long n)
-{
-	panic("Not implemented");
-}
-
-static void ether_shutdown(struct ether *edev)
+static long mlx4_ctl(struct ether *edev, void *buf, long n)
 {
 	panic("Not implemented");
 }
@@ -3966,11 +3962,11 @@ static int mlx4_pnp(struct ether *edev)
 	edev->tbdf = MKBUS(BusPCI, pdev->bus, pdev->dev, pdev->func);
 	edev->mbps = 10000; // FIXME
 
-	edev->attach = ether_attach;
-	edev->transmit = ether_transmit;
-	edev->ifstat = ether_ifstat;
-	edev->ctl = ether_ctl;
-	edev->shutdown = ether_shutdown;
+	edev->attach = mlx4_attach;
+	edev->transmit = mlx4_transmit;
+	edev->ifstat = mlx4_ifstat;
+	edev->ctl = mlx4_ctl;
+	edev->shutdown = mlx4_shutdown;
 
 	edev->arg = edev;
 	edev->promiscuous = NULL;
