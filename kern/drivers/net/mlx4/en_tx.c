@@ -530,10 +530,15 @@ static void mlx4_en_poll_tx_cq(uint32_t srcid, long a0, long a1, long a2)
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 	int clean_complete;
 
-	clean_complete = mlx4_en_process_tx_cq(dev, cq);
-	if (!clean_complete)
-		return;
-
+	/* On Linux, when we didn't finish the clean, we ask for another NAPI run,
+	 * or rather we don't stop the polling.  On Akaros, we're in a kthread /
+	 * KMSG, so we can just yield. */
+	while (1) {
+		clean_complete = mlx4_en_process_tx_cq(dev, cq);
+		if (clean_complete)
+			break;
+		kthread_yield();
+	}
 	mlx4_en_arm_cq(priv, cq);
 }
 

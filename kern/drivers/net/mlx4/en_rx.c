@@ -1105,7 +1105,16 @@ static void mlx4_en_poll_rx_cq(uint32_t srcid, long a0, long a1, long a2)
 	if (!mlx4_en_cq_lock_napi(cq))
 		return;
 
-	done = mlx4_en_process_rx_cq(dev, cq, budget);
+	/* Linux only requests more NAPI polls if we're on the right CPU.  I left
+	 * the code below.  On Akaros, we can kthread_yield in a loop instead of
+	 * interfacing with NAPI. */
+	while (1) {
+		done = mlx4_en_process_rx_cq(dev, cq, budget);
+		if (done < budget)
+			break;
+		/* If we used up all the quota - we're probably not done yet... */
+		kthread_yield();
+	}
 
 	mlx4_en_cq_unlock_napi(cq);
 
