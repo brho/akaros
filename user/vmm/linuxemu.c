@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <sys/syscall.h>
 #include <vmm/linux_syscalls.h>
+#include <sys/time.h>
 
 /* TODO: have an array which classifies syscall args
  * and "special" system calls (ones with weird return
@@ -40,7 +41,8 @@ linuxemu(struct guest_thread *gth, struct vm_trapframe *tf)
 		//tf->tf_rax = -ENOSYS;
 		break;
 	case DUNE_SYS_GETTIMEOFDAY:
-		tf->tf_rax = 0;
+		tf->tf_rax = gettimeofday((struct timeval*)tf->tf_rdi,
+		                          (struct timezone*)tf->tf_rsi);
 		ret = true;
 		break;
 	case DUNE_SYS_GETTID:
