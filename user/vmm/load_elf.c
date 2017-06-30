@@ -12,7 +12,7 @@
  * We assume that memory is set up correctly, and it will go hard
  * with you if it is not. */
 uintptr_t
-load_elf(char *filename)
+load_elf(char *filename, uint64_t offset)
 {
 	Elf64_Ehdr *ehdr;
 	Elf *elf;
@@ -85,7 +85,7 @@ load_elf(char *filename)
 		        i, h->p_offset, pa, h->p_paddr, h->p_filesz);
 		tot = 0;
 		while (tot < h->p_filesz) {
-			int amt = pread(fd, (void *)(pa + tot), h->p_filesz - tot,
+			int amt = pread(fd, (void *)(pa + tot + offset), h->p_filesz - tot,
 			                h->p_offset + tot);
 
 			if (amt < 1)
@@ -101,7 +101,7 @@ load_elf(char *filename)
 	}
 
 	close(fd);
-	ret = ehdr->e_entry;
+	ret = ehdr->e_entry + offset;
 	elf_end(elf);
 	return ret;
 fail:
