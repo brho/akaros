@@ -14,6 +14,7 @@ struct vmm_gpcore_init {
 	void					*posted_irq_desc;
 	void					*vapic_addr;
 	void					*apic_addr;
+	void					*user_data;
 };
 
 /* Intel VM Trap Injection Fields */

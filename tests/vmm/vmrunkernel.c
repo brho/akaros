@@ -22,6 +22,7 @@
 #include <parlib/uthread.h>
 #include <vmm/linux_bootparam.h>
 #include <getopt.h>
+#include <parlib/alarm.h>
 
 #include <vmm/virtio.h>
 #include <vmm/virtio_blk.h>
@@ -48,24 +49,6 @@ void vapic_status_dump(FILE *f, void *vapic);
 #else
 #define BITOP_ADDR(x) "+m" (*(volatile long *) (x))
 #endif
-
-void *timer_thread(void *arg)
-{
-	uint8_t vector;
-	uint32_t initial_count;
-	while (1) {
-		for (int i = 0; i < vm->nr_gpcs; i++) {
-			vector = ((uint32_t *)gpcis[i].vapic_addr)[0x32] & 0xff;
-			initial_count = ((uint32_t *)gpcis[i].vapic_addr)[0x38];
-			if (vector && initial_count)
-				vmm_interrupt_guest(vm, i, vector);
-		}
-		uthread_usleep(1000);
-	}
-	fprintf(stderr, "SENDING TIMER\n");
-	return 0;
-}
-
 
 static void virtio_poke_guest(uint8_t vec, uint32_t dest)
 {
@@ -300,6 +283,87 @@ void alloc_intr_pages(void)
 		((uint32_t *)gpcis[i].vapic_addr)[0x30/4] = 0x01060015;
 		/* Set LOGICAL APIC ID. */
 		((uint32_t *)gpcis[i].vapic_addr)[0xD0/4] = 1 << i;
+	}
+}
+
+/* This rams all cores with a valid timer vector and initial count
+ * with a timer interrupt. Used only for debugging/as a temporary workaround */
+void *inject_timer_spurious(void *args)
+{
+	struct vmm_gpcore_init *curgpci;
+	uint32_t initial_count;
+	uint8_t vector;
+
+	for (int i = 0; i < vm->nr_gpcs; i++) {
+		curgpci = &gpcis[i];
+		vector = ((uint32_t *)curgpci->vapic_addr)[0x32] & 0xff;
+		initial_count = ((uint32_t *)curgpci->vapic_addr)[0x38];
+		if (initial_count && vector)
+			vmm_interrupt_guest(vm, i, vector);
+	}
+	return 0;
+}
+
+/* This injects the timer interrupt to the guest. */
+void *inject_timer(void *args)
+{
+	uint64_t gpcoreid = (uint64_t)args;
+	struct vmm_gpcore_init *gpci = &gpcis[gpcoreid];
+	uint8_t vector = ((uint32_t *)gpci->vapic_addr)[0x32] & 0xff;
+
+	vmm_interrupt_guest(vm, gpcoreid, vector);
+	return 0;
+}
+
+/* This handler must never call __set_alarm after interrupting the guest,
+ * otherwise the guest could try to write to the timer msrs and cause a
+ * race condition. */
+void timer_alarm_handler(struct alarm_waiter *waiter)
+{
+	uint8_t vector;
+	uint32_t initial_count;
+	uint32_t divide_config_reg;
+	uint32_t multiplier;
+	uint32_t timer_mode;
+	uint64_t gpcoreid = *((uint64_t *)waiter->data);
+	struct vmm_gpcore_init *gpci = &gpcis[gpcoreid];
+
+	vector = ((uint32_t *)gpci->vapic_addr)[0x32] & 0xff;
+	timer_mode = (((uint32_t *)gpci->vapic_addr)[0x32] >> 17) & 0x03;
+	initial_count = ((uint32_t *)gpci->vapic_addr)[0x38];
+	divide_config_reg = ((uint32_t *)gpci->vapic_addr)[0x3E];
+
+	/* Don't blame me for this. Look at the intel manual
+	 * Vol 3 10.5.4 APIC Timer */
+	multiplier = (((divide_config_reg & 0x08) >> 1) |
+	              (divide_config_reg & 0x03)) + 1;
+	multiplier &= 0x07;
+
+	if (vector && initial_count && timer_mode == 0x01) {
+		/* This is periodic, we reset the alarm */
+		set_awaiter_inc(waiter, initial_count << multiplier);
+		__set_alarm(waiter);
+	}
+
+	/* We spin up a task to inject the timer because vmm_interrupt_guest
+	 * may block and we can't do that from vcore context. */
+	vmm_run_task(vm, inject_timer, (void *)gpcoreid);
+}
+
+/* This sets up the structs for each of the guest pcore's timers, but
+ * doesn't actually start the alarms until the core writes all the reasonable
+ * values to the x2apic msrs. */
+void init_timer_alarms(void)
+{
+	uint64_t *gpcoreids = malloc(sizeof(uint64_t) * vm->nr_gpcs);
+
+	for (uint64_t i = 0; i < vm->nr_gpcs; i++) {
+		struct alarm_waiter *timer_alarm = malloc(sizeof(struct alarm_waiter));
+
+		gpcoreids[i] = i;
+		gpcis[i].user_data = (void *)timer_alarm;
+		timer_alarm->data = gpcoreids + i;
+		init_awaiter(timer_alarm, timer_alarm_handler);
 	}
 }
 
@@ -558,7 +622,8 @@ int main(int argc, char **argv)
 
 	/* Set maxcpus to the number of cores we're giving the guest. */
 	len = snprintf(cmdlinep, cmdlinesz,
-	               "\n maxcpus=%lld", vm->nr_gpcs);
+	               "\n maxcpus=%lld\n possible_cpus=%lld", vm->nr_gpcs,
+	               vm->nr_gpcs);
 	if (len >= cmdlinesz) {
 		fprintf(stderr, "Too many arguments to the linux command line.");
 		exit(1);
@@ -570,7 +635,7 @@ int main(int argc, char **argv)
 	assert(!ret);
 
 	cr3 = setup_paging(memstart, memsize, debug);
-	vmm_run_task(vm, timer_thread, 0);
+	init_timer_alarms();
 
 	vm_tf = gth_to_vmtf(vm->gths[0]);
 	vm_tf->tf_cr3 = (uint64_t) cr3;

@@ -301,7 +301,10 @@ void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr)
 	assert(new_thread);
 	new_thread->state = UT_NOT_RUNNING;
 	/* Set the signal state. */
-	new_thread->sigstate.mask = current_uthread->sigstate.mask;
+	if (current_uthread)
+		new_thread->sigstate.mask = current_uthread->sigstate.mask;
+	else
+		new_thread->sigstate.mask = 0;
 	__sigemptyset(&new_thread->sigstate.pending);
 	new_thread->sigstate.data = NULL;
 	/* They should have zero'd the uthread.  Let's check critical things: */

@@ -29,6 +29,7 @@
 #include <vmm/sched.h>
 #include <vmm/vmm.h>
 #include <ros/arch/trapframe.h>
+#include <parlib/alarm.h>
 
 struct emmsr {
 	uint32_t reg;
@@ -213,12 +214,102 @@ static int emsr_fakewrite(struct guest_thread *vm_thread, struct emmsr *msr,
 	return 0;
 }
 
+static int apic_icr_write(struct guest_thread *vm_thread,
+                          struct vmm_gpcore_init *gpci)
+{
+	/* We currently only handle physical destinations.
+	 * TODO(ganshun): Support logical destinations if needed. */
+	struct virtual_machine *vm = gth_to_vm(vm_thread);
+	struct vm_trapframe *vm_tf = gth_to_vmtf(vm_thread);
+	uint32_t destination = vm_tf->tf_rdx & 0xffffffff;
+	uint8_t vector = vm_tf->tf_rax & 0xff;
+	uint8_t type = (vm_tf->tf_rax >> 8) & 0x7;
+	int apic_offset = vm_tf->tf_rcx & 0xff;
+
+	if (destination >= vm->nr_gpcs && destination != 0xffffffff) {
+		fprintf(stderr, "UNSUPPORTED DESTINATION 0x%02x!\n",
+				destination);
+		return SHUTDOWN_UNHANDLED_EXIT_REASON;
+	}
+	switch (type) {
+	case 0:
+		/* Send IPI */
+		if (destination == 0xffffffff) {
+			/* Broadcast */
+			for (int i = 0; i < vm->nr_gpcs; i++)
+				vmm_interrupt_guest(vm, i, vector);
+		} else {
+			/* Send individual IPI */
+			vmm_interrupt_guest(vm, destination, vector);
+		}
+		break;
+	default:
+		/* This is not a terrible error, we don't currently support
+		 * SIPIs and INIT IPIs. The guest is allowed to try to make
+		 * them for now even though we don't do anything. */
+		fprintf(stderr, "Unsupported IPI type %d!\n", type);
+		break;
+	}
+
+	((uint32_t *)(gpci->vapic_addr))[apic_offset] =
+	                                       (uint32_t)(vm_tf->tf_rax);
+	((uint32_t *)(gpci->vapic_addr))[apic_offset + 1] =
+	                                       (uint32_t)(vm_tf->tf_rdx);
+	return 0;
+}
+
+static int apic_timer_write(struct guest_thread *vm_thread,
+                            struct vmm_gpcore_init *gpci)
+{
+	uint32_t multiplier;
+	uint8_t vector;
+	uint32_t initial_count;
+	uint32_t divide_config_reg;
+	struct alarm_waiter *timer_waiter;
+	struct vm_trapframe *vm_tf = gth_to_vmtf(vm_thread);
+	int apic_offset = vm_tf->tf_rcx & 0xff;
+
+	((uint32_t *)(gpci->vapic_addr))[apic_offset] =
+                                       (uint32_t)(vm_tf->tf_rax);
+
+	/* See if we can set the timer. */
+	vector = ((uint32_t *)gpci->vapic_addr)[0x32] & 0xff;
+	initial_count = ((uint32_t *)gpci->vapic_addr)[0x38];
+	divide_config_reg = ((uint32_t *)gpci->vapic_addr)[0x3E];
+	timer_waiter = (struct alarm_waiter *)gpci->user_data;
+
+	uint64_t gpcoreid = *((uint64_t *)timer_waiter->data);
+
+	/* This is a precaution on my part, in case the guest tries to look at
+	 * the current count on the lapic. I wanted it to be something other than
+	 * 0 just in case. The current count will never be right short of us
+	 * properly emulating it. */
+	((uint32_t *)(gpci->vapic_addr))[0x39] = initial_count;
+
+	if (!timer_waiter)
+		panic("NO WAITER");
+
+	/* Look at the intel manual Vol 3 10.5.4 APIC Timer */
+	multiplier = (((divide_config_reg & 0x08) >> 1) |
+	              (divide_config_reg & 0x03)) + 1;
+	multiplier &= 0x07;
+
+	unset_alarm(timer_waiter);
+
+	if (vector && initial_count) {
+		set_awaiter_rel(timer_waiter, initial_count << multiplier);
+		set_alarm(timer_waiter);
+	}
+	return 0;
+}
+
 static int emsr_apic(struct guest_thread *vm_thread,
                      struct vmm_gpcore_init *gpci, uint32_t opcode)
 {
 	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
 	int apic_offset = vm_tf->tf_rcx & 0xff;
 	uint64_t value;
+	int error;
 
 	if (opcode == EXIT_REASON_MSR_READ) {
 		if (vm_tf->tf_rcx != MSR_LAPIC_ICR) {
@@ -229,46 +320,20 @@ static int emsr_apic(struct guest_thread *vm_thread,
 			vm_tf->tf_rdx = ((uint32_t *)(gpci->vapic_addr))[apic_offset + 1];
 		}
 	} else {
-		if (vm_tf->tf_rcx != MSR_LAPIC_ICR)
+		switch (vm_tf->tf_rcx) {
+		case MSR_LAPIC_ICR:
+			error = apic_icr_write(vm_thread, gpci);
+			if (error != 0)
+				return error;
+			break;
+		case MSR_LAPIC_DIVIDE_CONFIG_REG:
+		case MSR_LAPIC_LVT_TIMER:
+		case MSR_LAPIC_INITIAL_COUNT:
+			apic_timer_write(vm_thread, gpci);
+			break;
+		default:
 			((uint32_t *)(gpci->vapic_addr))[apic_offset] =
-			                                       (uint32_t)(vm_tf->tf_rax);
-		else {
-			/* We currently only handle physical destinations.
-			 * TODO(ganshun): Support logical destinations if needed. */
-			struct virtual_machine *vm = gth_to_vm(vm_thread);
-			uint32_t destination = vm_tf->tf_rdx & 0xffffffff;
-			uint8_t vector = vm_tf->tf_rax & 0xff;
-			uint8_t type = (vm_tf->tf_rax >> 8) & 0x7;
-
-			if (destination >= vm->nr_gpcs && destination != 0xffffffff) {
-				fprintf(stderr, "UNSUPPORTED DESTINATION 0x%02x!\n",
-						destination);
-				return SHUTDOWN_UNHANDLED_EXIT_REASON;
-			}
-			switch (type) {
-				case 0:
-					/* Send IPI */
-					if (destination == 0xffffffff) {
-						/* Broadcast */
-						for (int i = 0; i < vm->nr_gpcs; i++)
-							vmm_interrupt_guest(vm, i, vector);
-					} else {
-						/* Send individual IPI */
-						vmm_interrupt_guest(vm, destination, vector);
-					}
-					break;
-				default:
-					/* This is not a terrible error, we don't currently support
-					 * SIPIs and INIT IPIs. The guest is allowed to try to make
-					 * them for now even though we don't do anything. */
-					fprintf(stderr, "Unsupported IPI type %d!\n", type);
-					break;
-			}
-
-			((uint32_t *)(gpci->vapic_addr))[apic_offset] =
-			                                       (uint32_t)(vm_tf->tf_rax);
-			((uint32_t *)(gpci->vapic_addr))[apic_offset + 1] =
-			                                       (uint32_t)(vm_tf->tf_rdx);
+		                                       (uint32_t)(vm_tf->tf_rax);
 		}
 	}
 	return 0;
