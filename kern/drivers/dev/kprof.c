@@ -36,6 +36,7 @@ enum {
 	Kprofdirqid = 0,
 	Kprofdataqid,
 	Kprofctlqid,
+	Kptracectlqid,
 	Kptraceqid,
 	Kprintxqid,
 	Kmpstatqid,
@@ -59,6 +60,7 @@ struct dirtab kproftab[] = {
 	{".",			{Kprofdirqid,		0, QTDIR}, 0,	DMDIR|0550},
 	{"kpdata",		{Kprofdataqid},		0,	0600},
 	{"kpctl",		{Kprofctlqid},		0,	0600},
+	{"kptrace_ctl",	{Kptracectlqid},	0,	0660},
 	{"kptrace",		{Kptraceqid},		0,	0600},
 	{"kprintx",		{Kprintxqid},		0,	0600},
 	{"mpstat",		{Kmpstatqid},		0,	0600},
@@ -373,6 +375,15 @@ static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
 			kprof_stop_profiler();
 		} else {
 			error(EFAIL, kprof_control_usage);
+		}
+		break;
+	case Kptracectlqid:
+		if (cb->nf < 1)
+			error(EFAIL, "Bad kptrace_ctl option (reset)");
+		if (!strcmp(cb->f[0], "clear")) {
+			spin_lock_irqsave(&ktrace_lock);
+			circular_buffer_clear(&ktrace_data);
+			spin_unlock_irqsave(&ktrace_lock);
 		}
 		break;
 	case Kptraceqid:

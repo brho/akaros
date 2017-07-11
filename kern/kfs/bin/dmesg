@@ -1,0 +1,14 @@
+#!/bin/sh
+
+if [[ x$1 == x"-C" ]]
+then
+	echo "clear" > "#kprof/kptrace_ctl"
+	exit
+fi
+
+cat "#kprof/kptrace"
+
+if [[ x$1 == x"-c" ]]
+then
+	echo "clear" > "#kprof/kptrace_ctl"
+fi
