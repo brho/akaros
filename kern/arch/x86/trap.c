@@ -892,6 +892,9 @@ static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 		case 0x01:
 			/* Set the hypervisor bit to let the guest know it is virtualized */
 			ecx |= 1 << 31;
+			/* Unset the monitor capability bit so that the guest does not try
+			 * to use monitor/mwait. */
+			ecx &= ~(1 << 3);
 			/* Unset the vmx capability bit so that the guest does not try
 			 * to turn it on. */
 			ecx &= ~(1 << 5);
@@ -916,6 +919,12 @@ static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 			ebx = 0x4b4d564b;
 			ecx = 0x564b4d56;
 			edx = 0x0000004d;
+			break;
+		/* Hypervisor Features. */
+		case 0x40000003:
+			/* Unset the monitor capability bit so that the guest does not try
+			 * to use monitor/mwait. */
+			edx &= ~(1 << 0);
 			break;
 		default:
 			break;

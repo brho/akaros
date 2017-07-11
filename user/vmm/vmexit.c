@@ -300,18 +300,6 @@ static bool handle_halt(struct guest_thread *gth)
 	return TRUE;
 }
 
-static bool handle_mwait(struct guest_thread *gth)
-{
-	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
-
-	/* TODO: we need to handle the actual monitor part of mwait.  This just
-	 * implements the power management / halting.  Likewise, it's possible IRQs
-	 * are disabled (as with halt). */
-	sleep_til_irq(gth);
-	vm_tf->tf_rip += 3;
-	return TRUE;
-}
-
 /* Is this a vmm specific thing?  or generic?
  *
  * what do we do when we want to kill the vm?  what are our other options? */
@@ -335,8 +323,6 @@ bool handle_vmexit(struct guest_thread *gth)
 		return handle_apic_access(gth);
 	case EXIT_REASON_HLT:
 		return handle_halt(gth);
-	case EXIT_REASON_MWAIT_INSTRUCTION:
-		return handle_mwait(gth);
 	case EXIT_REASON_EXTERNAL_INTERRUPT:
 	case EXIT_REASON_APIC_WRITE:
 		/* TODO: just ignore these? */
