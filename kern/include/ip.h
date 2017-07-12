@@ -427,7 +427,8 @@ enum {
 	Logrudp = 1 << 15,
 	Logrudpmsg = 1 << 16,
 	Logesp = 1 << 17,
-	Logtcpwin = 1 << 18,
+	Logtcpreset = 1 << 18,
+	Logtcpverbose = 1 << 19,
 };
 
 void netloginit(struct Fs *);

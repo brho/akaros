@@ -1316,7 +1316,7 @@ sndrst(struct Proto *tcp, uint8_t * source, uint8_t * dest,
 	Tcp4hdr ph4;
 	Tcp6hdr ph6;
 
-	netlog(tcp->f, Logtcp, "sndrst: %s\n", reason);
+	netlog(tcp->f, Logtcpreset, "sndrst: %s\n", reason);
 
 	tpriv = tcp->priv;
 
@@ -2184,7 +2184,7 @@ void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
 
 	/* s, the conv matching the n-tuple, was set above */
 	if (s == NULL) {
-		netlog(f, Logtcp, "iphtlook failed: src %I:%u, dst %I:%u\n",
+		netlog(f, Logtcpreset, "iphtlook failed: src %I:%u, dst %I:%u\n",
 		       source, seg.source, dest, seg.dest);
 reset:
 		sndrst(tcp, source, dest, length, &seg, version, "no conversation");
@@ -2309,7 +2309,8 @@ reset:
 
 	/* Cut the data to fit the receive window */
 	if (tcptrim(tcb, &seg, &bp, &length) == -1) {
-		netlog(f, Logtcp, "tcp len < 0, %lu %d\n", seg.seq, length);
+		netlog(f, Logtcp, "%I.%d -> %I.%d: tcp len < 0, %lu %d\n",
+		       s->raddr, s->rport, s->laddr, s->lport, seg.seq, length);
 		update(s, &seg);
 		if (qlen(s->wq) + tcb->flgcnt == 0 && tcb->state == Closing) {
 			tcphalt(tpriv, &tcb->rtt_timer);
