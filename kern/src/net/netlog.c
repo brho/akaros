@@ -255,9 +255,10 @@ void netlogctl(struct Fs *f, char *s, int n)
 
 void netlog(struct Fs *f, int mask, char *fmt, ...)
 {
-	char buf[128], *t, *fp;
+	char buf[256], *t, *fp;
 	int i, n;
 	va_list arg;
+	struct timespec ts_now;
 
 	if (!(f->alog->logmask & mask))
 		return;
@@ -265,8 +266,14 @@ void netlog(struct Fs *f, int mask, char *fmt, ...)
 	if (f->alog->opens == 0)
 		return;
 
+	/* Same style as trace_printk */
+	if (likely(__proc_global_info.tsc_freq))
+		ts_now = tsc2timespec(read_tsc());
+	n = snprintf(buf, sizeof(buf), "[%lu.%09lu]: ",
+	             ts_now.tv_sec, ts_now.tv_nsec);
+
 	va_start(arg, fmt);
-	n = vsnprintf(buf, sizeof(buf), fmt, arg);
+	n += vsnprintf(buf + n, sizeof(buf) - n, fmt, arg);
 	va_end(arg);
 
 	spin_lock(&f->alog->lock);
