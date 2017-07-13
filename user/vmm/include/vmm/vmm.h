@@ -95,8 +95,8 @@ int __apic_access(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
                   uint64_t *regp, int store);
 int vmm_interrupt_guest(struct virtual_machine *vm, unsigned int gpcoreid,
                         unsigned int vector);
-uintptr_t load_elf(char *filename, uint64_t offset);
-
+uintptr_t load_elf(char *filename, uint64_t offset, uint64_t *highest);
+ssize_t setup_initrd(char *filename, void *membase, size_t memsize);
 /* Lookup helpers */
 
 static struct virtual_machine *gth_to_vm(struct guest_thread *gth)

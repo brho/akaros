@@ -373,6 +373,7 @@ int main(int argc, char **argv)
 	int debug = 0;
 	unsigned long long memsize = GiB;
 	uintptr_t memstart = MinMemory;
+	uintptr_t memend;
 	struct boot_params *bp;
 	char cmdline_default[512] = {0};
 	char *cmdline_extra = "\0";
@@ -395,6 +396,9 @@ int main(int argc, char **argv)
 	uint64_t num_pcs = 1;
 	bool is_greedy = FALSE;
 	bool is_scp = FALSE;
+	char *initrd = NULL;
+	uint64_t initrd_start = 0, initrd_size = 0;
+	uint64_t kernel_max_address;
 
 	static struct option long_options[] = {
 		{"debug",         no_argument,       0, 'd'},
@@ -404,6 +408,7 @@ int main(int argc, char **argv)
 		{"memstart",      required_argument, 0, 'M'},
 		{"cmdline_extra", required_argument, 0, 'c'},
 		{"greedy",        no_argument,       0, 'g'},
+		{"initrd",        required_argument, 0, 'i'},
 		{"scp",           no_argument,       0, 's'},
 		{"image_file",    required_argument, 0, 'f'},
 		{"cmdline",       required_argument, 0, 'k'},
@@ -435,7 +440,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "static initializers are broken\n");
 	memsize = GiB;
 
-	while ((c = getopt_long(argc, argv, "dvm:M:c:gsf:k:N:n:t:hR:",
+	while ((c = getopt_long(argc, argv, "dvi:m:M:c:gsf:k:N:n:t:hR:",
 				long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
@@ -470,6 +475,9 @@ int main(int argc, char **argv)
 			break;
 		case 'f':	/* file to pass to blk_init */
 			disk_image_file = optarg;
+			break;
+		case 'i':
+			initrd = optarg;
 			break;
 		case 'k':	/* specify file to get cmdline args from */
 			cmdline_fd = open(optarg, O_RDONLY);
@@ -538,7 +546,8 @@ int main(int argc, char **argv)
 
 	alloc_intr_pages();
 
-	if ((uintptr_t)(memstart + memsize) >= (uintptr_t)BRK_START) {
+	memend = memstart + memsize - 1;
+	if (memend >= BRK_START) {
 		fprintf(stderr,
 		        "memstart 0x%llx memsize 0x%llx -> 0x%llx is too large; overlaps BRK_START at %p\n",
 		        memstart, memsize, memstart + memsize, BRK_START);
@@ -547,7 +556,7 @@ int main(int argc, char **argv)
 
 	mmap_memory(vm, memstart, memsize);
 
-	entry = load_elf(argv[0], 0);
+	entry = load_elf(argv[0], 0, &kernel_max_address);
 	if (entry == 0) {
 		fprintf(stderr, "Unable to load kernel %s\n", argv[0]);
 		exit(1);
@@ -557,6 +566,25 @@ int main(int argc, char **argv)
 
 	bp = a;
 	a = init_e820map(bp, memstart, memsize);
+
+	if (initrd) {
+		initrd_start = ROUNDUP(kernel_max_address, PGSIZE);
+		fprintf(stderr, "kernel_max_address is %#p; Load initrd @ %#p\n",
+		        kernel_max_address, initrd_start);
+		initrd_size = setup_initrd(initrd, (void *)initrd_start,
+		                           memend - initrd_start + 1);
+		if (initrd_size <= 0) {
+			fprintf(stderr, "Unable to load initrd %s\n", initrd);
+			exit(1);
+		}
+
+		bp->hdr.ramdisk_image = initrd_start;
+		bp->hdr.ramdisk_size = initrd_size;
+		bp->hdr.root_dev = 0x100;
+		bp->hdr.type_of_loader = 0xff;
+		fprintf(stderr, "Set bp initrd to %p / %p\n",
+		        initrd_start, initrd_size);
+	}
 
 	/* The MMIO address of the console device is really the address of an
 	 * unbacked EPT page: accesses to this page will cause a page fault that

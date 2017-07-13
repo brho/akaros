@@ -42,9 +42,10 @@ void *setup_paging(struct virtual_machine *vm, bool debug)
 	nptp += npml2;
 
 	fprintf(stderr,
-	        "Memstart is %llx, memsize is %llx, memstart + memsize is %llx; ",
+	        "Memstart is %llx, memsize is %llx,"
+		"memstart + memsize is %llx; \n",
 	        memstart, memsize, memstart + memsize);
-	fprintf(stderr, " %d pml4 %d pml3 %d pml2\n",
+	fprintf(stderr, "\t%d pml4 %d pml3 %d pml2\n",
 	        npml4, npml3, npml2);
 
 	/* Place these page tables right after VM memory. We

@@ -10,9 +10,10 @@
 
 /* load_elf loads and ELF file. This is almost always a kernel.
  * We assume that memory is set up correctly, and it will go hard
- * with you if it is not. */
+ * with you if it is not. The reference parameter records the highest
+ * address we wrote. The initrd can go there.*/
 uintptr_t
-load_elf(char *filename, uint64_t offset)
+load_elf(char *filename, uint64_t offset, uint64_t *highest)
 {
 	Elf64_Ehdr *ehdr;
 	Elf *elf;
@@ -20,6 +21,7 @@ load_elf(char *filename, uint64_t offset)
 	Elf64_Phdr *hdrs;
 	int fd;
 	uintptr_t ret;
+	uintptr_t kern_end = 0;
 
 	elf_version(EV_CURRENT);
 	fd = open(filename, O_RDONLY);
@@ -64,7 +66,7 @@ load_elf(char *filename, uint64_t offset)
 		uintptr_t pa;
 
 		fprintf(stderr,
-		        "%d: type 0x%lx flags 0x%lx  offset 0x%lx vaddr 0x%lx paddr 0x%lx size 0x%lx  memsz 0x%lx align 0x%lx\n",
+		        "%d: type 0x%lx flags 0x%lx  offset 0x%lx vaddr 0x%lx\npaddr 0x%lx size 0x%lx  memsz 0x%lx align 0x%lx\n",
 		        i,
 		        h->p_type,              /* Segment type */
 		        h->p_flags,             /* Segment flags */
@@ -98,11 +100,15 @@ load_elf(char *filename, uint64_t offset)
 			        filename, tot, h->p_filesz);
 			goto fail;
 		}
+		if ((h->p_paddr + h->p_memsz) > kern_end)
+			kern_end = h->p_paddr + h->p_memsz;
 	}
 
 	close(fd);
 	ret = ehdr->e_entry + offset;
 	elf_end(elf);
+	if (highest)
+		*highest = kern_end;
 	return ret;
 fail:
 	close(fd);
