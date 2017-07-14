@@ -107,7 +107,9 @@ enum {
 	TCP_CONNECT = 1,	/* Outgoing connection */
 	SYNACK_RXTIMER = 250,	/* ms between SYNACK retransmits */
 
-	TCPREXMTTHRESH = 3,	/* dupack threshhold for rxt */
+	TCPREXMTTHRESH = 3,	/* dupack threshold for recovery */
+	FAST_RETRANS_RECOVERY = 2,
+	RTO_RETRANS_RECOVERY = 3,
 	CWIND_SCALE = 10,	/* initial CWIND will be MSS * this */
 
 	FORCE = 1,
@@ -249,17 +251,17 @@ struct Tcpctl {
 	uint8_t type;				/* Listening or active connection */
 	uint8_t code;				/* Icmp code */
 	struct {
-		uint32_t una;			/* Unacked data pointer */
-		uint32_t nxt;			/* Next sequence expected */
-		uint32_t ptr;			/* Data pointer */
+		uint32_t una;			/* Left edge of unacked data region */
+		uint32_t nxt;			/* Next seq to send, right edge of unacked */
+		uint32_t rtx;			/* Next to send for retrans */
 		uint32_t wnd;			/* Tcp send window */
 		uint32_t urg;			/* Urgent data pointer */
 		uint32_t wl2;
-		int scale;				/* how much to right shift window in xmitted packets */
-		/* to implement tahoe and reno TCP */
-		uint32_t dupacks;		/* number of duplicate acks rcvd */
-		int recovery;			/* loss recovery flag */
-		uint32_t rxt;			/* right window marker for recovery */
+		int scale;				/* how much to right shift window for xmit */
+		uint32_t in_flight;		/* estimate of how much is in flight */
+		uint8_t loss_hint;		/* number of loss hints rcvd */
+		uint8_t recovery;		/* loss recovery flag */
+		uint32_t recovery_pt;	/* right window for recovery point */
 	} snd;
 	struct {
 		uint32_t nxt;			/* Receive pointer to next uint8_t slot */
@@ -267,14 +269,13 @@ struct Tcpctl {
 		uint32_t urg;			/* Urgent pointer */
 		int blocked;
 		int una;				/* unacked data segs */
-		int scale;				/* how much to left shift window in rcved packets */
+		int scale;				/* how much to left shift window for rx */
 	} rcv;
 	uint32_t iss;				/* Initial sequence number */
 	int sawwsopt;				/* true if we saw a wsopt on the incoming SYN */
 	uint32_t cwind;				/* Congestion window */
 	int scale;					/* desired snd.scale */
 	uint32_t ssthresh;			/* Slow start threshold */
-	int resent;					/* Bytes just resent */
 	int irs;					/* Initial received squence */
 	uint16_t mss;				/* Max segment size */
 	uint16_t typical_mss;		/* MSS for most packets (< MSS for some opts) */
@@ -295,7 +296,7 @@ struct Tcpctl {
 	uint64_t sndsyntime;		/* time syn sent */
 	uint64_t time;				/* time Finwait2 was sent */
 	int nochecksum;				/* non-zero means don't send checksums */
-	int flgcnt;					/* number of flags in the sequence (FIN,SEQ) */
+	int flgcnt;					/* number of flags in the sequence (FIN,SYN) */
 	uint32_t ts_recent;			/* timestamp received around last_ack_sent */
 	uint32_t last_ack_sent;		/* to determine when to update timestamp */
 	bool sack_ok;				/* Can use SACK for this connection */
@@ -432,6 +433,16 @@ void tcprxmit(struct conv *);
 void tcpsettimer(Tcpctl *);
 void tcpsynackrtt(struct conv *);
 void tcpsetscale(struct conv *, Tcpctl *, uint16_t, uint16_t);
+static void tcp_loss_event(struct conv *s, Tcpctl *tcb);
+static uint16_t derive_payload_mss(Tcpctl *tcb);
+static int seq_within(uint32_t x, uint32_t low, uint32_t high);
+static int seq_lt(uint32_t x, uint32_t y);
+static int seq_le(uint32_t x, uint32_t y);
+static int seq_gt(uint32_t x, uint32_t y);
+static int seq_ge(uint32_t x, uint32_t y);
+static uint32_t seq_max(uint32_t x, uint32_t y);
+static uint32_t seq_min(uint32_t x, uint32_t y);
+static void set_in_flight(Tcpctl *tcb);
 
 static void limborexmit(struct Proto *);
 static void limbo(struct conv *, uint8_t * unused_uint8_p_t, uint8_t *, Tcp *,
@@ -1286,7 +1297,7 @@ int ntohtcp4(Tcp * tcph, struct block **bpp)
 }
 
 /*
- *  For outgiing calls, generate an initial sequence
+ *  For outgoing calls, generate an initial sequence
  *  number and put a SYN on the send queue
  */
 void tcpsndsyn(struct conv *s, Tcpctl * tcb)
@@ -1295,7 +1306,7 @@ void tcpsndsyn(struct conv *s, Tcpctl * tcb)
 	tcb->rttseq = tcb->iss;
 	tcb->snd.wl2 = tcb->iss;
 	tcb->snd.una = tcb->iss;
-	tcb->snd.ptr = tcb->rttseq;
+	tcb->snd.rtx = tcb->rttseq;
 	tcb->snd.nxt = tcb->rttseq;
 	tcb->flgcnt++;
 	tcb->flags |= FORCE;
@@ -1410,7 +1421,7 @@ static void tcphangup(struct conv *s)
 			seg.ack = tcb->rcv.nxt;
 			tcb->last_ack_sent = seg.ack;
 			tcb->rcv.una = 0;
-			seg.seq = tcb->snd.ptr;
+			seg.seq = tcb->snd.nxt;
 			seg.wnd = 0;
 			seg.urg = 0;
 			seg.mss = 0;
@@ -1757,7 +1768,7 @@ static struct conv *tcpincoming(struct conv *s, Tcp * segp, uint8_t * src,
 	tcb->rttseq = tcb->iss;
 	tcb->snd.wl2 = tcb->iss;
 	tcb->snd.una = tcb->iss + 1;
-	tcb->snd.ptr = tcb->iss + 1;
+	tcb->snd.rtx = tcb->iss + 1;
 	tcb->snd.nxt = tcb->iss + 1;
 	tcb->flgcnt = 0;
 	tcb->flags |= SYNACK;
@@ -1849,6 +1860,16 @@ int seq_ge(uint32_t x, uint32_t y)
 	return (int)(x - y) >= 0;
 }
 
+static uint32_t seq_max(uint32_t x, uint32_t y)
+{
+	return seq_ge(x, y) ? x : y;
+}
+
+static uint32_t seq_min(uint32_t x, uint32_t y)
+{
+	return seq_le(x, y) ? x : y;
+}
+
 /*
  *  use the time between the first SYN and it's ack as the
  *  initial round trip time
@@ -1893,12 +1914,41 @@ static void adjust_tx_qio_limit(struct conv *s)
 	 * actual threshold was.  We want the limit to be the 'stable' cwnd * 2. */
 }
 
+static void set_in_flight(Tcpctl *tcb)
+{
+	tcb->snd.in_flight = tcb->snd.rtx - tcb->snd.una;
+}
+
+static void reset_recovery(struct conv *s, Tcpctl *tcb)
+{
+	netlog(s->p->f, Logtcprxmt,
+	       "%I.%d -> %I.%d: recovery complete, una %u, rtx %u, nxt %u, recovery %u\n",
+	       s->laddr, s->lport, s->raddr, s->rport,
+	       tcb->snd.una, tcb->snd.rtx, tcb->snd.nxt, tcb->snd.recovery_pt);
+	tcb->snd.recovery = 0;
+	tcb->snd.recovery_pt = 0;
+	tcb->snd.loss_hint = 0;
+}
+
+static bool is_dup_ack(Tcpctl *tcb, Tcp *seg)
+{
+	/* this is a pure ack w/o window update */
+	return (seg->ack == tcb->snd.una) &&
+	       (tcb->snd.una != tcb->snd.nxt) &&
+	       (seg->len == 0) &&
+	       (seg->wnd == tcb->snd.wnd);
+}
+
+static bool is_potential_loss(Tcpctl *tcb, Tcp *seg)
+{
+	return is_dup_ack(tcb, seg);
+}
+
 void update(struct conv *s, Tcp * seg)
 {
 	int rtt, delta;
 	Tcpctl *tcb;
-	uint32_t acked;
-	uint32_t expand;
+	uint32_t acked, expand;
 	struct tcppriv *tpriv;
 
 	tpriv = s->p->priv;
@@ -1910,27 +1960,24 @@ void update(struct conv *s, Tcp * seg)
 		return;
 	}
 
-	/* added by Dong Lin for fast retransmission */
-	if (seg->ack == tcb->snd.una
-		&& tcb->snd.una != tcb->snd.nxt
-		&& seg->len == 0 && seg->wnd == tcb->snd.wnd) {
+	acked = seg->ack - tcb->snd.una;
+	tcb->snd.una = seg->ack;
+	if (seq_gt(seg->ack, tcb->snd.rtx))
+		tcb->snd.rtx = seg->ack;
 
-		/* this is a pure ack w/o window update */
-		netlog(s->p->f, Logtcprxmt, "dupack %lu ack %lu sndwnd %d advwin %d\n",
-			   tcb->snd.dupacks, seg->ack, tcb->snd.wnd, seg->wnd);
+	set_in_flight(tcb);
 
-		if (++tcb->snd.dupacks == TCPREXMTTHRESH) {
-			/*
-			 *  tahoe tcp rxt the packet, half sshthresh,
-			 *  and set cwnd to one packet
-			 */
-			tcb->snd.recovery = 1;
-			tcb->snd.rxt = tcb->snd.nxt;
-			netlog(s->p->f, Logtcprxmt, "fast rxt %lu, nxt %lu\n", tcb->snd.una,
-				   tcb->snd.nxt);
+	if (is_potential_loss(tcb, seg) && !tcb->snd.recovery) {
+		tcb->snd.loss_hint++;
+		if (tcb->snd.loss_hint == TCPREXMTTHRESH) {
+			netlog(s->p->f, Logtcprxmt,
+			       "%I.%d -> %I.%d: loss hint thresh, nxt %u, una %u, cwnd %u\n",
+			       s->laddr, s->lport, s->raddr, s->rport,
+			       tcb->snd.nxt, tcb->snd.una, tcb->cwind);
+			tcp_loss_event(s, tcb);
+			tcb->snd.recovery_pt = tcb->snd.nxt;
+			tcb->snd.recovery = FAST_RETRANS_RECOVERY;
 			tcprxmit(s);
-		} else {
-			/* do reno tcp here. */
 		}
 	}
 
@@ -1943,7 +1990,7 @@ void update(struct conv *s, Tcp * seg)
 		tcb->snd.wl2 = seg->ack;
 	}
 
-	if (!seq_gt(seg->ack, tcb->snd.una)) {
+	if (!acked) {
 		/*
 		 *  don't let us hangup if sending into a closed window and
 		 *  we're still getting acks
@@ -1953,20 +2000,14 @@ void update(struct conv *s, Tcp * seg)
 		}
 		return;
 	}
-
-	/*
-	 *  any positive ack turns off fast rxt,
-	 *  (should we do new-reno on partial acks?)
-	 */
-	if (!tcb->snd.recovery || seq_ge(seg->ack, tcb->snd.rxt)) {
-		tcb->snd.dupacks = 0;
-		tcb->snd.recovery = 0;
-	} else
-		netlog(s->p->f, Logtcp, "rxt next %lu, cwin %u\n", seg->ack,
-			   tcb->cwind);
-
-	/* Compute the new send window size */
-	acked = seg->ack - tcb->snd.una;
+	/* At this point, they have acked something new. (positive ack, ack > una).
+	 *
+	 * If we hadn't reached the threshold for recovery yet, the positive ACK
+	 * will reset our loss_hint count. */
+	if (!tcb->snd.recovery)
+		tcb->snd.loss_hint = 0;
+	else if (seq_ge(seg->ack, tcb->snd.recovery_pt))
+		reset_recovery(s, tcb);
 
 	/* avoid slow start and timers for SYN acks */
 	if ((tcb->flags & SYNACK) == 0) {
@@ -2036,7 +2077,6 @@ done:
 	if (qdiscard(s->wq, acked) < acked)
 		tcb->flgcnt--;
 
-	tcb->snd.una = seg->ack;
 	if (seq_gt(seg->ack, tcb->snd.urg))
 		tcb->snd.urg = seg->ack;
 
@@ -2044,9 +2084,6 @@ done:
 		tcpgo(tpriv, &tcb->timer);
 	else
 		tcphalt(tpriv, &tcb->timer);
-
-	if (seq_lt(tcb->snd.ptr, tcb->snd.una))
-		tcb->snd.ptr = tcb->snd.una;
 
 	tcb->flags &= ~RETRAN;
 	tcb->backoff = 0;
@@ -2569,6 +2606,133 @@ static uint16_t derive_payload_mss(Tcpctl *tcb)
 	return payload_mss;
 }
 
+/* Decreases the xmit amt, given the MSS / TSO. */
+static uint32_t throttle_for_mss(Tcpctl *tcb, uint32_t ssize,
+                                 uint16_t payload_mss, bool retrans)
+{
+	if (ssize > payload_mss) {
+		if ((tcb->flags & TSO) == 0) {
+			ssize = payload_mss;
+		} else {
+			/* Don't send too much.  32K is arbitrary.. */
+			if (ssize > 32 * 1024)
+				ssize = 32 * 1024;
+			if (!retrans) {
+				/* Clamp xmit to an integral MSS to avoid ragged tail segments
+				 * causing poor link utilization. */
+				ssize = ROUNDDOWN(ssize, payload_mss);
+			}
+		}
+	}
+	return ssize;
+}
+
+/* Reduces ssize for a variety of reasons.  Returns FALSE if we should abort
+ * sending the packet.  o/w returns TRUE and modifies ssize by reference. */
+static bool throttle_ssize(struct conv *s, Tcpctl *tcb, uint32_t *ssize_p,
+                           uint16_t payload_mss, bool retrans)
+{
+	struct Fs *f = s->p->f;
+	uint32_t usable;
+	uint32_t ssize = *ssize_p;
+
+	/* Compute usable segment based on offered window and limit
+	 * window probes to one */
+	if (tcb->snd.wnd == 0) {
+		if (tcb->snd.in_flight != 0) {
+			if ((tcb->flags & FORCE) == 0)
+				return FALSE;
+		}
+		usable = 1;
+	} else {
+		usable = tcb->cwind;
+		if (tcb->snd.wnd < usable)
+			usable = tcb->snd.wnd;
+		if (usable > tcb->snd.in_flight)
+			usable -= tcb->snd.in_flight;
+		else
+			usable = 0;
+	}
+	if (ssize && usable < 2)
+		netlog(s->p->f, Logtcpverbose,
+		       "%I.%d -> %I.%d: throttled snd.wnd %lu cwind %lu\n",
+		       s->laddr, s->lport, s->raddr, s->rport,
+		       tcb->snd.wnd, tcb->cwind);
+	if (usable < ssize)
+		ssize = usable;
+
+	ssize = throttle_for_mss(tcb, ssize, payload_mss, retrans);
+
+	*ssize_p = ssize;
+	return TRUE;
+}
+
+/* Helper, picks the next segment to send, which is possibly a retransmission.
+ * Returns TRUE if we have a segment, FALSE o/w.  Returns ssize, from_seq, and
+ * sent by reference.
+ *
+ * from_seq is the seq number we are transmitting from.
+ *
+ * sent includes all seq from una to from_seq *including* any previously sent
+ * flags (part of tcb->flgcnt), for instance an unacknowledged SYN (which counts
+ * as a seq number).  Those flags are in the e.g. snd.nxt - snd.una range, and
+ * they get dropped after qdiscard.
+ *
+ * ssize is the amount of data we are sending, starting from from_seq, and it
+ * will include any *new* flags, which haven't been accounted for yet.
+ *
+ * tcb->flgcnt consists of the flags both in ssize and in sent.
+ *
+ * Note that we could be in recovery and not retrans a segment. */
+static bool get_xmit_segment(struct conv *s, Tcpctl *tcb, uint16_t payload_mss,
+                             uint32_t *from_seq_p, uint32_t *sent_p,
+                             uint32_t *ssize_p)
+{
+	struct Fs *f = s->p->f;
+	struct tcppriv *tpriv = s->p->priv;
+	uint32_t ssize, sent, from_seq, ideal_rxmit_amt = 0;
+	bool retrans = FALSE;
+
+	/* For now (sackless), assume we start from snd.rtx. */
+	from_seq = tcb->snd.rtx;
+	sent = from_seq - tcb->snd.una;
+
+	/* qlen + flgcnt is every seq we want to have sent, including unack'd
+	 * data, unacked flags, and new flags. */
+	ssize = qlen(s->wq) + tcb->flgcnt - sent;
+	/* RFC suggests this */
+	if (tcb->snd.recovery == RTO_RETRANS_RECOVERY) {
+		/* We had a loss during recovery.  Don't send anything new until we
+		 * get out of it.  This can happen if we lose a rxmit packet.  We'll
+		 * limit ourselves to sending up to whatever we sent previously*/
+		ssize = MIN(ssize, tcb->snd.nxt - tcb->snd.rtx);
+	}
+
+	if (!throttle_ssize(s, tcb, &ssize, payload_mss, retrans))
+		return FALSE;
+
+	/* This counts flags, which is a little hokey, but it's okay since in_flight
+	 * gets reset on each ACK */
+	tcb->snd.in_flight += ssize;
+	/* Log and track rxmit.  This covers both SACK (retrans) and fast rxmit. */
+	if (ssize && seq_lt(tcb->snd.rtx, tcb->snd.nxt)) {
+		netlog(f, Logtcpverbose,
+		       "%I.%d -> %I.%d: rxmit: rtx %u amt %u, nxt %u\n",
+		       s->laddr, s->lport, s->raddr, s->rport,
+		       tcb->snd.rtx, MIN(tcb->snd.nxt - tcb->snd.rtx, ssize),
+		       tcb->snd.nxt);
+		tpriv->stats[RetransSegs]++;
+	}
+	tcb->snd.rtx += ssize;
+	if (seq_gt(tcb->snd.rtx, tcb->snd.nxt))
+		tcb->snd.nxt = tcb->snd.rtx;
+	*from_seq_p = from_seq;
+	*sent_p = sent;
+	*ssize_p = ssize;
+
+	return TRUE;
+}
+
 /*
  *  always enters and exits with the s locked.  We drop
  *  the lock to ipoput the packet so some care has to be
@@ -2578,10 +2742,10 @@ void tcpoutput(struct conv *s)
 {
 	Tcp seg;
 	int msgs;
+	int next_yield = 1;
 	Tcpctl *tcb;
 	struct block *hbp, *bp;
-	int sndcnt, n;
-	uint32_t ssize, dsize, usable, sent;
+	uint32_t ssize, dsize, sent, from_seq;
 	struct Fs *f;
 	struct tcppriv *tpriv;
 	uint8_t version;
@@ -2607,66 +2771,18 @@ void tcpoutput(struct conv *s)
 			tcb->flags |= FORCE;
 		}
 
-		sndcnt = qlen(s->wq) + tcb->flgcnt;
-		sent = tcb->snd.ptr - tcb->snd.una;
-
 		/* Don't send anything else until our SYN has been acked */
-		if (tcb->snd.ptr != tcb->iss && (tcb->flags & SYNACK) == 0)
+		if (tcb->snd.nxt != tcb->iss && (tcb->flags & SYNACK) == 0)
 			break;
 
-		/* Compute usable segment based on offered window and limit
-		 * window probes to one
-		 */
-		if (tcb->snd.wnd == 0) {
-			if (sent != 0) {
-				if ((tcb->flags & FORCE) == 0)
-					break;
-//              tcb->snd.ptr = tcb->snd.una;
-			}
-			usable = 1;
-		} else {
-			usable = tcb->cwind;
-			if (tcb->snd.wnd < usable)
-				usable = tcb->snd.wnd;
-			usable -= sent;
-		}
-		ssize = sndcnt - sent;
-		if (ssize && usable < 2)
-			netlog(s->p->f, Logtcp, "throttled snd.wnd %lu cwind %lu\n",
-				   tcb->snd.wnd, tcb->cwind);
-		if (usable < ssize)
-			ssize = usable;
 		/* payload_mss is the actual amount of data in the packet, which is the
-		 * advertised mss - header opts.  This varies from packet to packet,
+		 * advertised (mss - header opts).  This varies from packet to packet,
 		 * based on the options that might be present (e.g. always timestamps,
 		 * sometimes SACKs) */
 		payload_mss = derive_payload_mss(tcb);
-		if (ssize > payload_mss) {
-			if ((tcb->flags & TSO) == 0) {
-				ssize = payload_mss;
-			} else {
-				int segs;
 
-				/*  Don't send too much.  32K is arbitrary..
-				 */
-				if (ssize > 32 * 1024)
-					ssize = 32 * 1024;
-
-				/* Clamp xmit to an integral MSS to
-				 * avoid ragged tail segments causing
-				 * poor link utilization.  Also
-				 * account for each segment sent in
-				 * msg heuristic, and round up to the
-				 * next multiple of 4, to ensure we
-				 * still yeild.
-				 */
-				segs = ssize / payload_mss;
-				ssize = segs * payload_mss;
-				msgs += segs;
-				if (segs > 3)
-					msgs = (msgs + 4) & ~3;
-			}
-		}
+		if (!get_xmit_segment(s, tcb, payload_mss, &from_seq, &sent, &ssize))
+			break;
 
 		dsize = ssize;
 		seg.urg = 0;
@@ -2692,7 +2808,7 @@ void tcpoutput(struct conv *s)
 		if (tcb->state == Syn_sent) {
 			seg.flags = 0;
 			seg.sack_ok = SACK_SUPPORTED;	/* here's where we advertise SACK */
-			if (tcb->snd.ptr == tcb->iss) {
+			if (tcb->snd.nxt - ssize == tcb->iss) {
 				seg.flags |= SYN;
 				dsize--;
 				seg.mss = tcb->mss;
@@ -2702,7 +2818,7 @@ void tcpoutput(struct conv *s)
 				warn("TCP: weird Syn_sent state, tell someone you saw this");
 			}
 		}
-		seg.seq = tcb->snd.ptr;
+		seg.seq = from_seq;
 		seg.ack = tcb->rcv.nxt;
 		tcb->last_ack_sent = seg.ack;
 		seg.wnd = tcb->rcv.wnd;
@@ -2713,6 +2829,10 @@ void tcpoutput(struct conv *s)
 		if (dsize != 0) {
 			bp = qcopy(s->wq, dsize, sent);
 			if (BLEN(bp) != dsize) {
+				/* Here's where the flgcnt kicked in.  Note dsize is
+				 * decremented, but ssize isn't.  Not that we use ssize for much
+				 * anymore.  Decrementing dsize prevents us from sending a PSH
+				 * with the FIN. */
 				seg.flags |= FIN;
 				dsize--;
 			}
@@ -2722,28 +2842,8 @@ void tcpoutput(struct conv *s)
 			}
 		}
 
-		if (sent + dsize == sndcnt)
+		if (sent + dsize == qlen(s->wq) + tcb->flgcnt)
 			seg.flags |= PSH;
-
-		/* keep track of balance of resent data */
-		if (seq_lt(tcb->snd.ptr, tcb->snd.nxt)) {
-			n = tcb->snd.nxt - tcb->snd.ptr;
-			if (ssize < n)
-				n = ssize;
-			tcb->resent += n;
-			netlog(f, Logtcp, "rexmit: %I.%d -> %I.%d ptr 0x%lx nxt 0x%lx\n",
-				   s->raddr, s->rport, s->laddr, s->lport, tcb->snd.ptr,
-				   tcb->snd.nxt);
-			tpriv->stats[RetransSegs]++;
-		}
-
-		tcb->snd.ptr += ssize;
-
-		/* Pull up the send pointer so we can accept acks
-		 * for this window
-		 */
-		if (seq_gt(tcb->snd.ptr, tcb->snd.nxt))
-			tcb->snd.nxt = tcb->snd.ptr;
 
 		/* Build header, link data and compute cksum */
 		switch (version) {
@@ -2778,7 +2878,7 @@ void tcpoutput(struct conv *s)
 			/* If round trip timer isn't running, start it. */
 			if (tcb->rtt_timer.state != TcptimerON) {
 				tcpgo(tpriv, &tcb->rtt_timer);
-				tcb->rttseq = tcb->snd.ptr;
+				tcb->rttseq = from_seq + ssize;
 			}
 		}
 
@@ -2803,7 +2903,16 @@ void tcpoutput(struct conv *s)
 			default:
 				panic("tcpoutput2: version %d", version);
 		}
-		if ((msgs % 4) == 1) {
+		if (ssize) {
+			/* The outer loop thinks we sent one packet.  If we used TSO, we
+			 * might have sent several.  Minus one for the loop increment. */
+			msgs += DIV_ROUND_UP(ssize, payload_mss) - 1;
+		}
+		/* Old Plan 9 tidbit - yield every four messages.  We want to break out
+		 * and unlock so we can process inbound ACKs which might do things like
+		 * say "slow down". */
+		if (msgs >= next_yield) {
+			next_yield = msgs + 4;
 			qunlock(&s->qlock);
 			kthread_yield();
 			qlock(&s->qlock);
@@ -2937,6 +3046,21 @@ static void tcpsetchecksum(struct conv *s, char **f, int unused)
 	tcb->nochecksum = !atoi(f[1]);
 }
 
+static void tcp_loss_event(struct conv *s, Tcpctl *tcb)
+{
+	uint32_t old_cwnd = tcb->cwind;
+
+	/* Reno */
+	tcb->ssthresh = tcb->cwind / 2;
+	tcb->cwind = tcb->ssthresh;
+	netlog(s->p->f, Logtcprxmt,
+	       "%I.%d -> %I.%d: loss event, cwnd was %d, now %d\n",
+	       s->laddr, s->lport, s->raddr, s->rport,
+	       old_cwnd, tcb->cwind);
+}
+
+/* Called when we need to retrans the entire outstanding window (everything
+ * previously sent, but unacknowledged). */
 void tcprxmit(struct conv *s)
 {
 	Tcpctl *tcb;
@@ -2944,11 +3068,9 @@ void tcprxmit(struct conv *s)
 	tcb = (Tcpctl *) s->ptcl;
 
 	tcb->flags |= RETRAN | FORCE;
-	tcb->snd.ptr = tcb->snd.una;
+	tcb->snd.rtx = tcb->snd.una;
+	set_in_flight(tcb);
 
-	/* Reno */
-	tcb->ssthresh = tcb->cwind / 2;
-	tcb->cwind = tcb->ssthresh;
 	tcpoutput(s);
 }
 
@@ -2981,12 +3103,20 @@ void tcptimeout(void *arg)
 				localclose(s, "connection timed out");
 				break;
 			}
-			netlog(s->p->f, Logtcprxmt, "timeout rexmit 0x%lx %llu/%llu\n",
-				   tcb->snd.una, tcb->timer.start, NOW);
+			netlog(s->p->f, Logtcprxmt,
+			       "%I.%d -> %I.%d: timeout rxmit una %u, rtx %u, nxt %u, in_flight %u, timer.start %u\n",
+			       s->laddr, s->lport, s->raddr, s->rport,
+			       tcb->snd.una, tcb->snd.rtx, tcb->snd.nxt, tcb->snd.in_flight,
+			       tcb->timer.start);
 			tcpsettimer(tcb);
+			tcp_loss_event(s, tcb);
+			/* Advance the recovery point.  Any dupacks/sacks below this won't
+			 * trigger a new loss, since we won't reset_recovery() until we ack
+			 * past recovery_pt. */
+			tcb->snd.recovery = RTO_RETRANS_RECOVERY;
+			tcb->snd.recovery_pt = tcb->snd.nxt;
 			tcprxmit(s);
 			tpriv->stats[RetransTimeouts]++;
-			tcb->snd.dupacks = 0;
 			break;
 		case Time_wait:
 			localclose(s, NULL);
@@ -3309,7 +3439,7 @@ void tcpsettimer(Tcpctl * tcb)
 	x = backoff(tcb->backoff) *
 		(tcb->mdev + (tcb->srtt >> LOGAGAIN) + MSPTICK) / MSPTICK;
 
-	/* bounded twixt 1/2 and 64 seconds */
+	/* Bounded twixt 1/2 and 64 seconds.  RFC 6298 suggested min is 1 second. */
 	if (x < 500 / MSPTICK)
 		x = 500 / MSPTICK;
 	else if (x > (64000 / MSPTICK))
