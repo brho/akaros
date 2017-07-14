@@ -96,11 +96,15 @@ enum {
 	TS_SEND_PREPAD = 2,	/* For non-SYNs, pre-pad 2 nops for 32 byte alignment */
 	SACK_OK_OPT = 4,
 	SACK_OK_LENGTH = 2,
+	SACK_OPT = 5,
 	MSL2 = 10,
 	MSPTICK = 50,	/* Milliseconds per timer tick */
 	DEF_MSS = 1460,	/* Default mean segment */
 	DEF_MSS6 = 1280,	/* Default mean segment (min) for v6 */
 	SACK_SUPPORTED = TRUE,	/* SACK is on by default */
+	MAX_NR_SACKS_PER_PACKET = 4,	/* limited by TCP's opts size */
+	MAX_NR_SND_SACKS = 10,
+	MAX_NR_RCV_SACKS = 3,	/* We could try for 4, but don't need to */
 	DEF_RTT = 500,	/* Default round trip */
 	DEF_KAT = 120000,	/* Default time (ms) between keep alives */
 	TCP_LISTEN = 0,	/* Listen connection */
@@ -108,6 +112,7 @@ enum {
 	SYNACK_RXTIMER = 250,	/* ms between SYNACK retransmits */
 
 	TCPREXMTTHRESH = 3,	/* dupack threshold for recovery */
+	SACK_RETRANS_RECOVERY = 1,
 	FAST_RETRANS_RECOVERY = 2,
 	RTO_RETRANS_RECOVERY = 3,
 	CWIND_SCALE = 10,	/* initial CWIND will be MSS * this */
@@ -207,6 +212,11 @@ struct Tcp6hdr {
 	uint8_t tcpopt[1];
 };
 
+struct sack_block {
+	uint32_t left;
+	uint32_t right;
+};
+
 /*
  *  this represents the control info
  *  for a single packet.  It is derived from
@@ -228,6 +238,8 @@ struct Tcp {
 	uint32_t ts_val;			/* timestamp val from sender */
 	uint32_t ts_ecr;			/* timestamp echo response from sender */
 	bool sack_ok;				/* header had/should have SACK_PERMITTED */
+	uint8_t nr_sacks;
+	struct sack_block sacks[MAX_NR_SACKS_PER_PACKET];
 };
 
 /*
@@ -260,8 +272,12 @@ struct Tcpctl {
 		int scale;				/* how much to right shift window for xmit */
 		uint32_t in_flight;		/* estimate of how much is in flight */
 		uint8_t loss_hint;		/* number of loss hints rcvd */
+		uint8_t sack_loss_hint;	/* For detecting sack rxmit losses */
+		bool flush_sacks;		/* Two timeouts in a row == dump sacks */
 		uint8_t recovery;		/* loss recovery flag */
 		uint32_t recovery_pt;	/* right window for recovery point */
+		uint8_t nr_sacks;
+		struct sack_block sacks[MAX_NR_SND_SACKS];
 	} snd;
 	struct {
 		uint32_t nxt;			/* Receive pointer to next uint8_t slot */
@@ -270,6 +286,8 @@ struct Tcpctl {
 		int blocked;
 		int una;				/* unacked data segs */
 		int scale;				/* how much to left shift window for rx */
+		uint8_t nr_sacks;
+		struct sack_block sacks[MAX_NR_RCV_SACKS];
 	} rcv;
 	uint32_t iss;				/* Initial sequence number */
 	int sawwsopt;				/* true if we saw a wsopt on the incoming SYN */
@@ -1021,6 +1039,8 @@ static void compute_hdrlen_optpad(Tcp *tcph, uint16_t default_hdrlen,
 		if (!(tcph->flags & SYN))
 			hdrlen += TS_SEND_PREPAD;
 	}
+	if (tcb && tcb->rcv.nr_sacks)
+		hdrlen += 2 + tcb->rcv.nr_sacks * 8;
 	optpad = hdrlen & 3;
 	if (optpad)
 		optpad = 4 - optpad;
@@ -1062,6 +1082,16 @@ static void write_opts(Tcp *tcph, uint8_t *opt, uint16_t optpad, Tcpctl *tcb)
 		/* Setting TSecr, the time we last saw from them, stored in ts_val */
 		hnputl(opt, tcph->ts_val);
 		opt += 4;
+	}
+	if (tcb && tcb->rcv.nr_sacks) {
+		*opt++ = SACK_OPT;
+		*opt++ = 2 + tcb->rcv.nr_sacks * 8;
+		for (int i = 0; i < tcb->rcv.nr_sacks; i++) {
+			hnputl(opt, tcb->rcv.sacks[i].left);
+			opt += 4;
+			hnputl(opt, tcb->rcv.sacks[i].right);
+			opt += 4;
+		}
 	}
 	while (optpad-- > 0)
 		*opt++ = NOOPOPT;
@@ -1180,6 +1210,30 @@ struct block *htontcp4(Tcp *tcph, struct block *data, Tcp4hdr *ph,
 	return data;
 }
 
+static void parse_inbound_sacks(Tcp *tcph, uint8_t *opt, uint16_t optlen)
+{
+	uint8_t nr_sacks;
+	uint32_t left, right;
+
+	nr_sacks = (optlen - 2) / 8;
+	if (nr_sacks > MAX_NR_SACKS_PER_PACKET)
+		return;
+	opt += 2;
+	for (int i = 0; i < nr_sacks; i++, opt += 8) {
+		left = nhgetl(opt);
+		right = nhgetl(opt + 4);
+		if (seq_ge(left, right)) {
+			/* bad / malicious SACK.  Skip it, and adjust. */
+			nr_sacks--;
+			i--;	/* stay on this array element next loop */
+			continue;
+		}
+		tcph->sacks[i].left = left;
+		tcph->sacks[i].right = right;
+	}
+	tcph->nr_sacks = nr_sacks;
+}
+
 static void parse_inbound_opts(Tcp *tcph, uint8_t *opt, uint16_t optsize)
 {
 	uint16_t optlen;
@@ -1206,6 +1260,9 @@ static void parse_inbound_opts(Tcp *tcph, uint8_t *opt, uint16_t optsize)
 				if (optlen == SACK_OK_LENGTH)
 					tcph->sack_ok = TRUE;
 				break;
+			case SACK_OPT:
+				parse_inbound_sacks(tcph, opt, optlen);
+				break;
 			case TS_OPT:
 				if (optlen == TS_LENGTH) {
 					tcph->ts_val = nhgetl(opt + 2);
@@ -1225,6 +1282,7 @@ static void clear_tcph_opts(Tcp *tcph)
 	tcph->mss = 0;
 	tcph->ws = 0;
 	tcph->sack_ok = FALSE;
+	tcph->nr_sacks = 0;
 	tcph->ts_val = 0;
 	tcph->ts_ecr = 0;
 }
@@ -1383,6 +1441,7 @@ sndrst(struct Proto *tcp, uint8_t * source, uint8_t * dest,
 	seg->mss = 0;
 	seg->ws = 0;
 	seg->sack_ok = FALSE;
+	seg->nr_sacks = 0;
 	/* seg->ts_val is already set with their timestamp */
 	switch (version) {
 		case V4:
@@ -1427,6 +1486,7 @@ static void tcphangup(struct conv *s)
 			seg.mss = 0;
 			seg.ws = 0;
 			seg.sack_ok = FALSE;
+			seg.nr_sacks = 0;
 			seg.ts_val = tcb->ts_recent;
 			switch (s->ipversion) {
 				case V4:
@@ -1493,6 +1553,7 @@ int sndsynack(struct Proto *tcp, Limbo * lp)
 	seg.mss = tcpmtu(tcp, lp->laddr, lp->version, &scale, &flag);
 	seg.wnd = QMAX;
 	seg.ts_val = lp->ts_val;
+	seg.nr_sacks = 0;
 
 	/* if the other side set scale, we should too */
 	if (lp->rcvscale) {
@@ -1914,9 +1975,280 @@ static void adjust_tx_qio_limit(struct conv *s)
 	 * actual threshold was.  We want the limit to be the 'stable' cwnd * 2. */
 }
 
+/* Attempts to merge later sacks into sack 'into' (index in the array) */
+static void merge_sacks_into(Tcpctl *tcb, int into)
+{
+	struct sack_block *into_sack = &tcb->snd.sacks[into];
+	struct sack_block *tcb_sack;
+	int shift = 0;
+
+	for (int i = into + 1; i < tcb->snd.nr_sacks; i++) {
+		tcb_sack = &tcb->snd.sacks[i];
+		if (seq_lt(into_sack->right, tcb_sack->left))
+			break;
+		if (seq_gt(tcb_sack->right, into_sack->right))
+			into_sack->right = tcb_sack->right;
+		shift++;
+	}
+	if (shift) {
+		memmove(tcb->snd.sacks + into + 1,
+		        tcb->snd.sacks + into + 1 + shift,
+		        sizeof(struct sack_block) * (tcb->snd.nr_sacks - into - 1
+				                             - shift));
+		tcb->snd.nr_sacks -= shift;
+	}
+}
+
+/* If we update a sack, it means they received a packet (possibly out of order),
+ * but they have not received earlier packets.  Otherwise, they would do a full
+ * ACK.
+ *
+ * The trick is in knowing whether the reception growing this sack is due to a
+ * retrans or due to packets from before our last loss event.  The rightmost
+ * sack tends to grow a lot with packets we sent before the loss.  However,
+ * intermediate sacks that grow are signs of a loss, since they only grow as a
+ * result of retrans.
+ *
+ * This is only true for the first time through a retrans.  After we've gone
+ * through a full retrans blast, the sack that hinted at the retrans loss (and
+ * there could be multiple of them!) will continue to grow.  We could come up
+ * with some tracking for this, but instead we'll just do a one-time deal.  You
+ * can recover from one detected sack retrans loss.  After that, you'll have to
+ * use the RTO.
+ *
+ * This won't catch some things, like a sack that grew and merged with the
+ * rightmost sack.  This also won't work if you have a single sack.  We can't
+ * tell where the retrans ends and the sending begins. */
+static bool sack_hints_at_loss(Tcpctl *tcb, struct sack_block *tcb_sack)
+{
+	if (tcb->snd.recovery != SACK_RETRANS_RECOVERY)
+		return FALSE;
+	return &tcb->snd.sacks[tcb->snd.nr_sacks - 1] != tcb_sack;
+}
+
+static bool sack_contains(struct sack_block *tcb_sack, uint32_t seq)
+{
+	return seq_le(tcb_sack->left, seq) && seq_lt(seq, tcb_sack->right);
+}
+
+/* Debugging helper! */
+static void sack_asserter(Tcpctl *tcb, char *str)
+{
+	struct sack_block *tcb_sack;
+
+	for (int i = 0; i < tcb->snd.nr_sacks; i++) {
+		tcb_sack = &tcb->snd.sacks[i];
+		/* Checking invariants: snd.rtx is never inside a sack, sacks are always
+		 * mutually exclusive. */
+		if (sack_contains(tcb_sack, tcb->snd.rtx) ||
+		    ((i + 1 < tcb->snd.nr_sacks) && seq_ge(tcb_sack->right,
+			                                       (tcb_sack + 1)->left))) {
+			printk("SACK ASSERT ERROR at %s\n", str);
+			printk("rtx %u una %u nxt %u, sack [%u, %u)\n",
+			       tcb->snd.rtx, tcb->snd.una, tcb->snd.nxt, tcb_sack->left,
+				   tcb_sack->right);
+			for (int i = 0; i < tcb->snd.nr_sacks; i++)
+				printk("\t %d: [%u, %u)\n", i, tcb->snd.sacks[i].left,
+				       tcb->snd.sacks[i].right);
+			backtrace();
+			panic("");
+		}
+	}
+}
+
+/* Updates bookkeeping whenever a sack is added or updated */
+static void sack_has_changed(struct conv *s, Tcpctl *tcb,
+                             struct sack_block *tcb_sack)
+{
+	/* Due to the change, snd.rtx might be in the middle of this sack.  Advance
+	 * it to the right edge. */
+	if (sack_contains(tcb_sack, tcb->snd.rtx))
+		tcb->snd.rtx = tcb_sack->right;
+
+	/* This is a sack for something we retransed and we think it means there was
+	 * another loss.  Instead of waiting for the RTO, we can take action. */
+	if (sack_hints_at_loss(tcb, tcb_sack)) {
+		if (++tcb->snd.sack_loss_hint == TCPREXMTTHRESH) {
+			netlog(s->p->f, Logtcprxmt,
+			       "%I.%d -> %I.%d: sack rxmit loss: snd.rtx %u, sack [%u,%u), una %u, recovery_pt %u\n",
+			       s->laddr, s->lport, s->raddr, s->rport,
+			       tcb->snd.rtx, tcb_sack->left, tcb_sack->right, tcb->snd.una,
+			       tcb->snd.recovery_pt);
+			/* Redo retrans, but keep the sacks and recovery point */
+			tcp_loss_event(s, tcb);
+			tcb->snd.rtx = tcb->snd.una;
+			tcb->snd.sack_loss_hint = 0;
+			/* Act like an RTO.  We just detected it earlier.  This prevents us
+			 * from getting another sack hint loss this recovery period and from
+			 * advancing the opportunistic right edge. */
+			tcb->snd.recovery = RTO_RETRANS_RECOVERY;
+			/* We didn't actually time out yet and we expect to keep getting
+			 * sacks, so we don't want to flush or worry about in_flight.  If we
+			 * messed something up, the RTO will still fire. */
+			set_in_flight(tcb);
+		}
+	}
+}
+
+/* Advances tcb_sack's right edge, if new_right is farther, and updates the
+ * bookkeeping due to the change. */
+static void update_right_edge(struct conv *s, Tcpctl *tcb,
+                              struct sack_block *tcb_sack, uint32_t new_right)
+{
+	if (seq_le(new_right, tcb_sack->right))
+		return;
+	tcb_sack->right = new_right;
+	merge_sacks_into(tcb, tcb_sack - tcb->snd.sacks);
+	sack_has_changed(s, tcb, tcb_sack);
+}
+
+static void update_or_insert_sack(struct conv *s, Tcpctl *tcb,
+                                  struct sack_block *seg_sack)
+{
+	struct sack_block *tcb_sack;
+
+	for (int i = 0; i < tcb->snd.nr_sacks; i++) {
+		tcb_sack = &tcb->snd.sacks[i];
+		if (seq_lt(tcb_sack->left, seg_sack->left)) {
+			/* This includes adjacent (which I've seen!) and overlap. */
+			if (seq_le(seg_sack->left, tcb_sack->right)) {
+				update_right_edge(s, tcb, tcb_sack, seg_sack->right);
+				return;
+			}
+			continue;
+		}
+		/* Update existing sack */
+		if (tcb_sack->left == seg_sack->left) {
+			update_right_edge(s, tcb, tcb_sack, seg_sack->right);
+			return;
+		}
+		/* Found our slot */
+		if (seq_gt(tcb_sack->left, seg_sack->left)) {
+			if (tcb->snd.nr_sacks == MAX_NR_SND_SACKS) {
+				/* Out of room, but it is possible this sack overlaps later
+				 * sacks, including the max sack's right edge. */
+				if (seq_ge(seg_sack->right, tcb_sack->left)) {
+					/* Take over the sack */
+					tcb_sack->left = seg_sack->left;
+					update_right_edge(s, tcb, tcb_sack, seg_sack->right);
+				}
+				return;
+			}
+			/* O/W, it's our slot and we have room (at least one spot). */
+			memmove(&tcb->snd.sacks[i + 1], &tcb->snd.sacks[i],
+			        sizeof(struct sack_block) * (tcb->snd.nr_sacks - i));
+			tcb_sack->left = seg_sack->left;
+			tcb_sack->right = seg_sack->right;
+			tcb->snd.nr_sacks++;
+			merge_sacks_into(tcb, i);
+			sack_has_changed(s, tcb, tcb_sack);
+			return;
+		}
+	}
+	if (tcb->snd.nr_sacks == MAX_NR_SND_SACKS) {
+		/* We didn't find space in the sack array. */
+		tcb_sack = &tcb->snd.sacks[MAX_NR_SND_SACKS - 1];
+		/* Need to always maintain the rightmost sack, discarding the prev */
+		if (seq_gt(seg_sack->right, tcb_sack->right)) {
+			tcb_sack->left = seg_sack->left;
+			tcb_sack->right = seg_sack->right;
+			sack_has_changed(s, tcb, tcb_sack);
+		}
+		return;
+	}
+	tcb_sack = &tcb->snd.sacks[tcb->snd.nr_sacks];
+	tcb->snd.nr_sacks++;
+	tcb_sack->left = seg_sack->left;
+	tcb_sack->right = seg_sack->right;
+	sack_has_changed(s, tcb, tcb_sack);
+}
+
+/* Given the packet seg, track the sacks in TCB.  There are a few things: if seg
+ * acks new data, some sacks might no longer be needed.  Some sacks might grow,
+ * we might add new sacks, either of which can cause a merger.
+ *
+ * The important thing is that we always have the max sack entry: it must be
+ * inserted for sure and findable.  We need that for our measurement of what
+ * packets are in the network.
+ *
+ * Note that we keep sacks that are below snd.rtx (and above
+ * seg.ack/tcb->snd.una) as best we can - we don't prune them.  We'll need those
+ * for the in_flight estimate.
+ *
+ * When we run out of room, we'll have to throw away a sack.  Anything we throw
+ * away below snd.rtx will be counted as 'in flight', even though it isn't.  If
+ * we throw away something greater than snd.rtx, we'll also retrans it.  For
+ * simplicity, we throw-away / replace the rightmost sack, since we're always
+ * maintaining a highest sack. */
+static void update_sacks(struct conv *s, Tcpctl *tcb, Tcp *seg)
+{
+	int prune = 0;
+	struct sack_block *tcb_sack;
+
+	for (int i = 0; i < tcb->snd.nr_sacks; i++) {
+		tcb_sack = &tcb->snd.sacks[i];
+		/* For the equality case, if they acked up to, but not including an old
+		 * sack, they must have reneged it.  Otherwise they would have acked
+		 * beyond the sack. */
+		if (seq_lt(seg->ack, tcb_sack->left))
+			break;
+		prune++;
+	}
+	if (prune) {
+		memmove(tcb->snd.sacks, tcb->snd.sacks + prune,
+		        sizeof(struct sack_block) * (tcb->snd.nr_sacks - prune));
+		tcb->snd.nr_sacks -= prune;
+	}
+	for (int i = 0; i < seg->nr_sacks; i++) {
+		/* old sacks */
+		if (seq_lt(seg->sacks[i].left, seg->ack))
+			continue;
+		/* buggy sack: out of range */
+		if (seq_gt(seg->sacks[i].right, tcb->snd.nxt))
+			continue;
+		update_or_insert_sack(s, tcb, &seg->sacks[i]);
+	}
+}
+
+/* This is a little bit of an under estimate, since we assume a packet is lost
+ * once we have any sacks above it.  Overall, it's at most 2 * MSS of an
+ * overestimate.
+ *
+ * If we have no sacks (either reneged or never used) we'll assume all packets
+ * above snd.rtx are lost.  This will be the case for sackless fast rxmit
+ * (Dong's stuff) or for a timeout.  In the former case, this is probably not
+ * true, and in_flight should be higher, but we have no knowledge without the
+ * sacks. */
 static void set_in_flight(Tcpctl *tcb)
 {
-	tcb->snd.in_flight = tcb->snd.rtx - tcb->snd.una;
+	struct sack_block *tcb_sack;
+	uint32_t in_flight = 0;
+	uint32_t from;
+
+	if (!tcb->snd.nr_sacks) {
+		tcb->snd.in_flight = tcb->snd.rtx - tcb->snd.una;
+		return;
+	}
+
+	/* Everything to the right of the unsacked */
+	tcb_sack = &tcb->snd.sacks[tcb->snd.nr_sacks - 1];
+	in_flight += tcb->snd.nxt - tcb_sack->right;
+
+	/* Everything retransed (from una to snd.rtx, minus sacked regions.  Note
+	 * we only retrans at most the last sack's left edge.  snd.rtx will be
+	 * advanced to the right edge of some sack (possibly the last one). */
+	from = tcb->snd.una;
+	for (int i = 0; i < tcb->snd.nr_sacks; i++) {
+		tcb_sack = &tcb->snd.sacks[i];
+		if (seq_ge(tcb_sack->left, tcb->snd.rtx))
+			break;
+		assert(seq_ge(tcb->snd.rtx, tcb_sack->right));
+		in_flight += tcb_sack->left - from;
+		from = tcb_sack->right;
+	}
+	in_flight += tcb->snd.rtx - from;
+
+	tcb->snd.in_flight = in_flight;
 }
 
 static void reset_recovery(struct conv *s, Tcpctl *tcb)
@@ -1928,6 +2260,8 @@ static void reset_recovery(struct conv *s, Tcpctl *tcb)
 	tcb->snd.recovery = 0;
 	tcb->snd.recovery_pt = 0;
 	tcb->snd.loss_hint = 0;
+	tcb->snd.flush_sacks = FALSE;
+	tcb->snd.sack_loss_hint = 0;
 }
 
 static bool is_dup_ack(Tcpctl *tcb, Tcp *seg)
@@ -1939,9 +2273,20 @@ static bool is_dup_ack(Tcpctl *tcb, Tcp *seg)
 	       (seg->wnd == tcb->snd.wnd);
 }
 
+/* If we have sacks, we'll ignore dupacks and look at the sacks ahead of una
+ * (which are managed by the TCB).  The tcb will not have old sacks (below
+ * ack/snd.rtx).  Receivers often send sacks below their ack point when we are
+ * coming out of a loss, and we don't want those to count.
+ *
+ * Note the tcb could have sacks (in the future), but the receiver stopped using
+ * them (reneged).  We'll catch that with the RTO.  If we try to catch it here,
+ * we could get in a state where we never allow them to renege. */
 static bool is_potential_loss(Tcpctl *tcb, Tcp *seg)
 {
-	return is_dup_ack(tcb, seg);
+	if (seg->nr_sacks > 0)
+		return tcb->snd.nr_sacks > 0;
+	else
+		return is_dup_ack(tcb, seg);
 }
 
 void update(struct conv *s, Tcp * seg)
@@ -1965,18 +2310,28 @@ void update(struct conv *s, Tcp * seg)
 	if (seq_gt(seg->ack, tcb->snd.rtx))
 		tcb->snd.rtx = seg->ack;
 
+	update_sacks(s, tcb, seg);
 	set_in_flight(tcb);
 
+	/* We treat either a dupack or forward SACKs as a hint that there is a loss.
+	 * The RFCs suggest three dupacks before treating it as a loss (alternative
+	 * is reordered packets).  We'll treat three SACKs the same way. */
 	if (is_potential_loss(tcb, seg) && !tcb->snd.recovery) {
 		tcb->snd.loss_hint++;
 		if (tcb->snd.loss_hint == TCPREXMTTHRESH) {
 			netlog(s->p->f, Logtcprxmt,
-			       "%I.%d -> %I.%d: loss hint thresh, nxt %u, una %u, cwnd %u\n",
+			       "%I.%d -> %I.%d: loss hint thresh, nr sacks %u, nxt %u, una %u, cwnd %u\n",
 			       s->laddr, s->lport, s->raddr, s->rport,
-			       tcb->snd.nxt, tcb->snd.una, tcb->cwind);
+			       tcb->snd.nr_sacks, tcb->snd.nxt, tcb->snd.una, tcb->cwind);
 			tcp_loss_event(s, tcb);
 			tcb->snd.recovery_pt = tcb->snd.nxt;
-			tcb->snd.recovery = FAST_RETRANS_RECOVERY;
+			if (tcb->snd.nr_sacks) {
+				tcb->snd.recovery = SACK_RETRANS_RECOVERY;
+				tcb->snd.flush_sacks = FALSE;
+				tcb->snd.sack_loss_hint = 0;
+			} else {
+				tcb->snd.recovery = FAST_RETRANS_RECOVERY;
+			}
 			tcprxmit(s);
 		}
 	}
@@ -2100,6 +2455,76 @@ static void update_tcb_ts(Tcpctl *tcb, Tcp *seg)
 	    (seq_ge(seg->ts_val, tcb->ts_recent) &&
 	     seq_le(seg->seq, tcb->last_ack_sent)))
 		tcb->ts_recent = seg->ts_val;
+}
+
+/* Overlap happens when one sack's left edge is inside another sack. */
+static bool sacks_overlap(struct sack_block *x, struct sack_block *y)
+{
+	return (seq_le(x->left, y->left) && seq_le(y->left, x->right)) ||
+	       (seq_le(y->left, x->left) && seq_le(x->left, y->right));
+}
+
+static void make_sack_first(Tcpctl *tcb, struct sack_block *tcb_sack)
+{
+	struct sack_block temp;
+
+	if (tcb_sack == &tcb->rcv.sacks[0])
+		return;
+	temp = tcb->rcv.sacks[0];
+	tcb->rcv.sacks[0] = *tcb_sack;
+	*tcb_sack = temp;
+}
+
+/* Track sack in our tcb for a block of data we received.  This handles all the
+ * stuff: making sure sack is first (since it's the most recent sack change),
+ * updating or merging sacks, and dropping excess sacks (we only need to
+ * maintain 3).  Unlike on the snd side, our tcb sacks are *not* sorted. */
+static void track_rcv_sack(Tcpctl *tcb, uint32_t left, uint32_t right)
+{
+	struct sack_block *tcb_sack;
+	struct sack_block sack[1];
+
+	if (!tcb->sack_ok)
+		return;
+	assert(seq_lt(left, right));
+	sack->left = left;
+	sack->right = right;
+	/* We can reuse an existing sack if we're merging or overlapping. */
+	for (int i = 0; i < tcb->rcv.nr_sacks; i++) {
+		tcb_sack = &tcb->rcv.sacks[i];
+		if (sacks_overlap(tcb_sack, sack)) {
+			tcb_sack->left = seq_min(tcb_sack->left, sack->left);
+			tcb_sack->right = seq_max(tcb_sack->right, sack->right);
+			make_sack_first(tcb, tcb_sack);
+			return;
+		}
+	}
+	/* We can discard the last sack (right shift) - we should have sent it at
+	 * least once by now.  If not, oh well. */
+	memmove(tcb->rcv.sacks + 1, tcb->rcv.sacks, sizeof(struct sack_block) *
+	        MIN(MAX_NR_RCV_SACKS - 1, tcb->rcv.nr_sacks));
+	tcb->rcv.sacks[0] = *sack;
+	if (tcb->rcv.nr_sacks < MAX_NR_RCV_SACKS)
+		tcb->rcv.nr_sacks++;
+}
+
+/* Once we receive everything and move rcv.nxt past a sack, we don't need to
+ * track it.  I've seen Linux report sacks in the past, but we probably
+ * shouldn't. */
+static void drop_old_rcv_sacks(Tcpctl *tcb)
+{
+	struct sack_block *tcb_sack;
+
+	for (int i = 0; i < tcb->rcv.nr_sacks; i++) {
+		tcb_sack = &tcb->rcv.sacks[i];
+		/* Moving up to or past the left is enough to drop it. */
+		if (seq_ge(tcb->rcv.nxt, tcb_sack->left)) {
+			memmove(tcb->rcv.sacks + i, tcb->rcv.sacks + i + 1,
+			        sizeof(struct sack_block) * (tcb->rcv.nr_sacks - i - 1));
+			tcb->rcv.nr_sacks--;
+			i--;
+		}
+	}
 }
 
 void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
@@ -2495,6 +2920,7 @@ reset:
 							tcb->flags |= FORCE;
 					}
 					tcb->rcv.nxt += length;
+					drop_old_rcv_sacks(tcb);
 
 					/*
 					 *  update our rcv window
@@ -2601,6 +3027,8 @@ static uint16_t derive_payload_mss(Tcpctl *tcb)
 		 * and not really a problem. */
 		opt_size += TS_SEND_PREPAD;
 	}
+	if (tcb->rcv.nr_sacks)
+		opt_size += 2 + tcb->rcv.nr_sacks * 8;
 	opt_size = ROUNDUP(opt_size, 4);
 	payload_mss -= opt_size;
 	return payload_mss;
@@ -2683,32 +3111,73 @@ static bool throttle_ssize(struct conv *s, Tcpctl *tcb, uint32_t *ssize_p,
  *
  * tcb->flgcnt consists of the flags both in ssize and in sent.
  *
- * Note that we could be in recovery and not retrans a segment. */
+ * Note that we could be in recovery and not sack_retrans a segment. */
 static bool get_xmit_segment(struct conv *s, Tcpctl *tcb, uint16_t payload_mss,
                              uint32_t *from_seq_p, uint32_t *sent_p,
                              uint32_t *ssize_p)
 {
 	struct Fs *f = s->p->f;
 	struct tcppriv *tpriv = s->p->priv;
-	uint32_t ssize, sent, from_seq, ideal_rxmit_amt = 0;
-	bool retrans = FALSE;
+	uint32_t ssize, sent, from_seq;
+	bool sack_retrans = FALSE;
+	struct sack_block *tcb_sack = 0;
 
-	/* For now (sackless), assume we start from snd.rtx. */
-	from_seq = tcb->snd.rtx;
-	sent = from_seq - tcb->snd.una;
-
-	/* qlen + flgcnt is every seq we want to have sent, including unack'd
-	 * data, unacked flags, and new flags. */
-	ssize = qlen(s->wq) + tcb->flgcnt - sent;
-	/* RFC suggests this */
-	if (tcb->snd.recovery == RTO_RETRANS_RECOVERY) {
-		/* We had a loss during recovery.  Don't send anything new until we
-		 * get out of it.  This can happen if we lose a rxmit packet.  We'll
-		 * limit ourselves to sending up to whatever we sent previously*/
-		ssize = MIN(ssize, tcb->snd.nxt - tcb->snd.rtx);
+	for (int i = 0; i < tcb->snd.nr_sacks; i++) {
+		tcb_sack = &tcb->snd.sacks[i];
+		if (seq_lt(tcb->snd.rtx, tcb_sack->left)) {
+			/* So ssize is supposed to include any *new* flags to flgcnt, which
+			 * at this point would be a FIN.
+			 *
+			 * It might be possible that flgcnt is incremented so we send a FIN,
+			 * even for an intermediate sack retrans.  Perhaps the user closed
+			 * the conv.
+			 *
+			 * However, the way the "flgcnt for FIN" works is that it inflates
+			 * the desired amount we'd like to send (qlen + flgcnt).
+			 * Eventually, we reach the end of the queue and fail to extract all
+			 * of dsize.  At that point, we put on the FIN, and that's where the
+			 * extra 'byte' comes from.
+			 *
+			 * For sack retrans, since we're extracting from parts of the qio
+			 * that aren't the right-most edge, we don't need to consider flgcnt
+			 * when setting ssize. */
+			from_seq = tcb->snd.rtx;
+			sent = from_seq - tcb->snd.una;
+			ssize = tcb_sack->left - from_seq;
+			sack_retrans = TRUE;
+			break;
+		}
+	}
+	/* SACK holes have first dibs, but we can still opportunisitically send new
+	 * data.
+	 *
+	 * During other types of recovery, we'll just send from the retrans point.
+	 * If we're in an RTO while we still have sacks, we could be resending data
+	 * that wasn't lost.  Consider a sack that is still growing (usually the
+	 * right-most), but we haven't received the ACK yet.  rxt may be included in
+	 * that area.  Given we had two losses or otherwise timed out, I'm not too
+	 * concerned.
+	 *
+	 * Note that Fast and RTO can send data beyond nxt.  If we change that,
+	 * change the accounting below. */
+	if (!sack_retrans) {
+		switch (tcb->snd.recovery) {
+		default:
+		case SACK_RETRANS_RECOVERY:
+			from_seq = tcb->snd.nxt;
+			break;
+		case FAST_RETRANS_RECOVERY:
+		case RTO_RETRANS_RECOVERY:
+			from_seq = tcb->snd.rtx;
+			break;
+		}
+		sent = from_seq - tcb->snd.una;
+		/* qlen + flgcnt is every seq we want to have sent, including unack'd
+		 * data, unacked flags, and new flags. */
+		ssize = qlen(s->wq) + tcb->flgcnt - sent;
 	}
 
-	if (!throttle_ssize(s, tcb, &ssize, payload_mss, retrans))
+	if (!throttle_ssize(s, tcb, &ssize, payload_mss, sack_retrans))
 		return FALSE;
 
 	/* This counts flags, which is a little hokey, but it's okay since in_flight
@@ -2723,9 +3192,43 @@ static bool get_xmit_segment(struct conv *s, Tcpctl *tcb, uint16_t payload_mss,
 		       tcb->snd.nxt);
 		tpriv->stats[RetransSegs]++;
 	}
-	tcb->snd.rtx += ssize;
-	if (seq_gt(tcb->snd.rtx, tcb->snd.nxt))
-		tcb->snd.nxt = tcb->snd.rtx;
+	if (sack_retrans) {
+		/* If we'll send up to the left edge, advance snd.rtx to the right.
+		 *
+		 * This includes the largest sack.  It might get removed later, in which
+		 * case we'll underestimate the amount in-flight.  The alternative is to
+		 * not count the rightmost sack, but when it gets removed, we'll retrans
+		 * it anyway.  No matter what, we'd count it. */
+		tcb->snd.rtx += ssize;
+		if (tcb->snd.rtx == tcb_sack->left)
+			tcb->snd.rtx = tcb_sack->right;
+		/* RFC 6675 says we MAY rearm the RTO timer on each retrans, since we
+		 * might not be getting ACKs for a while. */
+		tcpsettimer(tcb);
+	} else {
+		switch (tcb->snd.recovery) {
+		default:
+			/* under normal op, we drag rtx along with nxt.  this prevents us
+			 * from sending sacks too early (up above), since rtx doesn't get
+			 * reset to una until we have a loss (e.g. 3 dupacks/sacks). */
+			tcb->snd.nxt += ssize;
+			tcb->snd.rtx = tcb->snd.nxt;
+			break;
+		case SACK_RETRANS_RECOVERY:
+			/* We explicitly do not want to increase rtx here.  We might still
+			 * need it to fill in a sack gap below nxt if we get new, higher
+			 * sacks. */
+			tcb->snd.nxt += ssize;
+			break;
+		case FAST_RETRANS_RECOVERY:
+		case RTO_RETRANS_RECOVERY:
+			tcb->snd.rtx += ssize;
+			/* Fast and RTO can send new data, advancing nxt. */
+			if (seq_gt(tcb->snd.rtx, tcb->snd.nxt))
+				tcb->snd.nxt = tcb->snd.rtx;
+			break;
+		}
+	}
 	*from_seq_p = from_seq;
 	*sent_p = sent;
 	*ssize_p = ssize;
@@ -2803,6 +3306,7 @@ void tcpoutput(struct conv *s)
 		seg.mss = 0;
 		seg.ws = 0;
 		seg.sack_ok = FALSE;
+		seg.nr_sacks = 0;
 		/* When outputting, Syn_sent means "send the Syn", for connections we
 		 * initiate.  SYNACKs are sent from sndsynack directly. */
 		if (tcb->state == Syn_sent) {
@@ -2939,6 +3443,7 @@ void tcpsendka(struct conv *s)
 	seg.mss = 0;
 	seg.ws = 0;
 	seg.sack_ok = FALSE;
+	seg.nr_sacks = 0;
 	if (tcpporthogdefense)
 		urandom_read(&seg.seq, sizeof(seg.seq));
 	else
@@ -3074,6 +3579,39 @@ void tcprxmit(struct conv *s)
 	tcpoutput(s);
 }
 
+/* The original RFC said to drop sacks on a timeout, since the receiver could
+ * renege.  Later RFCs say we can keep them around, so long as we are careful.
+ *
+ * We'll go with a "flush if we have two timeouts" plan.  This doesn't have to
+ * be perfect - there might be cases where we accidentally flush the sacks too
+ * often.  Perhaps we never get dup_acks to start fast/sack rxmit.  The main
+ * thing is that after multiple timeouts we flush the sacks, since the receiver
+ * might renege.
+ *
+ * We also have an Akaros-specific problem.  We use the sacks to determine
+ * in_flight.  Specifically, the (snd.nxt - upper right edge) is tracked as in
+ * flight.  Usually the receiver will keep sacking that right edge all the way
+ * up to snd.nxt, but they might not, and the gap might be quite large.  After a
+ * timeout, that data is definitely not in flight.  If that block's size is
+ * greater than cwnd, we'll never transmit.  This should be rare, and in that
+ * case we can just dump the sacks.  The typical_mss fudge factor is so we can
+ * send a reasonably-sized packet. */
+static void timeout_handle_sacks(Tcpctl *tcb)
+{
+	struct sack_block *last_sack;
+
+	if (tcb->snd.nr_sacks) {
+		last_sack = &tcb->snd.sacks[tcb->snd.nr_sacks - 1];
+		if (tcb->snd.flush_sacks || (tcb->snd.nxt - last_sack->right >=
+		                             tcb->cwind - tcb->typical_mss)) {
+			tcb->snd.nr_sacks = 0;
+			tcb->snd.flush_sacks = FALSE;
+		} else {
+			tcb->snd.flush_sacks = TRUE;
+		}
+	}
+}
+
 void tcptimeout(void *arg)
 {
 	ERRSTACK(1);
@@ -3115,6 +3653,7 @@ void tcptimeout(void *arg)
 			 * past recovery_pt. */
 			tcb->snd.recovery = RTO_RETRANS_RECOVERY;
 			tcb->snd.recovery_pt = tcb->snd.nxt;
+			timeout_handle_sacks(tcb);
 			tcprxmit(s);
 			tpriv->stats[RetransTimeouts]++;
 			break;
@@ -3175,6 +3714,7 @@ addreseq(Tcpctl * tcb, struct tcppriv *tpriv, Tcp * seg,
 	rp->bp = bp;
 	rp->length = length;
 
+	track_rcv_sack(tcb, seg->seq, seg->seq + length);
 	/* Place on reassembly list sorting by starting seq number */
 	rp1 = tcb->reseq;
 	if (rp1 == NULL || seq_lt(seg->seq, rp1->seg.seq)) {
@@ -3198,6 +3738,7 @@ addreseq(Tcpctl * tcb, struct tcppriv *tpriv, Tcp * seg,
 		rp1 = rp1->next;
 	}
 	qmax = QMAX << tcb->rcv.scale;
+	/* Here's where we're reneging on previously reported sacks. */
 	if (rqlen > qmax) {
 		printd("resequence queue > window: %d > %d\n", rqlen, qmax);
 		i = 0;
@@ -3218,6 +3759,7 @@ addreseq(Tcpctl * tcb, struct tcppriv *tpriv, Tcp * seg,
 			kfree(rp);
 		}
 		tcb->reseq = NULL;
+		tcb->rcv.nr_sacks = 0;
 
 		return -1;
 	}
