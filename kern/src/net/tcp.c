@@ -3094,6 +3094,21 @@ static bool throttle_ssize(struct conv *s, Tcpctl *tcb, uint32_t *ssize_p,
 			usable -= tcb->snd.in_flight;
 		else
 			usable = 0;
+		/* Avoid Silly Window Syndrome.  This is a little different thant RFC
+		 * 813.  I took their additional enhancement of "< MSS" as an AND, not
+		 * an OR.  25% of a large snd.wnd is pretty large, and our main goal is
+		 * to avoid packets smaller than MSS.  I still use the 25% threshold,
+		 * because it is important that there is *some* data in_flight.  If
+		 * usable < MSS because snd.wnd is very small (but not 0), we might
+		 * never get an ACK and would need to set up a timer.
+		 *
+		 * Also, I'm using 'ssize' as a proxy for a PSH point.  If there's just
+		 * a small blob in the qio (or retrans!), then we might as well just
+		 * send it. */
+		if ((usable < tcb->typical_mss) && (usable < tcb->snd.wnd >> 2)
+		    && (usable < ssize)) {
+			return FALSE;
+		}
 	}
 	if (ssize && usable < 2)
 		netlog(s->p->f, Logtcpverbose,
