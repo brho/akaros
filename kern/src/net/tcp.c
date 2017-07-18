@@ -702,7 +702,9 @@ void tcpacktimer(void *v)
 
 static void tcpcreate(struct conv *c)
 {
-	c->rq = qopen(QMAX, Qcoalesce, 0, 0);
+	/* We don't use qio limits.  Instead, TCP manages flow control on its own.
+	 * We only use qpassnolim().  Note for qio that 0 doesn't mean no limit. */
+	c->rq = qopen(0, Qcoalesce, 0, 0);
 	c->wq = qopen(8 * QMAX, Qkick, tcpkick, c);
 }
 
@@ -870,18 +872,9 @@ int tcpmtu(struct Proto *tcp, uint8_t * addr, int version, int *scale,
 			break;
 	}
 	*flags &= ~TSO;
-
-	if (ifc != NULL) {
-		if (ifc->mbps > 100)
-			*scale = HaveWS | 3;
-		else if (ifc->mbps > 10)
-			*scale = HaveWS | 1;
-		else
-			*scale = HaveWS | 0;
-		if (ifc->feat & NETF_TSO)
-			*flags |= TSO;
-	} else
-		*scale = HaveWS | 0;
+	if (ifc && (ifc->feat & NETF_TSO))
+		*flags |= TSO;
+	*scale = HaveWS | 7;
 
 	return mtu;
 }
@@ -954,7 +947,6 @@ void inittcpctl(struct conv *s, int mode)
 	tcb->rcv.wnd = QMAX;
 	tcb->rcv.scale = 0;
 	tcb->snd.scale = 0;
-	qsetlimit(s->rq, QMAX);
 }
 
 /*
@@ -4070,12 +4062,10 @@ tcpsetscale(struct conv *s, Tcpctl * tcb, uint16_t rcvscale, uint16_t sndscale)
 	if (rcvscale) {
 		tcb->rcv.scale = rcvscale & 0xff;
 		tcb->snd.scale = sndscale & 0xff;
-		tcb->window = QMAX << tcb->snd.scale;
-		qsetlimit(s->rq, tcb->window);
+		tcb->window = QMAX << tcb->rcv.scale;
 	} else {
 		tcb->rcv.scale = 0;
 		tcb->snd.scale = 0;
 		tcb->window = QMAX;
-		qsetlimit(s->rq, tcb->window);
 	}
 }
