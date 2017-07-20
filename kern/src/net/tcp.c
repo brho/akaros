@@ -117,12 +117,11 @@ enum {
 	RTO_RETRANS_RECOVERY = 3,
 	CWIND_SCALE = 10,	/* initial CWIND will be MSS * this */
 
-	FORCE = 1,
-	CLONE = 2,
-	RETRAN = 4,
-	ACTIVE = 8,
-	SYNACK = 16,
-	TSO = 32,
+	FORCE			= 1 << 0,
+	CLONE			= 1 << 1,
+	ACTIVE			= 1 << 2,
+	SYNACK			= 1 << 3,
+	TSO				= 1 << 4,
 
 	LOGAGAIN = 3,
 	LOGDGAIN = 2,
@@ -2356,9 +2355,8 @@ void update(struct conv *s, Tcp * seg)
 		 *  don't let us hangup if sending into a closed window and
 		 *  we're still getting acks
 		 */
-		if ((tcb->flags & RETRAN) && tcb->snd.wnd == 0) {
+		if (tcb->snd.recovery && (tcb->snd.wnd == 0))
 			tcb->backedoff = MAXBACKMS / 4;
-		}
 		return;
 	}
 	/* At this point, they have acked something new. (positive ack, ack > una).
@@ -2409,7 +2407,7 @@ void update(struct conv *s, Tcp * seg)
 	/* Adjust the timers according to the round trip time */
 	if (tcb->rtt_timer.state == TcptimerON && seq_ge(seg->ack, tcb->rttseq)) {
 		tcphalt(tpriv, &tcb->rtt_timer);
-		if ((tcb->flags & RETRAN) == 0) {
+		if (!tcb->snd.recovery) {
 			tcb->backoff = 0;
 			tcb->backedoff = 0;
 			rtt = tcb->rtt_timer.start - tcb->rtt_timer.count;
@@ -2446,7 +2444,6 @@ done:
 	else
 		tcphalt(tpriv, &tcb->timer);
 
-	tcb->flags &= ~RETRAN;
 	tcb->backoff = 0;
 	tcb->backedoff = 0;
 }
@@ -3596,7 +3593,7 @@ void tcprxmit(struct conv *s)
 
 	tcb = (Tcpctl *) s->ptcl;
 
-	tcb->flags |= RETRAN | FORCE;
+	tcb->flags |= FORCE;
 	tcb->snd.rtx = tcb->snd.una;
 	set_in_flight(tcb);
 
