@@ -6,7 +6,7 @@
  *
  * Modified for the Akaros operating system:
  * Copyright (c) 2013-2014 The Regents of the University of California
- * Copyright (c) 2013-2015 Google Inc.
+ * Copyright (c) 2013-2017 Google Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -2294,9 +2294,50 @@ static bool is_potential_loss(Tcpctl *tcb, Tcp *seg)
 		return is_dup_ack(tcb, seg);
 }
 
+/* When we use timestamps for RTTM, RFC 7323 suggests scaling by
+ * expected_samples (per cwnd).  They say:
+ *
+ * ExpectedSamples = ceiling(FlightSize / (SMSS * 2))
+ *
+ * However, SMMS * 2 is really "number of bytes expected to be acked in a
+ * packet.".  We'll use 'acked' to approximate that.  When the receiver uses
+ * LRO, they'll send back large ACKs, which decreases the number of samples.
+ *
+ * If it turns out that all the divides are bad, we can just go back to not
+ * using expected_samples at all. */
+static int expected_samples_ts(Tcpctl *tcb, uint32_t acked)
+{
+	assert(acked);
+	return MAX(DIV_ROUND_UP(tcb->snd.nxt - tcb->snd.una, acked), 1);
+}
+
+/* Updates the RTT, given the currently sampled RTT and the number samples per
+ * cwnd.  For non-TS RTTM, that'll be 1. */
+static void update_rtt(Tcpctl *tcb, int rtt_sample, int expected_samples)
+{
+	int delta;
+
+	tcb->backoff = 0;
+	tcb->backedoff = 0;
+	if (tcb->srtt == 0) {
+		tcb->srtt = rtt_sample;
+		tcb->mdev = rtt_sample / 2;
+	} else {
+		delta = rtt_sample - tcb->srtt;
+		tcb->srtt += (delta >> RTTM_ALPHA_SHIFT) / expected_samples;
+		if (tcb->srtt <= 0)
+			tcb->srtt = 1;
+		tcb->mdev += ((abs(delta) - tcb->mdev) >> RTTM_BRAVO_SHIFT) /
+		             expected_samples;
+		if (tcb->mdev <= 0)
+			tcb->mdev = 1;
+	}
+	tcpsettimer(tcb);
+}
+
 void update(struct conv *s, Tcp * seg)
 {
-	int rtt, delta;
+	int rtt;
 	Tcpctl *tcb;
 	uint32_t acked, expand;
 	struct tcppriv *tpriv;
@@ -2404,30 +2445,19 @@ void update(struct conv *s, Tcp * seg)
 	}
 	adjust_tx_qio_limit(s);
 
-	/* Adjust the timers according to the round trip time */
-	if (tcb->rtt_timer.state == TcptimerON && seq_ge(seg->ack, tcb->rttseq)) {
+	if (tcb->ts_recent) {
+		update_rtt(tcb, abs(milliseconds() - seg->ts_ecr),
+		           expected_samples_ts(tcb, acked));
+	} else if (tcb->rtt_timer.state == TcptimerON &&
+	           seq_ge(seg->ack, tcb->rttseq)) {
+		/* Adjust the timers according to the round trip time */
 		tcphalt(tpriv, &tcb->rtt_timer);
 		if (!tcb->snd.recovery) {
-			tcb->backoff = 0;
-			tcb->backedoff = 0;
 			rtt = tcb->rtt_timer.start - tcb->rtt_timer.count;
 			if (rtt == 0)
-				rtt = 1;	/* otherwise all close systems will rexmit in 0 time */
+				rtt = 1;	/* o/w all close systems will rexmit in 0 time */
 			rtt *= MSPTICK;
-			if (tcb->srtt == 0) {
-				tcb->srtt = rtt;
-				tcb->mdev = rtt / 2;
-			} else {
-				delta = rtt - tcb->srtt;
-				tcb->srtt += delta >> RTTM_ALPHA_SHIFT;
-				if (tcb->srtt <= 0)
-					tcb->srtt = 1;
-
-				tcb->mdev += (abs(delta) - tcb->mdev) >> RTTM_BRAVO_SHIFT;
-				if (tcb->mdev <= 0)
-					tcb->mdev = 1;
-			}
-			tcpsettimer(tcb);
+			update_rtt(tcb, rtt, 1);
 		}
 	}
 
@@ -3399,8 +3429,8 @@ void tcpoutput(struct conv *s)
 			if (tcb->timer.state != TcptimerON)
 				tcpgo(tpriv, &tcb->timer);
 
-			/* If round trip timer isn't running, start it. */
-			if (tcb->rtt_timer.state != TcptimerON) {
+			if (!tcb->ts_recent && (tcb->rtt_timer.state != TcptimerON)) {
+				/* If round trip timer isn't running, start it. */
 				tcpgo(tpriv, &tcb->rtt_timer);
 				tcb->rttseq = from_seq + ssize;
 			}
