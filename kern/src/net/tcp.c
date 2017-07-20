@@ -123,8 +123,8 @@ enum {
 	SYNACK			= 1 << 3,
 	TSO				= 1 << 4,
 
-	LOGAGAIN = 3,
-	LOGDGAIN = 2,
+	RTTM_ALPHA_SHIFT = 3,	/* alpha = 1/8 */
+	RTTM_BRAVO_SHIFT = 2,	/* bravo = 1/4 (beta) */
 
 	Closed = 0,	/* Connection states */
 	Listen,
@@ -890,7 +890,7 @@ void inittcpctl(struct conv *s, int mode)
 	memset(tcb, 0, sizeof(Tcpctl));
 
 	tcb->ssthresh = UINT32_MAX;
-	tcb->srtt = tcp_irtt << LOGAGAIN;
+	tcb->srtt = tcp_irtt;
 	tcb->mdev = 0;
 
 	/* setup timers */
@@ -1950,8 +1950,8 @@ void tcpsynackrtt(struct conv *s)
 	tpriv = s->p->priv;
 
 	delta = NOW - tcb->sndsyntime;
-	tcb->srtt = delta << LOGAGAIN;
-	tcb->mdev = delta << LOGDGAIN;
+	tcb->srtt = delta;
+	tcb->mdev = delta / 2;
 
 	/* halt round trip timer */
 	tcphalt(tpriv, &tcb->rtt_timer);
@@ -2415,16 +2415,15 @@ void update(struct conv *s, Tcp * seg)
 				rtt = 1;	/* otherwise all close systems will rexmit in 0 time */
 			rtt *= MSPTICK;
 			if (tcb->srtt == 0) {
-				tcb->srtt = rtt << LOGAGAIN;
-				tcb->mdev = rtt << LOGDGAIN;
+				tcb->srtt = rtt;
+				tcb->mdev = rtt / 2;
 			} else {
-				delta = rtt - (tcb->srtt >> LOGAGAIN);
-				tcb->srtt += delta;
+				delta = rtt - tcb->srtt;
+				tcb->srtt += delta >> RTTM_ALPHA_SHIFT;
 				if (tcb->srtt <= 0)
 					tcb->srtt = 1;
 
-				delta = abs(delta) - (tcb->mdev >> LOGDGAIN);
-				tcb->mdev += delta;
+				tcb->mdev += (abs(delta) - tcb->mdev) >> RTTM_BRAVO_SHIFT;
 				if (tcb->mdev <= 0)
 					tcb->mdev = 1;
 			}
@@ -3999,8 +3998,8 @@ void tcpsettimer(Tcpctl * tcb)
 	int x;
 
 	/* round trip dependency */
-	x = backoff(tcb->backoff) *
-		(tcb->mdev + (tcb->srtt >> LOGAGAIN) + MSPTICK) / MSPTICK;
+	x = backoff(tcb->backoff) * (tcb->srtt + MAX(4 * tcb->mdev, MSPTICK));
+	x = DIV_ROUND_UP(x, MSPTICK);
 
 	/* Bounded twixt 1/2 and 64 seconds.  RFC 6298 suggested min is 1 second. */
 	if (x < 500 / MSPTICK)
