@@ -39,7 +39,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 #include <vfs.h>
 #include <kfs.h>
@@ -53,7 +53,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 #define DPRINT if(0)print
 

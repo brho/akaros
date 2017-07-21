@@ -10,7 +10,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 #include <arch/io.h>
 #include <trap.h>
 

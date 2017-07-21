@@ -10,7 +10,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 /* normally automatically generated on plan 9. Move to ldscripts soon. */
 extern void tcpinit(struct Fs *);

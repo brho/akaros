@@ -28,7 +28,7 @@
  */
 
 #include <error.h>
-#include <ip.h>
+#include <net/ip.h>
 #include <kmalloc.h>
 
 enum {

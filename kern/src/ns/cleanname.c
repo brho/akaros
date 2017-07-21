@@ -38,7 +38,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 /*
  * In place, rewrite name to compress multiple /, eliminate ., and process ..

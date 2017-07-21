@@ -28,7 +28,7 @@
 #include <smp.h>
 #include <arch/pci.h>
 #include <assert.h>
-#include <ip.h>
+#include <net/ip.h>
 #include <ns.h>
 
 #define ilock(x) spin_lock_irqsave(x)

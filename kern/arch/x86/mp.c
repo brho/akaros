@@ -17,7 +17,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 #include <arch/mptables.h>
 #include <arch/ioapic.h>
 

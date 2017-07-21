@@ -42,7 +42,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <arch/pci.h>
-#include <ip.h>
+#include <net/ip.h>
 #include <ns.h>
 #include "ethermii.h"
 

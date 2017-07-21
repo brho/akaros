@@ -19,7 +19,7 @@
 #include <pmap.h>
 #include <umem.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 #include <time.h>
 #include <bitops.h>
 #include <core_set.h>

@@ -38,7 +38,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 /*
  * Generous estimate of number of fields, including terminal NULL pointer

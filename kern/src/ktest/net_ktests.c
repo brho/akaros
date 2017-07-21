@@ -1,4 +1,4 @@
-#include <ip.h>
+#include <net/ip.h>
 #include <ktest.h>
 #include <linker_func.h>
 

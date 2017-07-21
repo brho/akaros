@@ -38,7 +38,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 static void pktbind(struct Ipifc *i, int unused_int, char **unused_char_pp_t);
 static void pktunbind(struct Ipifc *i);

@@ -33,7 +33,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 #include <sys/queue.h>
 
 struct dev srvdevtab;

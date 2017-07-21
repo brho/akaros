@@ -38,7 +38,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 enum {
 	Nlog = 4 * 1024,

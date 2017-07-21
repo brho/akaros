@@ -11,7 +11,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 /* Special akaros edition. */
 /* akaros does not (yet) pass as much info as plan 9 does,

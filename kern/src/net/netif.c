@@ -38,7 +38,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 static int netown(struct netfile *, char *unused_char_p_t, int);
 static int openfile(struct ether *, int);

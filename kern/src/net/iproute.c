@@ -38,7 +38,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 static void walkadd(struct Fs *, struct route **, struct route *);
 static void addnode(struct Fs *, struct route **, struct route *);

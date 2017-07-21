@@ -40,7 +40,7 @@
 #include <ext2fs.h>
 #include <kthread.h>
 #include <linker_func.h>
-#include <ip.h>
+#include <net/ip.h>
 #include <acpi.h>
 #include <coreboot_tables.h>
 

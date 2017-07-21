@@ -38,7 +38,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 typedef struct Ip4hdr Ip4hdr;
 typedef struct IP IP;

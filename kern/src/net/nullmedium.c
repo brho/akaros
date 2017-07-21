@@ -38,7 +38,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 static void nullbind(struct Ipifc *unused_ipifc, int unused_int,
 					 char **unused_char_pp_t)

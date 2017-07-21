@@ -40,7 +40,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 #include <umem.h>
 #include <coreboot_tables.h>
 

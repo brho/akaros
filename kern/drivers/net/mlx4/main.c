@@ -3856,7 +3856,7 @@ module_exit(mlx4_cleanup);
 #include <pmap.h>
 #include <smp.h>
 #include <arch/pci.h>
-#include <ip.h>
+#include <net/ip.h>
 #include <ns.h>
 
 extern int mlx4_en_init(void);

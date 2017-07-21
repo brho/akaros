@@ -31,7 +31,7 @@
 #include <stdio.h>
 #include <syscall.h>
 #include <error.h>
-#include <ip.h>
+#include <net/ip.h>
 
 struct ICMPpkt {
 	uint8_t type;

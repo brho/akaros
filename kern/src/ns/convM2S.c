@@ -38,7 +38,7 @@
 #include <cpio.h>
 #include <pmap.h>
 #include <smp.h>
-#include <ip.h>
+#include <net/ip.h>
 
 static
 uint8_t *gstring(uint8_t * p, uint8_t * ep, char **s)
