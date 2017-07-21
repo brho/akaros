@@ -1,8 +1,13 @@
-#ifndef _LINUX_MATH64_H
-#define _LINUX_MATH64_H
+/* Copyright (C) 1991-2016, the Linux Kernel authors
+ *
+ * This source code is licensed under the GNU General Public License
+ * Version 2. See the file COPYING for more details.
+ */
 
-#include <linux/types.h>
-#include <asm/div64.h>
+#pragma once
+
+#include <sys/types.h>
+#include <arch/div64.h>
 
 #if BITS_PER_LONG == 64
 
@@ -15,7 +20,8 @@
  * This is commonly provided by 32bit archs to provide an optimized 64bit
  * divide.
  */
-static inline u64 div_u64_rem(u64 dividend, u32 divisor, u32 *remainder)
+static inline uint64_t div_u64_rem(uint64_t dividend, uint32_t divisor,
+                                   uint32_t *remainder)
 {
 	*remainder = dividend % divisor;
 	return dividend / divisor;
@@ -24,7 +30,8 @@ static inline u64 div_u64_rem(u64 dividend, u32 divisor, u32 *remainder)
 /**
  * div_s64_rem - signed 64bit divide with 32bit divisor with remainder
  */
-static inline s64 div_s64_rem(s64 dividend, s32 divisor, s32 *remainder)
+static inline int64_t div_s64_rem(int64_t dividend, int32_t divisor,
+                                  int32_t *remainder)
 {
 	*remainder = dividend % divisor;
 	return dividend / divisor;
@@ -33,7 +40,8 @@ static inline s64 div_s64_rem(s64 dividend, s32 divisor, s32 *remainder)
 /**
  * div64_u64_rem - unsigned 64bit divide with 64bit divisor and remainder
  */
-static inline u64 div64_u64_rem(u64 dividend, u64 divisor, u64 *remainder)
+static inline uint64_t div64_u64_rem(uint64_t dividend, uint64_t divisor,
+                                     uint64_t *remainder)
 {
 	*remainder = dividend % divisor;
 	return dividend / divisor;
@@ -42,7 +50,7 @@ static inline u64 div64_u64_rem(u64 dividend, u64 divisor, u64 *remainder)
 /**
  * div64_u64 - unsigned 64bit divide with 64bit divisor
  */
-static inline u64 div64_u64(u64 dividend, u64 divisor)
+static inline uint64_t div64_u64(uint64_t dividend, uint64_t divisor)
 {
 	return dividend / divisor;
 }
@@ -50,7 +58,7 @@ static inline u64 div64_u64(u64 dividend, u64 divisor)
 /**
  * div64_s64 - signed 64bit divide with 64bit divisor
  */
-static inline s64 div64_s64(s64 dividend, s64 divisor)
+static inline int64_t div64_s64(int64_t dividend, int64_t divisor)
 {
 	return dividend / divisor;
 }
@@ -61,7 +69,8 @@ static inline s64 div64_s64(s64 dividend, s64 divisor)
 #define div64_ul(x, y)   div_u64((x), (y))
 
 #ifndef div_u64_rem
-static inline u64 div_u64_rem(u64 dividend, u32 divisor, u32 *remainder)
+static inline uint64_t div_u64_rem(uint64_t dividend, uint32_t divisor,
+                                   uint32_t *remainder)
 {
 	*remainder = do_div(dividend, divisor);
 	return dividend;
@@ -69,19 +78,21 @@ static inline u64 div_u64_rem(u64 dividend, u32 divisor, u32 *remainder)
 #endif
 
 #ifndef div_s64_rem
-extern s64 div_s64_rem(s64 dividend, s32 divisor, s32 *remainder);
+extern int64_t div_s64_rem(int64_t dividend, int32_t divisor,
+                           int32_t *remainder);
 #endif
 
 #ifndef div64_u64_rem
-extern u64 div64_u64_rem(u64 dividend, u64 divisor, u64 *remainder);
+extern uint64_t div64_u64_rem(uint64_t dividend, uint64_t divisor,
+                              uint64_t *remainder);
 #endif
 
 #ifndef div64_u64
-extern u64 div64_u64(u64 dividend, u64 divisor);
+extern uint64_t div64_u64(uint64_t dividend, uint64_t divisor);
 #endif
 
 #ifndef div64_s64
-extern s64 div64_s64(s64 dividend, s64 divisor);
+extern int64_t div64_s64(int64_t dividend, int64_t divisor);
 #endif
 
 #endif /* BITS_PER_LONG */
@@ -94,9 +105,9 @@ extern s64 div64_s64(s64 dividend, s64 divisor);
  * divide.
  */
 #ifndef div_u64
-static inline u64 div_u64(u64 dividend, u32 divisor)
+static inline uint64_t div_u64(uint64_t dividend, uint32_t divisor)
 {
-	u32 remainder;
+	uint32_t remainder;
 	return div_u64_rem(dividend, divisor, &remainder);
 }
 #endif
@@ -105,19 +116,20 @@ static inline u64 div_u64(u64 dividend, u32 divisor)
  * div_s64 - signed 64bit divide with 32bit divisor
  */
 #ifndef div_s64
-static inline s64 div_s64(s64 dividend, s32 divisor)
+static inline int64_t div_s64(int64_t dividend, int32_t divisor)
 {
-	s32 remainder;
+	int32_t remainder;
 	return div_s64_rem(dividend, divisor, &remainder);
 }
 #endif
 
-u32 iter_div_u64_rem(u64 dividend, u32 divisor, u64 *remainder);
+uint32_t iter_div_u64_rem(uint64_t dividend, uint32_t divisor,
+                          uint64_t *remainder);
 
-static __always_inline u32
-__iter_div_u64_rem(u64 dividend, u32 divisor, u64 *remainder)
+static __always_inline uint32_t
+__iter_div_u64_rem(uint64_t dividend, uint32_t divisor, uint64_t *remainder)
 {
-	u32 ret = 0;
+	uint32_t ret = 0;
 
 	while (dividend >= divisor) {
 		/* The following asm() prevents the compiler from
@@ -137,35 +149,38 @@ __iter_div_u64_rem(u64 dividend, u32 divisor, u64 *remainder)
 /*
  * Many a GCC version messes this up and generates a 64x64 mult :-(
  */
-static inline u64 mul_u32_u32(u32 a, u32 b)
+static inline uint64_t mul_u32_u32(uint32_t a, uint32_t b)
 {
-	return (u64)a * b;
+	return (uint64_t)a * b;
 }
 #endif
 
 #if defined(CONFIG_ARCH_SUPPORTS_INT128) && defined(__SIZEOF_INT128__)
 
 #ifndef mul_u64_u32_shr
-static inline u64 mul_u64_u32_shr(u64 a, u32 mul, unsigned int shift)
+static inline uint64_t mul_u64_u32_shr(uint64_t a, uint32_t mul,
+                                       unsigned int shift)
 {
-	return (u64)(((unsigned __int128)a * mul) >> shift);
+	return (uint64_t)(((unsigned __int128)a * mul) >> shift);
 }
 #endif /* mul_u64_u32_shr */
 
 #ifndef mul_u64_u64_shr
-static inline u64 mul_u64_u64_shr(u64 a, u64 mul, unsigned int shift)
+static inline uint64_t mul_u64_u64_shr(uint64_t a, uint64_t mul,
+                                       unsigned int shift)
 {
-	return (u64)(((unsigned __int128)a * mul) >> shift);
+	return (uint64_t)(((unsigned __int128)a * mul) >> shift);
 }
 #endif /* mul_u64_u64_shr */
 
 #else
 
 #ifndef mul_u64_u32_shr
-static inline u64 mul_u64_u32_shr(u64 a, u32 mul, unsigned int shift)
+static inline uint64_t mul_u64_u32_shr(uint64_t a, uint32_t mul,
+                                       unsigned int shift)
 {
-	u32 ah, al;
-	u64 ret;
+	uint32_t ah, al;
+	uint64_t ret;
 
 	al = a;
 	ah = a >> 32;
@@ -179,19 +194,20 @@ static inline u64 mul_u64_u32_shr(u64 a, u32 mul, unsigned int shift)
 #endif /* mul_u64_u32_shr */
 
 #ifndef mul_u64_u64_shr
-static inline u64 mul_u64_u64_shr(u64 a, u64 b, unsigned int shift)
+static inline uint64_t mul_u64_u64_shr(uint64_t a, uint64_t b,
+                                       unsigned int shift)
 {
 	union {
-		u64 ll;
+		uint64_t ll;
 		struct {
 #ifdef __BIG_ENDIAN
-			u32 high, low;
+			uint32_t high, low;
 #else
-			u32 low, high;
+			uint32_t low, high;
 #endif
 		} l;
 	} rl, rm, rn, rh, a0, b0;
-	u64 c;
+	uint64_t c;
 
 	a0.ll = a;
 	b0.ll = b;
@@ -206,7 +222,7 @@ static inline u64 mul_u64_u64_shr(u64 a, u64 b, unsigned int shift)
 	 * starting at bits 32-95.  The low 32-bits go into the result of the
 	 * multiplication, the high 32-bits are carried into the next step.
 	 */
-	rl.l.high = c = (u64)rl.l.high + rm.l.low + rn.l.low;
+	rl.l.high = c = (uint64_t)rl.l.high + rm.l.low + rn.l.low;
 	rh.l.low = c = (c >> 32) + rm.l.high + rn.l.high + rh.l.low;
 	rh.l.high = (c >> 32) + rh.l.high;
 
@@ -225,15 +241,16 @@ static inline u64 mul_u64_u64_shr(u64 a, u64 b, unsigned int shift)
 #endif
 
 #ifndef mul_u64_u32_div
-static inline u64 mul_u64_u32_div(u64 a, u32 mul, u32 divisor)
+static inline uint64_t mul_u64_u32_div(uint64_t a, uint32_t mul,
+                                       uint32_t divisor)
 {
 	union {
-		u64 ll;
+		uint64_t ll;
 		struct {
 #ifdef __BIG_ENDIAN
-			u32 high, low;
+			uint32_t high, low;
 #else
-			u32 low, high;
+			uint32_t low, high;
 #endif
 		} l;
 	} u, rl, rh;
@@ -252,5 +269,3 @@ static inline u64 mul_u64_u32_div(u64 a, u32 mul, u32 divisor)
 	return rl.ll;
 }
 #endif /* mul_u64_u32_div */
-
-#endif /* _LINUX_MATH64_H */

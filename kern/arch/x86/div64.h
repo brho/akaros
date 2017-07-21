@@ -1,5 +1,3 @@
-#ifndef _ASM_GENERIC_DIV64_H
-#define _ASM_GENERIC_DIV64_H
 /*
  * Copyright (C) 2003 Bernardo Innocenti <bernie@develer.com>
  * Based on former asm-ppc/div64.h and asm-m68knommu/div64.h
@@ -20,8 +18,9 @@
  *       beware of side effects!
  */
 
-#include <linux/types.h>
-#include <linux/compiler.h>
+#pragma once
+
+#include <sys/types.h>
 
 #if BITS_PER_LONG == 64
 
@@ -35,8 +34,6 @@
 
 #else /* BITS_PER_LONG == ?? */
 
-# error do_div() does not yet support the C64
+# error "BITS_PER_LONG isn't #defined 64"
 
 #endif /* BITS_PER_LONG */
-
-#endif /* _ASM_GENERIC_DIV64_H */
