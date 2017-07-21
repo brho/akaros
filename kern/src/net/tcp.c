@@ -39,336 +39,19 @@
 #include <pmap.h>
 #include <smp.h>
 #include <net/ip.h>
+#include <net/tcp.h>
 
-enum {
-	QMAX = 64 * 1024 - 1,
-	IP_TCPPROTO = 6,
-
-	TCP4_IPLEN = 8,
-	TCP4_PHDRSIZE = 12,
-	TCP4_HDRSIZE = 20,
-	TCP4_TCBPHDRSZ = 40,
-	TCP4_PKT = TCP4_IPLEN + TCP4_PHDRSIZE,
-
-	TCP6_IPLEN = 0,
-	TCP6_PHDRSIZE = 40,
-	TCP6_HDRSIZE = 20,
-	TCP6_TCBPHDRSZ = 60,
-	TCP6_PKT = TCP6_IPLEN + TCP6_PHDRSIZE,
-
-	TcptimerOFF = 0,
-	TcptimerON = 1,
-	TcptimerDONE = 2,
-	MAX_TIME = (1 << 20),	/* Forever */
-	TCP_ACK = 50,	/* Timed ack sequence in ms */
-	MAXBACKMS = 9 * 60 * 1000,	/* longest backoff time (ms) before hangup */
-
-	URG = 0x20,	/* Data marked urgent */
-	ACK = 0x10,	/* Acknowledge is valid */
-	PSH = 0x08,	/* Whole data pipe is pushed */
-	RST = 0x04,	/* Reset connection */
-	SYN = 0x02,	/* Pkt. is synchronise */
-	FIN = 0x01,	/* Start close down */
-
-	EOLOPT = 0,
-	NOOPOPT = 1,
-	MSSOPT = 2,
-	MSS_LENGTH = 4,	/* max segment size header option length */
-	WSOPT = 3,
-	WS_LENGTH = 3,	/* WS header option length */
-	MAX_WS_VALUE = 14,	/* RFC specified.  Limits available window to 2^30 */
-	TS_OPT = 8,
-	TS_LENGTH = 10,
-	TS_SEND_PREPAD = 2,	/* For non-SYNs, pre-pad 2 nops for 32 byte alignment */
-	SACK_OK_OPT = 4,
-	SACK_OK_LENGTH = 2,
-	SACK_OPT = 5,
-	MSL2 = 10,
-	MSPTICK = 50,	/* Milliseconds per timer tick */
-	DEF_MSS = 1460,	/* Default mean segment */
-	DEF_MSS6 = 1280,	/* Default mean segment (min) for v6 */
-	SACK_SUPPORTED = TRUE,	/* SACK is on by default */
-	MAX_NR_SACKS_PER_PACKET = 4,	/* limited by TCP's opts size */
-	MAX_NR_SND_SACKS = 10,
-	MAX_NR_RCV_SACKS = 3,	/* We could try for 4, but don't need to */
-	DEF_RTT = 500,	/* Default round trip */
-	DEF_KAT = 120000,	/* Default time (ms) between keep alives */
-	TCP_LISTEN = 0,	/* Listen connection */
-	TCP_CONNECT = 1,	/* Outgoing connection */
-	SYNACK_RXTIMER = 250,	/* ms between SYNACK retransmits */
-
-	TCPREXMTTHRESH = 3,	/* dupack threshold for recovery */
-	SACK_RETRANS_RECOVERY = 1,
-	FAST_RETRANS_RECOVERY = 2,
-	RTO_RETRANS_RECOVERY = 3,
-	CWIND_SCALE = 10,	/* initial CWIND will be MSS * this */
-
-	FORCE			= 1 << 0,
-	CLONE			= 1 << 1,
-	ACTIVE			= 1 << 2,
-	SYNACK			= 1 << 3,
-	TSO				= 1 << 4,
-
-	RTTM_ALPHA_SHIFT = 3,	/* alpha = 1/8 */
-	RTTM_BRAVO_SHIFT = 2,	/* bravo = 1/4 (beta) */
-
-	Closed = 0,	/* Connection states */
-	Listen,
-	Syn_sent,
-	Established,
-	Finwait1,
-	Finwait2,
-	Close_wait,
-	Closing,
-	Last_ack,
-	Time_wait,
-
-	Maxlimbo = 1000,	/* maximum procs waiting for response to SYN ACK */
-	NLHT = 256,	/* hash table size, must be a power of 2 */
-	LHTMASK = NLHT - 1,
-
-	HaveWS = 1 << 8,
-};
-
-/* Must correspond to the enumeration above */
-char *tcpstates[] = {
+/* Must correspond to the enumeration in tcp.h */
+static char *tcpstates[] = {
 	"Closed", "Listen", "Syn_sent",
 	"Established", "Finwait1", "Finwait2", "Close_wait",
 	"Closing", "Last_ack", "Time_wait"
 };
 
-typedef struct Tcptimer Tcptimer;
-struct Tcptimer {
-	Tcptimer *next;
-	Tcptimer *prev;
-	Tcptimer *readynext;
-	int state;
-	uint64_t start;
-	uint64_t count;
-	void (*func) (void *);
-	void *arg;
-};
+static int tcp_irtt = DEF_RTT;			/* Initial guess at round trip time */
+static uint16_t tcp_mss = DEF_MSS;		/* Maximum segment size to be sent */
 
-/*
- *  v4 and v6 pseudo headers used for
- *  checksuming tcp
- */
-typedef struct Tcp4hdr Tcp4hdr;
-struct Tcp4hdr {
-	uint8_t vihl;				/* Version and header length */
-	uint8_t tos;				/* Type of service */
-	uint8_t length[2];			/* packet length */
-	uint8_t id[2];				/* Identification */
-	uint8_t frag[2];			/* Fragment information */
-	uint8_t Unused;
-	uint8_t proto;
-	uint8_t tcplen[2];
-	uint8_t tcpsrc[4];
-	uint8_t tcpdst[4];
-	uint8_t tcpsport[2];
-	uint8_t tcpdport[2];
-	uint8_t tcpseq[4];
-	uint8_t tcpack[4];
-	uint8_t tcpflag[2];
-	uint8_t tcpwin[2];
-	uint8_t tcpcksum[2];
-	uint8_t tcpurg[2];
-	/* Options segment */
-	uint8_t tcpopt[1];
-};
-
-typedef struct Tcp6hdr Tcp6hdr;
-struct Tcp6hdr {
-	uint8_t vcf[4];
-	uint8_t ploadlen[2];
-	uint8_t proto;
-	uint8_t ttl;
-	uint8_t tcpsrc[IPaddrlen];
-	uint8_t tcpdst[IPaddrlen];
-	uint8_t tcpsport[2];
-	uint8_t tcpdport[2];
-	uint8_t tcpseq[4];
-	uint8_t tcpack[4];
-	uint8_t tcpflag[2];
-	uint8_t tcpwin[2];
-	uint8_t tcpcksum[2];
-	uint8_t tcpurg[2];
-	/* Options segment */
-	uint8_t tcpopt[1];
-};
-
-struct sack_block {
-	uint32_t left;
-	uint32_t right;
-};
-
-/*
- *  this represents the control info
- *  for a single packet.  It is derived from
- *  a packet in ntohtcp{4,6}() and stuck into
- *  a packet in htontcp{4,6}().
- */
-typedef struct Tcp Tcp;
-struct Tcp {
-	uint16_t source;
-	uint16_t dest;
-	uint32_t seq;
-	uint32_t ack;
-	uint8_t flags;
-	uint16_t ws;				/* window scale option (if not zero) */
-	uint32_t wnd;
-	uint16_t urg;
-	uint16_t mss;				/* max segment size option (if not zero) */
-	uint16_t len;				/* size of data */
-	uint32_t ts_val;			/* timestamp val from sender */
-	uint32_t ts_ecr;			/* timestamp echo response from sender */
-	bool sack_ok;				/* header had/should have SACK_PERMITTED */
-	uint8_t nr_sacks;
-	struct sack_block sacks[MAX_NR_SACKS_PER_PACKET];
-};
-
-/*
- *  this header is malloc'd to thread together fragments
- *  waiting to be coalesced
- */
-typedef struct Reseq Reseq;
-struct Reseq {
-	Reseq *next;
-	Tcp seg;
-	struct block *bp;
-	uint16_t length;
-};
-
-/*
- *  the qlock in the Conv locks this structure
- */
-typedef struct Tcpctl Tcpctl;
-struct Tcpctl {
-	uint8_t state;				/* Connection state */
-	uint8_t type;				/* Listening or active connection */
-	uint8_t code;				/* Icmp code */
-	struct {
-		uint32_t una;			/* Left edge of unacked data region */
-		uint32_t nxt;			/* Next seq to send, right edge of unacked */
-		uint32_t rtx;			/* Next to send for retrans */
-		uint32_t wnd;			/* Tcp send window */
-		uint32_t urg;			/* Urgent data pointer */
-		uint32_t wl2;
-		int scale;				/* how much to right shift window for xmit */
-		uint32_t in_flight;		/* estimate of how much is in flight */
-		uint8_t loss_hint;		/* number of loss hints rcvd */
-		uint8_t sack_loss_hint;	/* For detecting sack rxmit losses */
-		bool flush_sacks;		/* Two timeouts in a row == dump sacks */
-		uint8_t recovery;		/* loss recovery flag */
-		uint32_t recovery_pt;	/* right window for recovery point */
-		uint8_t nr_sacks;
-		struct sack_block sacks[MAX_NR_SND_SACKS];
-	} snd;
-	struct {
-		uint32_t nxt;			/* Receive pointer to next uint8_t slot */
-		uint32_t wnd;			/* Receive window incoming */
-		uint32_t urg;			/* Urgent pointer */
-		int blocked;
-		int una;				/* unacked data segs */
-		int scale;				/* how much to left shift window for rx */
-		uint8_t nr_sacks;
-		struct sack_block sacks[MAX_NR_RCV_SACKS];
-	} rcv;
-	uint32_t iss;				/* Initial sequence number */
-	int sawwsopt;				/* true if we saw a wsopt on the incoming SYN */
-	uint32_t cwind;				/* Congestion window */
-	int scale;					/* desired snd.scale */
-	uint32_t ssthresh;			/* Slow start threshold */
-	int irs;					/* Initial received squence */
-	uint16_t mss;				/* Max segment size */
-	uint16_t typical_mss;		/* MSS for most packets (< MSS for some opts) */
-	int rerecv;					/* Overlap of data rerecevived */
-	uint32_t window;			/* Recevive window */
-	uint8_t backoff;			/* Exponential backoff counter */
-	int backedoff;				/* ms we've backed off for rexmits */
-	uint8_t flags;				/* State flags */
-	Reseq *reseq;				/* Resequencing queue */
-	Tcptimer timer;				/* Activity timer */
-	Tcptimer acktimer;			/* Acknowledge timer */
-	Tcptimer rtt_timer;			/* Round trip timer */
-	Tcptimer katimer;			/* keep alive timer */
-	uint32_t rttseq;			/* Round trip sequence */
-	int srtt;					/* Shortened round trip */
-	int mdev;					/* Mean deviation of round trip */
-	int kacounter;				/* count down for keep alive */
-	uint64_t sndsyntime;		/* time syn sent */
-	uint64_t time;				/* time Finwait2 was sent */
-	int nochecksum;				/* non-zero means don't send checksums */
-	int flgcnt;					/* number of flags in the sequence (FIN,SYN) */
-	uint32_t ts_recent;			/* timestamp received around last_ack_sent */
-	uint32_t last_ack_sent;		/* to determine when to update timestamp */
-	bool sack_ok;				/* Can use SACK for this connection */
-
-	union {
-		Tcp4hdr tcp4hdr;
-		Tcp6hdr tcp6hdr;
-	} protohdr;					/* prototype header */
-};
-
-/*
- *  New calls are put in limbo rather than having a conversation structure
- *  allocated.  Thus, a SYN attack results in lots of limbo'd calls but not
- *  any real Conv structures mucking things up.  Calls in limbo rexmit their
- *  SYN ACK every SYNACK_RXTIMER ms up to 4 times, i.e., they disappear after 1 second.
- *
- *  In particular they aren't on a listener's queue so that they don't figure
- *  in the input queue limit.
- *
- *  If 1/2 of a T3 was attacking SYN packets, we'ld have a permanent queue
- *  of 70000 limbo'd calls.  Not great for a linear list but doable.  Therefore
- *  there is no hashing of this list.
- */
-typedef struct Limbo Limbo;
-struct Limbo {
-	Limbo *next;
-
-	uint8_t laddr[IPaddrlen];
-	uint8_t raddr[IPaddrlen];
-	uint16_t lport;
-	uint16_t rport;
-	uint32_t irs;				/* initial received sequence */
-	uint32_t iss;				/* initial sent sequence */
-	uint16_t mss;				/* mss from the other end */
-	uint16_t rcvscale;			/* how much to scale rcvd windows */
-	uint16_t sndscale;			/* how much to scale sent windows */
-	uint64_t lastsend;			/* last time we sent a synack */
-	uint8_t version;			/* v4 or v6 */
-	uint8_t rexmits;			/* number of retransmissions */
-	bool sack_ok;				/* other side said SACK_OK */
-	uint32_t ts_val;			/* timestamp val from sender */
-};
-
-int tcp_irtt = DEF_RTT;			/* Initial guess at round trip time */
-uint16_t tcp_mss = DEF_MSS;		/* Maximum segment size to be sent */
-
-enum {
-	/* MIB stats */
-	MaxConn,
-	ActiveOpens,
-	PassiveOpens,
-	EstabResets,
-	CurrEstab,
-	InSegs,
-	OutSegs,
-	RetransSegs,
-	RetransTimeouts,
-	InErrs,
-	OutRsts,
-
-	/* non-MIB stats */
-	CsumErrs,
-	HlenErrs,
-	LenErrs,
-	OutOfOrder,
-
-	Nstats
-};
-
+/* Must correspond to the enumeration in tcp.h */
 static char *statnames[] = {
 	[MaxConn] "MaxConn",
 	[ActiveOpens] "ActiveOpens",
@@ -387,26 +70,6 @@ static char *statnames[] = {
 	[OutOfOrder] "OutOfOrder",
 };
 
-typedef struct Tcppriv Tcppriv;
-struct tcppriv {
-	/* List of active timers */
-	qlock_t tl;
-	Tcptimer *timers;
-
-	/* hash table for matching conversations */
-	struct Ipht ht;
-
-	/* calls in limbo waiting for an ACK to our SYN ACK */
-	int nlimbo;
-	Limbo *lht[NLHT];
-
-	/* for keeping track of tcpackproc */
-	qlock_t apl;
-	int ackprocstarted;
-
-	uint32_t stats[Nstats];
-};
-
 /*
  *  Setting tcpporthogdefense to non-zero enables Dong Lin's
  *  solution to hijacked systems staking out port's as a form
@@ -416,42 +79,36 @@ struct tcppriv {
  *  it that number gets acked by the other end, we shut down the connection.
  *  Look for tcpporthogedefense in the code.
  */
-int tcpporthogdefense = 0;
+static int tcpporthogdefense = 0;
 
-int addreseq(Tcpctl *, struct tcppriv *, Tcp *, struct block *, uint16_t);
-void getreseq(Tcpctl *, Tcp *, struct block **, uint16_t *);
-void localclose(struct conv *, char *unused_char_p_t);
-void procsyn(struct conv *, Tcp *);
-void tcpiput(struct Proto *, struct Ipifc *, struct block *);
-void tcpoutput(struct conv *);
-int tcptrim(Tcpctl *, Tcp *, struct block **, uint16_t *);
-void tcpstart(struct conv *, int);
-void tcptimeout(void *);
-void tcpsndsyn(struct conv *, Tcpctl *);
-void tcprcvwin(struct conv *);
-void tcpacktimer(void *);
-void tcpkeepalive(void *);
-void tcpsetkacounter(Tcpctl *);
-void tcprxmit(struct conv *);
-void tcpsettimer(Tcpctl *);
-void tcpsynackrtt(struct conv *);
-void tcpsetscale(struct conv *, Tcpctl *, uint16_t, uint16_t);
+static int addreseq(Tcpctl *, struct tcppriv *, Tcp *, struct block *,
+                    uint16_t);
+static void getreseq(Tcpctl *, Tcp *, struct block **, uint16_t *);
+static void localclose(struct conv *, char *unused_char_p_t);
+static void procsyn(struct conv *, Tcp *);
+static void tcpiput(struct Proto *, struct Ipifc *, struct block *);
+static void tcpoutput(struct conv *);
+static int tcptrim(Tcpctl *, Tcp *, struct block **, uint16_t *);
+static void tcpstart(struct conv *, int);
+static void tcptimeout(void *);
+static void tcpsndsyn(struct conv *, Tcpctl *);
+static void tcprcvwin(struct conv *);
+static void tcpacktimer(void *);
+static void tcpkeepalive(void *);
+static void tcpsetkacounter(Tcpctl *);
+static void tcprxmit(struct conv *);
+static void tcpsettimer(Tcpctl *);
+static void tcpsynackrtt(struct conv *);
+static void tcpsetscale(struct conv *, Tcpctl *, uint16_t, uint16_t);
 static void tcp_loss_event(struct conv *s, Tcpctl *tcb);
 static uint16_t derive_payload_mss(Tcpctl *tcb);
-static int seq_within(uint32_t x, uint32_t low, uint32_t high);
-static int seq_lt(uint32_t x, uint32_t y);
-static int seq_le(uint32_t x, uint32_t y);
-static int seq_gt(uint32_t x, uint32_t y);
-static int seq_ge(uint32_t x, uint32_t y);
-static uint32_t seq_max(uint32_t x, uint32_t y);
-static uint32_t seq_min(uint32_t x, uint32_t y);
 static void set_in_flight(Tcpctl *tcb);
 
 static void limborexmit(struct Proto *);
-static void limbo(struct conv *, uint8_t * unused_uint8_p_t, uint8_t *, Tcp *,
+static void limbo(struct conv *, uint8_t *unused_uint8_p_t, uint8_t *, Tcp *,
 				  int);
 
-void tcpsetstate(struct conv *s, uint8_t newstate)
+static void tcpsetstate(struct conv *s, uint8_t newstate)
 {
 	Tcpctl *tcb;
 	uint8_t oldstate;
@@ -598,7 +255,7 @@ static void tcpclose(struct conv *c)
 	}
 }
 
-void tcpkick(void *x)
+static void tcpkick(void *x)
 {
 	ERRSTACK(1);
 	struct conv *s = x;
@@ -631,7 +288,7 @@ void tcpkick(void *x)
 	poperror();
 }
 
-void tcprcvwin(struct conv *s)
+static void tcprcvwin(struct conv *s)
 {
 	/* Call with tcb locked */
 	int w;
@@ -659,7 +316,7 @@ void tcprcvwin(struct conv *s)
 		tcb->rcv.blocked = 1;
 }
 
-void tcpacktimer(void *v)
+static void tcpacktimer(void *v)
 {
 	ERRSTACK(1);
 	Tcpctl *tcb;
@@ -690,7 +347,7 @@ static void tcpcreate(struct conv *c)
 	c->wq = qopen(8 * QMAX, Qkick, tcpkick, c);
 }
 
-static void timerstate(struct tcppriv *priv, Tcptimer * t, int newstate)
+static void timerstate(struct tcppriv *priv, Tcptimer *t, int newstate)
 {
 	if (newstate != TcptimerON) {
 		if (t->state == TcptimerON) {
@@ -721,7 +378,7 @@ static void timerstate(struct tcppriv *priv, Tcptimer * t, int newstate)
 	t->state = newstate;
 }
 
-void tcpackproc(void *a)
+static void tcpackproc(void *a)
 {
 	ERRSTACK(1);
 	Tcptimer *t, *tp, *timeo;
@@ -769,7 +426,7 @@ void tcpackproc(void *a)
 	}
 }
 
-void tcpgo(struct tcppriv *priv, Tcptimer * t)
+static void tcpgo(struct tcppriv *priv, Tcptimer *t)
 {
 	if (t == NULL || t->start == 0)
 		return;
@@ -780,7 +437,7 @@ void tcpgo(struct tcppriv *priv, Tcptimer * t)
 	qunlock(&priv->tl);
 }
 
-void tcphalt(struct tcppriv *priv, Tcptimer * t)
+static void tcphalt(struct tcppriv *priv, Tcptimer *t)
 {
 	if (t == NULL)
 		return;
@@ -790,13 +447,14 @@ void tcphalt(struct tcppriv *priv, Tcptimer * t)
 	qunlock(&priv->tl);
 }
 
-int backoff(int n)
+static int backoff(int n)
 {
 	return 1 << n;
 }
 
-void localclose(struct conv *s, char *reason)
-{	/* called with tcb locked */
+static void localclose(struct conv *s, char *reason)
+{
+	/* called with tcb locked */
 	Tcpctl *tcb;
 	Reseq *rp, *rp1;
 	struct tcppriv *tpriv;
@@ -833,8 +491,8 @@ void localclose(struct conv *s, char *reason)
 }
 
 /* mtu (- TCP + IP hdr len) of 1st hop */
-int tcpmtu(struct Proto *tcp, uint8_t * addr, int version, int *scale,
-	   uint8_t *flags)
+static int tcpmtu(struct Proto *tcp, uint8_t *addr, int version, int *scale,
+                  uint8_t *flags)
 {
 	struct Ipifc *ifc;
 	int mtu;
@@ -861,7 +519,7 @@ int tcpmtu(struct Proto *tcp, uint8_t * addr, int version, int *scale,
 	return mtu;
 }
 
-void inittcpctl(struct conv *s, int mode)
+static void inittcpctl(struct conv *s, int mode)
 {
 	Tcpctl *tcb;
 	Tcp4hdr *h4;
@@ -934,7 +592,7 @@ void inittcpctl(struct conv *s, int mode)
 /*
  *  called with s qlocked
  */
-void tcpstart(struct conv *s, int mode)
+static void tcpstart(struct conv *s, int mode)
 {
 	Tcpctl *tcb;
 	struct tcppriv *tpriv;
@@ -1105,8 +763,8 @@ static struct block *alloc_or_pad_block(struct block *data,
 	return data;
 }
 
-struct block *htontcp6(Tcp *tcph, struct block *data, Tcp6hdr *ph,
-					   Tcpctl *tcb)
+static struct block *htontcp6(Tcp *tcph, struct block *data, Tcp6hdr *ph,
+                              Tcpctl *tcb)
 {
 	int dlen = blocklen(data);
 	Tcp6hdr *h;
@@ -1155,8 +813,8 @@ struct block *htontcp6(Tcp *tcph, struct block *data, Tcp6hdr *ph,
 	return data;
 }
 
-struct block *htontcp4(Tcp *tcph, struct block *data, Tcp4hdr *ph,
-					   Tcpctl *tcb)
+static struct block *htontcp4(Tcp *tcph, struct block *data, Tcp4hdr *ph,
+                              Tcpctl *tcb)
 {
 	int dlen = blocklen(data);
 	Tcp4hdr *h;
@@ -1275,7 +933,7 @@ static void clear_tcph_opts(Tcp *tcph)
 	tcph->ts_ecr = 0;
 }
 
-int ntohtcp6(Tcp * tcph, struct block **bpp)
+static int ntohtcp6(Tcp *tcph, struct block **bpp)
 {
 	Tcp6hdr *h;
 	uint16_t hdrlen;
@@ -1308,7 +966,7 @@ int ntohtcp6(Tcp * tcph, struct block **bpp)
 	return hdrlen;
 }
 
-int ntohtcp4(Tcp * tcph, struct block **bpp)
+static int ntohtcp4(Tcp *tcph, struct block **bpp)
 {
 	Tcp4hdr *h;
 	uint16_t hdrlen;
@@ -1346,7 +1004,7 @@ int ntohtcp4(Tcp * tcph, struct block **bpp)
  *  For outgoing calls, generate an initial sequence
  *  number and put a SYN on the send queue
  */
-void tcpsndsyn(struct conv *s, Tcpctl * tcb)
+static void tcpsndsyn(struct conv *s, Tcpctl *tcb)
 {
 	urandom_read(&tcb->iss, sizeof(tcb->iss));
 	tcb->rttseq = tcb->iss;
@@ -1363,9 +1021,8 @@ void tcpsndsyn(struct conv *s, Tcpctl * tcb)
 			  &tcb->flags);
 }
 
-void
-sndrst(struct Proto *tcp, uint8_t * source, uint8_t * dest,
-	   uint16_t length, Tcp * seg, uint8_t version, char *reason)
+static void sndrst(struct Proto *tcp, uint8_t *source, uint8_t *dest,
+                   uint16_t length, Tcp *seg, uint8_t version, char *reason)
 {
 	struct block *hbp;
 	uint8_t rflags;
@@ -1499,7 +1156,7 @@ static void tcphangup(struct conv *s)
 /*
  *  (re)send a SYN ACK
  */
-int sndsynack(struct Proto *tcp, Limbo * lp)
+static int sndsynack(struct Proto *tcp, Limbo *lp)
 {
 	struct block *hbp;
 	Tcp4hdr ph4;
@@ -1583,8 +1240,8 @@ int sndsynack(struct Proto *tcp, Limbo * lp)
  *
  *  called with proto locked
  */
-static void
-limbo(struct conv *s, uint8_t * source, uint8_t * dest, Tcp * seg, int version)
+static void limbo(struct conv *s, uint8_t *source, uint8_t *dest, Tcp *seg,
+                  int version)
 {
 	Limbo *lp, **l;
 	struct tcppriv *tpriv;
@@ -1694,9 +1351,8 @@ static void limborexmit(struct Proto *tcp)
  *
  *  called with proto locked
  */
-static void
-limborst(struct conv *s, Tcp * segp, uint8_t * src, uint8_t * dst,
-		 uint8_t version)
+static void limborst(struct conv *s, Tcp *segp, uint8_t *src, uint8_t *dst,
+                     uint8_t version)
 {
 	Limbo *lp, **l;
 	int h;
@@ -1746,8 +1402,8 @@ static void adjust_typical_mss_for_opts(Tcp *tcph, Tcpctl *tcb)
  *
  *  called with proto locked
  */
-static struct conv *tcpincoming(struct conv *s, Tcp * segp, uint8_t * src,
-								uint8_t * dst, uint8_t version)
+static struct conv *tcpincoming(struct conv *s, Tcp *segp, uint8_t *src,
+								uint8_t *dst, uint8_t version)
 {
 	struct conv *new;
 	Tcpctl *tcb;
@@ -1877,53 +1533,11 @@ static struct conv *tcpincoming(struct conv *s, Tcp * segp, uint8_t * src,
 	return new;
 }
 
-int seq_within(uint32_t x, uint32_t low, uint32_t high)
-{
-	if (low <= high) {
-		if (low <= x && x <= high)
-			return 1;
-	} else {
-		if (x >= low || x <= high)
-			return 1;
-	}
-	return 0;
-}
-
-int seq_lt(uint32_t x, uint32_t y)
-{
-	return (int)(x - y) < 0;
-}
-
-int seq_le(uint32_t x, uint32_t y)
-{
-	return (int)(x - y) <= 0;
-}
-
-int seq_gt(uint32_t x, uint32_t y)
-{
-	return (int)(x - y) > 0;
-}
-
-int seq_ge(uint32_t x, uint32_t y)
-{
-	return (int)(x - y) >= 0;
-}
-
-static uint32_t seq_max(uint32_t x, uint32_t y)
-{
-	return seq_ge(x, y) ? x : y;
-}
-
-static uint32_t seq_min(uint32_t x, uint32_t y)
-{
-	return seq_le(x, y) ? x : y;
-}
-
 /*
  *  use the time between the first SYN and it's ack as the
  *  initial round trip time
  */
-void tcpsynackrtt(struct conv *s)
+static void tcpsynackrtt(struct conv *s)
 {
 	Tcpctl *tcb;
 	uint64_t delta;
@@ -2318,7 +1932,7 @@ static void update_rtt(Tcpctl *tcb, int rtt_sample, int expected_samples)
 	tcpsettimer(tcb);
 }
 
-void update(struct conv *s, Tcp * seg)
+static void update(struct conv *s, Tcp *seg)
 {
 	int rtt;
 	Tcpctl *tcb;
@@ -2545,7 +2159,7 @@ static void drop_old_rcv_sacks(Tcpctl *tcb)
 	}
 }
 
-void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
+static void tcpiput(struct Proto *tcp, struct Ipifc *unused, struct block *bp)
 {
 	ERRSTACK(1);
 	Tcp seg;
@@ -3274,7 +2888,7 @@ static bool get_xmit_segment(struct conv *s, Tcpctl *tcb, uint16_t payload_mss,
  *  the lock to ipoput the packet so some care has to be
  *  taken by callers.
  */
-void tcpoutput(struct conv *s)
+static void tcpoutput(struct conv *s)
 {
 	Tcp seg;
 	int msgs;
@@ -3463,7 +3077,7 @@ void tcpoutput(struct conv *s)
 /*
  *  the BSD convention (hack?) for keep alives.  resend last uint8_t acked.
  */
-void tcpsendka(struct conv *s)
+static void tcpsendka(struct conv *s)
 {
 	Tcp seg;
 	Tcpctl *tcb;
@@ -3520,7 +3134,7 @@ void tcpsendka(struct conv *s)
 /*
  *  set connection to time out after 12 minutes
  */
-void tcpsetkacounter(Tcpctl * tcb)
+static void tcpsetkacounter(Tcpctl *tcb)
 {
 	tcb->kacounter = (12 * 60 * 1000) / (tcb->katimer.start * MSPTICK);
 	if (tcb->kacounter < 3)
@@ -3531,7 +3145,7 @@ void tcpsetkacounter(Tcpctl * tcb)
  *  if we've timed out, close the connection
  *  otherwise, send a keepalive and restart the timer
  */
-void tcpkeepalive(void *v)
+static void tcpkeepalive(void *v)
 {
 	ERRSTACK(1);
 	Tcpctl *tcb;
@@ -3602,7 +3216,7 @@ static void tcp_loss_event(struct conv *s, Tcpctl *tcb)
 
 /* Called when we need to retrans the entire outstanding window (everything
  * previously sent, but unacknowledged). */
-void tcprxmit(struct conv *s)
+static void tcprxmit(struct conv *s)
 {
 	Tcpctl *tcb;
 
@@ -3648,7 +3262,7 @@ static void timeout_handle_sacks(Tcpctl *tcb)
 	}
 }
 
-void tcptimeout(void *arg)
+static void tcptimeout(void *arg)
 {
 	ERRSTACK(1);
 	struct conv *s;
@@ -3703,7 +3317,7 @@ void tcptimeout(void *arg)
 	poperror();
 }
 
-int inwindow(Tcpctl * tcb, int seq)
+static int inwindow(Tcpctl *tcb, int seq)
 {
 	return seq_within(seq, tcb->rcv.nxt, tcb->rcv.nxt + tcb->rcv.wnd - 1);
 }
@@ -3711,7 +3325,7 @@ int inwindow(Tcpctl * tcb, int seq)
 /*
  *  set up state for a received SYN (or SYN ACK) packet
  */
-void procsyn(struct conv *s, Tcp * seg)
+static void procsyn(struct conv *s, Tcp *seg)
 {
 	Tcpctl *tcb;
 
@@ -3733,9 +3347,8 @@ void procsyn(struct conv *s, Tcp * seg)
 	tcb->cwind = tcb->typical_mss * CWIND_SCALE;
 }
 
-int
-addreseq(Tcpctl * tcb, struct tcppriv *tpriv, Tcp * seg,
-		 struct block *bp, uint16_t length)
+static int addreseq(Tcpctl *tcb, struct tcppriv *tpriv, Tcp *seg,
+                    struct block *bp, uint16_t length)
 {
 	Reseq *rp, *rp1;
 	int i, rqlen, qmax;
@@ -3802,7 +3415,7 @@ addreseq(Tcpctl * tcb, struct tcppriv *tpriv, Tcp * seg,
 	return 0;
 }
 
-void getreseq(Tcpctl * tcb, Tcp * seg, struct block **bp, uint16_t * length)
+static void getreseq(Tcpctl *tcb, Tcp *seg, struct block **bp, uint16_t *length)
 {
 	Reseq *rp;
 
@@ -3819,7 +3432,7 @@ void getreseq(Tcpctl * tcb, Tcp * seg, struct block **bp, uint16_t * length)
 	kfree(rp);
 }
 
-int tcptrim(Tcpctl * tcb, Tcp * seg, struct block **bp, uint16_t * length)
+static int tcptrim(Tcpctl *tcb, Tcp *seg, struct block **bp, uint16_t *length)
 {
 	uint16_t len;
 	uint8_t accept;
@@ -3887,7 +3500,7 @@ int tcptrim(Tcpctl * tcb, Tcp * seg, struct block **bp, uint16_t * length)
 	return 0;
 }
 
-void tcpadvise(struct Proto *tcp, struct block *bp, char *msg)
+static void tcpadvise(struct Proto *tcp, struct block *bp, char *msg)
 {
 	Tcp4hdr *h4;
 	Tcp6hdr *h6;
@@ -3960,7 +3573,7 @@ static void tcpctl(struct conv *c, char **f, int n)
 		error(EINVAL, "unknown command to %s", __func__);
 }
 
-int tcpstats(struct Proto *tcp, char *buf, int len)
+static int tcpstats(struct Proto *tcp, char *buf, int len)
 {
 	struct tcppriv *priv;
 	char *p, *e;
@@ -3983,7 +3596,7 @@ int tcpstats(struct Proto *tcp, char *buf, int len)
  *  of questionable validity so we try to use them only when we're
  *  up against the wall.
  */
-int tcpgc(struct Proto *tcp)
+static int tcpgc(struct Proto *tcp)
 {
 	struct conv *c, **pp, **ep;
 	int n;
@@ -4009,7 +3622,7 @@ int tcpgc(struct Proto *tcp)
 	return n;
 }
 
-void tcpsettimer(Tcpctl * tcb)
+static void tcpsettimer(Tcpctl *tcb)
 {
 	int x;
 
@@ -4068,8 +3681,8 @@ void tcpinit(struct Fs *fs)
 	Fsproto(fs, tcp);
 }
 
-void
-tcpsetscale(struct conv *s, Tcpctl * tcb, uint16_t rcvscale, uint16_t sndscale)
+static void tcpsetscale(struct conv *s, Tcpctl *tcb, uint16_t rcvscale,
+                        uint16_t sndscale)
 {
 	if (rcvscale) {
 		tcb->rcv.scale = rcvscale & 0xff;
