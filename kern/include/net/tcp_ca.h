@@ -16,27 +16,29 @@
  *		2 of the License, or (at your option) any later version.
  */
 
-/* From include/uapi/linux/tcp.h */
+#pragma once
+
+#include <sys/types.h>
+#include <sys/queue.h>
+#include <net/ip.h>
 
 enum tcp_ca_state {
 	TCP_CA_Open = 0,
-#define TCPF_CA_Open	(1<<TCP_CA_Open)
+#define TCPF_CA_Open	(1 << TCP_CA_Open)
 	TCP_CA_Disorder = 1,
-#define TCPF_CA_Disorder (1<<TCP_CA_Disorder)
+#define TCPF_CA_Disorder (1 << TCP_CA_Disorder)
 	TCP_CA_CWR = 2,
-#define TCPF_CA_CWR	(1<<TCP_CA_CWR)
+#define TCPF_CA_CWR	(1 << TCP_CA_CWR)
 	TCP_CA_Recovery = 3,
-#define TCPF_CA_Recovery (1<<TCP_CA_Recovery)
+#define TCPF_CA_Recovery (1 << TCP_CA_Recovery)
 	TCP_CA_Loss = 4
-#define TCPF_CA_Loss	(1<<TCP_CA_Loss)
+#define TCPF_CA_Loss	(1 << TCP_CA_Loss)
 };
 
-/* From include/net/tcp.h */
-
-#define	TCP_ECN_OK		1
-#define	TCP_ECN_QUEUE_CWR	2
-#define	TCP_ECN_DEMAND_CWR	4
-#define	TCP_ECN_SEEN		8
+#define	TCP_ECN_OK				1
+#define	TCP_ECN_QUEUE_CWR		2
+#define	TCP_ECN_DEMAND_CWR		4
+#define	TCP_ECN_SEEN			8
 
 enum tcp_tw_status {
 	TCP_TW_SUCCESS = 0,
@@ -45,22 +47,15 @@ enum tcp_tw_status {
 	TCP_TW_SYN = 3
 };
 
-
-/* TCP uses 32bit jiffies to save some space.
- * Note that this is different from tcp_time_stamp, which
- * historically has been the same until linux-4.13.
- */
-#define tcp_jiffies32 ((u32)jiffies)
-
 /* Events passed to congestion control interface */
 enum tcp_ca_event {
-	CA_EVENT_TX_START,	/* first transmit when no packets in flight */
-	CA_EVENT_CWND_RESTART,	/* congestion window restart */
-	CA_EVENT_COMPLETE_CWR,	/* end of congestion recovery */
-	CA_EVENT_LOSS,		/* loss timeout */
-	CA_EVENT_ECN_NO_CE,	/* ECT set, but not CE marked */
-	CA_EVENT_ECN_IS_CE,	/* received CE marked IP packet */
-	CA_EVENT_DELAYED_ACK,	/* Delayed ack is sent */
+	CA_EVENT_TX_START,			/* first transmit when no packets in flight */
+	CA_EVENT_CWND_RESTART,		/* congestion window restart */
+	CA_EVENT_COMPLETE_CWR,		/* end of congestion recovery */
+	CA_EVENT_LOSS,				/* loss timeout */
+	CA_EVENT_ECN_NO_CE,			/* ECT set, but not CE marked */
+	CA_EVENT_ECN_IS_CE,			/* received CE marked IP packet */
+	CA_EVENT_DELAYED_ACK,		/* Delayed ack is sent */
 	CA_EVENT_NON_DELAYED_ACK,
 };
 
@@ -68,7 +63,7 @@ enum tcp_ca_event {
 enum tcp_ca_ack_event_flags {
 	CA_ACK_SLOWPATH		= (1 << 0),	/* In slow path processing */
 	CA_ACK_WIN_UPDATE	= (1 << 1),	/* ACK updated window */
-	CA_ACK_ECE		= (1 << 2),	/* ECE bit is set on ack */
+	CA_ACK_ECE			= (1 << 2),	/* ECE bit is set on ack */
 };
 
 /*
@@ -76,7 +71,8 @@ enum tcp_ca_ack_event_flags {
  */
 #define TCP_CA_NAME_MAX	16
 #define TCP_CA_MAX	128
-#define TCP_CA_BUF_MAX	(TCP_CA_NAME_MAX*TCP_CA_MAX)
+#define TCP_CA_BUF_MAX	(TCP_CA_NAME_MAX * TCP_CA_MAX)
+#define TCP_CA_PRIV_SIZE (8 * sizeof(uint64_t))
 
 #define TCP_CA_UNSPEC	0
 
@@ -88,9 +84,9 @@ enum tcp_ca_ack_event_flags {
 union tcp_cc_info;
 
 struct ack_sample {
-	u32 pkts_acked;
-	s32 rtt_us;
-	u32 in_flight;
+	uint32_t pkts_acked;
+	int32_t rtt_us;
+	uint32_t in_flight;
 };
 
 /* A rate sample measures the number of (original/retransmitted) data
@@ -102,54 +98,54 @@ struct ack_sample {
  * A sample is invalid if "delivered" or "interval_us" is negative.
  */
 struct rate_sample {
-	u64  prior_mstamp; /* starting timestamp for interval */
-	u32  prior_delivered;	/* tp->delivered at "prior_mstamp" */
-	s32  delivered;		/* number of packets delivered over interval */
-	long interval_us;	/* time for tp->delivered to incr "delivered" */
-	long rtt_us;		/* RTT of last (S)ACKed packet (or -1) */
-	int  losses;		/* number of packets marked lost upon ACK */
-	u32  acked_sacked;	/* number of packets newly (S)ACKed upon ACK */
-	u32  prior_in_flight;	/* in flight before this ACK */
-	bool is_app_limited;	/* is sample from packet with bubble in pipe? */
-	bool is_retrans;	/* is sample from retransmission? */
+	uint64_t prior_mstamp;		/* starting timestamp for interval */
+	uint32_t prior_delivered;	/* tp->delivered at "prior_mstamp" */
+	int32_t delivered;			/* number of packets delivered over interval */
+	long interval_us;			/* time for tp->delivered to incr "delivered" */
+	long rtt_us;				/* RTT of last (S)ACKed packet (or -1) */
+	int losses;					/* number of packets marked lost upon ACK */
+	uint32_t acked_sacked;		/* number of packets newly (S)ACKed upon ACK */
+	uint32_t prior_in_flight;	/* in flight before this ACK */
+	bool is_app_limited;		/* is sample from packet with bubble in pipe? */
+	bool is_retrans;			/* is sample from retransmission? */
 };
 
 struct tcp_congestion_ops {
-	struct list_head	list;
-	u32 key;
-	u32 flags;
+	TAILQ_ENTRY(next);
+	uint32_t key;
+	uint32_t flags;
 
 	/* initialize private data (optional) */
-	void (*init)(struct sock *sk);
+	void (*init)(struct conv *s);
 	/* cleanup private data  (optional) */
-	void (*release)(struct sock *sk);
+	void (*release)(struct conv *s);
 
 	/* return slow start threshold (required) */
-	u32 (*ssthresh)(struct sock *sk);
+	uint32_t (*ssthresh)(struct conv *s);
 	/* do new cwnd calculation (required) */
-	void (*cong_avoid)(struct sock *sk, u32 ack, u32 acked);
+	void (*cong_avoid)(struct conv *s, uint32_t ack, uint32_t acked);
 	/* call before changing ca_state (optional) */
-	void (*set_state)(struct sock *sk, u8 new_state);
+	void (*set_state)(struct conv *s, uint8_t new_state);
 	/* call when cwnd event occurs (optional) */
-	void (*cwnd_event)(struct sock *sk, enum tcp_ca_event ev);
+	void (*cwnd_event)(struct conv *s, enum tcp_ca_event ev);
 	/* call when ack arrives (optional) */
-	void (*in_ack_event)(struct sock *sk, u32 flags);
+	void (*in_ack_event)(struct conv *s, uint32_t flags);
 	/* new value of cwnd after loss (required) */
-	u32  (*undo_cwnd)(struct sock *sk);
+	uint32_t (*undo_cwnd)(struct conv *s);
 	/* hook for packet ack accounting (optional) */
-	void (*pkts_acked)(struct sock *sk, const struct ack_sample *sample);
+	void (*pkts_acked)(struct conv *s, const struct ack_sample *sample);
 	/* suggest number of segments for each skb to transmit (optional) */
-	u32 (*tso_segs_goal)(struct sock *sk);
+	uint32_t (*tso_segs_goal)(struct conv *s);
 	/* returns the multiplier used in tcp_sndbuf_expand (optional) */
-	u32 (*sndbuf_expand)(struct sock *sk);
+	uint32_t (*sndbuf_expand)(struct conv *s);
 	/* call when packets are delivered to update cwnd and pacing rate,
 	 * after all the ca_state processing. (optional)
 	 */
-	void (*cong_control)(struct sock *sk, const struct rate_sample *rs);
+	void (*cong_control)(struct conv *s, const struct rate_sample *rs);
 	/* get info for inet_diag (optional) */
-	size_t (*get_info)(struct sock *sk, u32 ext, int *attr,
-			   union tcp_cc_info *info);
+	size_t (*get_info)(struct conv *s, uint32_t ext, int *attr,
+	                   union tcp_cc_info *info);
 
 	char 		name[TCP_CA_NAME_MAX];
-	struct module 	*owner;
-};
+	/* we need to be aligned to 64 bytes for the linker tables. */
+} __attribute__ ((aligned(64)));
