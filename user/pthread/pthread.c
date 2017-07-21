@@ -619,6 +619,7 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	                     sizeof(struct pthread_tcb));
 	assert(!ret);
 	memset(pthread, 0, sizeof(struct pthread_tcb));	/* aggressively 0 for bugs*/
+	// XXX this default needs to be used for all task threads
 	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
 	pthread->state = PTH_CREATED;
 	pthread->id = get_next_pid();
@@ -698,6 +699,8 @@ int pthread_yield(void)
 	uthread_sched_yield();
 	return 0;
 }
+
+// XXX
 
 int pthread_cancel(pthread_t __th)
 {

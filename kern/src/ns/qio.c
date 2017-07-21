@@ -1607,6 +1607,7 @@ static struct block *build_block(void *from, size_t len, int mem_flags)
 	 * only available via padblock (to the left).  we also need some space
 	 * for pullupblock for some basic headers (like icmp) that get written
 	 * in directly */
+			// XXX might need to increase for TCP opts
 	b = block_alloc(64, mem_flags);
 	if (!b)
 		return 0;
@@ -1657,6 +1658,10 @@ static ssize_t __qwrite(struct queue *q, void *vp, size_t len, int mem_flags,
 	do {
 		n = len - sofar;
 		/* This is 64K, the max amount per single block.  Still a good value? */
+		// XXX btw, Maxatomic will probably fragment memory a bit, since the
+		// kmalloc in build_block is a little more than 64K, all together.
+		// 		or don't use kmalloc
+		//
 		if (n > Maxatomic)
 			n = Maxatomic;
 		b = build_block(p + sofar, n, mem_flags);

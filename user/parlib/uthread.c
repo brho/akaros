@@ -1430,5 +1430,43 @@ void uthread_sched_yield(void)
 
 struct uthread *uthread_self(void)
 {
+	// XXX might be pre-vc-ctx-ready?  or just proper fucked.
+	if (in_vcore_context())
+		fprintf(stderr, "OH FUCK, someone did pth_self from vc ctx!\n");
 	return current_uthread;
 }
+
+// consider a signal handler that tries to close an FD or o/w call into glibc.
+// that will panic, since we're in VC ctx.
+// 		could have a thread for it
+// 			though that doesn't help thread0 sched
+// 		for thread0, could mark the thread to inject a signal?
+// 			those are intraprocess signals
+//
+//
+// naming convention for uth ops called by 2LSs vs apps vs libraries?
+// 		e.g. uthread_sleep       (app)
+// 		e.g. uthread_init        (2LS)
+// 		e.g. uthread_yield       (2LS)
+// 		e.g. uthread_has_blocked (libraries)
+// 		e.g. uthread_paused      (libraries)
+// 		e.g. uthread_create      (app)
+// 		e.g. uthread_sched_yield (app)
+//
+// 	newer stuff, client-or-library callable, has been called uth_
+// 		uth_semaphore_down
+// 		uth_blockon_evq
+//
+// 	maybe change all external stuff to uth_
+// 		diff btw libraries and apps?
+// 	and 2LS helpers to uth_2ls_, e.g. uth_2ls_yield
+// 		run_uthread, run_current_uthread, etc.
+//
+// XXX the existing uth_2ls_is_multithreaded
+// 		the 2ls is actually "is the 2ls multithreaded"
+// 		not "2ls" namespacing
+// 		it's somewhat ok.  2ls-related helper
+// 	same with uthread_2ls_init.  it's 'init the 2ls'
+// 		should that be uth_2ls_2ls_init?
+// 		or is the 2ls more of a 'don't fuck with this unless you're a 2ls'?
+

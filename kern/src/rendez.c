@@ -18,6 +18,12 @@ void rendez_init(struct rendez *rv)
 	cv_init_irqsave(&rv->cv);
 }
 
+// XXX can we have multiple sleepers on a rendez with different functions?
+// 		if not, we can have the func (+ arg?) in the object
+// 		waker can check the func too, to avoid spurious wakeups
+//
+// 		if so, we could still store the func with some lookup-elem and still
+// 		have the waker run the funcs.
 void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg)
 {
 	int8_t irq_state = 0;

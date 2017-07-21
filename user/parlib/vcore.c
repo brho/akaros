@@ -92,6 +92,12 @@ static int allocate_vcore_stack(int id)
 	if (vcpd->vcore_stack)
 		return 0; // reuse old stack
 
+// XXX consider adding a guard page.  yeah, it fucks with the VMR map
+// 		at least for debugging
+//	force_a_page_fault = ACCESS_ONCE(*(int*)(pt->stacktop - sizeof(int)));
+//			also, can change this in pth code to use the syscall_async (faster)
+//	syscall_async(&uthread->local_sysc, SYS_populate_va, aux, 1);
+
 	void* stackbot = mmap(0, TRANSITION_STACK_SIZE,
 	                      PROT_READ | PROT_WRITE | PROT_EXEC,
 	                      MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);

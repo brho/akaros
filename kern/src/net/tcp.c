@@ -399,6 +399,37 @@ static void tcpackproc(void *a)
 			if (loop++ > 10000)
 				panic("tcpackproc1");
 			tp = t->next;
+			/* this is a little odd.  overall, we wake up once per 'tick' (50ms,
+			 * whatever).  then, we decrement count.  so the timer val is in
+			 * units of 50 ms.  the timer list isn't sorted either.  once
+			 * someone expires, we get moved to another LL, local, and we fire
+			 * those alarms.
+			 *
+			 * the best anyone could do would be 50 ms granularity.
+			 *
+			 * if things are slow, you could skew later too.
+			 *
+			 * actually, you're expected value is 25ms for the first count.  so
+			 * whatever your timer.start is, your wait time is start * 50 - 25.
+			 * 		which is why we wait 25 ms to open up our window again.
+			 *
+			 * might be issues with concurrency.  once the alarm is set to done
+			 * and yanked off the list, what's to stop a concurrent setter from
+			 * putting it back on the list and setting TcptimerON?
+			 * 		there's a lot of lockless peeks at the timer.state
+			 *
+			 * probably be better served with a kthread timer chain
+			 * 		one assumption with the timerchain stuff is that the source
+			 * 		is an IRQ, and thus IRQ context matters, etc.
+			 *
+			 * 		with a kth tchain, we're in kth context already.  and you
+			 * 		probably don't want to send another RKM for each timer.
+			 * 		unless the locking matters.
+			 *
+			 * 		interesting - even the pcpu tchains - should those be a
+			 * 		per-core kth?  does any alarm need to run from IRQ ctx?
+			 * 				maybe.
+			 * */
 			if (t->state == TcptimerON) {
 				t->count--;
 				if (t->count == 0) {
