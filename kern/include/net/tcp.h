@@ -120,8 +120,8 @@ enum {
 	HaveWS = 1 << 8,
 };
 
-typedef struct Tcptimer Tcptimer;
-struct Tcptimer {
+typedef struct tcptimer Tcptimer;
+struct tcptimer {
 	Tcptimer *next;
 	Tcptimer *prev;
 	Tcptimer *readynext;
@@ -136,8 +136,8 @@ struct Tcptimer {
  *  v4 and v6 pseudo headers used for
  *  checksuming tcp
  */
-typedef struct Tcp4hdr Tcp4hdr;
-struct Tcp4hdr {
+typedef struct tcp4hdr Tcp4hdr;
+struct tcp4hdr {
 	uint8_t vihl;				/* Version and header length */
 	uint8_t tos;				/* Type of service */
 	uint8_t length[2];			/* packet length */
@@ -160,8 +160,8 @@ struct Tcp4hdr {
 	uint8_t tcpopt[1];
 };
 
-typedef struct Tcp6hdr Tcp6hdr;
-struct Tcp6hdr {
+typedef struct tcp6hdr Tcp6hdr;
+struct tcp6hdr {
 	uint8_t vcf[4];
 	uint8_t ploadlen[2];
 	uint8_t proto;
@@ -191,8 +191,8 @@ struct sack_block {
  *  a packet in ntohtcp{4,6}() and stuck into
  *  a packet in htontcp{4,6}().
  */
-typedef struct Tcp Tcp;
-struct Tcp {
+typedef struct tcp Tcp;
+struct tcp {
 	uint16_t source;
 	uint16_t dest;
 	uint32_t seq;
@@ -214,8 +214,8 @@ struct Tcp {
  *  this header is malloc'd to thread together fragments
  *  waiting to be coalesced
  */
-typedef struct Reseq Reseq;
-struct Reseq {
+typedef struct reseq Reseq;
+struct reseq {
 	Reseq *next;
 	Tcp seg;
 	struct block *bp;
@@ -225,8 +225,8 @@ struct Reseq {
 /*
  *  the qlock in the Conv locks this structure
  */
-typedef struct Tcpctl Tcpctl;
-struct Tcpctl {
+typedef struct tcpctl Tcpctl;
+struct tcpctl {
 	uint8_t state;				/* Connection state */
 	uint8_t type;				/* Listening or active connection */
 	uint8_t code;				/* Icmp code */
@@ -305,8 +305,8 @@ struct Tcpctl {
  *  70000 limbo'd calls.  Not great for a linear list but doable.  Therefore
  *  there is no hashing of this list.
  */
-typedef struct Limbo Limbo;
-struct Limbo {
+typedef struct limbo Limbo;
+struct limbo {
 	Limbo *next;
 
 	uint8_t laddr[IPaddrlen];
@@ -348,7 +348,7 @@ enum {
 	Nstats
 };
 
-typedef struct Tcppriv Tcppriv;
+typedef struct tcppriv Tcppriv;
 struct tcppriv {
 	/* List of active timers */
 	qlock_t tl;
