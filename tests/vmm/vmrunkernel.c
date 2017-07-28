@@ -373,7 +373,6 @@ int main(int argc, char **argv)
 	int debug = 0;
 	unsigned long long memsize = GiB;
 	uintptr_t memstart = MinMemory;
-	uintptr_t stack;
 	struct boot_params *bp;
 	char cmdline_default[512] = {0};
 	char *cmdline_extra = "\0";
@@ -401,7 +400,6 @@ int main(int argc, char **argv)
 		{"maxresume",     required_argument, 0, 'R'},
 		{"memsize",       required_argument, 0, 'm'},
 		{"memstart",      required_argument, 0, 'M'},
-		{"stack",         required_argument, 0, 'S'},
 		{"cmdline_extra", required_argument, 0, 'c'},
 		{"greedy",        no_argument,       0, 'g'},
 		{"scp",           no_argument,       0, 's'},
@@ -435,7 +433,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "static initializers are broken\n");
 	memsize = GiB;
 
-	while ((c = getopt_long(argc, argv, "dvm:M:S:c:gsf:k:N:n:t:hR:",
+	while ((c = getopt_long(argc, argv, "dvm:M:c:gsf:k:N:n:t:hR:",
 				long_options, &option_index)) != -1) {
 		switch (c) {
 		case 'd':
@@ -449,9 +447,6 @@ int main(int argc, char **argv)
 			break;
 		case 'M':
 			memstart = strtoull(optarg, 0, 0);
-			break;
-		case 'S':
-			stack = strtoull(optarg, 0, 0);
 			break;
 		case 'c':
 			cmdline_extra = optarg;
@@ -640,11 +635,10 @@ int main(int argc, char **argv)
 	vm_tf = gth_to_vmtf(vm->gths[0]);
 	vm_tf->tf_cr3 = (uint64_t) cr3;
 	vm_tf->tf_rip = entry;
-	vm_tf->tf_rsp = stack;
+	vm_tf->tf_rsp = 0xe0000;
 	vm_tf->tf_rsi = (uint64_t) bp;
 	vm->up_gpcs = 1;
-	fprintf(stderr, "Start guest: cr3 %p rip %p stack %p\n",
-	        cr3, entry, stack);
+	fprintf(stderr, "Start guest: cr3 %p rip %p\n", cr3, entry);
 	start_guest_thread(vm->gths[0]);
 
 	uthread_sleep_forever();
