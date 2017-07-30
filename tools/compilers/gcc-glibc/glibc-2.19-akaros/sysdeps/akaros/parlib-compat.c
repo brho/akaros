@@ -56,6 +56,13 @@ int __akaros_printf(const char *format, ...)
 }
 weak_alias(__akaros_printf, akaros_printf)
 
+int __trace_printf(const char *format, ...)
+{
+	assert(0);
+	return -1;
+}
+weak_alias(__trace_printf, trace_printf)
+
 void __print_user_context(struct user_context *ctx)
 {
 	assert(0);

@@ -83,6 +83,7 @@ libc {
     __vcoreid;
     __vcore_context;
     akaros_printf;
+    trace_printf;
     print_user_context;
     _assert_failed;
     nsec2tsc;
