@@ -43,11 +43,12 @@ int __gethostbyname2_r(const char *name, int af, struct hostent *ret,
 		static char *aptr[Nname + 1];
 		static char addr[Nname][4];
 	 * we need to use space in buf for them */
-	char **nptr, **aptr, **addr;
+	char **nptr, **aptr;
+	char (*addr)[4];
 	size_t nptr_sz, aptr_sz, addr_sz;
 	nptr_sz = sizeof(char *) * (Nname + 1);
 	aptr_sz = sizeof(char *) * (Nname + 1);
-	addr_sz = sizeof(char) * Nname * 4;
+	addr_sz = sizeof(char[Nname][4]);
 
 	if (nptr_sz + aptr_sz + addr_sz >= buflen) {
 		*result = 0;
