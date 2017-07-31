@@ -580,13 +580,8 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 			    *(uint8_t*)(ip + 1) == 0x01,
 			    *(uint8_t*)(ip + 2) == 0xf9) {
 				x86_fake_rdtscp(hw_tf);
-				pcpui->__lock_checking_enabled++;	/* for print debugging */
 				handled = TRUE;
-				break;
 			}
-			enable_irq();
-			monitor(hw_tf);
-			disable_irq();
 			pcpui->__lock_checking_enabled++;		/* for print debugging */
 			break;
 		}
