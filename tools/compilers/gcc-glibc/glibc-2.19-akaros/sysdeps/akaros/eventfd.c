@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/plan9_helpers.h>
 
 /* Gets a new EFD instance, returning the FD on success. */
 int eventfd(int initval, int flags)
@@ -55,11 +56,5 @@ int eventfd_read(int efd, eventfd_t *value)
 /* Writes value, in host-endian format, into the efd.  Returns 0 on success. */
 int eventfd_write(int efd, eventfd_t value)
 {
-	int ret;
-	char num64[32];
-	ret = snprintf(num64, sizeof(num64), "0x%llx", value);
-	if (write(efd, num64, ret) == ret)
-		return 0;
-	else
-		return -1;
+	return write_hex_to_fd(efd, value);
 }
