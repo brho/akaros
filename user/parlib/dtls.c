@@ -71,12 +71,12 @@ int dtls_cache_init(void)
 	/* Initialize the global cache of dtls_keys */
 	__dtls_keys_cache =
 	    kmem_cache_create("dtls_keys_cache", sizeof(struct dtls_key),
-	                      __alignof__(struct dtls_key), 0, NULL, NULL);
+	                      __alignof__(struct dtls_key), 0, NULL, NULL, NULL);
 
 	/* Initialize the global cache of dtls_values */
 	__dtls_values_cache =
 	    kmem_cache_create("dtls_values_cache", sizeof(struct dtls_value),
-	                      __alignof__(struct dtls_value), 0, NULL, NULL);
+	                      __alignof__(struct dtls_value), 0, NULL, NULL, NULL);
 
 	return 0;
 }

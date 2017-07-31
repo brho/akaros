@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <parlib/assert.h>
 #include <parlib/parlib.h>
+#include <parlib/stdio.h>
 #include <sys/mman.h>
 #include <sys/param.h>
 
@@ -32,8 +33,9 @@ struct kmem_cache *kmem_slab_cache, *kmem_bufctl_cache;
 
 static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
                                 size_t obj_size, int align, int flags,
-                                void (*ctor)(void *, size_t),
-                                void (*dtor)(void *, size_t))
+                                int (*ctor)(void *, void *, int),
+                                void (*dtor)(void *, void *),
+                                void *priv)
 {
 	assert(kc);
 	assert(align);
@@ -47,6 +49,7 @@ static void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	TAILQ_INIT(&kc->empty_slab_list);
 	kc->ctor = ctor;
 	kc->dtor = dtor;
+	kc->priv = priv;
 	kc->nr_cur_alloc = 0;
 	
 	/* put in cache list based on it's size */
@@ -74,29 +77,30 @@ static void kmem_cache_init(void *arg)
 	 * kmem_cache_cache. */
 	__kmem_cache_create(&kmem_cache_cache, "kmem_cache",
 	                    sizeof(struct kmem_cache),
-	                    __alignof__(struct kmem_cache), 0, NULL, NULL);
+	                    __alignof__(struct kmem_cache), 0, NULL, NULL, NULL);
 	/* Build the slab and bufctl caches */
 	kmem_slab_cache = kmem_cache_alloc(&kmem_cache_cache, 0);
 	__kmem_cache_create(kmem_slab_cache, "kmem_slab", sizeof(struct kmem_slab),
-	                    __alignof__(struct kmem_slab), 0, NULL, NULL); 
+	                    __alignof__(struct kmem_slab), 0, NULL, NULL, NULL);
 	kmem_bufctl_cache = kmem_cache_alloc(&kmem_cache_cache, 0);
 	__kmem_cache_create(kmem_bufctl_cache, "kmem_bufctl",
 	                    sizeof(struct kmem_bufctl),
-	                    __alignof__(struct kmem_bufctl), 0, NULL, NULL); 
+	                    __alignof__(struct kmem_bufctl), 0, NULL, NULL, NULL);
 }
 
 /* Cache management */
 struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
                                      int align, int flags,
-                                     void (*ctor)(void *, size_t),
-                                     void (*dtor)(void *, size_t))
+                                     int (*ctor)(void *, void *, int),
+                                     void (*dtor)(void *, void *),
+                                     void *priv)
 {
 	struct kmem_cache *kc;
 	static parlib_once_t once = PARLIB_ONCE_INIT;
 
 	parlib_run_once(&once, kmem_cache_init, NULL);
 	kc = kmem_cache_alloc(&kmem_cache_cache, 0);
-	__kmem_cache_create(kc, name, obj_size, align, flags, ctor, dtor);
+	__kmem_cache_create(kc, name, obj_size, align, flags, ctor, dtor, priv);
 	return kc;
 }
 
@@ -107,7 +111,7 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 		if (cp->dtor) {
 			void *buf = a_slab->free_small_obj;
 			for (int i = 0; i < a_slab->num_total_obj; i++) {
-				cp->dtor(buf, cp->obj_size);
+				cp->dtor(buf, cp->priv);
 				buf += a_slab->obj_size;
 			}
 		}
@@ -123,7 +127,7 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 			page_start = MIN(page_start, i->buf_addr);
 			/* Deconstruct all the objects, if necessary */
 			if (cp->dtor) // TODO: (BUF)
-				cp->dtor(i->buf_addr, cp->obj_size);
+				cp->dtor(i->buf_addr, cp->priv);
 			kmem_cache_free(kmem_bufctl_cache, i);
 		}
 		// free the pages for the slab's buffer
@@ -253,6 +257,8 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 	struct kmem_slab *a_slab;
 	struct kmem_bufctl *a_bufctl;
 	void *a_page;
+	int ctor_ret;
+
 	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
 		// Just get a single page for small slabs
 		a_page = mmap(0, PGSIZE, PROT_READ | PROT_WRITE,
@@ -273,14 +279,18 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 		void *buf = a_slab->free_small_obj;
 		for (int i = 0; i < a_slab->num_total_obj - 1; i++) {
 			// Initialize the object, if necessary
-			if (cp->ctor)
-				cp->ctor(buf, cp->obj_size);
+			if (cp->ctor) {
+				ctor_ret = cp->ctor(buf, cp->priv, 0);
+				assert(!ctor_ret);
+			}
 			*(uintptr_t**)(buf + cp->obj_size) = buf + a_slab->obj_size;
 			buf += a_slab->obj_size;
 		}
 		/* Initialize the final object (note the -1 in the for loop). */
-		if (cp->ctor)
-			cp->ctor(buf, cp->obj_size);
+		if (cp->ctor) {
+			ctor_ret = cp->ctor(buf, cp->priv, 0);
+			assert(!ctor_ret);
+		}
 		*((uintptr_t**)(buf + cp->obj_size)) = NULL;
 	} else {
 		a_slab = kmem_cache_alloc(kmem_slab_cache, 0);
@@ -300,8 +310,10 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 		/* for each buffer, set up a bufctl and point to the buffer */
 		for (int i = 0; i < a_slab->num_total_obj; i++) {
 			// Initialize the object, if necessary
-			if (cp->ctor)
-				cp->ctor(buf, cp->obj_size);
+			if (cp->ctor) {
+				ctor_ret = cp->ctor(buf, cp->priv, 0);
+				assert(!ctor_ret);
+			}
 			a_bufctl = kmem_cache_alloc(kmem_bufctl_cache, 0);	
 			TAILQ_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
 			a_bufctl->buf_addr = buf;

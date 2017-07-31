@@ -254,14 +254,15 @@ static void epoll_fd_closed(int fd)
 	uth_mutex_unlock(ctlrs_mtx);
 }
 
-static void ep_alarm_ctor(void *obj, size_t unused)
+static int ep_alarm_ctor(void *obj, void *priv, int flags)
 {
 	struct ep_alarm *ep_a = (struct ep_alarm*)obj;
 
 	ep_a->alarm_evq = ep_get_alarm_evq();
+	return 0;
 }
 
-static void ep_alarm_dtor(void *obj, size_t unused)
+static void ep_alarm_dtor(void *obj, void *priv)
 {
 	struct ep_alarm *ep_a = (struct ep_alarm*)obj;
 
@@ -282,7 +283,7 @@ static void epoll_init(void *arg)
 	ep_alarms_cache = kmem_cache_create("epoll alarms",
 	                                    sizeof(struct ep_alarm),
 	                                    __alignof__(sizeof(struct ep_alarm)), 0,
-	                                    ep_alarm_ctor, ep_alarm_dtor);
+	                                    ep_alarm_ctor, ep_alarm_dtor, NULL);
 	assert(ep_alarms_cache);
 }
 
