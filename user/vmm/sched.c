@@ -15,6 +15,7 @@
 #include <parlib/arch/trap.h>
 #include <parlib/ros_debug.h>
 #include <parlib/vcore_tick.h>
+#include <parlib/slab.h>
 
 int vmm_sched_period_usec = 1000;
 
@@ -32,6 +33,7 @@ static atomic_t nr_unblk_tasks;
 static atomic_t nr_unblk_guests;
 /* Global evq for all syscalls.  Could make this per vcore or whatever. */
 static struct event_queue *sysc_evq;
+static struct kmem_cache *task_thread_cache;
 
 static void vmm_sched_init(void);
 static void vmm_sched_entry(void);
@@ -64,6 +66,8 @@ static void vmm_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
 static void acct_thread_blocked(struct vmm_thread *vth);
 static void acct_thread_unblocked(struct vmm_thread *vth);
 static void enqueue_vmm_thread(struct vmm_thread *vth);
+static int task_thread_ctor(void *obj, void *priv, int flags);
+static void task_thread_dtor(void *obj, void *priv);
 static struct vmm_thread *alloc_vmm_thread(struct virtual_machine *vm,
                                            int type);
 static void *__alloc_stack(size_t stacksize);
@@ -127,6 +131,11 @@ static void vmm_sched_init(void)
 	/* for lack of a better vcore, might as well send to 0 */
 	sysc_evq = setup_sysc_evq(0);
 	uthread_2ls_init((struct uthread*)thread0, vmm_handle_syscall, NULL);
+	task_thread_cache = kmem_cache_create("task threads",
+	                                      sizeof(struct vmm_thread),
+	                                      __alignof__(struct vmm_thread), 0,
+	                                      task_thread_ctor, task_thread_dtor,
+	                                      NULL);
 }
 
 /* The scheduling policy is encapsulated in the next few functions (from here
@@ -393,6 +402,13 @@ static void vmm_thread_refl_fault(struct uthread *uth,
 	}
 }
 
+static void task_thread_dtor(void *obj, void *priv)
+{
+	struct task_thread *tth = (struct task_thread*)obj;
+
+	__free_stack(tth->stacktop, tth->stacksize);
+}
+
 static void vmm_thread_exited(struct uthread *uth)
 {
 	struct vmm_thread *vth = (struct vmm_thread*)uth;
@@ -403,8 +419,9 @@ static void vmm_thread_exited(struct uthread *uth)
 
 	acct_thread_blocked((struct vmm_thread*)tth);
 	uthread_cleanup(uth);
-	__free_stack(tth->stacktop, tth->stacksize);
-	free(tth);
+	if (uth->flags & UTHREAD_IS_THREAD0)
+		return;
+	kmem_cache_free(task_thread_cache, tth);
 }
 
 static void destroy_guest_thread(struct guest_thread *gth)
@@ -497,6 +514,21 @@ static void __task_thread_run(void)
 	uth_2ls_thread_exit(tth->func(tth->arg));
 }
 
+static int task_thread_ctor(void *obj, void *priv, int flags)
+{
+	struct vmm_thread *vth = (struct vmm_thread*)obj;
+	struct task_thread *tth = (struct task_thread*)obj;
+
+	memset(vth, 0, sizeof(struct vmm_thread));
+	vth->type = VMM_THREAD_TASK;
+	vth->vm = current_vm;
+	tth->stacksize = VMM_THR_STACKSIZE;
+	tth->stacktop = __alloc_stack(tth->stacksize);
+	if (!tth->stacktop)
+		return -1;
+	return 0;
+}
+
 /* Helper, creates and starts a task thread. */
 static struct task_thread *__vmm_run_task(struct virtual_machine *vm,
                                           void *(*func)(void *), void *arg,
@@ -504,15 +536,7 @@ static struct task_thread *__vmm_run_task(struct virtual_machine *vm,
 {
 	struct task_thread *tth;
 
-	tth = (struct task_thread*)alloc_vmm_thread(vm, VMM_THREAD_TASK);
-	if (!tth)
-		return 0;
-	tth->stacksize = VMM_THR_STACKSIZE;
-	tth->stacktop = __alloc_stack(tth->stacksize);
-	if (!tth->stacktop) {
-		free(tth);
-		return 0;
-	}
+	tth = kmem_cache_alloc(task_thread_cache, 0);
 	tth->func = func;
 	tth->arg = arg;
 	init_user_ctx(&tth->uthread.u_ctx, (uintptr_t)&__task_thread_run,
@@ -581,6 +605,8 @@ static void enqueue_vmm_thread(struct vmm_thread *vth)
 	case VMM_THREAD_TASK:
 		TAILQ_INSERT_TAIL(&rnbl_tasks, vth, tq_next);
 		break;
+	default:
+		panic("Bad vmm_thread type %p\n", vth->type);
 	}
 	spin_pdr_unlock(&queue_lock);
 	try_to_get_vcores();
