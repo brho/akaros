@@ -253,86 +253,6 @@ diff -ruB --unidirectional-new-file ../glibc-2.19/shlib-versions ../glibc-2.19-a
  
  # libmachuser.so.1 corresponds to mach/*.defs as of Utah's UK22 release.
  .*-.*-gnu-gnu.*		libmachuser=1
-diff -ruB --unidirectional-new-file ../glibc-2.19/stdio-common/vfprintf.c ../glibc-2.19-akaros/stdio-common/vfprintf.c
---- glibc-2.19/stdio-common/vfprintf.c	2014-02-07 04:04:38.000000000 -0500
-+++ glibc-2.19-akaros/stdio-common/vfprintf.c	2017-02-10 09:46:12.976092517 -0500
-@@ -29,6 +29,11 @@
- #include <_itoa.h>
- #include <locale/localeinfo.h>
- #include <stdio.h>
-+#include <ros/common.h>
-+#include <sys/mman.h>
-+
-+/* Modified for AKAROS, uses mmap in place of large stack allocations */
-+static char *failmsg = "vfprintf mmap failed!";
- 
- /* This code is shared between the standard stdio implementation found
-    in GNU C library and the libio implementation originally found in
-@@ -246,6 +251,8 @@
-   CHAR_T work_buffer[1000];
-   CHAR_T *workstart = NULL;
-   CHAR_T *workend;
-+  /* AKAROS: this might get mmaped */
-+  void *specs_buf = NULL;
- 
-   /* We have to save the original argument pointer.  */
-   va_list ap_save;
-@@ -1678,7 +1685,18 @@
-     size_t nspecs = 0;
-     /* A more or less arbitrary start value.  */
-     size_t nspecs_size = 32 * sizeof (struct printf_spec);
--    struct printf_spec *specs = alloca (nspecs_size);
-+
-+	/* AKAROS: specs_buf declared above and conditionally freed below */
-+    //struct printf_spec *specs = alloca (nspecs_size);
-+    struct printf_spec *specs;
-+
-+    specs_buf = mmap(0, ROUNDUP(nspecs_size, PGSIZE), PROT_WRITE | PROT_READ,
-+                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-+    if (specs_buf == MAP_FAILED) {
-+      write(2, failmsg, sizeof(failmsg));
-+      exit(-1);
-+    }
-+	specs = (struct printf_spec*)specs_buf;
- 
-     /* The number of arguments the format string requests.  This will
-        determine the size of the array needed to store the argument
-@@ -2049,6 +2067,8 @@
-     free (args_malloced);
-   if (__glibc_unlikely (workstart != NULL))
-     free (workstart);
-+  if (__glibc_unlikely (specs_buf != NULL))
-+    munmap(specs_buf, ROUNDUP(32 * sizeof (struct printf_spec), PGSIZE));
-   /* Unlock the stream.  */
-   _IO_funlockfile (s);
-   _IO_cleanup_region_end (0);
-@@ -2276,7 +2296,17 @@
- buffered_vfprintf (_IO_FILE *s, const CHAR_T *format,
- 		   _IO_va_list args)
- {
--  CHAR_T buf[_IO_BUFSIZ];
-+  /* AKAROS: mmap the buf.  */
-+  //CHAR_T buf[_IO_BUFSIZ];
-+  CHAR_T *buf;
-+
-+  buf = mmap(0, ROUNDUP(_IO_BUFSIZ, PGSIZE), PROT_WRITE | PROT_READ,
-+             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-+  if (buf == MAP_FAILED) {
-+    write(2, failmsg, sizeof(failmsg));
-+    exit(-1);
-+  }
-+
-   struct helper_file helper;
-   _IO_FILE *hp = (_IO_FILE *) &helper._f;
-   int result, to_flush;
-@@ -2338,6 +2368,7 @@
-   _IO_funlockfile (s);
-   __libc_cleanup_region_end (0);
- 
-+  munmap(buf, ROUNDUP(_IO_BUFSIZ, PGSIZE)); /* AKAROS */
-   return result;
- }
- 
 diff -ruB --unidirectional-new-file ../glibc-2.19/sunrpc/netname.c ../glibc-2.19-akaros/sunrpc/netname.c
 --- glibc-2.19/sunrpc/netname.c	2014-02-07 04:04:38.000000000 -0500
 +++ glibc-2.19-akaros/sunrpc/netname.c	2015-12-17 14:58:45.065386401 -0500
@@ -514,3 +434,100 @@ diff -ruB --unidirectional-new-file ../glibc-2.19/sysdeps/x86_64/tlsdesc.sym ../
    __run_exit_handlers (status, &__exit_funcs, true);
  }
  libc_hidden_def (exit)
+diff -ruB --unidirectional-new-file ../glibc-2.19/stdio-common/vfprintf.c ../glibc-2.19-akaros/stdio-common/vfprintf.c
+--- glibc-2.19/stdio-common/vfprintf.c	2014-02-07 04:04:38.000000000 -0500
++++ glibc-2.19-akaros/stdio-common/vfprintf.c	2017-07-31 16:49:00.835618991 -0400
+@@ -30,6 +30,38 @@
+ #include <locale/localeinfo.h>
+ #include <stdio.h>
+ 
++#include <ros/common.h>
++#include <sys/mman.h>
++#include <parlib/vcore.h>
++#include <unistd.h>
++
++/* Modified for AKAROS, uses mmap in place of large stack allocations */
++static const char *failmsg = "vfprintf mmap failed!";
++
++static inline __attribute__((always_inline)) void *safe_alloc(size_t amt)
++{
++	void *buf;
++
++	if (in_vcore_context()) {
++		buf = mmap(0, ROUNDUP(amt, PGSIZE), PROT_WRITE | PROT_READ,
++		           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++		if (buf == MAP_FAILED) {
++			write(2, failmsg, sizeof(failmsg));
++			exit(-1);
++		}
++		return buf;
++	} else {
++		/* This might have issues.  Might have to use macros. */
++		return alloca(amt);
++	}
++}
++
++static inline void safe_free(void *buf, size_t amt)
++{
++	if (in_vcore_context())
++    	munmap(buf, ROUNDUP(amt, PGSIZE));
++}
++
+ /* This code is shared between the standard stdio implementation found
+    in GNU C library and the libio implementation originally found in
+    GNU libg++.
+@@ -246,6 +278,8 @@
+   CHAR_T work_buffer[1000];
+   CHAR_T *workstart = NULL;
+   CHAR_T *workend;
++  /* AKAROS: this might get mmaped */
++  void *specs_buf = NULL;
+ 
+   /* We have to save the original argument pointer.  */
+   va_list ap_save;
+@@ -1678,7 +1712,13 @@
+     size_t nspecs = 0;
+     /* A more or less arbitrary start value.  */
+     size_t nspecs_size = 32 * sizeof (struct printf_spec);
+-    struct printf_spec *specs = alloca (nspecs_size);
++
++	/* AKAROS: specs_buf declared above and conditionally freed below */
++    //struct printf_spec *specs = alloca (nspecs_size);
++    struct printf_spec *specs;
++
++    specs_buf = safe_alloc(nspecs_size);
++	specs = (struct printf_spec*)specs_buf;
+ 
+     /* The number of arguments the format string requests.  This will
+        determine the size of the array needed to store the argument
+@@ -2049,6 +2089,8 @@
+     free (args_malloced);
+   if (__glibc_unlikely (workstart != NULL))
+     free (workstart);
++  if (specs_buf)
++    safe_free(specs_buf, 32 * sizeof(struct printf_spec));
+   /* Unlock the stream.  */
+   _IO_funlockfile (s);
+   _IO_cleanup_region_end (0);
+@@ -2276,7 +2318,12 @@
+ buffered_vfprintf (_IO_FILE *s, const CHAR_T *format,
+ 		   _IO_va_list args)
+ {
+-  CHAR_T buf[_IO_BUFSIZ];
++  /* AKAROS: mmap the buf.  */
++  //CHAR_T buf[_IO_BUFSIZ];
++  CHAR_T *buf;
++
++  buf = safe_alloc(_IO_BUFSIZ);
++
+   struct helper_file helper;
+   _IO_FILE *hp = (_IO_FILE *) &helper._f;
+   int result, to_flush;
+@@ -2338,6 +2385,7 @@
+   _IO_funlockfile (s);
+   __libc_cleanup_region_end (0);
+ 
++  safe_free(buf, _IO_BUFSIZ);
+   return result;
+ }
+ 
