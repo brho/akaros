@@ -116,6 +116,7 @@ struct kmem_cache {
 	void (*dtor)(void *obj, void *priv);
 	void *priv;
 	unsigned long nr_cur_alloc;
+	unsigned long nr_direct_allocs_ever;
 	struct hash_helper hh;
 	struct kmem_bufctl_list *alloc_hash;
 	struct kmem_bufctl_list static_hash[HASH_INIT_SZ];

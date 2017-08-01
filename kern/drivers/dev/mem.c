@@ -302,6 +302,7 @@ static size_t fetch_slab_line(struct kmem_cache *kc, struct sized_alloc *sza,
 		nr_unalloc_objs += s_i->num_total_obj;
 	TAILQ_FOREACH(s_i, &kc->partial_slab_list, link)
 		nr_unalloc_objs += s_i->num_total_obj - s_i->num_busy_obj;
+	nr_allocs_ever = kc->nr_direct_allocs_ever;
 	spin_unlock_irqsave(&kc->cache_lock);
 	/* Lockless peak at the pcpu state */
 	for (int i = 0; i < kmc_nr_pcpu_caches(); i++) {

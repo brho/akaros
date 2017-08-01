@@ -284,6 +284,7 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	kc->dtor = dtor;
 	kc->priv = priv;
 	kc->nr_cur_alloc = 0;
+	kc->nr_direct_allocs_ever = 0;
 	kc->alloc_hash = kc->static_hash;
 	hash_init_hh(&kc->hh);
 	for (int i = 0; i < kc->hh.nr_hash_lists; i++)
@@ -542,6 +543,7 @@ static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags)
 		TAILQ_INSERT_HEAD(&cp->full_slab_list, a_slab, link);
 	}
 	cp->nr_cur_alloc++;
+	cp->nr_direct_allocs_ever++;
 	spin_unlock_irqsave(&cp->cache_lock);
 	if (cp->ctor) {
 		if (cp->ctor(retval, cp->priv, flags)) {
