@@ -27,6 +27,10 @@
 #include <profiler.h>
 #include <umem.h>
 
+/* These are the only mmap flags that are saved in the VMR.  If we implement
+ * more of the mmap interface, we may need to grow this. */
+#define MAP_PERSIST_FLAGS		(MAP_SHARED | MAP_PRIVATE | MAP_ANONYMOUS)
+
 struct kmem_cache *vmr_kcache;
 
 static int __vmr_free_pgs(struct proc *p, pte_t pte, void *va, void *arg);
@@ -691,7 +695,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	}
 	addr = vmr->vm_base;
 	vmr->vm_prot = prot;
-	vmr->vm_flags = flags;
+	vmr->vm_flags = flags & MAP_PERSIST_FLAGS;
 	vmr->vm_foff = offset;
 	if (file) {
 		if (!check_file_perms(vmr, file, prot)) {
@@ -787,20 +791,21 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	struct vm_region *vmr, *next_vmr;
 	pte_t pte;
 	bool shootdown_needed = FALSE;
+	bool file_access_failure = FALSE;
 	int pte_prot = (prot & PROT_WRITE) ? PTE_USER_RW :
 	               (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : PTE_NONE;
 
 	/* TODO: this is aggressively splitting, when we might not need to if the
 	 * prots are the same as the previous.  Plus, there are three excessive
-	 * scans.  Finally, we might be able to merge when we are done. */
+	 * scans. */
 	isolate_vmrs(p, addr, len);
 	vmr = find_first_vmr(p, addr);
 	while (vmr && vmr->vm_base < addr + len) {
 		if (vmr->vm_prot == prot)
 			goto next_vmr;
 		if (vmr->vm_file && !check_file_perms(vmr, vmr->vm_file, prot)) {
-			set_errno(EACCES);
-			return -1;
+			file_access_failure = TRUE;
+			goto next_vmr;
 		}
 		vmr->vm_prot = prot;
 		spin_lock(&p->pte_lock);	/* walking and changing PTEs */
@@ -817,13 +822,22 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 			}
 		}
 		spin_unlock(&p->pte_lock);
-		vmr = merge_me(vmr);
 next_vmr:
+		/* Note that this merger could cause us to not look at the next one,
+		 * since we merged with it.  That's ok, since in that case, the next one
+		 * already has the right prots.  Also note that every VMR in the region,
+		 * including the ones at the endpoints, attempted to merge left and
+		 * right. */
+		vmr = merge_me(vmr);
 		next_vmr = TAILQ_NEXT(vmr, vm_link);
 		vmr = next_vmr;
 	}
 	if (shootdown_needed)
 		proc_tlbshootdown(p, addr, addr + len);
+	if (file_access_failure) {
+		set_errno(EACCES);
+		return -1;
+	}
 	return 0;
 }
 
