@@ -218,6 +218,15 @@ static bool try_to_get_vcores(void)
 	return FALSE;
 }
 
+static void stats_run_vth(struct vmm_thread *vth)
+{
+	vth->nr_runs++;
+	if (vth->prev_vcoreid != vcore_id()) {
+		vth->prev_vcoreid = vcore_id();
+		vth->nr_resched++;
+	}
+}
+
 static void __attribute__((noreturn)) vmm_sched_entry(void)
 {
 	struct vmm_thread *vth;
@@ -228,14 +237,17 @@ static void __attribute__((noreturn)) vmm_sched_entry(void)
 		/* slightly less than ideal: we grab the queue lock twice */
 		yield_current_uth();
 	}
-	if (current_uthread)
+	if (current_uthread) {
+		stats_run_vth((struct vmm_thread*)current_uthread);
 		run_current_uthread();
+	}
 	if (have_enough)
 		vth = pick_a_thread_plenty();
 	else
 		vth = pick_a_thread_degraded();
 	if (!vth)
 		vcore_yield_or_restart();
+	stats_run_vth(vth);
 	run_uthread((struct uthread*)vth);
 }
 
@@ -322,6 +334,7 @@ static void __swap_to_gth(struct uthread *uth, void *dummy)
 	/* We just immediately run our buddy.  The ctlr and the guest are accounted
 	 * together ("pass the token" back and forth). */
 	current_uthread = NULL;
+	stats_run_vth((struct vmm_thread*)cth->buddy);
 	run_uthread((struct uthread*)cth->buddy);
 	assert(0);
 }
@@ -359,6 +372,7 @@ static void vmm_thread_refl_vm_fault(struct uthread *uth)
 	struct guest_thread *gth = (struct guest_thread*)uth;
 	struct ctlr_thread *cth = gth->buddy;
 
+	gth->nr_vmexits++;
 	/* The ctlr starts frm the top every time we get a new fault. */
 	cth->uthread.flags |= UTHREAD_SAVED;
 	init_user_ctx(&cth->uthread.u_ctx, (uintptr_t)&__ctlr_entry,
@@ -366,6 +380,7 @@ static void vmm_thread_refl_vm_fault(struct uthread *uth)
 	/* We just immediately run our buddy.  The ctlr and the guest are accounted
 	 * together ("pass the token" back and forth). */
 	current_uthread = NULL;
+	stats_run_vth((struct vmm_thread*)cth);
 	run_uthread((struct uthread*)cth);
 	assert(0);
 }
@@ -462,6 +477,38 @@ static struct guest_thread *create_guest_thread(struct virtual_machine *vm,
 	return gth;
 }
 
+static void ev_handle_diag(struct event_msg *ev_msg, unsigned int ev_type,
+                           void *data)
+{
+	struct virtual_machine *vm = current_vm;
+	struct guest_thread *gth;
+	struct ctlr_thread *cth;
+	bool reset = FALSE;
+
+	if (ev_msg && (ev_msg->ev_arg1 == 1))
+		reset = TRUE;
+
+	fprintf(stderr, "\nSCHED stats:\n---------------\n");
+	for (int i = 0; i < vm->nr_gpcs; i++) {
+		gth = vm->gths[i];
+		cth = gth->buddy;
+		fprintf(stderr, "\tGPC %2d: %lu resched, %lu gth runs, %lu ctl runs, %lu user-handled vmexits\n",
+				i,
+		        ((struct vmm_thread*)gth)->nr_resched,
+		        ((struct vmm_thread*)gth)->nr_runs,
+		        ((struct vmm_thread*)cth)->nr_runs,
+		        gth->nr_vmexits);
+		if (reset) {
+		    ((struct vmm_thread*)gth)->nr_resched = 0;
+		    ((struct vmm_thread*)gth)->nr_runs = 0;
+		    ((struct vmm_thread*)cth)->nr_runs = 0;
+		    gth->nr_vmexits = 0;
+		}
+	}
+	fprintf(stderr, "\n\tNr unblocked gpc %lu, Nr unblocked tasks %lu\n",
+	        atomic_read(&nr_unblk_guests), atomic_read(&nr_unblk_tasks));
+}
+
 int vmm_init(struct virtual_machine *vm, int flags)
 {
 	struct guest_thread **gths;
@@ -485,6 +532,7 @@ int vmm_init(struct virtual_machine *vm, int flags)
 	}
 	vm->gths = gths;
 	uthread_mcp_init();
+	register_ev_handler(EV_FREE_APPLE_PIE, ev_handle_diag, NULL);
 	return 0;
 }
 

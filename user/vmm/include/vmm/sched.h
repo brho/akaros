@@ -33,6 +33,7 @@ struct guest_thread {
 	bool						halt_exit;
 	uth_mutex_t					*halt_mtx;
 	uth_cond_var_t				*halt_cv;
+	unsigned long				nr_vmexits;
 	// TODO: work out a real ops strategy.
 	bool (*vmcall)(struct guest_thread *gth, struct vm_trapframe *);
 };
@@ -62,6 +63,10 @@ struct vmm_thread {
 	int							type;
 	TAILQ_ENTRY(vmm_thread)		tq_next;
 	struct virtual_machine		*vm;
+	/* Sched stats */
+	int							prev_vcoreid;
+	unsigned long				nr_runs;
+	unsigned long				nr_resched;
 };
 
 TAILQ_HEAD(vmm_thread_tq, vmm_thread);
