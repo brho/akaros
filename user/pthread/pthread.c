@@ -444,8 +444,8 @@ static int __pthread_allocate_stack(struct pthread_tcb *pt)
 	int force_a_page_fault;
 	assert(pt->stacksize);
 	void* stackbot = mmap(0, pt->stacksize,
-	                      PROT_READ|PROT_WRITE|PROT_EXEC,
-	                      MAP_ANONYMOUS, -1, 0);
+	                      PROT_READ | PROT_WRITE | PROT_EXEC,
+	                      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	if (stackbot == MAP_FAILED)
 		return -1; // errno set by mmap
 	pt->stacktop = stackbot + pt->stacksize;
@@ -547,7 +547,8 @@ void pth_sched_init(void)
 	/* Get a block of pages for our per-vcore (but non-VCPD) ev_qs */
 	mmap_block = (uintptr_t)mmap(0, PGSIZE * 2 * max_vcores(),
 	                             PROT_WRITE | PROT_READ,
-	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	                             MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE,
+	                             -1, 0);
 	assert(mmap_block);
 	/* Could be smarter and do this on demand (in case we don't actually want
 	 * max_vcores()). */
@@ -568,7 +569,8 @@ void pth_sched_init(void)
 #if 0   /* One global ev_mbox, separate ev_q per vcore */
 	struct event_mbox *sysc_mbox = malloc(sizeof(struct event_mbox));
 	uintptr_t two_pages = (uintptr_t)mmap(0, PGSIZE * 2, PROT_WRITE | PROT_READ,
-	                                      MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	                                      MAP_POPULATE | MAP_ANONYMOUS |
+	                                      MAP_PRIVATE, -1, 0);
 	printd("Global ucq: %08p\n", &sysc_mbox->ev_msgs);
 	assert(sysc_mbox);
 	assert(two_pages);

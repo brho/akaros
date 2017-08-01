@@ -248,7 +248,7 @@ void alloc_intr_pages(void)
 	void *pages, *pir;
 
 	a_page = mmap((void *)APIC_GPA, PGSIZE, PROT_READ | PROT_WRITE,
-	              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	              MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	fprintf(stderr, "a_page mmap pointer %p\n", a_page);
 
 	if (a_page != (void *)APIC_GPA) {
@@ -261,7 +261,7 @@ void alloc_intr_pages(void)
 
 	/* Allocate VAPIC and PIR pages. */
 	pages = mmap((void*)0, vm->nr_gpcs * 2 * PGSIZE, PROT_READ | PROT_WRITE,
-	             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	             MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	if (pages == MAP_FAILED) {
 		perror("Unable to map VAPIC and PIR pages.");
 		exit(1);

@@ -45,7 +45,9 @@ void ucq_init(struct ucq *ucq)
 {
 	uintptr_t two_pages = (uintptr_t)mmap(0, PGSIZE * 2,
 	                                      PROT_WRITE | PROT_READ,
-	                                      MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	                                      MAP_POPULATE | MAP_ANONYMOUS |
+	                                      MAP_PRIVATE, -1, 0);
+
 	assert(two_pages);
 	ucq_init_raw(ucq, two_pages, two_pages + PGSIZE);
 }

@@ -107,7 +107,8 @@ static struct event_queue *setup_sysc_evq(int vcoreid)
 
 	mmap_block = (uintptr_t)mmap(0, PGSIZE * 2,
 	                             PROT_WRITE | PROT_READ,
-	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	                             MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE,
+	                             -1, 0);
 	evq = get_eventq_raw();
 	assert(mmap_block && evq);
 	evq->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP;
@@ -637,7 +638,7 @@ static void *__alloc_stack(size_t stacksize)
 	int force_a_page_fault;
 	void *stacktop;
 	void *stackbot = mmap(0, stacksize, PROT_READ | PROT_WRITE | PROT_EXEC,
-	                      MAP_ANONYMOUS, -1, 0);
+	                      MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
 	if (stackbot == MAP_FAILED)
 		return 0;

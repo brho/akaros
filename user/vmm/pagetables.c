@@ -50,7 +50,7 @@ void *setup_paging(unsigned long long memstart, unsigned long long memsize,
 	 * used to use posix_memalign but that puts them
 	 * outside EPT-accessible space on some CPUs. */
 	p512 = mmap((void *)memstart + memsize, nptp * 4096, PROT_READ | PROT_WRITE,
-	             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	             MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	if (p512 == MAP_FAILED) {
 		perror("page table page alloc");
 		exit(1);

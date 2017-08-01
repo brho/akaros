@@ -328,6 +328,7 @@ static int fill_vmr(struct proc *p, struct proc *new_p, struct vm_region *vmr)
 	int ret = 0;
 
 	if ((!vmr->vm_file) || (vmr->vm_flags & MAP_PRIVATE)) {
+		/* We don't support ANON + SHARED yet */
 		assert(!(vmr->vm_flags & MAP_SHARED));
 		ret = copy_pages(p, new_p, vmr->vm_base, vmr->vm_end);
 	} else {
@@ -422,6 +423,12 @@ void enumerate_vmrs(struct proc *p,
 	spin_unlock(&p->vmr_lock);
 }
 
+static bool mmap_flags_priv_ok(int flags)
+{
+	return (flags & (MAP_PRIVATE | MAP_SHARED)) == MAP_PRIVATE ||
+	       (flags & (MAP_PRIVATE | MAP_SHARED)) == MAP_SHARED;
+}
+
 /* Error values aren't quite comprehensive - check man mmap() once we do better
  * with the FS.
  *
@@ -436,9 +443,14 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset)
 {
 	struct file *file = NULL;
+
 	offset <<= PGSHIFT;
 	printd("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n", addr,
 	       len, prot, flags, fd, offset);
+	if (!mmap_flags_priv_ok(flags)) {
+		set_errno(EINVAL);
+		return MAP_FAILED;
+	}
 	if (fd >= 0 && (flags & MAP_ANON)) {
 		set_errno(EBADF);
 		return MAP_FAILED;
@@ -463,7 +475,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	 * We could just have userspace handle this (in glibc's mmap), so we don't
 	 * need to know about BRK_END, but this will work for now (and may avoid
 	 * bugs).  Note that this limits mmap(0) a bit.  Keep this in sync with
-	 * __do_mmap()'s check.  (Both are necessary).  */
+	 * do_mmap()'s check.  (Both are necessary).  */
 	if (addr == 0)
 		addr = BRK_END;
 	/* Still need to enforce this: */
@@ -663,6 +675,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	len = ROUNDUP(len, PGSIZE);
 	struct vm_region *vmr, *vmr_temp;
 
+	assert(mmap_flags_priv_ok(flags));
 	/* read/write vmr lock (will change the tree) */
 	spin_lock(&p->vmr_lock);
 	p->vmr_history++;

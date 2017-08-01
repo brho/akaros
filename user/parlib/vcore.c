@@ -103,8 +103,8 @@ static int allocate_vcore_stack(int id)
 		return 0; // reuse old stack
 
 	void* stackbot = mmap(0, TRANSITION_STACK_SIZE,
-	                      PROT_READ|PROT_WRITE|PROT_EXEC,
-	                      MAP_POPULATE|MAP_ANONYMOUS, -1, 0);
+	                      PROT_READ | PROT_WRITE | PROT_EXEC,
+	                      MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
 	if(stackbot == MAP_FAILED)
 		return -1; // errno set by mmap
@@ -152,7 +152,8 @@ static void prep_vcore_0(void)
 
 	mmap_block = (uintptr_t)mmap(0, PGSIZE * 4,
 	                             PROT_WRITE | PROT_READ,
-	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	                             MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE,
+	                             -1, 0);
 	assert((void*)mmap_block != MAP_FAILED);
 	__prep_vcore(0, mmap_block);
 }
@@ -163,7 +164,8 @@ static void prep_remaining_vcores(void)
 
 	mmap_block = (uintptr_t)mmap(0, PGSIZE * 4 * (max_vcores() - 1),
 	                             PROT_WRITE | PROT_READ,
-	                             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	                             MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE,
+	                             -1, 0);
 	assert((void*)mmap_block != MAP_FAILED);
 	for (int i = 1; i < max_vcores(); i++)
 		__prep_vcore(i, mmap_block + 4 * (i - 1) * PGSIZE);

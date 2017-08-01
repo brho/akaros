@@ -69,7 +69,8 @@ grab_lock:
 		 * the proc_lock, and potentially deadlock the system. */
 		new_page = (struct ucq_page*)do_mmap(p, 0, PGSIZE,
 		                                     PROT_READ | PROT_WRITE,
-		                                     MAP_ANON | MAP_POPULATE, 0, 0);
+		                                     MAP_ANONYMOUS | MAP_POPULATE |
+		                                     MAP_PRIVATE, NULL, 0);
 		assert(new_page);
 		assert(!PGOFF(new_page));
 	} else {

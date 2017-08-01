@@ -42,7 +42,7 @@ static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
                                                 int auxc, elf_aux_t auxv[])
 {
 	/* Map in pages for p's stack. */
-	int flags = MAP_FIXED | MAP_ANONYMOUS;
+	int flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
 	uintptr_t stacksz = USTACK_NUM_PAGES*PGSIZE;
 	if (do_mmap(p, USTACKTOP-stacksz, stacksz, PROT_READ | PROT_WRITE,
 	            flags, NULL, 0) == MAP_FAILED)
@@ -144,7 +144,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 	ei->highest_addr = 0;
 	off64_t f_off = 0;
 	void* phdrs = 0;
-	int mm_perms, mm_flags = MAP_FIXED;
+	int mm_perms, mm_flags;
 
 	/* When reading on behalf of the kernel, we need to switch to a ktask so
 	 * the VFS (and maybe other places) know. (TODO: KFOP) */
@@ -216,7 +216,8 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 		p_flags |= (writable ? ELF_PROT_WRITE : 0);
 		/* All mmaps need to be fixed to their VAs.  If the program wants it to
 		 * be a writable region, we also need the region to be private. */
-		mm_flags = MAP_FIXED | (p_flags & ELF_PROT_WRITE ? MAP_PRIVATE : 0);
+		mm_flags = MAP_FIXED |
+		           (p_flags & ELF_PROT_WRITE ? MAP_PRIVATE : MAP_SHARED);
 
 		if (p_type == ELF_PROG_PHDR)
 			ei->phdr = p_va;
@@ -288,6 +289,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 					/* Need our own populated, private copy of the page so that
 					 * we can zero the remainder - and not zero chunks of the
 					 * real file in the page cache. */
+					mm_flags &= ~MAP_SHARED;
 					mm_flags |= MAP_PRIVATE | MAP_POPULATE;
 
 					/* Map the final partial page. */

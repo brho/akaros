@@ -202,7 +202,7 @@ void *setup_biostables(struct virtual_machine *vm,
 	// And, sorry, due to the STUPID format of the RSDP for now we need the low
 	// 1M.
 	low1m = mmap((int*)4096, MiB-4096, PROT_READ | PROT_WRITE,
-	             MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	             MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	if (low1m != (void *)4096) {
 		perror("Unable to mmap low 1m");
 		exit(1);

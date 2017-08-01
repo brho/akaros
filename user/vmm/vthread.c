@@ -16,7 +16,7 @@
 static void *page(void *addr, int count)
 {
 	void *v;
-	unsigned long flags = MAP_POPULATE | MAP_ANONYMOUS;
+	unsigned long flags = MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE;
 
 	if (addr)
 		flags |= MAP_FIXED;

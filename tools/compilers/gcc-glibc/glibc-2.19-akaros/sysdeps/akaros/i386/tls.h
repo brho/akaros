@@ -473,8 +473,8 @@ static const char* tls_init_tp(void* thrdescr)
 	 * setting it up...) */
 	void *ldt = (void*)__ros_syscall_noerrno(SYS_mmap, 0, sz,
 	                                         PROT_READ | PROT_WRITE,
-	                                         MAP_ANONYMOUS | MAP_POPULATE,
-	                                         -1, 0);
+	                                         MAP_ANONYMOUS | MAP_POPULATE |
+	                                         MAP_PRIVATE, -1, 0);
     if (ldt == MAP_FAILED)
       return "tls couldn't allocate memory\n";
 

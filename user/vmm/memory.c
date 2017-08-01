@@ -127,7 +127,7 @@ void mmap_memory(unsigned long long memstart, unsigned long long memsize)
 		r1size = memstart < RESERVED ? RESERVED - memstart : 0;
 		r2 = mmap((void *)r2start, memsize - r1size,
 		          PROT_READ | PROT_WRITE | PROT_EXEC,
-		          MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+		          MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 		if (r2 != (void *)r2start) {
 			fprintf(stderr,
 			        "High region: Could not mmap 0x%lx bytes at 0x%lx\n",
@@ -140,7 +140,7 @@ void mmap_memory(unsigned long long memstart, unsigned long long memsize)
 
 	r1 = mmap((void *)memstart, r1size,
 	              PROT_READ | PROT_WRITE | PROT_EXEC,
-	              MAP_POPULATE | MAP_ANONYMOUS, -1, 0);
+	              MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	if (r1 != (void *)memstart) {
 		fprintf(stderr, "Low region: Could not mmap 0x%lx bytes at 0x%lx\n",
 		        memsize, memstart);

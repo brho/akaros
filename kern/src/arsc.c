@@ -35,7 +35,7 @@ syscall_sring_t* sys_init_arsc(struct proc *p)
 	void * va;
 	// TODO: need to pin this page in the future when swapping happens
 	va = do_mmap(p,MMAP_LOWEST_VA, SYSCALLRINGSIZE, PROT_READ | PROT_WRITE,
-	             MAP_ANONYMOUS | MAP_POPULATE, NULL, 0);
+	             MAP_ANONYMOUS | MAP_POPULATE | MAP_PRIVATE, NULL, 0);
 	pte_t pte = pgdir_walk(p->env_pgdir, (void*)va, 0);
 	assert(pte_walk_okay(pte));
 	sring = (syscall_sring_t*) KADDR(pte_get_paddr(pte));
