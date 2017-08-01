@@ -445,7 +445,6 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 			uint8_t *rptr;
 			struct perfmon_cpu_caps pcc;
 
-			kptr++;
 			perfmon_get_cpu_caps(&pcc);
 
 			pc->resp_size = 6 * sizeof(uint32_t);
