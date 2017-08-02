@@ -8,6 +8,7 @@
 #include <sys/fcntl.h>
 #include <sys/mman.h>
 #include <ros/arch/mmu.h>
+#include <vmm/util.h>
 #include <vmm/vmm.h>
 
 #include <vmm/acpi/acpi.h>
@@ -153,32 +154,13 @@ static void *init_madt_local_x2apic(struct virtual_machine *vm, void *start)
 	return apic;
 }
 
-static int cat(char *file, void *where)
-{
-	int fd;
-	int amt, tot = 0;
-
-	fd = open(file, O_RDONLY);
-	if (fd < 0)
-		return -1;
-
-	while (amt = read(fd, where, 4096)) {
-		if (amt < 0) {
-			close(fd);
-			return -1;
-		}
-		tot += amt;
-		where += amt;
-	}
-	close(fd);
-	return tot;
-}
-
+/* smbios reads the smbios into the e segment. By convention the
+ * e segment includes the f segment and is 128 kbytes. */
 static int smbios(char *smbiostable, void *esegment)
 {
 	int amt;
 
-	amt = cat(smbiostable, esegment);
+	amt = cat(smbiostable, esegment, 128 * 1024);
 	if (amt < 0) {
 		fprintf(stderr, "%s: %r\n", smbiostable);
 		exit(1);
