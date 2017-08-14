@@ -341,7 +341,7 @@ void timer_alarm_handler(struct alarm_waiter *waiter)
 
 	if (vector && initial_count && timer_mode == 0x01) {
 		/* This is periodic, we reset the alarm */
-		set_awaiter_inc(waiter, initial_count << multiplier);
+		set_awaiter_rel(waiter, initial_count << multiplier);
 		__set_alarm(waiter);
 	}
 
