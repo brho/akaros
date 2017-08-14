@@ -1226,8 +1226,10 @@ static long conswrite(struct chan *c, void *va, long n, int64_t off)
 			 * keyboard would try to print it (which it can't do yet).  The hack
 			 * is even dirtier in that we only detect it if it is the first
 			 * char, and we ignore everything else.  \033 is 0x1b. */
-			if (((char*)va)[0] != '\033')
+			if (((char*)va)[0] != '\033') {
+				n = MIN(n, 80);
 				cputbuf(va, n);
+			}
 			poperror();
 			px_unlock();
 			return n;
