@@ -28,6 +28,7 @@ static struct spin_pdr_lock queue_lock = SPINPDR_INITIALIZER;
 /* Runnable queues, broken up by thread type. */
 static struct vmm_thread_tq rnbl_tasks = TAILQ_HEAD_INITIALIZER(rnbl_tasks);
 static struct vmm_thread_tq rnbl_guests = TAILQ_HEAD_INITIALIZER(rnbl_guests);
+static struct vmm_thread **greedy_rnbl_guests;
 /* Counts of *unblocked* threads.  Unblocked = Running + Runnable. */
 static atomic_t nr_unblk_tasks;
 static atomic_t nr_unblk_guests;
@@ -73,6 +74,17 @@ static struct vmm_thread *alloc_vmm_thread(struct virtual_machine *vm,
 static void *__alloc_stack(size_t stacksize);
 static void __free_stack(void *stacktop, size_t stacksize);
 
+static bool sched_is_greedy(void)
+{
+	return parlib_never_yield;
+}
+
+static unsigned int sched_nr_greedy_cores(void)
+{
+	if (!current_vm)
+		return 1;
+	return current_vm->nr_gpcs + 1;
+}
 
 static void restart_thread(struct syscall *sysc)
 {
@@ -206,9 +218,13 @@ static void yield_current_uth(void)
  * to send events, how to avoid interfering with gpcs, etc. */
 static bool try_to_get_vcores(void)
 {
-	int nr_vcores_wanted = desired_nr_vcores();
-	bool have_enough = nr_vcores_wanted <= num_vcores();
+	int nr_vcores_wanted;
+	bool have_enough;
 
+	if (sched_is_greedy())
+		return num_vcores() == sched_nr_greedy_cores();
+	nr_vcores_wanted = desired_nr_vcores();
+	have_enough = nr_vcores_wanted <= num_vcores();
 	if (have_enough) {
 		vcore_tick_disable();
 		return TRUE;
@@ -227,7 +243,35 @@ static void stats_run_vth(struct vmm_thread *vth)
 	}
 }
 
-static void __attribute__((noreturn)) vmm_sched_entry(void)
+/* TODO: This assumes we get all of our vcores. */
+static struct vmm_thread *sched_pick_thread_greedy(void)
+{
+	struct vmm_thread *vth;
+
+	if (current_uthread) {
+		stats_run_vth((struct vmm_thread*)current_uthread);
+		run_current_uthread();
+	}
+	if (vcore_id() == 0) {
+		spin_pdr_lock(&queue_lock);
+		vth = __pop_first(&rnbl_tasks);
+		spin_pdr_unlock(&queue_lock);
+		return vth;
+	}
+	/* This races with enqueue_vmm_thread, which can run on another core.
+	 * Here are the rules:
+	 * - set when runnable (race free, only one state for the thread at a time)
+	 * - cleared when we run it (race free, we're the only runners)
+	 * - if we take an interrupt, we'll just run_current_uthread and not check
+	 * - if we vmexit, we'll run the buddy directly */
+	assert(vcore_id() <= current_vm->nr_gpcs);
+	vth = greedy_rnbl_guests[vcore_id() - 1];
+	if (vth)
+		greedy_rnbl_guests[vcore_id() - 1] = NULL;
+	return vth;
+}
+
+static struct vmm_thread *sched_pick_thread_nice(void)
 {
 	struct vmm_thread *vth;
 	bool have_enough;
@@ -245,6 +289,17 @@ static void __attribute__((noreturn)) vmm_sched_entry(void)
 		vth = pick_a_thread_plenty();
 	else
 		vth = pick_a_thread_degraded();
+	return vth;
+}
+
+static void __attribute__((noreturn)) vmm_sched_entry(void)
+{
+	struct vmm_thread *vth;
+
+	if (sched_is_greedy())
+		vth = sched_pick_thread_greedy();
+	else
+		vth = sched_pick_thread_nice();
 	if (!vth)
 		vcore_yield_or_restart();
 	stats_run_vth(vth);
@@ -533,6 +588,11 @@ int vmm_init(struct virtual_machine *vm, int flags)
 	vm->gths = gths;
 	uthread_mcp_init();
 	register_ev_handler(EV_FREE_APPLE_PIE, ev_handle_diag, NULL);
+	if (sched_is_greedy()) {
+		greedy_rnbl_guests = calloc(vm->nr_gpcs, sizeof(struct vmm_thread *));
+		assert(greedy_rnbl_guests);
+		vcore_request_total(sched_nr_greedy_cores());
+	}
 	return 0;
 }
 
@@ -629,21 +689,39 @@ static void acct_thread_unblocked(struct vmm_thread *vth)
 	}
 }
 
+static void greedy_mark_guest_runnable(struct vmm_thread *vth)
+{
+	int gpcid;
+
+	if (vth->type == VMM_THREAD_GUEST)
+		gpcid = ((struct guest_thread*)vth)->gpc_id;
+	else
+		gpcid = ((struct ctlr_thread*)vth)->buddy->gpc_id;
+	/* racing with the reader */
+	greedy_rnbl_guests[gpcid] = vth;
+}
+
 static void enqueue_vmm_thread(struct vmm_thread *vth)
 {
-	spin_pdr_lock(&queue_lock);
 	switch (vth->type) {
 	case VMM_THREAD_GUEST:
 	case VMM_THREAD_CTLR:
-		TAILQ_INSERT_TAIL(&rnbl_guests, vth, tq_next);
+		if (sched_is_greedy()) {
+			greedy_mark_guest_runnable(vth);
+		} else {
+			spin_pdr_lock(&queue_lock);
+			TAILQ_INSERT_TAIL(&rnbl_guests, vth, tq_next);
+			spin_pdr_unlock(&queue_lock);
+		}
 		break;
 	case VMM_THREAD_TASK:
+		spin_pdr_lock(&queue_lock);
 		TAILQ_INSERT_TAIL(&rnbl_tasks, vth, tq_next);
+		spin_pdr_unlock(&queue_lock);
 		break;
 	default:
 		panic("Bad vmm_thread type %p\n", vth->type);
 	}
-	spin_pdr_unlock(&queue_lock);
 	try_to_get_vcores();
 }
 
