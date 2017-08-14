@@ -164,26 +164,12 @@ static struct vmm_thread *__pop_first(struct vmm_thread_tq *tq)
 
 static struct vmm_thread *pick_a_thread_degraded(void)
 {
-	struct vmm_thread *vth = 0;
-	static int next_class = VMM_THREAD_GUEST;
+	struct vmm_thread *vth;
 
-	/* We don't have a lot of cores (maybe 0), so we'll alternate which type of
-	 * thread we look at first.  Basically, we're RR within a class of threads,
-	 * and we'll toggle between those two classes. */
 	spin_pdr_lock(&queue_lock);
-	if (next_class == VMM_THREAD_GUEST) {
-		if (!vth)
-			vth = __pop_first(&rnbl_guests);
-		if (!vth)
-			vth = __pop_first(&rnbl_tasks);
-		next_class = VMM_THREAD_TASK;
-	} else {
-		if (!vth)
-			vth = __pop_first(&rnbl_tasks);
-		if (!vth)
-			vth = __pop_first(&rnbl_guests);
-		next_class = VMM_THREAD_GUEST;
-	};
+	vth = __pop_first(&rnbl_tasks);
+	if (!vth)
+		vth = __pop_first(&rnbl_guests);
 	spin_pdr_unlock(&queue_lock);
 	return vth;
 }
