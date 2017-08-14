@@ -83,6 +83,12 @@ void *cons_receiveq_fn(void *_vq) // host -> guest
 			VIRTIO_DEV_ERRX(vq->vqdev,
 				"Encountered an error trying to read input from stdin (fd 0).");
 
+		if (num_read == 0) {
+			VIRTIO_DEV_WARNX(vq->vqdev,
+				"Encountered EOF reading from stdin; exiting input thread.");
+			break;
+		}
+
 		// You pass the number of bytes written to virtio_add_used_desc
 		virtio_add_used_desc(vq, head, num_read);
 
