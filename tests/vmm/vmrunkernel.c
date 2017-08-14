@@ -393,6 +393,8 @@ int main(int argc, char **argv)
 	char *smbiostable = NULL;
 	char *net_opts = NULL;
 	uint64_t num_pcs = 1;
+	bool is_greedy = FALSE;
+	bool is_scp = FALSE;
 
 	static struct option long_options[] = {
 		{"debug",         no_argument,       0, 'd'},
@@ -452,9 +454,19 @@ int main(int argc, char **argv)
 			cmdline_extra = optarg;
 		case 'g':	/* greedy */
 			parlib_never_yield = TRUE;
+			if (is_scp) {
+				fprintf(stderr, "Can't be both greedy and an SCP\n");
+				exit(1);
+			}
+			is_greedy = TRUE;
 			break;
 		case 's':	/* scp */
 			parlib_wants_to_be_mcp = FALSE;
+			if (is_greedy) {
+				fprintf(stderr, "Can't be both greedy and an SCP\n");
+				exit(1);
+			}
+			is_scp = TRUE;
 			break;
 		case 'f':	/* file to pass to blk_init */
 			disk_image_file = optarg;
