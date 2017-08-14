@@ -92,10 +92,12 @@ static void __ksched_tick(struct alarm_waiter *waiter)
 {
 	/* TODO: imagine doing some accounting here */
 	run_scheduler();
-	/* Set our alarm to go off, incrementing from our last tick (instead of
-	 * setting it relative to now, since some time has passed since the alarm
-	 * first went off.  Note, this may be now or in the past! */
-	set_awaiter_inc(&ksched_waiter, TIMER_TICK_USEC);
+	/* Set our alarm to go off, relative to now.  This means we might lag a bit,
+	 * and our ticks won't match wall clock time.  But if we do incremental,
+	 * we'll actually punish the next process because the kernel took too long
+	 * for the previous process.  Ultimately, if we really care, we should
+	 * account for the actual time used. */
+	set_awaiter_rel(&ksched_waiter, TIMER_TICK_USEC);
 	set_alarm(&per_cpu_info[core_id()].tchain, &ksched_waiter);
 }
 
