@@ -941,11 +941,14 @@ static bool handle_vmexit_ept_fault(struct vm_trapframe *tf)
 	prot |= tf->tf_exit_qual & VMX_EPT_FAULT_WRITE ? PROT_WRITE : 0;
 	prot |= tf->tf_exit_qual & VMX_EPT_FAULT_INS ? PROT_EXEC : 0;
 	ret = handle_page_fault(current, tf->tf_guest_pa, prot);
-	if (ret) {
-		/* TODO: maybe put ret in the TF somewhere */
-		return FALSE;
-	}
-	return TRUE;
+	if (ret == 0)
+		return TRUE;
+
+	//Mirror behavior in uthreads, tell userspace to try again.
+	if (ret == -EAGAIN)
+		tf->tf_flags |= VMCTX_FL_EPT_VMR_BACKED;
+
+	return FALSE;
 }
 
 /* Regarding NMI blocking,

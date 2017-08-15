@@ -109,8 +109,16 @@ static bool handle_ept_fault(struct guest_thread *gth)
 	uint8_t regx;
 	int store, size;
 	int advance;
+	int ret;
 
-	int ret = decode(gth, &gpa, &regx, &regp, &store, &size, &advance);
+	if (vm_tf->tf_flags & VMCTX_FL_EPT_VMR_BACKED) {
+		ret = ros_syscall(SYS_populate_va, vm_tf->tf_guest_pa, 1, 0, 0, 0, 0);
+		if (ret <= 0)
+			panic("[user] handle_ept_fault: populate_va failed: ret = %d\n",
+			      ret);
+		return TRUE;
+	}
+	ret = decode(gth, &gpa, &regx, &regp, &store, &size, &advance);
 
 	if (ret < 0)
 		return FALSE;
