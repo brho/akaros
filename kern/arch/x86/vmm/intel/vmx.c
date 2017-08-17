@@ -177,6 +177,10 @@ int x86_ept_pte_fix_ups = 0;
 struct vmx_capability vmx_capability;
 struct vmcs_config vmcs_config;
 
+char * const VMX_EXIT_REASON_NAMES[] = {
+	VMX_EXIT_REASONS
+};
+
 static char *cr_access_type[] = {
 	"move to cr",
 	"move from cr",

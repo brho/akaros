@@ -566,12 +566,6 @@ enum vmcs_field {
 #define ASM_VMX_INVEPT		  ".byte 0x66, 0x0f, 0x38, 0x80, 0x08"
 #define ASM_VMX_INVVPID		  ".byte 0x66, 0x0f, 0x38, 0x81, 0x08"
 
-struct vmx_msr_entry {
-	uint32_t index;
-	uint32_t reserved;
-	uint64_t value;
-} __attribute__((aligned(16))) ;
-
 /*
  * Exit Qualifications for entry failure during or after loading guest state
  */
@@ -611,12 +605,6 @@ enum vm_instruction_error_number {
 	VMXERR_INVALID_OPERAND_TO_INVEPT_INVVPID = 28,
 };
 
-#define MSR_IA32_VMX_BASIC_MSR   		0x480
-#define MSR_IA32_VMX_PINBASED_CTLS_MSR		0x481
-#define MSR_IA32_VMX_PROCBASED_CTLS_MSR		0x482
-#define MSR_IA32_VMX_EXIT_CTLS_MSR		0x483
-#define MSR_IA32_VMX_ENTRY_CTLS_MSR		0x484
-
 /*
  * shutdown reasons
  */
@@ -628,72 +616,4 @@ enum shutdown_reason {
 	SHUTDOWN_EPT_VIOLATION,
 	SHUTDOWN_NMI_EXCEPTION,
 	SHUTDOWN_UNHANDLED_EXIT_REASON,
-};
-
-/* Additional bits for VMMCPs, originally from the Dune version of kvm. */
-/*
- * vmx.h - header file for USM VMX driver.
- */
-
-/* This is per-guest per-core, and the implementation specific area
- * should be assumed to have hidden fields.
- */
-struct vmcs {
-	uint32_t revision_id;
-	uint32_t abort_code;
-	char _impl_specific[PGSIZE - sizeof(uint32_t) * 2];
-};
-
-typedef uint64_t gpa_t;
-typedef uint64_t gva_t;
-
-struct vmx_capability {
-	uint32_t ept;
-	uint32_t vpid;
-};
-
-extern struct vmx_capability vmx_capability;
-
-struct vmcs_config {
-	int size;
-	uint32_t revision_id;
-	uint32_t pin_based_exec_ctrl;
-	uint32_t cpu_based_exec_ctrl;
-	uint32_t cpu_based_2nd_exec_ctrl;
-	uint32_t vmexit_ctrl;
-	uint32_t vmentry_ctrl;
-};
-
-extern struct vmcs_config vmcs_config;
-
-#define NR_AUTOLOAD_MSRS 8
-
-/* the horror. */
-struct desc_struct {
-        union {
-                struct {
-                        unsigned int a;
-                        unsigned int b;
-                };
-                struct {
-                        uint16_t limit0;
-                        uint16_t base0;
-                        unsigned base1: 8, type: 4, s: 1, dpl: 2, p: 1;
-                        unsigned limit: 4, avl: 1, l: 1, d: 1, g: 1, base2: 8;
-                };
-        };
-} __attribute__((packed));
-
-/* LDT or TSS descriptor in the GDT. 16 bytes. */
-struct ldttss_desc64 {
-	uint16_t limit0;
-	uint16_t base0;
-	unsigned base1 : 8, type : 5, dpl : 2, p : 1;
-	unsigned limit1 : 4, zero0 : 3, g : 1, base2 : 8;
-	uint32_t base3;
-	uint32_t zero1;
-} __attribute__((packed));
-
-static char * const VMX_EXIT_REASON_NAMES[] = {
-	VMX_EXIT_REASONS
 };

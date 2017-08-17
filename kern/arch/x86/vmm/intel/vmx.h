@@ -1,5 +1,3 @@
-#pragma once
-
 /*
  * vmx.h: VMX Architecture related definitions
  * Copyright (c) 2004, Intel Corporation.
@@ -24,12 +22,83 @@
  *
  */
 
+#pragma once
+
 #include <ros/arch/vmx.h>
+
+/* Additional bits for VMMCPs, originally from the Dune version of kvm. */
+/*
+ * vmx.h - header file for USM VMX driver.
+ */
+
+/* This is per-guest per-core, and the implementation specific area
+ * should be assumed to have hidden fields.
+ */
+struct vmcs {
+	uint32_t revision_id;
+	uint32_t abort_code;
+	char _impl_specific[PGSIZE - sizeof(uint32_t) * 2];
+};
+
+typedef uint64_t gpa_t;
+typedef uint64_t gva_t;
+
+struct vmx_capability {
+	uint32_t ept;
+	uint32_t vpid;
+};
+
+struct vmcs_config {
+	int size;
+	uint32_t revision_id;
+	uint32_t pin_based_exec_ctrl;
+	uint32_t cpu_based_exec_ctrl;
+	uint32_t cpu_based_2nd_exec_ctrl;
+	uint32_t vmexit_ctrl;
+	uint32_t vmentry_ctrl;
+};
+
+#define NR_AUTOLOAD_MSRS 8
+
+/* the horror. */
+struct desc_struct {
+        union {
+                struct {
+                        unsigned int a;
+                        unsigned int b;
+                };
+                struct {
+                        uint16_t limit0;
+                        uint16_t base0;
+                        unsigned base1: 8, type: 4, s: 1, dpl: 2, p: 1;
+                        unsigned limit: 4, avl: 1, l: 1, d: 1, g: 1, base2: 8;
+                };
+        };
+} __attribute__((packed));
+
+/* LDT or TSS descriptor in the GDT. 16 bytes. */
+struct ldttss_desc64 {
+	uint16_t limit0;
+	uint16_t base0;
+	unsigned base1 : 8, type : 5, dpl : 2, p : 1;
+	unsigned limit1 : 4, zero0 : 3, g : 1, base2 : 8;
+	uint32_t base3;
+	uint32_t zero1;
+} __attribute__((packed));
 
 #define INTEL_MSR_WRITE_OFFSET			2048
 
 #define INTEL_X2APIC_MSR_START			0x100
 #define INTEL_X2APIC_MSR_LENGTH			(0x40/8)
+
+#define MSR_IA32_VMX_BASIC_MSR			0x480
+#define MSR_IA32_VMX_PINBASED_CTLS_MSR	0x481
+#define MSR_IA32_VMX_PROCBASED_CTLS_MSR	0x482
+#define MSR_IA32_VMX_EXIT_CTLS_MSR		0x483
+#define MSR_IA32_VMX_ENTRY_CTLS_MSR		0x484
+
+extern char * const VMX_EXIT_REASON_NAMES[];
+
 
 int vmx_init(void);
 void vmx_exit(void);
@@ -88,6 +157,11 @@ static inline void native_store_gdt(pseudodesc_t *dtr)
 {
         asm volatile("sgdt %0":"=m" (*dtr));
 }
+
+/* TODO: somewhat nasty - two structs, only used by the helpers.  Maybe use cpu
+ * features. */
+extern struct vmcs_config vmcs_config;
+extern struct vmx_capability vmx_capability;
 
 static inline bool cpu_has_secondary_exec_ctrls(void)
 {
