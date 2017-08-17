@@ -243,8 +243,6 @@ struct emmsr {
 
 static bool emsr_miscenable(struct emmsr *msr, struct vm_trapframe *vm_tf,
                             uint32_t opcode);
-static bool emsr_mustmatch(struct emmsr *msr, struct vm_trapframe *vm_tf,
-                           uint32_t opcode);
 static bool emsr_readonly(struct emmsr *msr, struct vm_trapframe *vm_tf,
                           uint32_t opcode);
 static bool emsr_readzero(struct emmsr *msr, struct vm_trapframe *vm_tf,
@@ -311,43 +309,14 @@ struct emmsr emmsrs[] = {
 bool emsr_miscenable(struct emmsr *msr, struct vm_trapframe *vm_tf,
                      uint32_t opcode)
 {
-	uint32_t eax, edx;
 	uint64_t val;
+	uint32_t eax, edx;
 
 	if (read_msr_safe(msr->reg, &val))
 		return FALSE;
-	split_msr_val(val, &edx, &eax);
-	/* we just let them read the misc msr for now. */
-	if (opcode == VMM_MSR_EMU_READ) {
-		vm_tf->tf_rax = eax;
-		vm_tf->tf_rax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
-		vm_tf->tf_rdx = edx;
-		return TRUE;
-	} else {
-		/* if they are writing what is already written, that's ok. */
-		eax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
-		if (((uint32_t) vm_tf->tf_rax == eax)
-		    && ((uint32_t) vm_tf->tf_rdx == edx))
-			return TRUE;
-	}
-	printk
-		("%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
-		 msr->name, (uint32_t) vm_tf->tf_rdx, (uint32_t) vm_tf->tf_rax, edx,
-		 eax);
-	return FALSE;
-}
-
-/* TODO: this looks like a copy-paste for the read side.  What's the purpose of
- * mustmatch?  No one even uses it. */
-bool emsr_mustmatch(struct emmsr *msr, struct vm_trapframe *vm_tf,
-                    uint32_t opcode)
-{
-	uint32_t eax, edx;
-	uint64_t val;
-
-	if (read_msr_safe(msr->reg, &val))
-		return FALSE;
-	split_msr_val(val, &edx, &eax);
+	eax = low32(val);
+	eax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
+	edx = high32(val);
 	/* we just let them read the misc msr for now. */
 	if (opcode == VMM_MSR_EMU_READ) {
 		vm_tf->tf_rax = eax;
@@ -359,25 +328,22 @@ bool emsr_mustmatch(struct emmsr *msr, struct vm_trapframe *vm_tf,
 		    && ((uint32_t) vm_tf->tf_rdx == edx))
 			return TRUE;
 	}
-	printk
-		("%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
-		 msr->name, (uint32_t) vm_tf->tf_rdx, (uint32_t) vm_tf->tf_rax, edx,
-		 eax);
+	printk("%s: Wanted to write 0x%x%x, but could not; value was 0x%x%x\n",
+	       msr->name, (uint32_t) vm_tf->tf_rdx, (uint32_t) vm_tf->tf_rax,
+	       edx, eax);
 	return FALSE;
 }
 
 bool emsr_readonly(struct emmsr *msr, struct vm_trapframe *vm_tf,
                    uint32_t opcode)
 {
-	uint32_t eax, edx;
 	uint64_t val;
 
 	if (read_msr_safe(msr->reg, &val))
 		return FALSE;
-	split_msr_val(val, &edx, &eax);
 	if (opcode == VMM_MSR_EMU_READ) {
-		vm_tf->tf_rax = eax;
-		vm_tf->tf_rdx = edx;
+		vm_tf->tf_rax = low32(val);
+		vm_tf->tf_rdx = high32(val);
 		return TRUE;
 	}
 
@@ -408,10 +374,11 @@ bool emsr_fakewrite(struct emmsr *msr, struct vm_trapframe *vm_tf,
 	if (!msr->written) {
 		if (read_msr_safe(msr->reg, &val))
 			return FALSE;
-		split_msr_val(val, &edx, &eax);
+		eax = low32(val);
+		edx = high32(val);
 	} else {
-		edx = msr->edx;
 		eax = msr->eax;
+		edx = msr->edx;
 	}
 	/* we just let them read the misc msr for now. */
 	if (opcode == VMM_MSR_EMU_READ) {
@@ -419,10 +386,6 @@ bool emsr_fakewrite(struct emmsr *msr, struct vm_trapframe *vm_tf,
 		vm_tf->tf_rdx = edx;
 		return TRUE;
 	} else {
-		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) vm_tf->tf_rax == eax)
-		    && ((uint32_t) vm_tf->tf_rdx == edx))
-			return TRUE;
 		msr->edx = vm_tf->tf_rdx;
 		msr->eax = vm_tf->tf_rax;
 		msr->written = TRUE;
@@ -433,15 +396,13 @@ bool emsr_fakewrite(struct emmsr *msr, struct vm_trapframe *vm_tf,
 bool emsr_ok(struct emmsr *msr, struct vm_trapframe *vm_tf,
              uint32_t opcode)
 {
-	uint32_t eax, edx;
 	uint64_t val;
 
 	if (opcode == VMM_MSR_EMU_READ) {
 		if (read_msr_safe(msr->reg, &val))
 			return FALSE;
-		split_msr_val(val, &edx, &eax);
-		vm_tf->tf_rax = eax;
-		vm_tf->tf_rdx = edx;
+		vm_tf->tf_rax = low32(val);
+		vm_tf->tf_rdx = high32(val);
 	} else {
 		val = (vm_tf->tf_rdx << 32) | (vm_tf->tf_rax & 0xffffffff);
 		if (write_msr_safe(msr->reg, val))

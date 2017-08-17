@@ -470,12 +470,6 @@ static inline uint64_t read_msr(uint32_t reg)
 	return (uint64_t)edx << 32 | eax;
 }
 
-static void split_msr_val(uint64_t val, uint32_t *high32, uint32_t *low32)
-{
-	*high32 = val >> 32;
-	*low32 = val & 0xffffffff;
-}
-
 static inline void write_msr(uint32_t reg, uint64_t val)
 {
 	asm volatile("wrmsr" : : "d"(val >> 32), "a"(val & 0xFFFFFFFF), "c"(reg));

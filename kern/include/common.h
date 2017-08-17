@@ -64,3 +64,17 @@ do {                                                                           \
 		ran_once = TRUE;                                                       \
 	}                                                                          \
 } while (0)
+
+#ifndef __ASSEMBLER__
+
+static inline uint32_t low32(uint64_t val)
+{
+	return val & 0xffffffff;
+}
+
+static inline uint32_t high32(uint64_t val)
+{
+	return val >> 32;
+}
+
+#endif /* !__ASSEMBLER__ */
