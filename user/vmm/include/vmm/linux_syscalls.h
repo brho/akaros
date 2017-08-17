@@ -1,3 +1,7 @@
+#pragma once
+
+#define linux_max_syscall 311
+
 char *syscalls[] = {
 [0]	"DUNE_SYS_READ",
 [1]	"DUNE_SYS_WRITE",

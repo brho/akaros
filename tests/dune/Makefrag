@@ -4,11 +4,11 @@ DUNE_TESTS_CFLAGS += $(CFLAGS_TESTS) -Wunused -Werror
 
 ALL_DUNE_TEST_FILES := $(wildcard $(DUNE_TESTS_DIR)/*.c)
 
-DUNE_TESTS_LDLIBS := $(TESTS_LDLIBS) -lelf -liplib
+DUNE_TESTS_LDLIBS := $(TESTS_LDLIBS) -lelf -liplib -ldl
 
 DUNE_TESTS_SRCS := $(ALL_DUNE_TEST_FILES)
 
-DUNE_TESTS_LDDEPENDS := $(DUNE_TESTS_DIR)/%.c 
+DUNE_TESTS_LDDEPENDS := $(DUNE_TESTS_DIR)/%.c
 
 TESTS_EXECS_C  += $(patsubst $(DUNE_TESTS_DIR)/%.c, \
                       $(OBJDIR)/$(DUNE_TESTS_DIR)/%, \

@@ -28,7 +28,7 @@
 #include <sys/eventfd.h>
 #include <sys/uio.h>
 #include <err.h>
-
+#include <vmm/linuxemu.h>
 struct vmm_gpcore_init gpci;
 bool linuxemu(struct guest_thread *gth, struct vm_trapframe *tf);
 
@@ -51,10 +51,14 @@ static void hlt(void)
 	__asm__ __volatile__("\thlt\n\t");
 }
 
-static int pc(uint16_t c)
+static int pc(char *c)
 {
-	__asm__ __volatile__("movw $0, %%rax\nmovw %0, %%di\n\tvmcall\n" ::
-	                     "m"(c) : "rdi", "rax");
+	__asm__ __volatile__("movq $1, %%rax\n"
+	                     "movq $1, %%rdi\n"
+	                     "movq %0, %%rsi\n"
+	                     "movq $1, %%rdx\n"
+	                     "vmcall\n" ::
+	                     "m"(c) : "rdi", "rax", "rsi", "rdx");
 	return 0;
 }
 
@@ -64,9 +68,8 @@ static void xnum(uint64_t x)
 
 	for (int i = 0; i < 8; i++) {
 		uint8_t v = ((uint8_t*)&x)[7 - i];
-
-		pc(hex[v >> 4]);
-		pc(hex[v & 0xf]);
+		pc(&hex[v >> 4]);
+		pc(&hex[v & 0xf]);
 	}
 }
 
@@ -79,8 +82,7 @@ static void show(char *s)
 		return;
 	}
 	while (*s) {
-	//	xnum((uint64_t)s);pc(';');
-		pc(*s);
+		pc(s);
 		s++;
 	}
 }
@@ -88,8 +90,11 @@ static void show(char *s)
 /* This is a small test that runs in gr0 and tests our argument setup.
  * This test can grow in capability as we find more broken bits in our
  * dune-like environment. */
+
 void dune_test(void *stack)
 {
+	show("Hello this is dune's test\n");
+
 	int argc;
 	char **argv;
 	struct elf_aux *auxv;
@@ -122,9 +127,6 @@ void dune_test(void *stack)
 		xnum(auxv[i].v[1]); show("\n");
 	}
 	show("Done dumping [argv, env, auxv]\n");
-	__asm__ __volatile__("movl $0xdeadbeef, %eax\nmovq $1, %rdi\nmov $2,"
-	                     "%rsi\nmovq $3, %rdx\n"
-	                     "movq $4,%rcx\nmovq $5, %r8\nmovq $6,%r9\nvmcall\n");
 	hlt();
 }
 
@@ -341,28 +343,6 @@ buildaux(struct elf_aux *base, int basec, struct elf_aux *extra, int extrac)
 	return ret;
 }
 
-static bool
-testvmcall(struct guest_thread *gth, struct vm_trapframe *tf)
-{
-	uintptr_t rax = tf->tf_rax;
-
-	switch (rax) {
-	default:
-		fprintf(stderr, "testvmcall: gth %p tf %p\n", gth, tf);
-		fprintf(stderr, "args should be 1, 2, 3, 4, 5, 6:\n");
-		fprintf(stderr, "%p %p %p %p %p %p\n",
-		        tf->tf_rdi, tf->tf_rsi, tf->tf_rdx,
-		        tf->tf_rcx, tf->tf_r8, tf->tf_r9);
-		fprintf(stderr, "RAX should be deadbeef: 0x%x\n", rax);
-		break;
-	case 0:
-		write(1, &tf->tf_rdi, 1);
-		break;
-	}
-	tf->tf_rip += 3;
-	return true;
-}
-
 int main(int argc, char **argv)
 {
 	void *tos;
@@ -429,6 +409,8 @@ int main(int argc, char **argv)
 		usage();
 	}
 
+	init_syscall_table();
+
 	if ((uintptr_t)(memstart + memsize) >= (uintptr_t)BRK_START) {
 		fprintf(stderr,
 		        "memstart 0x%lx memsize 0x%lx -> 0x%lx is too large; overlaps BRK_START at %p\n",
@@ -480,7 +462,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	vm.gths[0]->vmcall = test ? testvmcall : linuxemu;
+	vm.gths[0]->vmcall = linuxemu;
 	vm_tf = gth_to_vmtf(vm.gths[0]);
 
 	/* we can't use the default stack since we set one up
