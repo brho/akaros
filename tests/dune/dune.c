@@ -436,7 +436,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	mmap_memory(memstart, memsize);
+	mmap_memory(&vm, memstart, memsize);
 
 	if (debug)
 		fprintf(stderr, "mmap guest physical memory at %p for 0x%lx bytes\n",

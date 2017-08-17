@@ -62,6 +62,13 @@ struct virtual_machine {
 	uint8_t						*low4k;
 	struct virtio_mmio_dev		*virtio_mmio_devices[VIRTIO_MMIO_MAX_NUM_DEV];
 
+	/* minimum and maximum physical memory addresses. When we set up the initial
+	 * default page tables we use this range. Note that even if the "physical"
+	 * memory has holes, we'll create PTEs for it. This seems enough for now but
+	 * we shall see. */
+	uintptr_t                   minphys;
+	uintptr_t                   maxphys;
+
 	/* Default root pointer to use if one is not set in a
 	 * guest thread. We expect this to be the common case,
 	 * where all guests share a page table. It's not required
@@ -118,9 +125,9 @@ static struct virtual_machine *get_my_vm(void)
 void *init_e820map(struct boot_params *bp,
                    unsigned long long memstart,
                    unsigned long long memsize);
-void checkmemaligned(unsigned long long memstart, unsigned long long memsize);
-void mmap_memory(unsigned long long memstart, unsigned long long memsize);
-void *setup_paging(unsigned long long memstart, unsigned long long memsize,
-                   bool debug);
+void checkmemaligned(uintptr_t memstart, size_t memsize);
+void mmap_memory(struct virtual_machine *vm, uintptr_t memstart,
+                 size_t memsize);
+void *setup_paging(struct virtual_machine *vm, bool debug);
 void *setup_biostables(struct virtual_machine *vm,
                        void *a, void *smbiostable);

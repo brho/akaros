@@ -545,7 +545,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	mmap_memory(memstart, memsize);
+	mmap_memory(vm, memstart, memsize);
 
 	entry = load_elf(argv[0], 0);
 	if (entry == 0) {
@@ -641,7 +641,7 @@ int main(int argc, char **argv)
 	ret = vmm_init(vm, vmmflags);
 	assert(!ret);
 
-	cr3 = setup_paging(memstart, memsize, debug);
+	cr3 = setup_paging(vm, debug);
 	init_timer_alarms();
 
 	vm_tf = gth_to_vmtf(vm->gths[0]);

@@ -1,7 +1,7 @@
 /* Copyright (c) 2017 Google Inc.
  * See LICENSE for details.
  *
- * Memory, paging, e820, bootparams and other helpers */
+ * Set up paging, using the minphys and maxphys in the vm struct. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,11 +13,12 @@ typedef struct {
 	uint64_t pte[512];
 } ptp;
 
-void *setup_paging(unsigned long long memstart, unsigned long long memsize,
-				   bool debug)
+void *setup_paging(struct virtual_machine *vm, bool debug)
 {
 	ptp *p512, *p1, *p2m;
 	int nptp, npml4, npml3, npml2;
+	uintptr_t memstart = vm->minphys;
+	size_t memsize = vm->maxphys - vm->minphys + 1;
 
 	/* This test is redundant when booting kernels, as it is also
 	 * performed in memory(), but not all users call that function,

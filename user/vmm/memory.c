@@ -88,7 +88,7 @@ void *init_e820map(struct boot_params *bp,
 /* checkmemaligned verifies alignment attributes of your memory space.
  * It terminates your process with extreme prejudice if they are
  * incorrect in some way. */
-void checkmemaligned(unsigned long long memstart, unsigned long long memsize)
+void checkmemaligned(uintptr_t memstart, size_t memsize)
 {
 	if (!ALIGNED(memstart, PML1_REACH))
 		errx(1, "memstart (%#x) wrong: must be aligned to %#x",
@@ -103,8 +103,9 @@ void checkmemaligned(unsigned long long memstart, unsigned long long memsize)
 // RESERVED to _4GiB for that.  The memory is either split, all low, or all
 // high. This code is designed for a kernel. Dune-style code does not need it
 // as it does not have the RESERVED restrictions. Dune-style code can use this,
-// however, by setting memstart to 4 GiB.
-void mmap_memory(unsigned long long memstart, unsigned long long memsize)
+// however, by setting memstart to 4 GiB. This code can be called multiple
+// times with more ranges. It does not check for overlaps.
+void mmap_memory(struct virtual_machine *vm, uintptr_t memstart, size_t memsize)
 {
 	void *r1, *r2;
 	unsigned long r1size = memsize;
@@ -135,7 +136,7 @@ void mmap_memory(unsigned long long memstart, unsigned long long memsize)
 			exit(1);
 		}
 		if (memstart >= _4GiB)
-			return;
+			goto done;
 	}
 
 	r1 = mmap((void *)memstart, r1size,
@@ -146,4 +147,11 @@ void mmap_memory(unsigned long long memstart, unsigned long long memsize)
 		        memsize, memstart);
 		exit(1);
 	}
+
+done:
+	if ((vm->minphys == 0) || (vm->minphys > memstart))
+		vm->minphys = memstart;
+
+	if (vm->maxphys < memstart + memsize - 1)
+		vm->maxphys = memstart + memsize - 1;
 }
