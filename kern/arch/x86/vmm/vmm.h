@@ -40,8 +40,9 @@ struct vmm {
 	// installed would GPF on a K7.
 	union {
 		void *svm;
-		struct guest_pcore **guest_pcores;
+		struct vmx_vmm vmx;
 	};
+	struct guest_pcore **guest_pcores;
 	unsigned long vmexits[VMM_VMEXIT_NR_TYPES];
 };
 

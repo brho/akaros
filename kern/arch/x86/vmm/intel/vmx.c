@@ -325,6 +325,11 @@ vmcs_write64(unsigned long field, uint64_t value)
 
 void vapic_status_dump_kernel(void *vapic);
 
+static bool vmx_control_can_be_changed(struct vmxec *v, uint32_t ctl)
+{
+	return v->hw_changeable & v->policy_changeable & ctl;
+}
+
 /*
  * A note on Things You Can't Make Up.
  * or
@@ -401,10 +406,8 @@ void vapic_status_dump_kernel(void *vapic);
  * weirdness in the bits, we don't want to run.
  * The try_set stuff adds particular ugliness but we have to have it.
  */
-
-static bool
-check_vmxec_controls(struct vmxec const *v, bool have_true_msr,
-					 uint32_t * result)
+static bool check_vmxec_controls(struct vmxec *v, bool have_true_msr,
+                                 uint32_t *result)
 {
 	bool err = false;
 	uint32_t vmx_msr_low, vmx_msr_high;
@@ -425,6 +428,7 @@ check_vmxec_controls(struct vmxec const *v, bool have_true_msr,
 	reserved_0 = (~vmx_msr_low) & (~vmx_msr_high);
 	reserved_1 = vmx_msr_low & vmx_msr_high;
 	changeable_bits = ~(reserved_0 | reserved_1);
+	v->hw_changeable = changeable_bits;
 
 	/*
 	 * this is very much as follows:
@@ -495,7 +499,7 @@ check_vmxec_controls(struct vmxec const *v, bool have_true_msr,
  * We're trying to make this as readable as possible. Realistically, it will
  * rarely if ever change, if the past is any guide.
  */
-static const struct vmxec pbec = {
+static struct vmxec pbec = {
 	.name = "Pin Based Execution Controls",
 	.msr = MSR_IA32_VMX_PINBASED_CTLS,
 	.truemsr = MSR_IA32_VMX_TRUE_PINBASED_CTLS,
@@ -508,7 +512,7 @@ static const struct vmxec pbec = {
 	.must_be_0 = (PIN_BASED_VMX_PREEMPTION_TIMER),
 };
 
-static const struct vmxec cbec = {
+static struct vmxec cbec = {
 	.name = "CPU Based Execution Controls",
 	.msr = MSR_IA32_VMX_PROCBASED_CTLS,
 	.truemsr = MSR_IA32_VMX_TRUE_PROCBASED_CTLS,
@@ -537,10 +541,13 @@ static const struct vmxec cbec = {
 		     CPU_BASED_PAUSE_EXITING |
 		     CPU_BASED_UNCOND_IO_EXITING),
 
-	.try_set_0 = (CPU_BASED_MONITOR_EXITING)
+	.try_set_0 = (CPU_BASED_MONITOR_EXITING),
+	.policy_changeable = (
+	         CPU_BASED_HLT_EXITING |
+	         CPU_BASED_PAUSE_EXITING),
 };
 
-static const struct vmxec cb2ec = {
+static struct vmxec cb2ec = {
 	.name = "CPU Based 2nd Execution Controls",
 	.msr = MSR_IA32_VMX_PROCBASED_CTLS2,
 	.truemsr = MSR_IA32_VMX_PROCBASED_CTLS2,
@@ -552,8 +559,6 @@ static const struct vmxec cb2ec = {
 		     SECONDARY_EXEC_WBINVD_EXITING),
 
 	.must_be_0 = (
-		     //SECONDARY_EXEC_APIC_REGISTER_VIRT |
-		     //SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 		     SECONDARY_EXEC_DESCRIPTOR_EXITING |
 		     SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
 		     SECONDARY_EXEC_ENABLE_VPID |
@@ -573,7 +578,7 @@ static const struct vmxec cb2ec = {
 
 };
 
-static const struct vmxec vmentry = {
+static struct vmxec vmentry = {
 	.name = "VMENTRY controls",
 	.msr = MSR_IA32_VMX_ENTRY_CTLS,
 	.truemsr = MSR_IA32_VMX_TRUE_ENTRY_CTLS,
@@ -589,7 +594,7 @@ static const struct vmxec vmentry = {
 		     VM_ENTRY_LOAD_IA32_PAT),
 };
 
-static const struct vmxec vmexit = {
+static struct vmxec vmexit = {
 	.name = "VMEXIT controls",
 	.msr = MSR_IA32_VMX_EXIT_CTLS,
 	.truemsr = MSR_IA32_VMX_TRUE_EXIT_CTLS,
@@ -655,6 +660,7 @@ setup_vmcs_config(void *p)
 		printk("vmxexec controls is no good.\n");
 		return;
 	}
+	assert(cpu_has_secondary_exec_ctrls());
 
 	/* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
 	if ((vmx_msr_high & 0x1fff) > PGSIZE) {
@@ -767,12 +773,18 @@ static void vmx_setup_constant_host_state(void)
 static void __vmx_setup_pcpu(struct guest_pcore *gpc)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct vmx_vmm *vmx = &gpc->proc->vmm.vmx;
 
 	vmcs_write(HOST_TR_BASE, (uintptr_t)pcpui->tss);
 	vmcs_writel(HOST_GDTR_BASE, (uintptr_t)pcpui->gdt);
 	vmcs_write(HOST_GS_BASE, (uintptr_t)pcpui);
 	/* TODO: we might need to also set HOST_IA32_PERF_GLOBAL_CTRL.  Need to
 	 * think about how perf will work with VMs */
+	/* Userspace can request changes to the ctls.  They take effect when we
+	 * reload the GPC, which occurs after a transition from userspace to VM. */
+	vmcs_write(PIN_BASED_VM_EXEC_CONTROL, vmx->pin_exec_ctls);
+	vmcs_write(CPU_BASED_VM_EXEC_CONTROL, vmx->cpu_exec_ctls);
+	vmcs_write(SECONDARY_VM_EXEC_CONTROL, vmx->cpu2_exec_ctls);
 }
 
 uint64_t
@@ -1004,6 +1016,13 @@ static void setup_msr(struct guest_pcore *gpc)
 	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, 0);
 }
 
+void vmx_setup_vmx_vmm(struct vmx_vmm *vmx)
+{
+	vmx->pin_exec_ctls = vmcs_config.pin_based_exec_ctrl;
+	vmx->cpu_exec_ctls = vmcs_config.cpu_based_exec_ctrl;
+	vmx->cpu2_exec_ctls = vmcs_config.cpu_based_2nd_exec_ctrl;
+}
+
 /**
  *  vmx_setup_vmcs - configures the vmcs with starting parameters
  */
@@ -1011,18 +1030,6 @@ static void vmx_setup_vmcs(struct guest_pcore *gpc)
 {
 	vmcs_write16(VIRTUAL_PROCESSOR_ID, 0);
 	vmcs_write64(VMCS_LINK_POINTER, -1ull);	/* 22.3.1.5 */
-
-	/* Control */
-	vmcs_write32(PIN_BASED_VM_EXEC_CONTROL,
-		     vmcs_config.pin_based_exec_ctrl);
-
-	vmcs_write32(CPU_BASED_VM_EXEC_CONTROL,
-		     vmcs_config.cpu_based_exec_ctrl);
-
-	if (cpu_has_secondary_exec_ctrls()) {
-		vmcs_write32(SECONDARY_VM_EXEC_CONTROL,
-			     vmcs_config.cpu_based_2nd_exec_ctrl);
-	}
 
 	vmcs_write64(EPT_POINTER, gpc_get_eptp(gpc));
 

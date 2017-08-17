@@ -91,8 +91,9 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
 		error(EAGAIN, "We're already running a vmmcp?");
 	/* Set this early, so cleanup checks the gpc array */
 	vmm->vmmcp = TRUE;
-	nr_guest_pcores = MIN(nr_guest_pcores, num_cores);
 	vmm->amd = 0;
+	vmx_setup_vmx_vmm(&vmm->vmx);
+	nr_guest_pcores = MIN(nr_guest_pcores, num_cores);
 	vmm->guest_pcores = kzmalloc(sizeof(void *) * nr_guest_pcores, MEM_WAIT);
 	if (!vmm->guest_pcores)
 		error(ENOMEM, "Allocation of vmm->guest_pcores failed");

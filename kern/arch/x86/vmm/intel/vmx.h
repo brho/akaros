@@ -385,6 +385,15 @@ struct vmxec {
 	uint32_t must_be_0;
 	uint32_t try_set_1;
 	uint32_t try_set_0;
+	uint32_t hw_changeable;
+	uint32_t policy_changeable;
+};
+
+/* Per-VM VMX info */
+struct vmx_vmm {
+	uint32_t					pin_exec_ctls;
+	uint32_t					cpu_exec_ctls;
+	uint32_t					cpu2_exec_ctls;
 };
 
 int intel_vmm_init(void);
@@ -393,3 +402,4 @@ void vmx_load_guest_pcore(struct guest_pcore *gpc);
 void vmx_unload_guest_pcore(struct guest_pcore *gpc);
 uint64_t gpc_get_eptp(struct guest_pcore *gpc);
 void vmx_clear_vmcs(void);
+void vmx_setup_vmx_vmm(struct vmx_vmm *vmx);
