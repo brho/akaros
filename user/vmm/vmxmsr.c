@@ -38,25 +38,17 @@ struct emmsr {
 	bool written;
 	uint32_t edx, eax;
 };
-// Might need to mfence rdmsr.  supposedly wrmsr serializes, but not for x2APIC
+
 static inline uint64_t read_msr(uint32_t reg)
 {
-	uint32_t edx, eax;
-	asm volatile("rdmsr; mfence" : "=d"(edx), "=a"(eax) : "c"(reg));
-	return (uint64_t)edx << 32 | eax;
+	panic("Not implemented for userspace");
 }
 
 static inline void write_msr(uint32_t reg, uint64_t val)
 {
-	asm volatile("wrmsr" : : "d"((uint32_t)(val >> 32)),
-	                         "a"((uint32_t)(val & 0xFFFFFFFF)),
-	                         "c"(reg));
+	panic("Not implemented for userspace");
 }
 
-static int emsr_miscenable(struct guest_thread *vm_thread, struct emmsr *,
-                           uint32_t);
-static int emsr_mustmatch(struct guest_thread *vm_thread, struct emmsr *,
-                          uint32_t);
 static int emsr_readonly(struct guest_thread *vm_thread, struct emmsr *,
                          uint32_t);
 static int emsr_readzero(struct guest_thread *vm_thread, struct emmsr *,
@@ -69,84 +61,29 @@ struct emmsr emmsrs[] = {
 	{MSR_RAPL_POWER_UNIT, "MSR_RAPL_POWER_UNIT", emsr_readzero},
 };
 
-static uint64_t set_low32(uint64_t hi, uint32_t lo)
+static inline uint32_t low32(uint64_t val)
 {
-	return (hi & 0xffffffff00000000ULL) | lo;
+	return val & 0xffffffff;
 }
 
-static uint64_t set_low16(uint64_t hi, uint16_t lo)
+static inline uint32_t high32(uint64_t val)
 {
-	return (hi & 0xffffffffffff0000ULL) | lo;
-}
-
-static uint64_t set_low8(uint64_t hi, uint8_t lo)
-{
-	return (hi & 0xffffffffffffff00ULL) | lo;
-}
-
-/* this may be the only register that needs special handling.
- * If there others then we might want to extend teh emmsr struct.
- */
-static int emsr_miscenable(struct guest_thread *vm_thread, struct emmsr *msr,
-                           uint32_t opcode) {
-	uint32_t eax, edx;
-	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
-
-	rdmsr(msr->reg, eax, edx);
-	/* we just let them read the misc msr for now. */
-	if (opcode == EXIT_REASON_MSR_READ) {
-		vm_tf->tf_rax = set_low32(vm_tf->tf_rax, eax);
-		vm_tf->tf_rax |= MSR_IA32_MISC_ENABLE_PEBS_UNAVAIL;
-		vm_tf->tf_rdx = set_low32(vm_tf->tf_rdx, edx);
-		return 0;
-	} else {
-		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) vm_tf->tf_rax == eax)
-		    && ((uint32_t) vm_tf->tf_rdx == edx))
-			return 0;
-	}
-	fprintf(stderr,
-		"%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
-		 msr->name, (uint32_t) vm_tf->tf_rdx,
-		 (uint32_t) vm_tf->tf_rax, edx, eax);
-	return SHUTDOWN_UNHANDLED_EXIT_REASON;
-}
-
-static int emsr_mustmatch(struct guest_thread *vm_thread, struct emmsr *msr,
-                          uint32_t opcode) {
-	uint32_t eax, edx;
-	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
-
-	rdmsr(msr->reg, eax, edx);
-	/* we just let them read the misc msr for now. */
-	if (opcode == EXIT_REASON_MSR_READ) {
-		vm_tf->tf_rax = set_low32(vm_tf->tf_rax, eax);
-		vm_tf->tf_rdx = set_low32(vm_tf->tf_rdx, edx);
-		return 0;
-	} else {
-		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) vm_tf->tf_rax == eax)
-		    && ((uint32_t) vm_tf->tf_rdx == edx))
-			return 0;
-	}
-	fprintf(stderr,
-		"%s: Wanted to write 0x%x:0x%x, but could not; value was 0x%x:0x%x\n",
-		 msr->name, (uint32_t) vm_tf->tf_rdx,
-		 (uint32_t) vm_tf->tf_rax, edx, eax);
-	return SHUTDOWN_UNHANDLED_EXIT_REASON;
+	return val >> 32;
 }
 
 static int emsr_ok(struct guest_thread *vm_thread, struct emmsr *msr,
                    uint32_t opcode)
 {
 	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+	uint64_t msr_val;
 
 	if (opcode == EXIT_REASON_MSR_READ) {
-		rdmsr(msr->reg, vm_tf->tf_rdx, vm_tf->tf_rax);
+		msr_val = read_msr(msr->reg);
+		vm_tf->tf_rax = low32(msr_val);
+		vm_tf->tf_rdx = high32(msr_val);
 	} else {
-		uint64_t val =
-			(uint64_t) vm_tf->tf_rdx << 32 | vm_tf->tf_rax;
-		write_msr(msr->reg, val);
+		msr_val = (vm_tf->tf_rdx << 32) | vm_tf->tf_rax;
+		write_msr(msr->reg, msr_val);
 	}
 	return 0;
 }
@@ -154,14 +91,13 @@ static int emsr_ok(struct guest_thread *vm_thread, struct emmsr *msr,
 static int emsr_readonly(struct guest_thread *vm_thread, struct emmsr *msr,
                          uint32_t opcode)
 {
-	uint32_t eax, edx;
 	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+	uint64_t msr_val;
 
-	rdmsr((uint32_t) vm_tf->tf_rcx, eax, edx);
-	/* we just let them read the misc msr for now. */
+	msr_val = read_msr(msr->reg);
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vm_tf->tf_rax = set_low32(vm_tf->tf_rax, eax);
-		vm_tf->tf_rdx = set_low32(vm_tf->tf_rdx, edx);
+		vm_tf->tf_rax = low32(msr_val);
+		vm_tf->tf_rdx = high32(msr_val);
 		return 0;
 	}
 
@@ -189,24 +125,22 @@ static int emsr_fakewrite(struct guest_thread *vm_thread, struct emmsr *msr,
                           uint32_t opcode)
 {
 	uint32_t eax, edx;
+	uint64_t msr_val;
 	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
 
 	if (!msr->written) {
-		rdmsr(msr->reg, eax, edx);
+		msr_val = read_msr(msr->reg);
+		eax = low32(msr_val);
+		edx = high32(msr_val);
 	} else {
-		edx = msr->edx;
 		eax = msr->eax;
+		edx = msr->edx;
 	}
-	/* we just let them read the misc msr for now. */
 	if (opcode == EXIT_REASON_MSR_READ) {
-		vm_tf->tf_rax = set_low32(vm_tf->tf_rax, eax);
-		vm_tf->tf_rdx = set_low32(vm_tf->tf_rdx, edx);
+		vm_tf->tf_rax = eax;
+		vm_tf->tf_rdx = edx;
 		return 0;
 	} else {
-		/* if they are writing what is already written, that's ok. */
-		if (((uint32_t) vm_tf->tf_rax == eax)
-		    && ((uint32_t) vm_tf->tf_rdx == edx))
-			return 0;
 		msr->edx = vm_tf->tf_rdx;
 		msr->eax = vm_tf->tf_rax;
 		msr->written = true;

@@ -404,12 +404,15 @@ check_vmxec_controls(struct vmxec const *v, bool have_true_msr,
 {
 	bool err = false;
 	uint32_t vmx_msr_low, vmx_msr_high;
+	uint64_t msr_val;
 	uint32_t reserved_0, reserved_1, changeable_bits, try0, try1;
 
 	if (have_true_msr)
-		rdmsr(v->truemsr, vmx_msr_low, vmx_msr_high);
+		msr_val = read_msr(v->truemsr);
 	else
-		rdmsr(v->msr, vmx_msr_low, vmx_msr_high);
+		msr_val = read_msr(v->msr);
+	vmx_msr_high = high32(msr_val);
+	vmx_msr_low = low32(msr_val);
 
 	if (vmx_msr_low & ~vmx_msr_high)
 		warn("JACKPOT: Conflicting VMX ec ctls for %s, high 0x%08x low 0x%08x",
@@ -673,7 +676,9 @@ setup_vmcs_config(void *p)
 
 	/* Read in the caps for runtime checks.  This MSR is only available if
 	 * secondary controls and ept or vpid is on, which we check earlier */
-	rdmsr(MSR_IA32_VMX_EPT_VPID_CAP, vmx_capability.ept, vmx_capability.vpid);
+	vmx_msr = read_msr(MSR_IA32_VMX_EPT_VPID_CAP);
+	vmx_capability.vpid = high32(vmx_msr);
+	vmx_capability.ept = low32(vmx_msr);
 
 	*ret = 0;
 }
@@ -722,8 +727,6 @@ vmx_free_vmcs(struct vmcs *vmcs)
  */
 static void vmx_setup_constant_host_state(void)
 {
-	uint32_t low32, high32;
-	unsigned long tmpl;
 	pseudodesc_t dt;
 
 	vmcs_writel(HOST_CR0, rcr0() & ~X86_CR0_TS);	/* 22.2.3 */
@@ -742,18 +745,13 @@ static void vmx_setup_constant_host_state(void)
 	extern void vmexit_handler(void);
 	vmcs_writel(HOST_RIP, (unsigned long)vmexit_handler);
 
-	rdmsr(MSR_IA32_SYSENTER_CS, low32, high32);
-	vmcs_write32(HOST_IA32_SYSENTER_CS, low32);
-	rdmsrl(MSR_IA32_SYSENTER_EIP, tmpl);
-	vmcs_writel(HOST_IA32_SYSENTER_EIP, tmpl);	/* 22.2.3 */
+	vmcs_write32(HOST_IA32_SYSENTER_CS, read_msr(MSR_IA32_SYSENTER_CS));
+	vmcs_writel(HOST_IA32_SYSENTER_EIP, read_msr(MSR_IA32_SYSENTER_EIP));
 
-	rdmsr(MSR_EFER, low32, high32);
-	vmcs_write32(HOST_IA32_EFER, low32);
+	vmcs_write32(HOST_IA32_EFER, read_msr(MSR_EFER));
 
-	if (vmcs_config.vmexit_ctrl & VM_EXIT_LOAD_IA32_PAT) {
-		rdmsr(MSR_IA32_CR_PAT, low32, high32);
-		vmcs_write64(HOST_IA32_PAT, low32 | ((uint64_t) high32 << 32));
-	}
+	if (vmcs_config.vmexit_ctrl & VM_EXIT_LOAD_IA32_PAT)
+		vmcs_write64(HOST_IA32_PAT, read_msr(MSR_IA32_CR_PAT));
 
 	vmcs_write16(HOST_FS_SELECTOR, 0);	/* 22.2.4 */
 	vmcs_write16(HOST_GS_SELECTOR, 0);	/* 22.2.4 */
@@ -1131,7 +1129,7 @@ static int __vmx_enable(struct vmcs *vmxon_buf) {
 		return -EBUSY;
 	}
 
-	rdmsrl(MSR_IA32_FEATURE_CONTROL, old);
+	old = read_msr(MSR_IA32_FEATURE_CONTROL);
 
 	test_bits = FEATURE_CONTROL_LOCKED;
 	test_bits |= FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX;
