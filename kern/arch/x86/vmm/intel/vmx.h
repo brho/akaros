@@ -58,6 +58,20 @@ struct vmcs_config {
 	uint32_t vmentry_ctrl;
 };
 
+struct guest_pcore {
+	int cpu;
+	struct proc *proc;
+	unsigned long *posted_irq_desc;
+	struct vmcs *vmcs;
+	int vmcs_core_id;
+	bool should_vmresume;
+	uint64_t xcr0;
+	uint64_t msr_kern_gs_base;
+	uint64_t msr_star;
+	uint64_t msr_lstar;
+	uint64_t msr_sfmask;
+};
+
 #define NR_AUTOLOAD_MSRS 8
 
 /* the horror. */
@@ -99,15 +113,6 @@ struct ldttss_desc64 {
 
 extern char * const VMX_EXIT_REASON_NAMES[];
 
-
-int vmx_init(void);
-void vmx_exit(void);
-int intel_vmm_init(void);
-int intel_vmm_pcpu_init(void);
-int ept_fault_pages(void *dir, uint32_t start, uint32_t end);
-int ept_check_page(void *dir, unsigned long addr);
-int vmx_do_ept_fault(void *dir, unsigned long gpa, unsigned long gva, int fault_flags);
-
 static inline void native_store_idt(pseudodesc_t *dtr);
 static inline unsigned long get_desc_base(const struct desc_struct *desc);
 static inline void native_store_gdt(pseudodesc_t *dtr);
@@ -138,7 +143,6 @@ static inline void __invvpid(int ext, uint16_t vpid, gva_t gva);
 static inline void vpid_sync_gpc_single(uint16_t vpid);
 static inline void vpid_sync_gpc_global(void);
 static inline void vpid_sync_context(uint16_t vpid);
-static inline uint64_t gpc_get_eptp(struct guest_pcore *gpc);
 
 /* no way to get around some of this stuff. */
 /* we will do the bare minimum required. */
@@ -338,11 +342,6 @@ static inline void vpid_sync_context(uint16_t vpid)
 		vpid_sync_gpc_global();
 }
 
-static inline uint64_t gpc_get_eptp(struct guest_pcore *gpc)
-{
-	return gpc->proc->env_pgdir.eptp;
-}
-
 static inline unsigned long vmcs_read(unsigned long field)
 {
 	unsigned long value;
@@ -388,6 +387,9 @@ struct vmxec {
 	uint32_t try_set_0;
 };
 
+int intel_vmm_init(void);
+int intel_vmm_pcpu_init(void);
 void vmx_load_guest_pcore(struct guest_pcore *gpc);
 void vmx_unload_guest_pcore(struct guest_pcore *gpc);
+uint64_t gpc_get_eptp(struct guest_pcore *gpc);
 void vmx_clear_vmcs(void);

@@ -1422,3 +1422,8 @@ void vmx_unload_guest_pcore(struct guest_pcore *gpc)
 	gpc->vmcs_core_id = core_id();
 	PERCPU_VAR(gpc_to_clear_to) = gpc;
 }
+
+uint64_t gpc_get_eptp(struct guest_pcore *gpc)
+{
+	return gpc->proc->env_pgdir.eptp;
+}

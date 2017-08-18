@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ros/vmm.h>
+#include <arch/vmm/intel/vmx.h>
 
 static inline int cpu_has_vmx(void)
 {
@@ -15,20 +16,6 @@ static inline int cpu_has_svm(const char **msg)
 }
 
 #define VMM_VMEXIT_NR_TYPES		65
-
-struct guest_pcore {
-	int cpu;
-	struct proc *proc;
-	unsigned long *posted_irq_desc;
-	struct vmcs *vmcs;
-	int vmcs_core_id;
-	bool should_vmresume;
-	uint64_t xcr0;
-	uint64_t msr_kern_gs_base;
-	uint64_t msr_star;
-	uint64_t msr_lstar;
-	uint64_t msr_sfmask;
-};
 
 struct vmm {
 	spinlock_t lock;	/* protects guest_pcore assignment */
@@ -65,9 +52,6 @@ int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
                     struct vmm_gpcore_init *gpcis, int flags);
 void __vmm_struct_cleanup(struct proc *p);
 int vmm_poke_guest(struct proc *p, int guest_pcoreid);
-
-int intel_vmx_start(int id);
-int intel_vmx_setup(int nvmcs);
 
 struct guest_pcore *create_guest_pcore(struct proc *p,
                                        struct vmm_gpcore_init *gpci);
