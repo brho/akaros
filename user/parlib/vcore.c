@@ -42,9 +42,21 @@ static void __fake_start(void)
 }
 void _start(void) __attribute__((weak, alias ("__fake_start")));
 
+/* Shared libraries also contain parlib.  That'll be true until we start making
+ * parlib a .so, which has some TLS implications (and maybe others).  The real
+ * parlib is the one in the program binary, not the shared libraries.  This
+ * detection works because all shared libs, both the -l and the dlopens, are
+ * mapped above the BRK.
+ *
+ * Previously, we tried using weak symbols, specifically _start or _end, but be
+ * careful.  If you pass e.g. _start or _end to a function or inline asm, the
+ * program binary will do something slightly different, which may make the
+ * shared library load different values. */
 bool __in_fake_parlib(void)
 {
-	return _start == __fake_start;
+	static char dummy;
+
+	return (uintptr_t)&dummy > BRK_START;
 }
 
 /* TODO: probably don't want to dealloc.  Considering caching */
