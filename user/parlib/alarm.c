@@ -153,6 +153,8 @@ static void __attribute__((constructor)) init_alarm_service(void)
 	struct event_queue *ev_q;
 	static struct fork_cb devalarm_fork_cb = {.func = devalarm_forked};
 
+	if (__in_fake_parlib())
+		return;
 	/* Sets up timer chain (only one chain per process) */
 	spin_pdr_init(&global_tchain.lock);
 	TAILQ_INIT(&global_tchain.waiters);

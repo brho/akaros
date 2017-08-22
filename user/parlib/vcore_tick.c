@@ -35,6 +35,8 @@ static struct vcore_tick *__vc_ticks;
 
 static void __attribute__((constructor)) vcore_tick_lib_init(void)
 {
+	if (__in_fake_parlib())
+		return;
 	__vc_ticks = calloc(max_vcores(), sizeof(struct vcore_tick));
 	assert(__vc_ticks);
 }

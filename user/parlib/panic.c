@@ -7,6 +7,8 @@
 
 static void __attribute__((constructor)) parlib_stdio_init(void)
 {
+	if (__in_fake_parlib())
+		return;
 	/* This isn't ideal, since it might affect some stdout streams where our
 	 * parent tried to do something else.  Note that isatty() always returns
 	 * TRUE, due to how we fake tcgetattr(), and that doesn't affect whatever
