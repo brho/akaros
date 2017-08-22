@@ -34,11 +34,12 @@ static void dumpe820(struct e820entry *e, int nr)
 // gotten here, then memsize and memstart are valid.  It returns
 // pointer to the first page after the map for our bump allocator.  We
 // assume the ranges passed in are validated already.
-void *init_e820map(struct boot_params *bp,
-                   unsigned long long memstart,
-                   unsigned long long memsize)
+void *init_e820map(struct virtual_machine *vm, struct boot_params *bp)
 {
-	unsigned long long lowmem = 0;
+	uintptr_t memstart = vm->minphys;
+	size_t memsize = vm->maxphys - vm->minphys + 1;
+	uintptr_t lowmem = 0;
+
 	// Everything in Linux at this level is PGSIZE.
 	memset(bp, 0, PGSIZE);
 

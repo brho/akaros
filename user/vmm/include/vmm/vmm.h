@@ -124,9 +124,7 @@ static struct virtual_machine *get_my_vm(void)
 }
 
 /* memory helpers */
-void *init_e820map(struct boot_params *bp,
-                   unsigned long long memstart,
-                   unsigned long long memsize);
+void *init_e820map(struct virtual_machine *vm, struct boot_params *bp);
 void checkmemaligned(uintptr_t memstart, size_t memsize);
 void mmap_memory(struct virtual_machine *vm, uintptr_t memstart,
                  size_t memsize);

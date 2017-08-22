@@ -565,7 +565,7 @@ int main(int argc, char **argv)
 	a = setup_biostables(vm, a, smbiostable);
 
 	bp = a;
-	a = init_e820map(bp, memstart, memsize);
+	a = init_e820map(vm, bp);
 
 	if (initrd) {
 		initrd_start = ROUNDUP(kernel_max_address, PGSIZE);
