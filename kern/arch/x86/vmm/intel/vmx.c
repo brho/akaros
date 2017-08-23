@@ -606,7 +606,6 @@ static struct vmxec vmexit = {
 				VM_EXIT_HOST_ADDR_SPACE_SIZE),	/* 64 bit */
 
 	.must_be_0 = (VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL |
-				// VM_EXIT_ACK_INTR_ON_EXIT |
 				 VM_EXIT_SAVE_IA32_PAT |
 				 VM_EXIT_LOAD_IA32_PAT |
 				VM_EXIT_SAVE_VMX_PREEMPTION_TIMER),
@@ -1433,4 +1432,40 @@ void vmx_unload_guest_pcore(struct guest_pcore *gpc)
 uint64_t gpc_get_eptp(struct guest_pcore *gpc)
 {
 	return gpc->proc->env_pgdir.eptp;
+}
+
+int vmx_ctl_get_exits(struct vmx_vmm *vmx)
+{
+	int ret = 0;
+
+	if (vmx->cpu_exec_ctls & CPU_BASED_HLT_EXITING)
+		ret |= VMM_CTL_EXIT_HALT;
+	if (vmx->cpu_exec_ctls & CPU_BASED_PAUSE_EXITING)
+		ret |= VMM_CTL_EXIT_PAUSE;
+	return ret;
+}
+
+int vmx_ctl_set_exits(struct vmx_vmm *vmx, int vmm_exits)
+{
+	int toggle_want;
+	int vmx_toggle_do = 0;
+
+	toggle_want = (vmx_ctl_get_exits(vmx) ^ vmm_exits) & VMM_CTL_ALL_EXITS;
+	if (toggle_want & VMM_CTL_EXIT_HALT) {
+	    if (!vmx_control_can_be_changed(&cbec, CPU_BASED_HLT_EXITING)) {
+			set_error(ENOSYS, "VMX can't toggle EXIT_HALT");
+			return -1;
+		}
+		vmx_toggle_do |= CPU_BASED_HLT_EXITING;
+	}
+	if (toggle_want & VMM_CTL_EXIT_PAUSE) {
+	    if (!vmx_control_can_be_changed(&cbec, CPU_BASED_PAUSE_EXITING)) {
+			set_error(ENOSYS, "VMX can't toggle EXIT_PAUSE");
+			return -1;
+		}
+		vmx_toggle_do |= CPU_BASED_PAUSE_EXITING;
+	}
+	/* This is being read concurrently by load_guest_pcore. */
+	WRITE_ONCE(vmx->cpu_exec_ctls, vmx->cpu_exec_ctls ^ vmx_toggle_do);
+	return 0;
 }

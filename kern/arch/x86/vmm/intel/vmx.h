@@ -403,3 +403,5 @@ void vmx_unload_guest_pcore(struct guest_pcore *gpc);
 uint64_t gpc_get_eptp(struct guest_pcore *gpc);
 void vmx_clear_vmcs(void);
 void vmx_setup_vmx_vmm(struct vmx_vmm *vmx);
+int vmx_ctl_get_exits(struct vmx_vmm *vmx);
+int vmx_ctl_set_exits(struct vmx_vmm *vmx, int vmm_exits);

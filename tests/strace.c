@@ -222,6 +222,7 @@ static struct trace_set sched_trace_set = { "sched",
 static struct trace_set vmm_trace_set = { "vmm",
 	{SYS_vmm_setup,
 	 SYS_vmm_poke_guest,
+	 SYS_vmm_ctl,
 	 SYS_pop_ctx,
 	 0}
 };

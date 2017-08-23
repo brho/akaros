@@ -592,6 +592,8 @@ int vmm_init(struct virtual_machine *vm, int flags)
 		greedy_rnbl_guests = calloc(vm->nr_gpcs, sizeof(struct vmm_thread *));
 		assert(greedy_rnbl_guests);
 		vcore_request_total(sched_nr_greedy_cores());
+		syscall(SYS_vmm_ctl, VMM_CTL_SET_EXITS,
+		        syscall(SYS_vmm_ctl, VMM_CTL_GET_EXITS) & ~VMM_CTL_EXIT_HALT);
 	}
 	return 0;
 }
