@@ -1053,8 +1053,10 @@ refault:
 			goto out;
 		}
 	} else {
-		if (!file_ok)
-			return -EACCES;
+		if (!file_ok) {
+			ret = -EACCES;
+			goto out;
+		}
 		/* If this fails, either something got screwed up with the VMR, or the
 		 * permissions changed after mmap/mprotect.  Either way, I want to know
 		 * (though it's not critical). */
