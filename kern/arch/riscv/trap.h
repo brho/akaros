@@ -20,6 +20,7 @@
 #warning "make sure this poke vector is okay"
 /* this is for an ipi that just wakes a core, but has no handler (for now) */
 #define I_POKE_CORE 254
+#define I_POKE_GUEST 253
 
 static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {

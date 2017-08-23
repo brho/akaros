@@ -916,7 +916,7 @@ static void vmx_setup_initial_guest_state(struct proc *p,
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);	/* 22.2.1 */
 
 	/* Initialize posted interrupt notification vector */
-	vmcs_write16(POSTED_NOTIFICATION_VEC, I_POKE_CORE);
+	vmcs_write16(POSTED_NOTIFICATION_VEC, I_POKE_GUEST);
 
 	/* Clear the EOI exit bitmap */
 	vmcs_writel(EOI_EXIT_BITMAP0, 0);

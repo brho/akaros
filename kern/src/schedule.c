@@ -249,10 +249,6 @@ void __sched_scp_wakeup(struct proc *p)
 	if (!management_core()) {
 		/* TODO: pick a better core and only send if halted.
 		 *
-		 * FYI, a POKE on x86 might lose a rare race with halt code, since the
-		 * poke handler does not abort halts.  if this happens, the next timer
-		 * IRQ would wake up the core.
-		 *
 		 * ideally, we'd know if a specific mgmt core is sleeping and wake it
 		 * up.  o/w, we could interrupt an already-running mgmt core that won't
 		 * get to our new proc anytime soon.  also, by poking core 0, a

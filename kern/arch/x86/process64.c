@@ -134,7 +134,7 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	 * notification' bit should still be set, and we can resend the IPI.  This
 	 * will arrive after we vmenter, since IRQs are currently disabled. */
 	if (test_bit(VMX_POSTED_OUTSTANDING_NOTIF, gpc->posted_irq_desc))
-		send_self_ipi(I_POKE_CORE);
+		send_self_ipi(I_POKE_GUEST);
 	/* The first time a VMCS is started after being loaded, it must be launched.
 	 * Subsequent starts must be resumes.  Once the VMCS is cleared, we start
 	 * with a launch again.  Note this is the VMCS, not the GPC unload. */

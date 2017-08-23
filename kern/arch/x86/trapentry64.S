@@ -86,7 +86,7 @@
 	.quad name;							\
 	.long num
 
-/* Only used in the kernel during SMP boot.  Send a LAPIC_EOI and iret. */
+/* Bare minimum IRQ handler: send a LAPIC_EOI and immediately iret. */
 #define POKE_HANDLER(name, num)			\
 	.text;								\
 	.globl name;						\
@@ -354,8 +354,8 @@ IRQ_HANDLER(IRQ200, 232)
 IRQ_HANDLER(IRQ201, 233)
 IRQ_HANDLER(IRQ202, 234)
 IRQ_HANDLER(IRQ203, 235)
-IRQ_HANDLER(IRQ204, 236)
-IRQ_HANDLER(IRQ205, I_TESTING)
+IRQ_HANDLER(IRQ204, I_TESTING)
+POKE_HANDLER(IRQ205, I_POKE_GUEST)
 POKE_HANDLER(IRQ206, I_POKE_CORE)
 IRQ_HANDLER(IRQ207, I_KERNEL_MSG)
 /* 240-255 are LAPIC vectors (0xf0-0xff), hightest priority class */

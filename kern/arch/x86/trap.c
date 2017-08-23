@@ -985,10 +985,17 @@ bool handle_vmexit_msr(struct vm_trapframe *tf)
 bool handle_vmexit_extirq(struct vm_trapframe *tf)
 {
 	struct hw_trapframe hw_tf;
+	uint32_t trap_nr;
 
 	/* For now, we just handle external IRQs.  I think guest traps should go to
 	 * the guest, based on our vmctls */
 	assert((tf->tf_intrinfo2 & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_EXT_INTR);
+	/* The POKE_HANDLER doesn't run for an ExtINT that triggers a vmexit */
+	trap_nr = tf->tf_intrinfo2 & INTR_INFO_VECTOR_MASK;
+	if (trap_nr == I_POKE_CORE) {
+		lapic_send_eoi(trap_nr);
+		return TRUE;
+	}
 	/* TODO: Our IRQ handlers all expect TFs.  Let's fake one.  A bunch of
 	 * handlers (e.g. backtrace/perf) will probably be unhappy about a user TF
 	 * that is really a VM, so this all needs work. */
@@ -1009,7 +1016,7 @@ bool handle_vmexit_extirq(struct vm_trapframe *tf)
 	hw_tf.tf_r13 = tf->tf_r13;
 	hw_tf.tf_r14 = tf->tf_r14;
 	hw_tf.tf_r15 = tf->tf_r15;
-	hw_tf.tf_trapno = tf->tf_intrinfo2 & INTR_INFO_VECTOR_MASK;
+	hw_tf.tf_trapno = trap_nr;
 	hw_tf.tf_err = 0;
 	hw_tf.tf_rip = tf->tf_rip;
 	hw_tf.tf_cs = GD_UT;	/* faking a user TF, even though it's a VM */

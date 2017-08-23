@@ -148,7 +148,7 @@ int vmm_poke_guest(struct proc *p, int guest_pcoreid)
 		 * mess up; we tried." */
 		return 0;
 	}
-	send_ipi(pcoreid, I_POKE_CORE);
+	send_ipi(pcoreid, I_POKE_GUEST);
 	return 0;
 }
 
