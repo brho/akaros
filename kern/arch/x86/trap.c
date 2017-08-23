@@ -1130,6 +1130,7 @@ void handle_vmexit(struct vm_trapframe *tf)
 	tf->tf_guest_pa = vmcs_read(GUEST_PHYSICAL_ADDRESS);
 
 	set_current_ctx_vm(pcpui, tf);
+	__set_cpu_state(pcpui, CPU_STATE_KERNEL);
 	tf = &pcpui->cur_ctx->tf.vm_tf;
 	vmexit_dispatch(tf);
 	/* We're either restarting a partial VM ctx (vmcs was launched, loaded on
