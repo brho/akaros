@@ -120,9 +120,11 @@ static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
 	(type*)((char*)ptr - offsetof(type, member));                             \
 })
 
-/* Force the reading exactly once of x.  You may still need mbs().  See
+/* Force the reading/writing exactly once of x.  You may still need mbs().  See
  * http://lwn.net/Articles/508991/ for more info. */
 #define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
+#define READ_ONCE(x) ACCESS_ONCE(x)
+#define WRITE_ONCE(x, val) ((*(volatile typeof(x) *)&(x)) = val)
 
 /* Makes sure func is run exactly once.  Can handle concurrent callers, and
  * other callers spin til the func is complete. */

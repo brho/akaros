@@ -30,9 +30,6 @@
 
 /* TODO: eventually we'll support some form of RCU and concurrent rb-tree
  * usage.  When we do that, we'll need to grab these functions from Linux. */
-#ifndef WRITE_ONCE
-#define WRITE_ONCE(d, s) (d) = (s)
-#endif
 #ifndef rcu_assign_pointer
 #define rcu_assign_pointer(d, s) (d) = (s)
 #endif
