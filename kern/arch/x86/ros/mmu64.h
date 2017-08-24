@@ -111,7 +111,7 @@ typedef struct x86_pgdir {
  *                     |                              |
  *                     .                              .
  *                     .                              .
- *    BRK_END   ---->  +------------------------------+ 0x0000400000000000
+ *    BRK_END   ---->  +------------------------------+ 0x0000300000000000
  *                     .                              .
  *                     .                              .
  *                     |                              |
@@ -202,7 +202,7 @@ typedef struct x86_pgdir {
 #define UVPT			(ULIM - PML4_PTE_REACH)
 /* Arbitrary boundary between the break and the start of
  * memory returned by calls to mmap with addr = 0 */
-#define BRK_END			0x0000400000000000
+#define BRK_END			0x0000300000000000
 /* Arbitrary boundary where the break (glibc's heap) starts.  You can safely
  * mmap with MAP_FIXED below this address. */
 #define BRK_START		0x0000100000000000
