@@ -827,18 +827,14 @@ static void vmx_setup_initial_guest_state(struct proc *p,
 		X86_CR4_PGE | X86_CR4_OSFXSR;
 	uint32_t protected_mode = X86_CR0_PG | X86_CR0_PE;
 
-#if 0
-	do
-		we need it if (boot_cpu_has(X86_FEATURE_PCID))
-			cr4 |= X86_CR4_PCIDE;
-	if (boot_cpu_has(X86_FEATURE_OSXSAVE))
-		cr4 |= X86_CR4_OSXSAVE;
-#endif
-	/* we almost certainly have this */
-	/* we'll go sour if we don't. */
-	if (1)	//boot_cpu_has(X86_FEATURE_FSGSBASE))
-		cr4 |= X86_CR4_RDWRGSFS;
-
+	/*
+	 * Allow guest to use xsave and read/write fs/gs base.
+	 * We require these features to be present on the cpu.
+	 */
+	assert(cpu_has_feat(CPU_FEAT_X86_XSAVE));
+	assert(cpu_has_feat(CPU_FEAT_X86_FSGSBASE));
+	cr4 |= X86_CR4_RDWRGSFS;
+	cr4 |= X86_CR4_OSXSAVE;
 	/* configure control and data registers */
 	vmcs_writel(GUEST_CR0, protected_mode | X86_CR0_WP |
 				X86_CR0_MP | X86_CR0_ET | X86_CR0_NE);
@@ -852,7 +848,7 @@ static void vmx_setup_initial_guest_state(struct proc *p,
 	 * CR4_GUEST_HOST_MASK? */
 	vmcs_writel(CR4_READ_SHADOW, 0);
 	vmcs_writel(GUEST_IA32_EFER, EFER_LME | EFER_LMA |
-				EFER_SCE /*| EFER_FFXSR */ );
+				EFER_SCE | EFER_NX /*| EFER_FFXSR */ );
 	vmcs_writel(GUEST_GDTR_BASE, 0);
 	vmcs_writel(GUEST_GDTR_LIMIT, 0);
 	vmcs_writel(GUEST_IDTR_BASE, 0);
