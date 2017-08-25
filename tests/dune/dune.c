@@ -29,6 +29,7 @@
 #include <sys/uio.h>
 #include <err.h>
 #include <vmm/linuxemu.h>
+
 struct vmm_gpcore_init gpci;
 bool linuxemu(struct guest_thread *gth, struct vm_trapframe *tf);
 
@@ -44,7 +45,7 @@ static struct virtual_machine vm = {.halt_exit = true,};
 static unsigned long long memsize = GiB;
 static uintptr_t memstart = MinMemory;
 
-static int debug;
+static int dune_debug;
 
 static void hlt(void)
 {
@@ -163,7 +164,7 @@ void *populate_stack(uintptr_t *stack, int argc, char *argv[],
 			return 0;
 		for (int i = 0; i < argc; i++) {
 			memcpy(new_argbuf + offset, argv[i], arg_lens[i]);
-			if (debug) {
+			if (dune_debug) {
 				fprintf(stderr, "data: memcpy(%p, %p, %ld)\n",
 				        new_argbuf + offset, argv[i], arg_lens[i]);
 				fprintf(stderr, "arg: set arg %d, @%p, to %p\n", i,
@@ -185,7 +186,7 @@ void *populate_stack(uintptr_t *stack, int argc, char *argv[],
 	bufsize += (auxc + 1) * sizeof(struct elf_aux);
 	bufsize += (envc + 1) * sizeof(char**);
 	bufsize += (argc + 1) * sizeof(char**);
-	if (debug)
+	if (dune_debug)
 		fprintf(stderr, "Bufsize for pointers and argc is %d\n", bufsize);
 
 	/* Add in the size of the env and arg strings. */
@@ -194,13 +195,13 @@ void *populate_stack(uintptr_t *stack, int argc, char *argv[],
 
 	bufsize += get_lens(argc, argv, arg_lens);
 	bufsize += get_lens(envc, envp, env_lens);
-	if (debug)
+	if (dune_debug)
 		fprintf(stderr, "Bufsize for pointers, argc, and strings is %d\n",
 		        bufsize);
 
 	/* Adjust bufsize so that our buffer will ultimately be 16 byte aligned. */
 	bufsize = (bufsize + 15) & ~0xf;
-	if (debug)
+	if (dune_debug)
 		fprintf(stderr,
 		        "Bufsize for pointers, argc, and strings is rounded is %d\n",
 		        bufsize);
@@ -212,7 +213,7 @@ void *populate_stack(uintptr_t *stack, int argc, char *argv[],
 	struct elf_aux *new_auxv = (struct elf_aux*)(new_envp + envc + 1);
 	char *new_argbuf = (char*)(new_auxv + auxc + 1);
 
-	if (debug) {
+	if (dune_debug) {
 		fprintf(stderr, "There are %d args, %d env, and %d aux\n", new_argc,
 		        envc, auxc);
 		fprintf(stderr, "Locations: argc: %p, argv: %p, envp: %p, auxv: %p\n",
@@ -229,7 +230,7 @@ void *populate_stack(uintptr_t *stack, int argc, char *argv[],
 	offset = remap(argc, argv, new_argv, new_argbuf, arg_lens);
 	if (offset == -1)
 		return 0;
-	if (debug) {
+	if (dune_debug) {
 		fprintf(stderr, "Locations: argbuf: %p, envbuf: %p, ", new_argbuf,
 			new_argbuf + offset);
 
@@ -243,7 +244,7 @@ void *populate_stack(uintptr_t *stack, int argc, char *argv[],
 
 	memcpy(new_auxv, auxv, auxc * sizeof(struct elf_aux));
 	memcpy(new_auxv + auxc, &null_aux, sizeof(struct elf_aux));
-	if (debug) {
+	if (dune_debug) {
 		fprintf(stderr, "auxbuf: %p\n", new_auxv);
 		hexdump(stdout, new_auxv, auxc * sizeof(struct elf_aux));
 	}
@@ -293,7 +294,7 @@ getextra(int *auxc, char *_s)
 	char *auxpairs[32];
 
 	*auxc = gettokens(s, auxpairs, 32, ",");
-	if (debug)
+	if (dune_debug)
 		fprintf(stderr, "Found %d extra aux pairs\n", *auxc);
 	if (*auxc < 1)
 		return NULL;
@@ -316,7 +317,7 @@ getextra(int *auxc, char *_s)
 		v = strtoul(aux[1], 0, 0);
 		auxv[i].v[0] = t;
 		auxv[i].v[1] = v;
-		if (debug)
+		if (dune_debug)
 			fprintf(stderr, "Adding aux pair 0x%x:0x%x\n", auxv[i].v[0],
 			        auxv[i].v[1]);
 	}
@@ -334,7 +335,7 @@ buildaux(struct elf_aux *base, int basec, struct elf_aux *extra, int extrac)
 	if (!ret)
 		return NULL;
 
-	if (debug)
+	if (dune_debug)
 		fprintf(stderr, "buildaux: consolidating %d aux and %d extra\n",
 			basec, extrac);
 	/* TOOD: check for dups. */
@@ -372,12 +373,12 @@ int main(int argc, char **argv)
 		switch (c) {
 		case 'a':
 			extra = getextra(&extrac, optarg);
-			if (debug)
+			if (dune_debug)
 				fprintf(stderr, "Added %d aux items\n", extrac);
 			break;
 		case 'd':
 			fprintf(stderr, "SET DEBUG\n");
-			debug++;
+			dune_debug++;
 			break;
 		case 'v':
 			vmmflags = strtoull(optarg, 0, 0);
@@ -409,6 +410,7 @@ int main(int argc, char **argv)
 		usage();
 	}
 
+	init_lemu_logging(dune_debug);
 	init_syscall_table();
 
 	if ((uintptr_t)(memstart + memsize) >= (uintptr_t)BRK_START) {
@@ -420,7 +422,7 @@ int main(int argc, char **argv)
 
 	mmap_memory(&vm, memstart, memsize);
 
-	if (debug)
+	if (dune_debug)
 		fprintf(stderr, "mmap guest physical memory at %p for 0x%lx bytes\n",
 			memstart, memsize);
 
@@ -449,10 +451,10 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Running dune test\n");
 		entry = (uintptr_t) dune_test;
 	}
-	if (debug)
+	if (dune_debug)
 		fprintf(stderr, "Test: Populate stack at %p\n", tos);
 	tos = populate_stack(tos, ac, av, envc, environ, auxc, auxv);
-	if (debug)
+	if (dune_debug)
 		fprintf(stderr, "populated stack at %p; argc %d, envc %d, auxc %d\n",
 		        tos, ac, envc, auxc);
 
@@ -468,7 +470,7 @@ int main(int argc, char **argv)
 	/* we can't use the default stack since we set one up
 	 * ourselves. */
 	vm_tf->tf_rsp = (uint64_t)tos;
-	if (debug)
+	if (dune_debug)
 		fprintf(stderr, "stack is %p\n", tos);
 
 	vthread_create(&vm, 0, (void *)entry, tos);

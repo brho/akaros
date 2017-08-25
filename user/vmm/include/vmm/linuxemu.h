@@ -12,5 +12,8 @@ struct dune_sys_table_entry {
 struct dune_sys_table_entry dune_syscall_table[dune_max_syscall];
 
 void init_syscall_table(void);
+void init_lemu_logging(int logging_level);
+void destroy_lemu_logging(void);
+
 bool dune_sys_write(struct vm_trapframe *tf);
 bool dune_sys_read(struct vm_trapframe *tf);
