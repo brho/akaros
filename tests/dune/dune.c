@@ -128,6 +128,9 @@ void dune_test(void *stack)
 		xnum(auxv[i].v[1]); show("\n");
 	}
 	show("Done dumping [argv, env, auxv]\n");
+	show("Testing syscall extensions\n");
+	__asm__ __volatile__("movq $400, %%rax\n"
+	                     "vmcall\n" :: );
 	hlt();
 }
 

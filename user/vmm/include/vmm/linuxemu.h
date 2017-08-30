@@ -7,13 +7,15 @@ struct dune_sys_table_entry {
 	const char *name;
 };
 
-#define dune_max_syscall 1024
+#define DUNE_MAX_NUM_SYSCALLS 1024
 
-struct dune_sys_table_entry dune_syscall_table[dune_max_syscall];
+extern struct dune_sys_table_entry dune_syscall_table[];
 
-void init_syscall_table(void);
+bool init_syscall_table(void);
 void init_lemu_logging(int logging_level);
 void destroy_lemu_logging(void);
+void lemuprint(const uint32_t tid, uint64_t syscall_number,
+               const bool isError, const char *fmt, ...);
 
 bool dune_sys_write(struct vm_trapframe *tf);
 bool dune_sys_read(struct vm_trapframe *tf);
