@@ -33,7 +33,7 @@ struct vcore_tick {
 
 static struct vcore_tick *__vc_ticks;
 
-static void __attribute__((constructor)) vcore_tick_lib_init(void)
+static void __attribute__((constructor)) vcore_tick_lib_ctor(void)
 {
 	if (__in_fake_parlib())
 		return;

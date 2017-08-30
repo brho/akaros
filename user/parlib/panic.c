@@ -5,7 +5,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-static void __attribute__((constructor)) parlib_stdio_init(void)
+static void __attribute__((constructor)) parlib_stdio_ctor(void)
 {
 	if (__in_fake_parlib())
 		return;

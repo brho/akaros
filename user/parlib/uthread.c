@@ -159,13 +159,13 @@ static char *__ros_errstr_loc(void)
 		return current_uthread->err_str;
 }
 
-static void __attribute__((constructor)) uthread_lib_init(void)
+static void __attribute__((constructor)) uthread_lib_ctor(void)
 {
 	/* Surprise!  Parlib's ctors also run in shared objects.  We can't have
 	 * multiple versions of parlib (with multiple data structures). */
 	if (__in_fake_parlib())
 		return;
-	/* Need to make sure the vcore_lib_init() ctor runs first */
+	/* Need to make sure vcore_lib_init() runs first */
 	vcore_lib_init();
 	/* Instead of relying on ctors for the specific 2LS, we make sure they are
 	 * called next.  They will call uthread_2ls_init().

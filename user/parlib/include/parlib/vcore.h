@@ -40,8 +40,9 @@ static inline void set_vcpd_tls_desc(uint32_t vcoreid, void *tls_desc);
 static inline uint64_t vcore_account_resume_nsec(uint32_t vcoreid);
 static inline uint64_t vcore_account_total_nsec(uint32_t vcoreid);
 static inline void cpu_relax_any(void);
+static inline bool __in_fake_parlib(void);
+
 void vcore_lib_init(void);
-bool __in_fake_parlib(void);
 void vcore_change_to_m(void);
 void vcore_request_more(long nr_new_vcores);
 void vcore_request_total(long nr_vcores_wanted);
@@ -191,6 +192,23 @@ static inline uint64_t vcore_account_uptime_nsec(uint32_t vcoreid)
 static inline void cpu_relax_any(void)
 {
 	return cpu_relax_vc(vcore_id());
+}
+
+/* Shared libraries also contain parlib.  That'll be true until we start making
+ * parlib a .so, which has some TLS implications (and maybe others).  The real
+ * parlib is the one in the program binary, not the shared libraries.  This
+ * detection works because all shared libs, both the -l and the dlopens, are
+ * mapped above the BRK.
+ *
+ * Previously, we tried using weak symbols, specifically _start or _end, but be
+ * careful.  If you pass e.g. _start or _end to a function or inline asm, the
+ * program binary will do something slightly different, which may make the
+ * shared library load different values. */
+static inline bool __in_fake_parlib(void)
+{
+	static char dummy;
+
+	return (uintptr_t)&dummy > BRK_START;
 }
 
 #ifndef __PIC__

@@ -37,28 +37,6 @@ void __attribute__((noreturn)) __vcore_entry(void)
 }
 void vcore_entry(void) __attribute__((weak, alias ("__vcore_entry")));
 
-static void __fake_start(void)
-{
-}
-void _start(void) __attribute__((weak, alias ("__fake_start")));
-
-/* Shared libraries also contain parlib.  That'll be true until we start making
- * parlib a .so, which has some TLS implications (and maybe others).  The real
- * parlib is the one in the program binary, not the shared libraries.  This
- * detection works because all shared libs, both the -l and the dlopens, are
- * mapped above the BRK.
- *
- * Previously, we tried using weak symbols, specifically _start or _end, but be
- * careful.  If you pass e.g. _start or _end to a function or inline asm, the
- * program binary will do something slightly different, which may make the
- * shared library load different values. */
-bool __in_fake_parlib(void)
-{
-	static char dummy;
-
-	return (uintptr_t)&dummy > BRK_START;
-}
-
 /* TODO: probably don't want to dealloc.  Considering caching */
 static void free_transition_tls(int id)
 {
@@ -192,10 +170,14 @@ static void vcore_libc_init(void)
 	 * program. */
 }
 
-void __attribute__((constructor)) vcore_lib_init(void)
+/* We need to separate the guts of vcore_lib_ctor() into a separate function,
+ * since the uthread ctor depends on this ctor running first.
+ *
+ * Also note that if you make a global ctor (not static, like this used to be),
+ * any shared objects that you load when the binary is built with -rdynamic will
+ * run the global ctor from the binary, not the one from the .so. */
+void vcore_lib_init(void)
 {
-	if (__in_fake_parlib())
-		return;
 	/* Note this is racy, but okay.  The first time through, we are _S.
 	 * Also, this is the "lowest" level constructor for now, so we don't need
 	 * to call any other init functions after our run_once() call. This may
@@ -207,6 +189,13 @@ void __attribute__((constructor)) vcore_lib_init(void)
 	prep_vcore_0();
 	assert(!in_vcore_context());
 	vcore_libc_init();
+}
+
+static void __attribute__((constructor)) vcore_lib_ctor(void)
+{
+	if (__in_fake_parlib())
+		return;
+	vcore_lib_init();
 }
 
 /* Helper functions used to reenter at the top of a vcore's stack for an

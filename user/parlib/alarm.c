@@ -147,7 +147,7 @@ static void devalarm_forked(void)
 	global_tchain.timerfd = -42;
 }
 
-static void __attribute__((constructor)) init_alarm_service(void)
+static void __attribute__((constructor)) alarm_service_ctor(void)
 {
 	int ctlfd, timerfd, alarmid;
 	struct event_queue *ev_q;
