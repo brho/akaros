@@ -13,7 +13,8 @@
  * with you if it is not. The reference parameter records the highest
  * address we wrote. The initrd can go there.*/
 uintptr_t
-load_elf(char *filename, uint64_t offset, uint64_t *highest)
+load_elf(char *filename, uint64_t offset, uint64_t *highest,
+         Elf64_Ehdr *ehdr_out)
 {
 	Elf64_Ehdr *ehdr;
 	Elf *elf;
@@ -106,6 +107,11 @@ load_elf(char *filename, uint64_t offset, uint64_t *highest)
 
 	close(fd);
 	ret = ehdr->e_entry + offset;
+
+	// Save the values in the header, if the caller wanted them
+	if (ehdr_out)
+		*ehdr_out = *ehdr;
+
 	elf_end(elf);
 	if (highest)
 		*highest = kern_end;

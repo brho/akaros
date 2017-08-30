@@ -442,7 +442,7 @@ int main(int argc, char **argv)
 	auxc = auxc + extrac;
 
 	if (!test) {
-		entry = load_elf(argv[0], MinMemory, NULL);
+		entry = load_elf(argv[0], MinMemory, NULL, NULL);
 		if (entry == 0) {
 			fprintf(stderr, "Unable to load kernel %s\n", argv[0]);
 			exit(1);

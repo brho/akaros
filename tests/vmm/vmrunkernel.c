@@ -556,7 +556,7 @@ int main(int argc, char **argv)
 
 	mmap_memory(vm, memstart, memsize);
 
-	entry = load_elf(argv[0], 0, &kernel_max_address);
+	entry = load_elf(argv[0], 0, &kernel_max_address, NULL);
 	if (entry == 0) {
 		fprintf(stderr, "Unable to load kernel %s\n", argv[0]);
 		exit(1);

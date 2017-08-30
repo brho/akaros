@@ -10,6 +10,7 @@
 #include <vmm/sched.h>
 #include <vmm/linux_bootparam.h>
 #include <parlib/stdio.h>
+#include <libelf.h>
 
 // We need to reserve an area of the low 4G for thinks like tables, APIC, and
 // so on. So far, 256 MiB has been more than enough, so ...
@@ -95,7 +96,8 @@ int __apic_access(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
                   uint64_t *regp, int store);
 int vmm_interrupt_guest(struct virtual_machine *vm, unsigned int gpcoreid,
                         unsigned int vector);
-uintptr_t load_elf(char *filename, uint64_t offset, uint64_t *highest);
+uintptr_t load_elf(char *filename, uint64_t offset, uint64_t *highest,
+                   Elf64_Ehdr *ehdr_out);
 ssize_t setup_initrd(char *filename, void *membase, size_t memsize);
 /* Lookup helpers */
 
