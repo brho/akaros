@@ -16,10 +16,13 @@
 #include <sys/time.h>
 #include <vmm/linuxemu.h>
 #include <dlfcn.h>
-
+#include <sys/mman.h>
+#include <futex.h>
 
 static int lemu_debug;
+
 static uth_mutex_t *lemu_logging_lock;
+
 static FILE *lemu_global_logfile;
 
 void init_lemu_logging(int log_level)
@@ -46,7 +49,70 @@ void destroy_lemu_logging(void)
 }
 
 
+/////////////////////////////////////
+// BEGIN DUNE SYSCALL IMPLEMENTATIONS
+/////////////////////////////////////
 
+//////////////////////////////////////////////////////
+// Ported Syscalls (we just call the akaros version)
+//////////////////////////////////////////////////////
+
+bool dune_sys_ftruncate(struct vm_trapframe *tf)
+{
+	int retval = ftruncate((int) tf->tf_rdi, (off_t) tf->tf_rsi);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
+
+}
+
+bool dune_sys_fcntl(struct vm_trapframe *tf)
+{
+	int retval = fcntl((int) tf->tf_rdi, (int) tf->tf_rsi, (int) tf->tf_rdx);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
+}
+
+bool dune_sys_pread64(struct vm_trapframe *tf)
+{
+	int fd = (int) tf->tf_rdi;
+	void *buf = (void*) tf->tf_rsi;
+	size_t count = tf->tf_rdx;
+	off_t offset = (off_t) tf->tf_r10;
+
+	ssize_t retval = pread(fd, buf, count, offset);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %zd\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %zd\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
+}
 
 bool dune_sys_read(struct vm_trapframe *tf)
 {
@@ -65,6 +131,27 @@ bool dune_sys_read(struct vm_trapframe *tf)
 	return true;
 }
 
+bool dune_sys_pwrite64(struct vm_trapframe *tf)
+{
+	int fd = (int) tf->tf_rdi;
+	const void *buf = (const void*) tf->tf_rsi;
+	size_t length = (size_t) tf->tf_rdx;
+	off_t offset = (off_t) tf->tf_r10;
+
+	ssize_t retval = pwrite(fd, buf, length, offset);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %zd\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %zd\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
+}
 
 bool dune_sys_write(struct vm_trapframe *tf)
 {
@@ -84,9 +171,13 @@ bool dune_sys_write(struct vm_trapframe *tf)
 	return true;
 }
 
-bool dune_sys_gettid(struct vm_trapframe *tf)
+bool dune_sys_getpid(struct vm_trapframe *tf)
 {
-	tf->tf_rax = tf->tf_guest_pcoreid;
+	// Getpid always suceeds
+	int retval = getpid();
+
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false, "SUCCESS %d\n", retval);
+	tf->tf_rax = retval;
 	return true;
 }
 
@@ -108,49 +199,330 @@ bool dune_sys_gettimeofday(struct vm_trapframe *tf)
 	return true;
 }
 
+bool dune_sys_dup(struct vm_trapframe *tf)
+{
+	int retval = dup((int) tf->tf_rdi);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
+}
+
+bool dune_sys_dup2(struct vm_trapframe *tf)
+{
+	int retval = dup2((int) tf->tf_rdi, (int)tf->tf_rsi);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
+}
+
+bool dune_sys_umask(struct vm_trapframe *tf)
+{
+	//Umask always succeeds
+	int retval = umask((mode_t) tf->tf_rdi);
+
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false, "SUCCESS %d\n", retval);
+	tf->tf_rax = retval;
+	return true;
+}
+
+bool dune_sys_clock_gettime(struct vm_trapframe *tf)
+{
+	int retval = clock_gettime(tf->tf_rdi, (struct timespec*) tf->tf_rsi);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
+}
+
+bool dune_sys_munmap(struct vm_trapframe *tf)
+{
+	int retval = munmap((void *) tf->tf_rdi, tf->tf_rsi);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
+}
+
+bool dune_sys_futex(struct vm_trapframe *tf)
+{
+	int *uaddr = (int*) tf->tf_rdi;
+	int op = (int) tf->tf_rsi;
+	int val = (int) tf->tf_rdx;
+	struct timespec *timeout = (struct timespec *) tf->tf_r10;
+	int *uaddr2 = (int*) tf->tf_r8;
+	int val3 = (int) tf->tf_r9;
+	int retval = futex(uaddr, op, val, timeout, uaddr2, val3);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
+}
+
+bool dune_sys_gettid(struct vm_trapframe *tf)
+{
+	// Gettid always succeeds
+	int retval = tf->tf_guest_pcoreid;
+
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false, "SUCCESS %d\n", retval);
+	tf->tf_rax = retval;
+	return true;
+}
+
+/////////////////////////////////////////////////////////
+// Modified Syscalls (Partially implemented in Akaros)
+////////////////////////////////////////////////////////
+
+bool dune_sys_open(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_openat(struct vm_trapframe *tf)
+{
+
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_readlinkat(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_unlinkat(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_close(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_sched_yield(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
 
 
+bool dune_sys_fstat(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_stat(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+///////////////////////////////////////////////////
+// Newly Implemented Syscalls
+///////////////////////////////////////////////////
+
+// Fallocate syscall
+bool dune_sys_fallocate(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_sched_getaffinity(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_pselect6(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_getrandom(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+/////////////////////////////////////////////////////////////////
+/// We don't have a good implementation for these syscalls,
+/// they will not work in all cases
+/////////////////////////////////////////////////////////////////
+
+bool dune_sys_getgroups(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+
+bool dune_sys_geteuid(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_getegid(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+
+bool dune_sys_getuid(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_getgid(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_mincore(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_rt_sigprocmask(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_sigaltstack(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_rt_sigaction(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_epoll_create1(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+bool dune_sys_epoll_wait(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+// Unimplemented
+bool dune_sys_epoll_ctl(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+// Unimplemented
+bool dune_sys_fstatfs(struct vm_trapframe *tf)
+{
+	// To Be Implemented
+	return false;
+}
+
+// Main syscall table
 struct dune_sys_table_entry dune_syscall_table[DUNE_MAX_NUM_SYSCALLS] = {
 	[DUNE_SYS_READ] = {dune_sys_read, "DUNE_SYS_READ"},
 	[DUNE_SYS_WRITE] = {dune_sys_write, "DUNE_SYS_WRITE"},
-	[DUNE_SYS_OPEN] = {NULL, "DUNE_SYS_OPEN"},
-	[DUNE_SYS_CLOSE] = {NULL, "DUNE_SYS_CLOSE"},
-	[DUNE_SYS_STAT] = {NULL, "DUNE_SYS_STAT"},
-	[DUNE_SYS_FSTAT] = {NULL, "DUNE_SYS_FSTAT"},
+	[DUNE_SYS_OPEN] = {dune_sys_open, "DUNE_SYS_OPEN"},
+	[DUNE_SYS_CLOSE] = {dune_sys_close, "DUNE_SYS_CLOSE"},
+	[DUNE_SYS_STAT] = {dune_sys_stat, "DUNE_SYS_STAT"},
+	[DUNE_SYS_FSTAT] = {dune_sys_fstat, "DUNE_SYS_FSTAT"},
 	[DUNE_SYS_LSTAT] = {NULL, "DUNE_SYS_LSTAT"},
 	[DUNE_SYS_POLL] = {NULL, "DUNE_SYS_POLL"},
 	[DUNE_SYS_LSEEK] = {NULL, "DUNE_SYS_LSEEK"},
 	[DUNE_SYS_MMAP] = {NULL, "DUNE_SYS_MMAP"},
 	[DUNE_SYS_MPROTECT] = {NULL, "DUNE_SYS_MPROTECT"},
-	[DUNE_SYS_MUNMAP] = {NULL, "DUNE_SYS_MUNMAP"},
+	[DUNE_SYS_MUNMAP] = {dune_sys_munmap, "DUNE_SYS_MUNMAP"},
 	[DUNE_SYS_BRK] = {NULL, "DUNE_SYS_BRK"},
-	[DUNE_SYS_RT_SIGACTION] = {NULL, "DUNE_SYS_RT_SIGACTION"},
-	[DUNE_SYS_RT_SIGPROCMASK] = {NULL, "DUNE_SYS_RT_SIGPROCMASK"},
+	[DUNE_SYS_RT_SIGACTION] = {dune_sys_rt_sigaction, "DUNE_SYS_RT_SIGACTION"},
+	[DUNE_SYS_RT_SIGPROCMASK] = {dune_sys_rt_sigprocmask,
+	                             "DUNE_SYS_RT_SIGPROCMASK"},
 	[DUNE_SYS_RT_SIGRETURN] = {NULL, "DUNE_SYS_RT_SIGRETURN"},
 	[DUNE_SYS_IOCTL] = {NULL, "DUNE_SYS_IOCTL"},
-	[DUNE_SYS_PREAD64] = {NULL, "DUNE_SYS_PREAD64"},
-	[DUNE_SYS_PWRITE64] = {NULL, "DUNE_SYS_PWRITE64"},
+	[DUNE_SYS_PREAD64] = {dune_sys_pread64, "DUNE_SYS_PREAD64"},
+	[DUNE_SYS_PWRITE64] = {dune_sys_pwrite64, "DUNE_SYS_PWRITE64"},
 	[DUNE_SYS_READV] = {NULL, "DUNE_SYS_READV"},
 	[DUNE_SYS_WRITEV] = {NULL, "DUNE_SYS_WRITEV"},
 	[DUNE_SYS_ACCESS] = {NULL, "DUNE_SYS_ACCESS"},
 	[DUNE_SYS_PIPE] = {NULL, "DUNE_SYS_PIPE"},
 	[DUNE_SYS_SELECT] = {NULL, "DUNE_SYS_SELECT"},
-	[DUNE_SYS_SCHED_YIELD] = {NULL, "DUNE_SYS_SCHED_YIELD"},
+	[DUNE_SYS_SCHED_YIELD] = {dune_sys_sched_yield, "DUNE_SYS_SCHED_YIELD"},
 	[DUNE_SYS_MREMAP] = {NULL, "DUNE_SYS_MREMAP"},
 	[DUNE_SYS_MSYNC] = {NULL, "DUNE_SYS_MSYNC"},
-	[DUNE_SYS_MINCORE] = {NULL, "DUNE_SYS_MINCORE"},
+	[DUNE_SYS_MINCORE] = {dune_sys_mincore, "DUNE_SYS_MINCORE"},
 	[DUNE_SYS_MADVISE] = {NULL, "DUNE_SYS_MADVISE"},
 	[DUNE_SYS_SHMGET] = {NULL, "DUNE_SYS_SHMGET"},
 	[DUNE_SYS_SHMAT] = {NULL, "DUNE_SYS_SHMAT"},
 	[DUNE_SYS_SHMCTL] = {NULL, "DUNE_SYS_SHMCTL"},
-	[DUNE_SYS_DUP] = {NULL, "DUNE_SYS_DUP"},
-	[DUNE_SYS_DUP2] = {NULL, "DUNE_SYS_DUP2"},
+	[DUNE_SYS_DUP] = {dune_sys_dup, "DUNE_SYS_DUP"},
+	[DUNE_SYS_DUP2] = {dune_sys_dup2, "DUNE_SYS_DUP2"},
 	[DUNE_SYS_PAUSE] = {NULL, "DUNE_SYS_PAUSE"},
 	[DUNE_SYS_NANOSLEEP] = {NULL, "DUNE_SYS_NANOSLEEP"},
 	[DUNE_SYS_GETITIMER] = {NULL, "DUNE_SYS_GETITIMER"},
 	[DUNE_SYS_ALARM] = {NULL, "DUNE_SYS_ALARM"},
 	[DUNE_SYS_SETITIMER] = {NULL, "DUNE_SYS_SETITIMER"},
-	[DUNE_SYS_GETPID] = {NULL, "DUNE_SYS_GETPID"},
+	[DUNE_SYS_GETPID] = {dune_sys_getpid, "DUNE_SYS_GETPID"},
 	[DUNE_SYS_SENDFILE] = {NULL, "DUNE_SYS_SENDFILE"},
 	[DUNE_SYS_SOCKET] = {NULL, "DUNE_SYS_SOCKET"},
 	[DUNE_SYS_CONNECT] = {NULL, "DUNE_SYS_CONNECT"},
@@ -183,12 +555,12 @@ struct dune_sys_table_entry dune_syscall_table[DUNE_MAX_NUM_SYSCALLS] = {
 	[DUNE_SYS_MSGSND] = {NULL, "DUNE_SYS_MSGSND"},
 	[DUNE_SYS_MSGRCV] = {NULL, "DUNE_SYS_MSGRCV"},
 	[DUNE_SYS_MSGCTL] = {NULL, "DUNE_SYS_MSGCTL"},
-	[DUNE_SYS_FCNTL] = {NULL, "DUNE_SYS_FCNTL"},
+	[DUNE_SYS_FCNTL] = {dune_sys_fcntl, "DUNE_SYS_FCNTL"},
 	[DUNE_SYS_FLOCK] = {NULL, "DUNE_SYS_FLOCK"},
 	[DUNE_SYS_FSYNC] = {NULL, "DUNE_SYS_FSYNC"},
 	[DUNE_SYS_FDATASYNC] = {NULL, "DUNE_SYS_FDATASYNC"},
 	[DUNE_SYS_TRUNCATE] = {NULL, "DUNE_SYS_TRUNCATE"},
-	[DUNE_SYS_FTRUNCATE] = {NULL, "DUNE_SYS_FTRUNCATE"},
+	[DUNE_SYS_FTRUNCATE] = {dune_sys_ftruncate, "DUNE_SYS_FTRUNCATE"},
 	[DUNE_SYS_GETDENTS] = {NULL, "DUNE_SYS_GETDENTS"},
 	[DUNE_SYS_GETCWD] = {NULL, "DUNE_SYS_GETCWD"},
 	[DUNE_SYS_CHDIR] = {NULL, "DUNE_SYS_CHDIR"},
@@ -206,27 +578,27 @@ struct dune_sys_table_entry dune_syscall_table[DUNE_MAX_NUM_SYSCALLS] = {
 	[DUNE_SYS_CHOWN] = {NULL, "DUNE_SYS_CHOWN"},
 	[DUNE_SYS_FCHOWN] = {NULL, "DUNE_SYS_FCHOWN"},
 	[DUNE_SYS_LCHOWN] = {NULL, "DUNE_SYS_LCHOWN"},
-	[DUNE_SYS_UMASK] = {NULL, "DUNE_SYS_UMASK"},
+	[DUNE_SYS_UMASK] = {dune_sys_umask, "DUNE_SYS_UMASK"},
 	[DUNE_SYS_GETTIMEOFDAY] = {dune_sys_gettimeofday, "DUNE_SYS_GETTIMEOFDAY"},
 	[DUNE_SYS_GETRLIMIT] = {NULL, "DUNE_SYS_GETRLIMIT"},
 	[DUNE_SYS_GETRUSAGE] = {NULL, "DUNE_SYS_GETRUSAGE"},
 	[DUNE_SYS_SYSINFO] = {NULL, "DUNE_SYS_SYSINFO"},
 	[DUNE_SYS_TIMES] = {NULL, "DUNE_SYS_TIMES"},
 	[DUNE_SYS_PTRACE] = {NULL, "DUNE_SYS_PTRACE"},
-	[DUNE_SYS_GETUID] = {NULL, "DUNE_SYS_GETUID"},
+	[DUNE_SYS_GETUID] = {dune_sys_getuid, "DUNE_SYS_GETUID"},
 	[DUNE_SYS_SYSLOG] = {NULL, "DUNE_SYS_SYSLOG"},
-	[DUNE_SYS_GETGID] = {NULL, "DUNE_SYS_GETGID"},
+	[DUNE_SYS_GETGID] = {dune_sys_getgid, "DUNE_SYS_GETGID"},
 	[DUNE_SYS_SETUID] = {NULL, "DUNE_SYS_SETUID"},
 	[DUNE_SYS_SETGID] = {NULL, "DUNE_SYS_SETGID"},
-	[DUNE_SYS_GETEUID] = {NULL, "DUNE_SYS_GETEUID"},
-	[DUNE_SYS_GETEGID] = {NULL, "DUNE_SYS_GETEGID"},
+	[DUNE_SYS_GETEUID] = {dune_sys_geteuid, "DUNE_SYS_GETEUID"},
+	[DUNE_SYS_GETEGID] = {dune_sys_getegid, "DUNE_SYS_GETEGID"},
 	[DUNE_SYS_SETPGID] = {NULL, "DUNE_SYS_SETPGID"},
 	[DUNE_SYS_GETPPID] = {NULL, "DUNE_SYS_GETPPID"},
 	[DUNE_SYS_GETPGRP] = {NULL, "DUNE_SYS_GETPGRP"},
 	[DUNE_SYS_SETSID] = {NULL, "DUNE_SYS_SETSID"},
 	[DUNE_SYS_SETREUID] = {NULL, "DUNE_SYS_SETREUID"},
 	[DUNE_SYS_SETREGID] = {NULL, "DUNE_SYS_SETREGID"},
-	[DUNE_SYS_GETGROUPS] = {NULL, "DUNE_SYS_GETGROUPS"},
+	[DUNE_SYS_GETGROUPS] = {dune_sys_getgroups, "DUNE_SYS_GETGROUPS"},
 	[DUNE_SYS_SETGROUPS] = {NULL, "DUNE_SYS_SETGROUPS"},
 	[DUNE_SYS_SETRESUID] = {NULL, "DUNE_SYS_SETRESUID"},
 	[DUNE_SYS_GETRESUID] = {NULL, "DUNE_SYS_GETRESUID"},
@@ -242,14 +614,14 @@ struct dune_sys_table_entry dune_syscall_table[DUNE_MAX_NUM_SYSCALLS] = {
 	[DUNE_SYS_RT_SIGTIMEDWAIT] = {NULL, "DUNE_SYS_RT_SIGTIMEDWAIT"},
 	[DUNE_SYS_RT_SIGQUEUEINFO] = {NULL, "DUNE_SYS_RT_SIGQUEUEINFO"},
 	[DUNE_SYS_RT_SIGSUSPEND] = {NULL, "DUNE_SYS_RT_SIGSUSPEND"},
-	[DUNE_SYS_SIGALTSTACK] = {NULL, "DUNE_SYS_SIGALTSTACK"},
+	[DUNE_SYS_SIGALTSTACK] = {dune_sys_sigaltstack, "DUNE_SYS_SIGALTSTACK"},
 	[DUNE_SYS_UTIME] = {NULL, "DUNE_SYS_UTIME"},
 	[DUNE_SYS_MKNOD] = {NULL, "DUNE_SYS_MKNOD"},
 	[DUNE_SYS_USELIB] = {NULL, "DUNE_SYS_USELIB"},
 	[DUNE_SYS_PERSONALITY] = {NULL, "DUNE_SYS_PERSONALITY"},
 	[DUNE_SYS_USTAT] = {NULL, "DUNE_SYS_USTAT"},
 	[DUNE_SYS_STATFS] = {NULL, "DUNE_SYS_STATFS"},
-	[DUNE_SYS_FSTATFS] = {NULL, "DUNE_SYS_FSTATFS"},
+	[DUNE_SYS_FSTATFS] = {dune_sys_fstatfs, "DUNE_SYS_FSTATFS"},
 	[DUNE_SYS_SYSFS] = {NULL, "DUNE_SYS_SYSFS"},
 	[DUNE_SYS_GETPRIORITY] = {NULL, "DUNE_SYS_GETPRIORITY"},
 	[DUNE_SYS_SETPRIORITY] = {NULL, "DUNE_SYS_SETPRIORITY"},
@@ -315,9 +687,10 @@ struct dune_sys_table_entry dune_syscall_table[DUNE_MAX_NUM_SYSCALLS] = {
 	[DUNE_SYS_FREMOVEXATTR] = {NULL, "DUNE_SYS_FREMOVEXATTR"},
 	[DUNE_SYS_TKILL] = {NULL, "DUNE_SYS_TKILL"},
 	[DUNE_SYS_TIME] = {NULL, "DUNE_SYS_TIME"},
-	[DUNE_SYS_FUTEX] = {NULL, "DUNE_SYS_FUTEX"},
+	[DUNE_SYS_FUTEX] = {dune_sys_futex, "DUNE_SYS_FUTEX"},
 	[DUNE_SYS_SCHED_SETAFFINITY] = {NULL, "DUNE_SYS_SCHED_SETAFFINITY"},
-	[DUNE_SYS_SCHED_GETAFFINITY] = {NULL, "DUNE_SYS_SCHED_GETAFFINITY"},
+	[DUNE_SYS_SCHED_GETAFFINITY] = {dune_sys_sched_getaffinity,
+	                                "DUNE_SYS_SCHED_GETAFFINITY"},
 	[DUNE_SYS_SET_THREAD_AREA] = {NULL, "DUNE_SYS_SET_THREAD_AREA"},
 	[DUNE_SYS_IO_SETUP] = {NULL, "DUNE_SYS_IO_SETUP"},
 	[DUNE_SYS_IO_DESTROY] = {NULL, "DUNE_SYS_IO_DESTROY"},
@@ -341,12 +714,13 @@ struct dune_sys_table_entry dune_syscall_table[DUNE_MAX_NUM_SYSCALLS] = {
 	[DUNE_SYS_TIMER_GETOVERRUN] = {NULL, "DUNE_SYS_TIMER_GETOVERRUN"},
 	[DUNE_SYS_TIMER_DELETE] = {NULL, "DUNE_SYS_TIMER_DELETE"},
 	[DUNE_SYS_CLOCK_SETTIME] = {NULL, "DUNE_SYS_CLOCK_SETTIME"},
-	[DUNE_SYS_CLOCK_GETTIME] = {NULL, "DUNE_SYS_CLOCK_GETTIME"},
+	[DUNE_SYS_CLOCK_GETTIME] = {dune_sys_clock_gettime,
+	                            "DUNE_SYS_CLOCK_GETTIME"},
 	[DUNE_SYS_CLOCK_GETRES] = {NULL, "DUNE_SYS_CLOCK_GETRES"},
 	[DUNE_SYS_CLOCK_NANOSLEEP] = {NULL, "DUNE_SYS_CLOCK_NANOSLEEP"},
 	[DUNE_SYS_EXIT_GROUP] = {NULL, "DUNE_SYS_EXIT_GROUP"},
-	[DUNE_SYS_EPOLL_WAIT] = {NULL, "DUNE_SYS_EPOLL_WAIT"},
-	[DUNE_SYS_EPOLL_CTL] = {NULL, "DUNE_SYS_EPOLL_CTL"},
+	[DUNE_SYS_EPOLL_WAIT] = {dune_sys_epoll_wait, "DUNE_SYS_EPOLL_WAIT"},
+	[DUNE_SYS_EPOLL_CTL] = {dune_sys_epoll_ctl, "DUNE_SYS_EPOLL_CTL"},
 	[DUNE_SYS_TGKILL] = {NULL, "DUNE_SYS_TGKILL"},
 	[DUNE_SYS_UTIMES] = {NULL, "DUNE_SYS_UTIMES"},
 	[DUNE_SYS_VSERVER] = {NULL, "DUNE_SYS_VSERVER"},
@@ -370,20 +744,20 @@ struct dune_sys_table_entry dune_syscall_table[DUNE_MAX_NUM_SYSCALLS] = {
 	[DUNE_SYS_INOTIFY_ADD_WATCH] = {NULL, "DUNE_SYS_INOTIFY_ADD_WATCH"},
 	[DUNE_SYS_INOTIFY_RM_WATCH] = {NULL, "DUNE_SYS_INOTIFY_RM_WATCH"},
 	[DUNE_SYS_MIGRATE_PAGES] = {NULL, "DUNE_SYS_MIGRATE_PAGES"},
-	[DUNE_SYS_OPENAT] = {NULL, "DUNE_SYS_OPENAT"},
+	[DUNE_SYS_OPENAT] = {dune_sys_openat, "DUNE_SYS_OPENAT"},
 	[DUNE_SYS_MKDIRAT] = {NULL, "DUNE_SYS_MKDIRAT"},
 	[DUNE_SYS_MKNODAT] = {NULL, "DUNE_SYS_MKNODAT"},
 	[DUNE_SYS_FCHOWNAT] = {NULL, "DUNE_SYS_FCHOWNAT"},
 	[DUNE_SYS_FUTIMESAT] = {NULL, "DUNE_SYS_FUTIMESAT"},
 	[DUNE_SYS_NEWFSTATAT] = {NULL, "DUNE_SYS_NEWFSTATAT"},
-	[DUNE_SYS_UNLINKAT] = {NULL, "DUNE_SYS_UNLINKAT"},
+	[DUNE_SYS_UNLINKAT] = {dune_sys_unlinkat, "DUNE_SYS_UNLINKAT"},
 	[DUNE_SYS_RENAMEAT] = {NULL, "DUNE_SYS_RENAMEAT"},
 	[DUNE_SYS_LINKAT] = {NULL, "DUNE_SYS_LINKAT"},
 	[DUNE_SYS_SYMLINKAT] = {NULL, "DUNE_SYS_SYMLINKAT"},
-	[DUNE_SYS_READLINKAT] = {NULL, "DUNE_SYS_READLINKAT"},
+	[DUNE_SYS_READLINKAT] = {dune_sys_readlinkat, "DUNE_SYS_READLINKAT"},
 	[DUNE_SYS_FCHMODAT] = {NULL, "DUNE_SYS_FCHMODAT"},
 	[DUNE_SYS_FACCESSAT] = {NULL, "DUNE_SYS_FACCESSAT"},
-	[DUNE_SYS_PSELECT6] = {NULL, "DUNE_SYS_PSELECT6"},
+	[DUNE_SYS_PSELECT6] = {dune_sys_pselect6, "DUNE_SYS_PSELECT6"},
 	[DUNE_SYS_PPOLL] = {NULL, "DUNE_SYS_PPOLL"},
 	[DUNE_SYS_UNSHARE] = {NULL, "DUNE_SYS_UNSHARE"},
 	[DUNE_SYS_SET_ROBUST_LIST] = {NULL, "DUNE_SYS_SET_ROBUST_LIST"},
@@ -398,13 +772,14 @@ struct dune_sys_table_entry dune_syscall_table[DUNE_MAX_NUM_SYSCALLS] = {
 	[DUNE_SYS_SIGNALFD] = {NULL, "DUNE_SYS_SIGNALFD"},
 	[DUNE_SYS_TIMERFD_CREATE] = {NULL, "DUNE_SYS_TIMERFD_CREATE"},
 	[DUNE_SYS_EVENTFD] = {NULL, "DUNE_SYS_EVENTFD"},
-	[DUNE_SYS_FALLOCATE] = {NULL, "DUNE_SYS_FALLOCATE"},
+	[DUNE_SYS_FALLOCATE] = {dune_sys_fallocate, "DUNE_SYS_FALLOCATE"},
 	[DUNE_SYS_TIMERFD_SETTIME] = {NULL, "DUNE_SYS_TIMERFD_SETTIME"},
 	[DUNE_SYS_TIMERFD_GETTIME] = {NULL, "DUNE_SYS_TIMERFD_GETTIME"},
 	[DUNE_SYS_ACCEPT4] = {NULL, "DUNE_SYS_ACCEPT4"},
 	[DUNE_SYS_SIGNALFD4] = {NULL, "DUNE_SYS_SIGNALFD4"},
 	[DUNE_SYS_EVENTFD2] = {NULL, "DUNE_SYS_EVENTFD2"},
-	[DUNE_SYS_EPOLL_CREATE1] = {NULL, "DUNE_SYS_EPOLL_CREATE1"},
+	[DUNE_SYS_EPOLL_CREATE1] = {dune_sys_epoll_create1,
+	                            "DUNE_SYS_EPOLL_CREATE1"},
 	[DUNE_SYS_DUP3] = {NULL, "DUNE_SYS_DUP3"},
 	[DUNE_SYS_PIPE2] = {NULL, "DUNE_SYS_PIPE2"},
 	[DUNE_SYS_INOTIFY_INIT1] = {NULL, "DUNE_SYS_INOTIFY_INIT1"},
@@ -425,6 +800,24 @@ struct dune_sys_table_entry dune_syscall_table[DUNE_MAX_NUM_SYSCALLS] = {
 	[DUNE_SYS_GETCPU] = {NULL, "DUNE_SYS_GETCPU"},
 	[DUNE_SYS_PROCESS_VM_READV] = {NULL, "DUNE_SYS_PROCESS_VM_READV"},
 	[DUNE_SYS_PROCESS_VM_WRITEV] = {NULL, "DUNE_SYS_PROCESS_VM_WRITEV"},
+	[DUNE_SYS_KCMP] = {NULL, "DUNE_KCMP"},
+	[DUNE_SYS_FINIT_MODULE] = {NULL, "DUNE_SYS_FINIT_MODULE"},
+	[DUNE_SYS_SCHED_SETATTR] = {NULL, "DUNE_SYS_SCHED_SETATTR"},
+	[DUNE_SYS_SCHED_GETATTR] = {NULL, "DUNE_SYS_SCHED_GETATTR"},
+	[DUNE_SYS_RENAMEAT2] = {NULL, "DUNE_SYS_RENAMEAT2"},
+	[DUNE_SYS_SECCOMP] = {NULL, "DUNE_SYS_SECCOMP"},
+	[DUNE_SYS_GETRANDOM] = {dune_sys_getrandom, "DUNE_SYS_GETRANDOM"},
+	[DUNE_SYS_MEMFD_CREATE] = {NULL, "DUNE_SYS_MEMFD_CREATE"},
+	[DUNE_SYS_KEXEC_FILE_LOAD] = {NULL, "DUNE_SYS_KEXEC_FILE_LOAD"},
+	[DUNE_SYS_BPF] = {NULL, "DUNE_SYS_BPF"},
+	[DUNE_STUB_EXECVEAT] = {NULL, "DUNE_STUB_EXECVEAT"},
+	[DUNE_USERFAULTFD] = {NULL, "DUNE_USERFAULTFD"},
+	[DUNE_MEMBARRIER] = {NULL, "DUNE_MEMBARRIER"},
+	[DUNE_MLOCK2] = {NULL, "DUNE_MLOCK2"},
+	[DUNE_COPY_FILE_RANGE] = {NULL, "DUNE_COPY_FILE_RANGE"},
+	[DUNE_PREADV2] = {NULL, "DUNE_PREADV2"},
+	[DUNE_PWRITEV2] = {NULL, "DUNE_PWRITEV2"},
+
 };
 
 bool init_syscall_table(void)

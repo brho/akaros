@@ -4,7 +4,7 @@ DUNE_TESTS_CFLAGS += $(CFLAGS_TESTS) -Wunused -Werror -rdynamic
 
 ALL_DUNE_TEST_FILES := $(wildcard $(DUNE_TESTS_DIR)/*.c)
 
-DUNE_TESTS_LDLIBS := $(TESTS_LDLIBS) -lelf -liplib -ldl
+DUNE_TESTS_LDLIBS := -lvmm -lpthread -liplib -lelf -ldl
 
 DUNE_TESTS_SRCS := $(ALL_DUNE_TEST_FILES)
 
