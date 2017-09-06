@@ -123,12 +123,14 @@ int io(struct guest_thread *vm_thread)
 	uint16_t *ip16;
 	uintptr_t ip;
 	uint32_t edx;
+	uint32_t eax;
 	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
 
 	/* Get the RIP of the io access. */
 	if (rippa(vm_thread, (uint64_t *)&ip))
 		return VM_PAGE_FAULT;
 	edx = vm_tf->tf_rdx;
+	eax = vm_tf->tf_rax;
 	ip8 = (void *)ip;
 	ip16 = (void *)ip;
 	//printf("io: ip16 %p\n", *ip16, edx);
@@ -176,6 +178,21 @@ int io(struct guest_thread *vm_thread)
 			//printf("ignoring write to cfc ");
 			return 0;
 		}
+		if (edx == 0xcf9) {
+			// on real hardware, an outb to 0xcf9 with bit 2 set is
+			// about as hard a reset as you can get. It yanks the
+			// reset on everything, including all the cores.  It
+			// usually happens after the kernel has done lots of work
+			// to carefully quiesce the machine but, once it happens,
+			// game is over. Hence, an exit(0) is most appropriate,
+			// since it's not an error.
+			if (eax & (1 << 2)) {
+				printf("outb to PCI reset port with bit 2 set: time to die\n");
+				exit(0);
+			}
+			return 0;
+		}
+
 		/* Another case where we print a message but it's not an error. */
 		printf("out al, dx: unhandled IO address dx @%p is 0x%x\n", ip8, edx);
 		return 0;
