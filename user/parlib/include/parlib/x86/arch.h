@@ -161,4 +161,24 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 	}
 }
 
+/* Cpuid helper function originally from Barret's fputest. */
+static inline void parlib_cpuid(uint32_t level1, uint32_t level2,
+                                uint32_t *eaxp, uint32_t *ebxp,
+                                uint32_t *ecxp, uint32_t *edxp)
+{
+	uint32_t eax, ebx, ecx, edx;
+
+	asm volatile("cpuid"
+	             : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
+	             : "a"(level1), "c"(level2));
+	if (eaxp)
+		*eaxp = eax;
+	if (ebxp)
+		*ebxp = ebx;
+	if (ecxp)
+		*ecxp = ecx;
+	if (edxp)
+		*edxp = edx;
+}
+
 __END_DECLS

@@ -8,98 +8,142 @@
 #include <sys/mman.h>
 #include <ros/arch/mmu.h>
 #include <vmm/vmm.h>
+#include <vmm/util.h>
+#include <string.h>
+#include <stdint.h>
+#include <errno.h>
+#include <parlib/uthread.h>
+#include <parlib/arch/arch.h>
 
-typedef struct {
-	uint64_t pte[512];
-} ptp;
+static bool debug;
 
-void *setup_paging(struct virtual_machine *vm, bool debug)
+struct ptp {
+	uintptr_t pte[NPTENTRIES];
+};
+
+#define PAGE_RESOLUTION PML3_PTE_REACH
+
+/* We put the page tables after 4Gb, where it exactly is doesn't matter as long
+ * as it's accessible by the guest. */
+#define PAGE_TABLE_ROOT_START 0x100000000
+
+static void check_jumbo_pages(void *arg)
 {
-	ptp *p512, *p1, *p2m;
-	int nptp, npml4, npml3, npml2;
-	uintptr_t memstart = vm->minphys;
-	size_t memsize = vm->maxphys - vm->minphys + 1;
+	uint32_t edx;
 
-	/* This test is redundant when booting kernels, as it is also
-	 * performed in memory(), but not all users call that function,
-	 * hence we must do it here too. */
-	checkmemaligned(memstart, memsize);
+	parlib_cpuid(0x80000001, 0x0, NULL, NULL, NULL, &edx);
+	if (!(edx & (1 << 26)))
+		panic("1 GB Jumbo Pages are not supported on this hardware!");
+}
 
-	/* How many page table pages do we need?  We conservatively
-	 * assume that we are in low memory, and hence assume a
-	 * 0-based range.  Note that in many cases, kernels will
-	 * immediately set up their own map. But for "dune" like
-	 * applications, it's necessary. Note also that in most cases,
-	 * the total number of pages will be < 16 or so. */
-	npml4 = DIV_ROUND_UP(memstart + memsize, PML4_REACH);
-	nptp = npml4;
+/*
+ * This function assumes that after the p512 page table, there is memory mapped
+ * (though not necessarily populated) for each PML3 page table. This assumes
+ * a total of 2M + 4K memory mapped. PML3 table n is located at 4K*(n+1) from
+ * the start of the p512 table.
+ * This function does a 1:1 mapping of va to pa. vm->root must be set
+ * */
+void add_pte_entries(struct virtual_machine *vm, uintptr_t start, uintptr_t end)
+{
+	struct ptp *p512;
+	uintptr_t cur_page, aligned_start, aligned_end, pml4, pml3;
+	static parlib_once_t once = PARLIB_ONCE_INIT;
 
-	npml3 = DIV_ROUND_UP(memstart + memsize, PML3_REACH);
-	nptp += npml3;
+	/* We check once if we can use 1Gb pages and die if we can't. */
+	parlib_run_once(&once, check_jumbo_pages, NULL);
 
-	/* and 1 for each 2 MiB of memory */
-	npml2 = DIV_ROUND_UP(memstart + memsize, PML2_REACH);
-	nptp += npml2;
+	uth_mutex_lock(&vm->root_mtx);
+	p512 = vm->root;
+	if (!p512)
+		panic("vm->root page table pointer was not set!");
 
-	fprintf(stderr,
-	        "Memstart is %llx, memsize is %llx,"
-		"memstart + memsize is %llx; \n",
-	        memstart, memsize, memstart + memsize);
-	fprintf(stderr, "\t%d pml4 %d pml3 %d pml2\n",
-	        npml4, npml3, npml2);
+	/* We align the start down and the end up to make sure we cover the full
+	 * area. */
+	aligned_start = ALIGN_DOWN(start, PAGE_RESOLUTION);
+	aligned_end = ALIGN(end, PAGE_RESOLUTION);
 
-	/* Place these page tables right after VM memory. We
-	 * used to use posix_memalign but that puts them
-	 * outside EPT-accessible space on some CPUs. */
-	p512 = mmap((void *)memstart + memsize, nptp * 4096, PROT_READ | PROT_WRITE,
-	             MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-	if (p512 == MAP_FAILED) {
-		perror("page table page alloc");
-		exit(1);
-	}
-	p1 = &p512[npml4];
-	p2m = &p1[npml3];
+	cur_page = aligned_start;
+	/* We always do end-1 because end from /proc/self/maps is not inclusive */
+	for (pml4 = PML4(start); pml4 <= PML4(end - 1); pml4++) {
+		struct ptp *p1 = p512 + pml4 + 1;
 
-	/* Set up a 1:1 ("identity") page mapping from guest virtual
-	 * to guest physical using the (host virtual)
-	 * `kerneladdress`. This mapping may be used for only a short
-	 * time, until the guest sets up its own page tables. Be aware
-	 * that the values stored in the table are physical addresses.
-	 * This is subtle and mistakes are easily disguised due to the
-	 * identity mapping, so take care when manipulating these
-	 * mappings. */
+		/* Create the PML4 entry. Rather than check, I just overwrite it. */
+		p512->pte[pml4] = (uintptr_t) p1 | PTE_KERN_RW;
 
-	p2m->pte[PML2(0)] = (uint64_t)0 | PTE_KERN_RW | PTE_PS;
+		for (pml3 = PML3(cur_page); pml3 < NPTENTRIES &&
+		     cur_page < aligned_end; pml3++, cur_page += PML3_PTE_REACH) {
 
-	fprintf(stderr, "Map %p for %zu bytes\n", memstart, memsize);
-	for (uintptr_t p4 = memstart, i4 = PML4(p4);
-		 p4 < memstart + memsize && i4 < NPTENTRIES;
-	     p4 = ROUNDUP(p4 + 1, PML4_PTE_REACH), p1++, i4++) {
-		p512->pte[PML4(p4)] = (uint64_t)p1 | PTE_KERN_RW;
-		if (debug)
-			fprintf(stderr, "l4@%p: %p set index 0x%x to 0x%llx\n",
-					&p512->pte[PML4(p4)],
-					p4, PML4(p4), p512->pte[PML4(p4)]);
-		for (uintptr_t p3 = p4, i3 = PML3(p3);
-			 p3 < memstart + memsize && i3 < NPTENTRIES;
-		     p3 = ROUNDUP(p3 + 1, PML3_PTE_REACH), p2m++, i3++) {
-			p1->pte[PML3(p3)] = (uint64_t)p2m | PTE_KERN_RW;
-			if (debug)
-				fprintf(stderr, "\tl3@%p: %p set index 0x%x to 0x%llx\n",
-						&p1->pte[PML3(p3)],
-						p3, PML3(p3), p1->pte[PML3(p3)]);
-			for (uintptr_t p2 = p3, i2 = PML2(p2);
-				 p2 < memstart + memsize && i2 < NPTENTRIES;
-			     p2 += PML2_PTE_REACH, i2++) {
-				p2m->pte[PML2(p2)] = (uint64_t)p2 | PTE_KERN_RW | PTE_PS;
-				if (debug)
-					fprintf(stderr, "\t\tl2@%p: %p set index 0x%x to 0x%llx\n",
-							&p2m->pte[PML2(p2)],
-							p2, PML2(p2), p2m->pte[PML2(p2)]);
-			}
+			/* Create the PML3 entry. */
+			p1->pte[pml3] = cur_page | PTE_KERN_RW | PTE_PS;
 		}
+	}
+	uth_mutex_unlock(&vm->root_mtx);
+}
+
+/* This function sets up the default page tables for the guest. It parses
+ * /proc/self/maps to figure out what pages are mapped for the uthread, and
+ * sets up a 1:1 mapping for the vm guest. This function can be called
+ * multiple times after startup to update the page tables, though regular
+ * vmms should call add_pte_entries if they mmap something for the guest after
+ * calling setup_paging to avoid having to parse /proc/self/maps again. */
+void setup_paging(struct virtual_machine *vm)
+{
+	FILE *maps;
+	char *line = NULL;
+	size_t line_sz;
+	char *strtok_save;
+	char *p;
+	uintptr_t first, second;
+
+	/* How many page table pages do we need?
+	 * If we create 1G PTEs for the whole space, it just takes 2M + 4k worth of
+	 * memory. Perhaps we should just identity map the whole space upfront.
+	 * Right now we don't MAP_POPULATE because we don't expect all the PTEs
+	 * to be used. */
+	if (!vm->root)
+		vm->root = mmap((void *)PAGE_TABLE_ROOT_START, 0x201000,
+		                PROT_READ | PROT_WRITE,
+		                MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+
+	if (vm->root == MAP_FAILED || (uintptr_t)vm->root >= BRK_START)
+		panic("page table page alloc");
+
+	/* We parse /proc/self/maps to figure out the currently mapped memory.
+	 * This way all the memory that's available to the HR3 process is also
+	 * reflected in the page tables. Our smallest PTEs here are 1Gb so there
+	 * may be memory locations described in the page tables that are not
+	 * mapped though. /proc/self/maps parsing code courtesy of Barret. */
+	maps = fopen("/proc/self/maps", "r");
+	if (!maps)
+		panic("unable to open /proc/self/maps");
+
+	/* returns -1 on error or EOF. */
+	while (getline(&line, &line_sz, maps) >= 0) {
+		if (debug)
+			fprintf(stderr, "Got line %s", line);
+
+		p = strchr(line, ' ');
+		/* No space, probably an error */
+		if (!p)
+			continue;
+		*p = '\0';
+		p = strtok_r(line, "-", &strtok_save);
+		/* No first element! */
+		if (!p)
+			continue;
+		first = strtoul(p, NULL, 16);
+		p = strtok_r(NULL, "-", &strtok_save);
+		/* No second element! */
+		if (!p)
+			continue;
+		second = strtoul(p, NULL, 16);
+
+		if (debug)
+			printf("first %p, second %p\n\n", first, second);
+
+		add_pte_entries(vm, first, second);
 
 	}
-
-	return (void *)p512;
+	free(line);
+	fclose(maps);
 }

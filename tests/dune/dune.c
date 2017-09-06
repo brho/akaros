@@ -37,7 +37,8 @@ bool linuxemu(struct guest_thread *gth, struct vm_trapframe *tf);
 
 extern char **environ;
 
-static struct virtual_machine vm = {.halt_exit = true,};
+static struct virtual_machine vm = {.halt_exit = true,
+                                    .root_mtx = UTH_MUTEX_INIT};
 
 static unsigned long long memsize = GiB;
 static uintptr_t memstart = MinMemory;

@@ -39,7 +39,9 @@
 #include <sys/uio.h>
 #include <parlib/opts.h>
 
-struct virtual_machine local_vm, *vm = &local_vm;
+struct virtual_machine local_vm = {.root_mtx = UTH_MUTEX_INIT},
+                            *vm = &local_vm;
+
 struct vmm_gpcore_init *gpcis;
 
 void vapic_status_dump(FILE *f, void *vapic);
@@ -369,7 +371,6 @@ void init_timer_alarms(void)
 
 int main(int argc, char **argv)
 {
-	void *cr3;
 	int debug = 0;
 	unsigned long long memsize = GiB;
 	uintptr_t memstart = MinMemory;
@@ -592,11 +593,27 @@ int main(int argc, char **argv)
 	 * known MMIO address, and fulfill the MMIO read or write on the guest's
 	 * behalf accordingly. We place the virtio space at 512 GB higher than the
 	 * guest physical memory to avoid a full page table walk. */
-	uint64_t virtio_mmio_base_addr;
+	uintptr_t virtio_mmio_base_addr_hint;
+	uintptr_t virtio_mmio_base_addr;
 
-	virtio_mmio_base_addr = ROUNDUP((bp->e820_map[bp->e820_entries - 1].addr +
-	                                 bp->e820_map[bp->e820_entries - 1].size),
-	                                 512ULL * GiB);
+	virtio_mmio_base_addr_hint =
+	    ROUNDUP((bp->e820_map[bp->e820_entries - 1].addr +
+	             bp->e820_map[bp->e820_entries - 1].size),
+	             PML4_PTE_REACH);
+
+	/* mmap with prot_none so we don't accidentally mmap something else here.
+	 * We give space for 512 devices right now.
+	 * TODO(ganshun): Make it dynamic based on number of virtio devices. */
+	virtio_mmio_base_addr =
+	    (uintptr_t) mmap((void *) virtio_mmio_base_addr_hint, 512 * PGSIZE,
+	                     PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+
+	if (!virtio_mmio_base_addr || virtio_mmio_base_addr >= BRK_START) {
+		/* Either we were unable to mmap at all or we mapped it too high. */
+		panic("Unable to mmap protect space for virtio devices, got 0x%016x",
+		      virtio_mmio_base_addr);
+	}
+
 	cons_mmio_dev.addr =
 		virtio_mmio_base_addr + PGSIZE * VIRTIO_MMIO_CONSOLE_DEV;
 	cons_mmio_dev.vqdev = &cons_vqdev;
@@ -669,16 +686,17 @@ int main(int argc, char **argv)
 	ret = vmm_init(vm, vmmflags);
 	assert(!ret);
 
-	cr3 = setup_paging(vm, debug);
 	init_timer_alarms();
 
+	setup_paging(vm);
+
 	vm_tf = gth_to_vmtf(vm->gths[0]);
-	vm_tf->tf_cr3 = (uint64_t) cr3;
+	vm_tf->tf_cr3 = (uint64_t) vm->root;
 	vm_tf->tf_rip = entry;
 	vm_tf->tf_rsp = 0xe0000;
 	vm_tf->tf_rsi = (uint64_t) bp;
 	vm->up_gpcs = 1;
-	fprintf(stderr, "Start guest: cr3 %p rip %p\n", cr3, entry);
+	fprintf(stderr, "Start guest: cr3 %p rip %p\n", vm_tf->tf_cr3, entry);
 	start_guest_thread(vm->gths[0]);
 
 	uthread_sleep_forever();

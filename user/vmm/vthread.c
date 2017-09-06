@@ -27,7 +27,6 @@ static void *page(void *addr, int count)
  * and vthread_attr_kernel_init. */
 static int vmsetup(struct virtual_machine *vm, int flags)
 {
-	unsigned long long *p512, *p1;
 	struct vm_trapframe *vm_tf;
 	int i, ret;
 	uint8_t *p;
@@ -39,51 +38,6 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 		vm->nr_gpcs = 1;
 
 	vm->gpcis = calloc(vm->nr_gpcs, sizeof(*vm->gpcis));
-
-	/* Set up default page mappings. The common case,
-	 * for user VM threads and kernel VM threads, is that
-	 * they need some kind of initial page tables. The kernels
-	 * will almost always throw them away; the user VM threads
-	 * will almost always continue to use them. Using two
-	 * pages and setting up an initial page table is
-	 * cheap and makes users lives easier. This initial
-	 * page table can grow to 512 GiB, which should be enough
-	 * for now.
-	 *
-	 * At the same time, we allow users to select other
-	 * arrangements if they wish.  Here's a simple example: is it
-	 * possible someone will want a different guest page table for
-	 * every guest? Yes.
-	 *
-	 * We lock the page table to 0x1000000 for now. We can't just
-	 * let it pick anything as it may pick something the guest
-	 * can't address (i.e. outside EPT range). */
-
-	/* Allocate 2 pages for page table pages: a page of
-	 * 512 GiB PTEs with only one entry filled to point to
-	 * a page of 1 GiB PTEs; a page of 1 GiB PTEs with
-	 * only one entry filled. */
-
-	p512 = page((void *)0x1000000, 2);
-	if (!p512) {
-		werrstr("page table allocation failed: %r\n");
-		return -1;
-	}
-	p1 = &p512[512];
-	vm->root = p512;
-
-	/* Set up a 1:1 ("identity") page mapping from host
-	 * virtual to guest physical for 1 GiB.  This mapping
-	 * is used unless the guest (e.g. Linux) sets up its
-	 * own page tables. Be aware that the values stored in
-	 * the table are physical addresses.  This is subtle
-	 * and mistakes are easily disguised due to the
-	 * identity mapping, so take care when manipulating
-	 * these mappings. Note: we don't yet have symbols for
-	 * "start of virtual address common to host and guest"
-	 * so we just use  the first GiB for now. */
-	p512[PML4(0x400000)] = (uint64_t)p1 | PTE_KERN_RW;
-	p1[PML3(0x400000)] = PTE_PS | PTE_KERN_RW;
 
 	/* technically, we don't need these pages for the
 	 * all guests. Currently, the kernel requires them. */
@@ -98,6 +52,9 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 		vm->gpcis[i].apic_addr = &p[8192];
 	}
 
+	/* Set up default page mappings. */
+	setup_paging(vm);
+
 	ret = vmm_init(vm, flags);
 	if (ret)
 		return ret;
@@ -105,7 +62,7 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 	for (i = 0; i < vm->nr_gpcs; i++) {
 		vm->gths[i]->halt_exit = vm->halt_exit;
 		vm_tf = gth_to_vmtf(vm->gths[i]);
-		vm_tf->tf_cr3 = (uint64_t)p512;
+		vm_tf->tf_cr3 = (uint64_t) vm->root;
 	}
 	vm->vminit = 1;
 

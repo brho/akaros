@@ -67,14 +67,17 @@ struct virtual_machine {
 	 * default page tables we use this range. Note that even if the "physical"
 	 * memory has holes, we'll create PTEs for it. This seems enough for now but
 	 * we shall see. */
-	uintptr_t                   minphys;
-	uintptr_t                   maxphys;
+	uintptr_t					minphys;
+	uintptr_t					maxphys;
 
 	/* Default root pointer to use if one is not set in a
 	 * guest thread. We expect this to be the common case,
 	 * where all guests share a page table. It's not required
-	 * however. */
+	 * however. setup_paging now updates this to point to the initial set of
+	 * page tables for the guest. */
 	void						*root;
+	/* lock to control access to root */
+	uth_mutex_t					root_mtx;
 
 	/* Default value for whether guest threads halt on an exit. */
 	bool						halt_exit;
@@ -134,7 +137,9 @@ void mmap_memory(struct virtual_machine *vm, uintptr_t memstart,
                  size_t memsize);
 bool mmap_file(const char *path, uintptr_t memstart, uintptr_t memsize,
                uint64_t protections, uint64_t offset);
-void *setup_paging(struct virtual_machine *vm, bool debug);
+void add_pte_entries(struct virtual_machine *vm, uintptr_t start,
+                     uintptr_t end);
+void setup_paging(struct virtual_machine *vm);
 void *setup_biostables(struct virtual_machine *vm,
                        void *a, void *smbiostable);
 void *populate_stack(uintptr_t *stack, int argc, char *argv[],
