@@ -10,8 +10,8 @@
 #include <vmm/linux_bootparam.h>
 #include <vmm/vmm.h>
 #include <err.h>
+#include <vmm/util.h>
 
-#define ALIGNED(p, a)	(!(((uintptr_t)(p)) & ((a)-1)))
 
 static char *entrynames[] = {
 	[E820_RAM] "E820_RAM",
