@@ -11,6 +11,8 @@
 #include <vmm/vmm.h>
 #include <err.h>
 #include <vmm/util.h>
+#include <parlib/ros_debug.h>
+#include <fcntl.h>
 
 
 static char *entrynames[] = {
@@ -155,4 +157,141 @@ done:
 
 	if (vm->maxphys < memstart + memsize - 1)
 		vm->maxphys = memstart + memsize - 1;
+}
+
+bool mmap_file(const char *path, uintptr_t memstart, uintptr_t memsize,
+               uint64_t protections, uint64_t offset)
+{
+	int fd = open(path, O_RDONLY);
+
+	if (fd == -1) {
+		fprintf(stderr, "Unable to open %s for reading.\n", path);
+		return false;
+	}
+
+	void *addr = mmap((void*) memstart, memsize, protections, MAP_PRIVATE,
+	                  fd, offset);
+	int err = errno;
+
+	close(fd);
+
+	if (addr == MAP_FAILED) {
+		fprintf(stderr, "Failed to mmap %s, got error %d\n", path, err);
+		return false;
+	}
+
+	if ((uint64_t) addr != (uint64_t) memstart) {
+		fprintf(stderr, "Could not mmap %s correctly.\n", path);
+		return false;
+	}
+	return true;
+}
+
+
+/* populate_stack fills the stack with an argv, envp, and auxv.
+ * We assume the stack pointer is backed by real memory.
+ * It will go hard with you if it does not. For your own health,
+ * stack should be 16-byte aligned. */
+void *populate_stack(uintptr_t *stack, int argc, char *argv[],
+                         int envc, char *envp[],
+                         int auxc, struct elf_aux auxv[])
+{
+	/* Function to get the lengths of the argument and environment strings. */
+	int get_lens(int argc, char *argv[], int arg_lens[])
+	{
+		int total = 0;
+
+		if (!argc)
+			return 0;
+		for (int i = 0; i < argc; i++) {
+			arg_lens[i] = strlen(argv[i]) + 1;
+			total += arg_lens[i];
+		}
+		return total;
+	}
+
+	/* Function to help map the argument and environment strings, to their
+	 * final location. */
+	int remap(int argc, char *argv[], char *new_argv[],
+              char new_argbuf[], int arg_lens[])
+	{
+		int offset = 0;
+
+		if (!argc)
+			return 0;
+		for (int i = 0; i < argc; i++) {
+			memcpy(new_argbuf + offset, argv[i], arg_lens[i]);
+			fprintf(stderr, "data: memcpy(%p, %p, %ld)\n",
+			        new_argbuf + offset, argv[i], arg_lens[i]);
+			fprintf(stderr, "arg: set arg %d, @%p, to %p\n", i,
+			        &new_argv[i], new_argbuf + offset);
+			new_argv[i] = new_argbuf + offset;
+			offset += arg_lens[i];
+		}
+		new_argv[argc] = NULL;
+		return offset;
+	}
+
+	/* Start tracking the size of the buffer necessary to hold all of our data
+	 * on the stack. Preallocate space for argc, argv, envp, and auxv in this
+	 * buffer. */
+	int bufsize = 0;
+
+	bufsize += 1 * sizeof(size_t);
+	bufsize += (auxc + 1) * sizeof(struct elf_aux);
+	bufsize += (envc + 1) * sizeof(char**);
+	bufsize += (argc + 1) * sizeof(char**);
+	fprintf(stderr, "Bufsize for pointers and argc is %d\n", bufsize);
+
+	/* Add in the size of the env and arg strings. */
+	int arg_lens[argc];
+	int env_lens[envc];
+
+	bufsize += get_lens(argc, argv, arg_lens);
+	bufsize += get_lens(envc, envp, env_lens);
+	fprintf(stderr, "Bufsize for pointers, argc, and strings is %d\n",
+	        bufsize);
+
+	/* Adjust bufsize so that our buffer will ultimately be 16 byte aligned. */
+	bufsize = (bufsize + 15) & ~0xf;
+	fprintf(stderr,
+	        "Bufsize for pointers, argc, and strings is rounded is %d\n",
+	        bufsize);
+
+	/* Set up pointers to all of the appropriate data regions we map to. */
+	size_t *new_argc = (size_t*)((uint8_t*)stack - bufsize);
+	char **new_argv = (char**)(new_argc + 1);
+	char **new_envp = new_argv + argc + 1;
+	struct elf_aux *new_auxv = (struct elf_aux*)(new_envp + envc + 1);
+	char *new_argbuf = (char*)(new_auxv + auxc + 1);
+
+	fprintf(stderr, "There are %d args, %d env, and %d aux\n", new_argc,
+	        envc, auxc);
+	fprintf(stderr, "Locations: argc: %p, argv: %p, envp: %p, auxv: %p\n",
+	        new_argc, new_argv, new_envp, new_auxv);
+	fprintf(stderr, "Locations: argbuf: %p, ", new_argbuf);
+	fprintf(stderr, "Sizeof argc is %d\n", sizeof(size_t));
+	/* Map argc into its final location. */
+	*new_argc = argc;
+
+	/* Map all data for argv and envp into its final location. */
+	int offset = 0;
+
+	offset = remap(argc, argv, new_argv, new_argbuf, arg_lens);
+	if (offset == -1)
+		return 0;
+	fprintf(stderr, "Locations: argbuf: %p, envbuf: %p, ", new_argbuf,
+	        new_argbuf + offset);
+	offset = remap(envc, envp, new_envp, new_argbuf + offset, env_lens);
+	if (offset == -1)
+		return 0;
+
+	/* Map auxv into its final location. */
+	struct elf_aux null_aux = {0, 0};
+
+	memcpy(new_auxv, auxv, auxc * sizeof(struct elf_aux));
+	memcpy(new_auxv + auxc, &null_aux, sizeof(struct elf_aux));
+	fprintf(stderr, "auxbuf: %p\n", new_auxv);
+	hexdump(stdout, new_auxv, auxc * sizeof(struct elf_aux));
+	return (uint8_t*)stack - bufsize;
 }

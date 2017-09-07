@@ -80,6 +80,10 @@ struct virtual_machine {
 	bool						halt_exit;
 };
 
+struct elf_aux {
+	unsigned long v[2];
+};
+
 char *regname(uint8_t reg);
 int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
            uint64_t **regp, int *store, int *size, int *advance);
@@ -128,6 +132,11 @@ void *init_e820map(struct virtual_machine *vm, struct boot_params *bp);
 void checkmemaligned(uintptr_t memstart, size_t memsize);
 void mmap_memory(struct virtual_machine *vm, uintptr_t memstart,
                  size_t memsize);
+bool mmap_file(const char *path, uintptr_t memstart, uintptr_t memsize,
+               uint64_t protections, uint64_t offset);
 void *setup_paging(struct virtual_machine *vm, bool debug);
 void *setup_biostables(struct virtual_machine *vm,
                        void *a, void *smbiostable);
+void *populate_stack(uintptr_t *stack, int argc, char *argv[],
+                         int envc, char *envp[],
+                         int auxc, struct elf_aux auxv[]);
