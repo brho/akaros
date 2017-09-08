@@ -182,6 +182,8 @@ bool mmap_file(const char *path, uintptr_t memstart, uintptr_t memsize,
 
 	if ((uint64_t) addr != (uint64_t) memstart) {
 		fprintf(stderr, "Could not mmap %s correctly.\n", path);
+		if (munmap(addr, memsize) == -1)
+			perror("Failed to unmap memory; leaking a mapping");
 		return false;
 	}
 	return true;
