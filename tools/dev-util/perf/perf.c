@@ -330,7 +330,8 @@ static int perf_record(struct perf_cmd *cmd, int argc, char *argv[])
 	 * However, we can control whether or not the samples are collected. */
 	submit_events(&opts);
 	perf_start_sampling(pctx);
-	run_process_and_wait(opts.cmd_argc, opts.cmd_argv, &opts.cores);
+	run_process_and_wait(opts.cmd_argc, opts.cmd_argv,
+	                     opts.got_cores ? &opts.cores : NULL);
 	perf_stop_sampling(pctx);
 	if (opts.verbose)
 		perf_context_show_events(pctx, stdout);
@@ -511,7 +512,8 @@ static int perf_stat(struct perf_cmd *cmd, int argc, char *argv[])
 	 * of every other event. */
 	clock_gettime(CLOCK_REALTIME, &start);
 	submit_events(&opts);
-	run_process_and_wait(opts.cmd_argc, opts.cmd_argv, &opts.cores);
+	run_process_and_wait(opts.cmd_argc, opts.cmd_argv,
+	                     opts.got_cores ? &opts.cores : NULL);
 	clock_gettime(CLOCK_REALTIME, &end);
 	subtract_timespecs(&diff, &end, &start);
 	stat_vals = collect_stats(pctx, &diff);
@@ -541,22 +543,22 @@ static void run_process_and_wait(int argc, char *argv[],
 		fflush(stderr);
 		exit(1);
 	}
-
-	ros_get_low_latency_core_set(&pvcores);
-	ros_not_core_set(&pvcores);
-	ros_and_core_sets(&pvcores, cores);
-	for (size_t i = 0; i < max_cores; i++) {
-		if (ros_get_bit(&pvcores, i)) {
-			if (sys_provision(pid, RES_CORES, i)) {
-				fprintf(stderr,
-						"Unable to provision CPU %lu to PID %d: cmd='%s'\n",
-						i, pid, argv[0]);
-				sys_proc_destroy(pid, -1);
-				exit(1);
+	if (cores) {
+		ros_get_low_latency_core_set(&pvcores);
+		ros_not_core_set(&pvcores);
+		ros_and_core_sets(&pvcores, cores);
+		for (size_t i = 0; i < max_cores; i++) {
+			if (ros_get_bit(&pvcores, i)) {
+				if (sys_provision(pid, RES_CORES, i)) {
+					fprintf(stderr,
+							"Unable to provision CPU %lu to PID %d: cmd='%s'\n",
+							i, pid, argv[0]);
+					sys_proc_destroy(pid, -1);
+					exit(1);
+				}
 			}
 		}
 	}
-
 	sys_proc_run(pid);
 	waitpid(pid, &status, 0);
 }
