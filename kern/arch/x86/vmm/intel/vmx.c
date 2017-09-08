@@ -835,7 +835,6 @@ static void vmcs_set_pgaddr(struct proc *p, void *u_addr,
 static void vmx_setup_initial_guest_state(struct proc *p,
                                           struct vmm_gpcore_init *gpci)
 {
-	unsigned long tmpl;
 	unsigned long cr4 = X86_CR4_PAE | X86_CR4_VMXE | X86_CR4_OSXMMEXCPT |
 		X86_CR4_PGE | X86_CR4_OSFXSR;
 	uint32_t protected_mode = X86_CR0_PG | X86_CR0_PE;
@@ -875,10 +874,11 @@ static void vmx_setup_initial_guest_state(struct proc *p,
 	vmcs_writel(GUEST_CS_BASE, 0);
 	vmcs_writel(GUEST_DS_BASE, 0);
 	vmcs_writel(GUEST_ES_BASE, 0);
-	vmcs_writel(GUEST_GS_BASE, 0);
+	enforce_user_canon(&gpci->fsbase);
+	vmcs_writel(GUEST_FS_BASE, gpci->fsbase);
+	enforce_user_canon(&gpci->gsbase);
+	vmcs_writel(GUEST_GS_BASE, gpci->gsbase);
 	vmcs_writel(GUEST_SS_BASE, 0);
-	tmpl = read_fsbase();
-	vmcs_writel(GUEST_FS_BASE, tmpl);
 
 	/* guest segment access rights */
 	vmcs_writel(GUEST_CS_AR_BYTES, 0xA09B);

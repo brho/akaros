@@ -15,6 +15,8 @@ struct vmm_gpcore_init {
 	void					*vapic_addr;
 	void					*apic_addr;
 	void					*user_data;
+	uintptr_t				fsbase;
+	uintptr_t				gsbase;
 };
 
 /* Intel VM Trap Injection Fields */

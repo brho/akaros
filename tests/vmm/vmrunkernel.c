@@ -278,6 +278,8 @@ void alloc_intr_pages(void)
 		gpcis[i].posted_irq_desc = pir + (PGSIZE * i);
 		gpcis[i].vapic_addr = pages + (PGSIZE * i);
 		gpcis[i].apic_addr = a_page;
+		gpcis[i].fsbase = 0;
+		gpcis[i].gsbase = 0;
 
 		/* Set APIC ID. */
 		((uint32_t *)gpcis[i].vapic_addr)[0x20/4] = i;

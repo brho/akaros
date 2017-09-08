@@ -236,14 +236,6 @@ void proc_pop_ctx(struct user_context *ctx)
 	}
 }
 
-/* Helper: if *addr isn't a canonical user address, poison it.  Use this when
- * you need a canonical address (like MSR_FS_BASE) */
-static void enforce_user_canon(uintptr_t *addr)
-{
-	if (*addr >> 47 != 0)
-		*addr = 0x5a5a5a5a;
-}
-
 void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
                    uintptr_t stack_top, uintptr_t tls_desc)
 {

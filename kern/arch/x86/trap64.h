@@ -15,6 +15,14 @@
 
 #include <arch/fsgsbase.h>
 
+/* Helper: if *addr isn't a canonical user address, poison it.  Use this when
+ * you need a canonical address (like MSR_FS_BASE) */
+static inline void enforce_user_canon(uintptr_t *addr)
+{
+	if (*addr >> 47 != 0)
+		*addr = 0x5a5a5a5a;
+}
+
 static inline bool in_kernel(struct hw_trapframe *hw_tf)
 {
 	return (hw_tf->tf_cs & ~3) == GD_KT;

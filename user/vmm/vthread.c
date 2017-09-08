@@ -50,6 +50,10 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 		vm->gpcis[i].posted_irq_desc = &p[0];
 		vm->gpcis[i].vapic_addr = &p[4096];
 		vm->gpcis[i].apic_addr = &p[8192];
+		/* TODO: once we are making these GPCs at the same time as vthreads, we
+		 * should set fsbase == the TLS desc of the vthread (if any). */
+		vm->gpcis[i].fsbase = 0;
+		vm->gpcis[i].gsbase = 0;
 	}
 
 	/* Set up default page mappings. */
