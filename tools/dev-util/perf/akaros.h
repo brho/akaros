@@ -12,15 +12,16 @@
 #include <stdio.h>
 #include <limits.h>
 #include <parlib/parlib.h>
+#include <parlib/bitmask.h>
 
-#define CORE_SET_SIZE DIV_ROUND_UP(MAX_NUM_CORES, CHAR_BIT)
+#define CORE_SET_SIZE BYTES_FOR_BITMASK(MAX_NUM_CORES)
 
 /* Not using sched.h CPU set because that file has definitions for a large
  * number of APIs Akaros does not support.
  * Making Akaros core_set.h visible in userslace might be a cleaner approach.
  */
 struct core_set {
-	uint8_t core_set[CORE_SET_SIZE];
+	DECL_BITMASK(core_set, MAX_NUM_CORES);
 };
 
 void ros_get_low_latency_core_set(struct core_set *cores);
@@ -34,15 +35,15 @@ void ros_or_core_sets(struct core_set *dcs, const struct core_set *scs);
 
 static inline void ros_set_bit(void *addr, size_t nbit)
 {
-	((uint8_t *) addr)[nbit % CHAR_BIT] |= 1 << (nbit % CHAR_BIT);
+	SET_BITMASK_BIT(addr, nbit);
 }
 
 static inline void ros_clear_bit(void *addr, size_t nbit)
 {
-	((uint8_t *) addr)[nbit % CHAR_BIT] &= ~(1 << (nbit % CHAR_BIT));
+	CLR_BITMASK_BIT(addr, nbit);
 }
 
 static inline bool ros_get_bit(const void *addr, size_t nbit)
 {
-	return ((const uint8_t *) addr)[nbit % CHAR_BIT] & (1 << (nbit % CHAR_BIT));
+	return GET_BITMASK_BIT(addr, nbit);
 }
