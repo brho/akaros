@@ -884,6 +884,8 @@ static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 
 	cpuid(tf->tf_rax, tf->tf_rcx, &eax, &ebx, &ecx, &edx);
 	switch (tf->tf_rax) {
+		/* TODO: If we can move this to userspace, vmrunkernel can make GPCS on
+		 * the fly. */
 		case 0x01:
 			/* Set the hypervisor bit to let the guest know it is virtualized */
 			ecx |= 1 << 31;

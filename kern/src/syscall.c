@@ -1490,8 +1490,8 @@ static int sys_pop_ctx(struct proc *p, struct user_context *ctx)
 	return 0;
 }
 
-static int sys_vmm_setup(struct proc *p, unsigned int nr_more_gpcs,
-                         struct vmm_gpcore_init *gpcis)
+static int sys_vmm_add_gpcs(struct proc *p, unsigned int nr_more_gpcs,
+                            struct vmm_gpcore_init *gpcis)
 {
 	ERRSTACK(1);
 	struct vmm *vmm = &p->vmm;
@@ -2638,7 +2638,7 @@ const struct sys_table_entry syscall_table[] = {
 	[SYS_init_arsc] = {(syscall_t)sys_init_arsc, "init_arsc"},
 #endif
 	[SYS_change_to_m] = {(syscall_t)sys_change_to_m, "change_to_m"},
-	[SYS_vmm_setup] = {(syscall_t)sys_vmm_setup, "vmm_setup"},
+	[SYS_vmm_add_gpcs] = {(syscall_t)sys_vmm_add_gpcs, "vmm_add_gpcs"},
 	[SYS_vmm_poke_guest] = {(syscall_t)sys_vmm_poke_guest, "vmm_poke_guest"},
 	[SYS_vmm_ctl] = {(syscall_t)sys_vmm_ctl, "vmm_ctl"},
 	[SYS_poke_ksched] = {(syscall_t)sys_poke_ksched, "poke_ksched"},

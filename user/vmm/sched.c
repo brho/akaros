@@ -567,7 +567,16 @@ int vmm_init(struct virtual_machine *vm, int flags)
 	if (current_vm)
 		return -1;
 	current_vm = vm;
-	if (syscall(SYS_vmm_setup, vm->nr_gpcs, vm->gpcis) != vm->nr_gpcs)
+	/* We should tell the kernel to create all of the GPCs we'll need in
+	 * advance.
+	 *
+	 * We could create the others on the fly, but the kernel's answer for
+	 * CPUID[0x1] will not have to total number of cores.  If we move that
+	 * handler to userspace, we can create the SMP-booted GPCs on the fly.
+	 *
+	 * We'd also have to deal with gths[] and gpcis[] growing dynamically, which
+	 * would require synchronization. */
+	if (syscall(SYS_vmm_add_gpcs, vm->nr_gpcs, vm->gpcis) != vm->nr_gpcs)
 		return -1;
 	if (flags) {
 		if (syscall(SYS_vmm_ctl, VMM_CTL_SET_FLAGS, flags))
