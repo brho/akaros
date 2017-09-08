@@ -1490,21 +1490,23 @@ static int sys_pop_ctx(struct proc *p, struct user_context *ctx)
 	return 0;
 }
 
-/* Initializes a process to run virtual machine contexts, returning the number
- * initialized, optionally setting errno */
-static int sys_vmm_setup(struct proc *p, unsigned int nr_guest_pcores,
+static int sys_vmm_setup(struct proc *p, unsigned int nr_more_gpcs,
                          struct vmm_gpcore_init *gpcis)
 {
-	int ret;
 	ERRSTACK(1);
+	struct vmm *vmm = &p->vmm;
 
+	qlock(&vmm->qlock);
 	if (waserror()) {
+		qunlock(&vmm->qlock);
 		poperror();
 		return -1;
 	}
-	ret = vmm_struct_init(p, nr_guest_pcores, gpcis);
+	__vmm_struct_init(p);
+	__vmm_add_gpcs(p, nr_more_gpcs, gpcis);
+	qunlock(&vmm->qlock);
 	poperror();
-	return ret;
+	return nr_more_gpcs;
 }
 
 static int sys_vmm_poke_guest(struct proc *p, int guest_pcoreid)
@@ -1528,9 +1530,7 @@ static int sys_vmm_ctl(struct proc *p, int cmd, unsigned long arg1,
 		poperror();
 		return -1;
 	}
-	/* TODO: have this also turn us into a VM */
-	if (!vmm->vmmcp)
-		error(EINVAL, "Not a VMM yet.");
+	__vmm_struct_init(p);
 	switch (cmd) {
 	case VMM_CTL_GET_EXITS:
 		if (vmm->amd)

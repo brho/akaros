@@ -65,46 +65,70 @@ void vmm_pcpu_init(void)
 	printk("vmm_pcpu_init failed\n");
 }
 
-/* Initializes a process to run virtual machine contexts, returning the number
- * initialized, throwing on error. */
-int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
-                    struct vmm_gpcore_init *u_gpcis)
+/* Ensures a process is ready to run virtual machines, though it may have no
+ * guest pcores yet.  Typically, this is called by other vmm functions.  Caller
+ * holds the qlock.  Throws on error. */
+void __vmm_struct_init(struct proc *p)
 {
-	ERRSTACK(1);
 	struct vmm *vmm = &p->vmm;
-	struct vmm_gpcore_init gpci;
 
+	if (vmm->vmmcp)
+		return;
 	if (!x86_supports_vmx)
 		error(ENODEV, "This CPU does not support VMX");
-	qlock(&vmm->qlock);
-	if (waserror()) {
-		qunlock(&vmm->qlock);
-		nexterror();
-	}
-
-	/* TODO: just use an atomic test instead of all this locking stuff? */
-	if (vmm->vmmcp)
-		error(EAGAIN, "We're already running a vmmcp?");
-	/* Set this early, so cleanup checks the gpc array */
 	vmm->vmmcp = TRUE;
 	vmm->amd = 0;
 	vmx_setup_vmx_vmm(&vmm->vmx);
-	nr_guest_pcores = MIN(nr_guest_pcores, num_cores);
-	vmm->guest_pcores = kzmalloc(sizeof(void *) * nr_guest_pcores, MEM_WAIT);
-	if (!vmm->guest_pcores)
-		error(ENOMEM, "Allocation of vmm->guest_pcores failed");
-
-	for (int i = 0; i < nr_guest_pcores; i++) {
-		if (copy_from_user(&gpci, &u_gpcis[i], sizeof(struct vmm_gpcore_init)))
-			error(EINVAL, "Bad pointer %p for gps", u_gpcis);
-		vmm->guest_pcores[i] = create_guest_pcore(p, &gpci);
-		vmm->nr_guest_pcores = i + 1;
-	}
 	for (int i = 0; i < VMM_VMEXIT_NR_TYPES; i++)
 		vmm->vmexits[i] = 0;
-	qunlock(&vmm->qlock);
-	poperror();
-	return vmm->nr_guest_pcores;
+	vmm->nr_guest_pcores = 0;
+	vmm->guest_pcores = NULL;
+	vmm->gpc_array_elem = 0;
+}
+
+/* Helper, grows the array of guest_pcores in vmm.  Concurrent readers
+ * (lookup_guest_pcore) need to use a seq-lock-style of concurrency.  They could
+ * read the old array even after we free it. */
+static void __vmm_grow_gpc_array(struct vmm *vmm, unsigned int new_nr_gpcs)
+{
+	struct guest_pcore **new_array, **old_array;
+	size_t new_nr_elem;
+
+	if (new_nr_gpcs <= vmm->gpc_array_elem)
+		return;
+	/* TODO: (RCU) we could defer the free, maybe with an RCU-safe krealloc. */
+	old_array = vmm->guest_pcores;
+	new_nr_elem = MAX(vmm->gpc_array_elem * 2, new_nr_gpcs);
+	new_array = kzmalloc(new_nr_elem * sizeof(void*), MEM_WAIT);
+	memcpy(new_array, vmm->guest_pcores,
+	       sizeof(void*) * vmm->nr_guest_pcores);
+	wmb();	/* all elements written before changing pointer */
+	vmm->guest_pcores = new_array;
+	wmb();	/* ptr written before potentially clobbering it. */
+	kfree(old_array);
+}
+
+/* Adds gpcs to the VMM.  Caller holds the qlock; throws on error. */
+void __vmm_add_gpcs(struct proc *p, unsigned int nr_more_gpcs,
+                    struct vmm_gpcore_init *u_gpcis)
+{
+	struct vmm *vmm = &p->vmm;
+	struct vmm_gpcore_init gpci;
+	unsigned int new_nr_gpcs;
+
+	if (!nr_more_gpcs)
+		return;
+	new_nr_gpcs = vmm->nr_guest_pcores + nr_more_gpcs;
+	if ((new_nr_gpcs < vmm->nr_guest_pcores) || (new_nr_gpcs > 10000))
+		error(EINVAL, "Can't add %u new gpcs", new_nr_gpcs);
+	__vmm_grow_gpc_array(vmm, new_nr_gpcs);
+	for (int i = 0; i < nr_more_gpcs; i++) {
+		if (copy_from_user(&gpci, &u_gpcis[i], sizeof(struct vmm_gpcore_init)))
+			error(EINVAL, "Bad pointer %p for gps", u_gpcis);
+		vmm->guest_pcores[vmm->nr_guest_pcores] = create_guest_pcore(p, &gpci);
+		wmb();	/* concurrent readers will check nr_guest_pcores first */
+		vmm->nr_guest_pcores++;
+	}
 }
 
 /* Has no concurrency protection - only call this when you know you have the
@@ -151,10 +175,19 @@ int vmm_poke_guest(struct proc *p, int guest_pcoreid)
 
 struct guest_pcore *lookup_guest_pcore(struct proc *p, int guest_pcoreid)
 {
+	struct guest_pcore **array;
+	struct guest_pcore *ret;
+
 	/* nr_guest_pcores is written once at setup and never changed */
 	if (guest_pcoreid >= p->vmm.nr_guest_pcores)
 		return 0;
-	return p->vmm.guest_pcores[guest_pcoreid];
+	/* TODO: (RCU) Synchronizing with __vmm_grow_gpc_array() */
+	do {
+		array = ACCESS_ONCE(p->vmm.guest_pcores);
+		ret = array[guest_pcoreid];
+		rmb();	/* read ret before rereading array pointer */
+	} while (array != ACCESS_ONCE(p->vmm.guest_pcores));
+	return ret;
 }
 
 struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid)

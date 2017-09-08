@@ -43,14 +43,16 @@ struct vmm {
 		struct vmx_vmm vmx;
 	};
 	struct guest_pcore **guest_pcores;
+	size_t gpc_array_elem;
 	unsigned long vmexits[VMM_VMEXIT_NR_TYPES];
 };
 
 void vmm_init(void);
 void vmm_pcpu_init(void);
 
-int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
-                    struct vmm_gpcore_init *gpcis);
+void __vmm_struct_init(struct proc *p);
+void __vmm_add_gpcs(struct proc *p, unsigned int nr_more_gpcs,
+                    struct vmm_gpcore_init *u_gpcis);
 void __vmm_struct_cleanup(struct proc *p);
 int vmm_poke_guest(struct proc *p, int guest_pcoreid);
 
