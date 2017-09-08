@@ -289,7 +289,7 @@ int main(int argc, char **argv)
 	}
 
 	init_lemu_logging(dune_debug);
-	init_syscall_table();
+	init_linuxemu();
 
 	if ((uintptr_t)(memstart + memsize) >= (uintptr_t)BRK_START) {
 		fprintf(stderr,

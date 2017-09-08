@@ -19,11 +19,19 @@
 #include <sys/mman.h>
 #include <futex.h>
 
+// This is the maximum fd number we allow opened in dune
+#define DUNE_NR_FILE_DESC 100
+
 static int lemu_debug;
 
 static uth_mutex_t *lemu_logging_lock;
+static uth_mutex_t *fd_table_lock;
 
 static FILE *lemu_global_logfile;
+
+//Records the open fds of files opened with linuxemu
+// TODO: Make this a dynamic array in the future
+char *openfd_filenames[DUNE_NR_FILE_DESC];
 
 void init_lemu_logging(int log_level)
 {
@@ -48,6 +56,166 @@ void destroy_lemu_logging(void)
 		fclose(lemu_global_logfile);
 }
 
+/////////////////////////////////////
+// BEGIN SYSCALL HELPERS
+/////////////////////////////////////
+
+// Checks if path is an absolute path
+// Symlinks are not resolved, we just check if we refer to the root directory
+bool is_absolute_path(const char *path)
+{
+	if (!path || strlen(path) == 0)
+		return false;
+	return (strncmp(path, "/", 1) == 0);
+}
+
+
+// This resolves relative paths in syscalls like openat and unlinkat, based on
+// our currently opened fds in dune
+//
+// This function will allocate memory for the string absolute_path, it is the
+// caller's responsibility to free this memory when it is done
+//
+// If path is an absolute path already, we ignore fd and retrun a copy of path
+// in absolute_path
+bool get_absolute_path_from_fd(int fd, const char *path, char **absolute_path)
+{
+	if (!path) {
+		fprintf(stderr, "get_absolute_path_from_fd: suffix is null.\n");
+		return false;
+	}
+
+	if (fd >= DUNE_NR_FILE_DESC) {
+		fprintf(stderr, "get_absolute_path_from_fd: fd too large.\n");
+		return false;
+	}
+
+	int len1 = strlen(path);
+
+	if (len1 == 0) {
+		fprintf(stderr, "get_absolute_path_from_fd: suffix is empty.\n");
+		return false;
+	}
+
+	if (is_absolute_path(path)) {
+		*absolute_path = calloc(sizeof(char), len1 + 1);
+		if (!(*absolute_path)) {
+			fprintf(stderr,
+			        "get_absolute_path_from_fd: couldn't allocate memory.\n");
+			return false;
+		}
+		strcpy(*absolute_path, path);
+		return true;
+	}
+
+	uth_mutex_lock(fd_table_lock);
+	if (!openfd_filenames[fd]) {
+		uth_mutex_unlock(fd_table_lock);
+		fprintf(stderr, "get_absolute_path_from_fd: no file open at fd.\n");
+		return false;
+	}
+
+	int len2 = strlen(openfd_filenames[fd]);
+
+	if (len2 == 0) {
+		uth_mutex_unlock(fd_table_lock);
+		fprintf(stderr,
+		        "get_absolute_path_from_fd: prefix has length 0, fd was probably not open.\n");
+		return false;
+	}
+
+	// Add space for an extra slash and a null terminator
+	int total_len = len1 + len2 + 2;
+
+	*absolute_path = calloc(sizeof(char), total_len);
+
+	if (!(*absolute_path)) {
+		uth_mutex_unlock(fd_table_lock);
+		fprintf(stderr,
+		        "get_absolute_path_from_fd: couldn't allocate memory.\n");
+		return false;
+	}
+
+	strcat(*absolute_path, openfd_filenames[fd]);
+	uth_mutex_unlock(fd_table_lock);
+
+	// Add a slash if we don't have one
+	if ((*absolute_path)[len2 - 1] != '/')
+		strcat(*absolute_path, "/");
+
+	strcat(*absolute_path, path);
+
+	fprintf(stderr, "Constructed full path \"%s\"\n", *absolute_path);
+	return true;
+}
+
+
+//Akaros open flags are different than linux
+//This function converts them
+int translate_open_flags(int flags)
+{
+	int lower3bits = flags & 0x7;
+	int otherstuff = flags & ~(0x7);
+
+	switch (lower3bits) {
+	case 0:
+		otherstuff |= O_RDONLY;
+		break;
+	case 1:
+		otherstuff |= O_WRONLY;
+		break;
+	case 2:
+		otherstuff |= O_RDWR;
+		break;
+	case 3:
+		otherstuff |= O_ACCMODE;
+		break;
+	default:
+		// TODO(ganshun): We panic here for now if they are trying behavior we
+		// do not expect
+		panic("linuxemu, translate_open_flags: unknown open flags provided\n");
+		break;
+	}
+	return otherstuff;
+}
+
+// Updates the fd mapping for a specific fd. Allows the fd mapping to
+// be freed (in the case of a close). Calls to the function may leave
+// values in the fd table as NULL
+bool update_fd_map(int fd, const char *path)
+{
+	int len = 0;
+
+	if (fd >= DUNE_NR_FILE_DESC)
+		return false;
+
+	if (path)
+		len = strlen(path);
+
+	uth_mutex_lock(fd_table_lock);
+
+	// If there was a file here before, free the string
+	// Potential optimization would be to only free when
+	// we need to grow the size of the string.
+	if (openfd_filenames[fd]) {
+		free(openfd_filenames[fd]);
+		openfd_filenames[fd] = NULL;
+	}
+	// If we have a new file to put here, allocate memory
+	// and copy it in.
+	if (len) {
+		openfd_filenames[fd] = (char*) calloc(sizeof(char), len + 1);
+		if (!openfd_filenames[fd]) {
+			uth_mutex_unlock(fd_table_lock);
+			panic("update_fd_map could not allocate memory\n");
+			return false;
+		}
+		strcpy(openfd_filenames[fd], path);
+	}
+
+	uth_mutex_unlock(fd_table_lock);
+	return true;
+}
 
 /////////////////////////////////////
 // BEGIN DUNE SYSCALL IMPLEMENTATIONS
@@ -316,39 +484,178 @@ bool dune_sys_gettid(struct vm_trapframe *tf)
 
 bool dune_sys_open(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	const char *file = (const char *) tf->tf_rdi;
+	int flags = tf->tf_rsi;
+
+	flags = translate_open_flags(flags);
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+	          "Trying to open \"%s\"\n", file);
+
+	int retval  = open(file, flags);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+		return true;
+	}
+
+	if (!update_fd_map(retval, file))
+		panic("[TID %d] %s: ERROR in updating fd_mapping\n",
+		      tf->tf_guest_pcoreid, dune_syscall_table[tf->tf_rax].name);
+
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+	          "SUCCESS %d\n", retval);
+	tf->tf_rax = retval;
+	return true;
 }
 
 bool dune_sys_openat(struct vm_trapframe *tf)
 {
 
-	// To Be Implemented
-	return false;
+	int fd = (int) tf->tf_rdi;
+	const char *s = (const char *) tf->tf_rsi;
+	int flags = (int) tf->tf_rdx;
+	char *s_absolute = NULL;
+	int retval;
+	int err;
+
+	// TODO: we panic here on failure, but there are probably instances
+	// where we'd want to recover and return EBADF or ENOTDIR
+	if (!get_absolute_path_from_fd(fd, s, &s_absolute)) {
+		panic("[TID %d] %s: ERROR in getting absolute path fd was %d, suffix was %s\n",
+		      tf->tf_guest_pcoreid, dune_syscall_table[tf->tf_rax].name, fd, s);
+	}
+
+	flags = translate_open_flags(flags);
+
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+	          "trying to open absolute path %s with translated flags %p\n",
+	          s, flags);
+	retval = open(s_absolute, flags);
+	err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+		free(s_absolute);
+		return true;
+	}
+
+	if (!update_fd_map(retval, s_absolute)) {
+		panic("[TID %d] %s: ERROR in updating fd_mapping\n",
+		      tf->tf_guest_pcoreid,
+		      dune_syscall_table[tf->tf_rax].name);
+	}
+
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+	          "SUCCESS %d\n", retval);
+	free(s_absolute);
+	tf->tf_rax = retval;
+	return true;
 }
 
 bool dune_sys_readlinkat(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	int fd = (int) tf->tf_rdi;
+	const char *s = (const char*) tf->tf_rsi;
+	char *buf = (char *) tf->tf_rdx;
+	size_t bufsize = (size_t) tf->tf_r10;
+	ssize_t retval;
+	int err;
+	char *s_absolute = NULL;
+
+
+	if (!get_absolute_path_from_fd(fd, s, &s_absolute)) {
+		panic("[TID %d] %s: ERROR in getting absolute path fd was %d, suffix was %s\n",
+		      tf->tf_guest_pcoreid, dune_syscall_table[tf->tf_rax].name, fd,
+		      s);
+	}
+
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+	          "trying to readlink %s\n", s_absolute);
+	retval = readlink(s_absolute, buf, bufsize);
+	err = errno;
+	free(s_absolute);
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %zd\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
 }
 
 bool dune_sys_unlinkat(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	int fd = (int) tf->tf_rdi;
+	const char *s = (const char*) tf->tf_rsi;
+	int flags = (int) tf->tf_rdx;
+	char *s_absolute = NULL;
+	int retval, err;
+
+	if (!get_absolute_path_from_fd(fd, s, &s_absolute)) {
+		panic("[TID %d] %s: ERROR in getting absolute path fd was %d, suffix was %s\n",
+		      tf->tf_guest_pcoreid, dune_syscall_table[tf->tf_rax].name, fd,
+		      s);
+	}
+
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+	          "trying to unlink %s\n", s_absolute);
+	retval = unlink(s_absolute);
+	err = errno;
+	free(s_absolute);
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
 }
 
 bool dune_sys_close(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	int fd = tf->tf_rdi;
+	int retval, err;
+
+	retval = close(fd);
+	err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+		return true;
+	}
+
+	if (!update_fd_map(fd, NULL)) {
+		panic("[TID %d] %s: ERROR in updating fd_mapping\n",
+		      tf->tf_guest_pcoreid,
+		      dune_syscall_table[tf->tf_rax].name);
+	}
+
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+	          "SUCCESS %d\n", retval);
+	tf->tf_rax = retval;
+	return true;
 }
 
 bool dune_sys_sched_yield(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = 0;
+	uthread_sched_yield();
+	return true;
 }
 
 
@@ -820,8 +1127,9 @@ struct dune_sys_table_entry dune_syscall_table[DUNE_MAX_NUM_SYSCALLS] = {
 
 };
 
-bool init_syscall_table(void)
+bool init_linuxemu(void)
 {
+	fd_table_lock = uth_mutex_alloc();
 	int i;
 
 	for (i = 0; i < DUNE_MAX_NUM_SYSCALLS ; ++i) {

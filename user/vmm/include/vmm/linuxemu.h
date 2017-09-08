@@ -14,7 +14,7 @@ struct dune_sys_table_entry {
 
 extern struct dune_sys_table_entry dune_syscall_table[];
 
-bool init_syscall_table(void);
+bool init_linuxemu(void);
 void init_lemu_logging(int logging_level);
 void destroy_lemu_logging(void);
 void lemuprint(const uint32_t tid, uint64_t syscall_number,

@@ -156,8 +156,8 @@ void *init_e820map(struct virtual_machine *vm, struct boot_params *bp);
 void checkmemaligned(uintptr_t memstart, size_t memsize);
 void mmap_memory(struct virtual_machine *vm, uintptr_t memstart,
                  size_t memsize);
-bool mmap_file(const char *path, uintptr_t memstart, uintptr_t memsize,
-               uint64_t protections, uint64_t offset);
+bool mmap_file(const char *path, uintptr_t memstart, size_t memsize,
+               uint64_t protections, size_t offset);
 void add_pte_entries(struct virtual_machine *vm, uintptr_t start,
                      uintptr_t end);
 void setup_paging(struct virtual_machine *vm);

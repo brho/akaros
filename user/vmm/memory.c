@@ -159,8 +159,8 @@ done:
 		vm->maxphys = memstart + memsize - 1;
 }
 
-bool mmap_file(const char *path, uintptr_t memstart, uintptr_t memsize,
-               uint64_t protections, uint64_t offset)
+bool mmap_file(const char *path, uintptr_t memstart, size_t memsize,
+               uint64_t protections, size_t offset)
 {
 	int fd = open(path, O_RDONLY);
 
