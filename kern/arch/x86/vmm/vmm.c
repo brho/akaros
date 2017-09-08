@@ -68,16 +68,12 @@ void vmm_pcpu_init(void)
 /* Initializes a process to run virtual machine contexts, returning the number
  * initialized, throwing on error. */
 int vmm_struct_init(struct proc *p, unsigned int nr_guest_pcores,
-                    struct vmm_gpcore_init *u_gpcis, int flags)
+                    struct vmm_gpcore_init *u_gpcis)
 {
 	ERRSTACK(1);
 	struct vmm *vmm = &p->vmm;
 	struct vmm_gpcore_init gpci;
 
-	if (flags & ~VMM_ALL_FLAGS)
-		error(EINVAL, "%s: flags is 0x%lx, VMM_ALL_FLAGS is 0x%lx\n", __func__,
-		      flags, VMM_ALL_FLAGS);
-	vmm->flags = flags;
 	if (!x86_supports_vmx)
 		error(ENODEV, "This CPU does not support VMX");
 	qlock(&vmm->qlock);

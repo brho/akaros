@@ -380,7 +380,7 @@ int main(int argc, char **argv)
 	char *cmdline_extra = "\0";
 	char *cmdline;
 	void *a = (void *)0xe0000;
-	int vmmflags = 0; // Disabled probably forever. VMM_VMCALL_PRINTF;
+	int vmmflags = 0;
 	uint64_t entry = 0;
 	int ret;
 	struct vm_trapframe *vm_tf;
@@ -448,7 +448,7 @@ int main(int argc, char **argv)
 			debug++;
 			break;
 		case 'v':
-			vmmflags |= VMM_VMCALL_PRINTF;
+			vmmflags |= VMM_CTL_FL_KERN_PRINTC;
 			break;
 		case 'm':
 			memsize = strtoull(optarg, 0, 0);

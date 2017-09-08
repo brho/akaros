@@ -1075,7 +1075,7 @@ static void vmexit_dispatch(struct vm_trapframe *tf)
 	 * do it for external IRQs - the irq_dispatch code will handle it. */
 	switch (tf->tf_exit_reason) {
 	case EXIT_REASON_VMCALL:
-		if (current->vmm.flags & VMM_VMCALL_PRINTF &&
+		if (current->vmm.flags & VMM_CTL_FL_KERN_PRINTC &&
 		    tf->tf_rax == VMCALL_PRINTC) {
 			printk("%c", tf->tf_rdi);
 			tf->tf_rip += 3;

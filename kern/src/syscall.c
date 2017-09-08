@@ -1493,7 +1493,7 @@ static int sys_pop_ctx(struct proc *p, struct user_context *ctx)
 /* Initializes a process to run virtual machine contexts, returning the number
  * initialized, optionally setting errno */
 static int sys_vmm_setup(struct proc *p, unsigned int nr_guest_pcores,
-                         struct vmm_gpcore_init *gpcis, int flags)
+                         struct vmm_gpcore_init *gpcis)
 {
 	int ret;
 	ERRSTACK(1);
@@ -1502,7 +1502,7 @@ static int sys_vmm_setup(struct proc *p, unsigned int nr_guest_pcores,
 		poperror();
 		return -1;
 	}
-	ret = vmm_struct_init(p, nr_guest_pcores, gpcis, flags);
+	ret = vmm_struct_init(p, nr_guest_pcores, gpcis);
 	poperror();
 	return ret;
 }
@@ -1544,6 +1544,16 @@ static int sys_vmm_ctl(struct proc *p, int cmd, unsigned long arg1,
 		if (vmm->amd)
 			error(ENOTSUP, "AMD VMMs unsupported");
 		ret = vmx_ctl_set_exits(&vmm->vmx, arg1);
+		break;
+	case VMM_CTL_GET_FLAGS:
+		ret = vmm->flags;
+		break;
+	case VMM_CTL_SET_FLAGS:
+		if (arg1 & ~VMM_CTL_ALL_FLAGS)
+			error(EINVAL, "Bad vmm_ctl flags.  Got 0x%lx, allowed 0x%lx\n",
+			      arg1, VMM_CTL_ALL_FLAGS);
+		vmm->flags = arg1;
+		ret = 0;
 		break;
 	default:
 		error(EINVAL, "Bad vmm_ctl cmd %d", cmd);

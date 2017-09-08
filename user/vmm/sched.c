@@ -567,8 +567,12 @@ int vmm_init(struct virtual_machine *vm, int flags)
 	if (current_vm)
 		return -1;
 	current_vm = vm;
-	if (syscall(SYS_vmm_setup, vm->nr_gpcs, vm->gpcis, flags) != vm->nr_gpcs)
+	if (syscall(SYS_vmm_setup, vm->nr_gpcs, vm->gpcis) != vm->nr_gpcs)
 		return -1;
+	if (flags) {
+		if (syscall(SYS_vmm_ctl, VMM_CTL_SET_FLAGS, flags))
+			return -1;
+	}
 	gths = malloc(vm->nr_gpcs * sizeof(struct guest_thread *));
 	if (!gths)
 		return -1;
