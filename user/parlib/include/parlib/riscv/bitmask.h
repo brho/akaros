@@ -17,7 +17,7 @@ __BEGIN_DECLS
 #define BYTES_FOR_BITMASK_WITH_CHECK(size) \
 	((size) ? ((size) - (1)) / (8) + (1) : (0))
 
-static bool GET_BITMASK_BIT(uint8_t* name, size_t bit) 
+static bool GET_BITMASK_BIT(const uint8_t *name, size_t bit)
 {
 	return (((name)[(bit)/8] & (1 << ((bit) % 8))) ? 1 : 0);
 }
@@ -78,7 +78,7 @@ static void SET_BITMASK_BIT_ATOMIC(uint8_t* name, size_t bit)
 	} \
 	clear; })
 
-static inline bool BITMASK_IS_FULL(uint8_t* map, size_t size)
+static inline bool BITMASK_IS_FULL(const uint8_t *map, size_t size)
 {
 	int _size = size;
 	for (int i = 0; i < BYTES_FOR_BITMASK(size); i++) {

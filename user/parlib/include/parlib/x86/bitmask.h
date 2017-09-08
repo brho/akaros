@@ -14,7 +14,7 @@ __BEGIN_DECLS
 #define BYTES_FOR_BITMASK(size) \
 	(((size) - 1) / 8 + 1)
 
-static inline bool GET_BITMASK_BIT(uint8_t *name, size_t bit)
+static inline bool GET_BITMASK_BIT(const uint8_t *name, size_t bit)
 {
 	return name[bit / 8] & (1 << (bit % 8)) ? TRUE : FALSE;
 }
@@ -50,13 +50,14 @@ static inline void FILL_BITMASK(uint8_t *name, size_t size)
 	name[BYTES_FOR_BITMASK(size) - 1] >>= ((size % 8) ? (8 - (size % 8)) : 0);
 }
 
-static inline void COPY_BITMASK(uint8_t *newmask, uint8_t *oldmask, size_t size)
+static inline void COPY_BITMASK(uint8_t *newmask, const uint8_t *oldmask,
+                                size_t size)
 {
 	memcpy(newmask, oldmask, BYTES_FOR_BITMASK(size));
 }
 
 /* this checks the entire last byte, so keep it 0 in the other functions */
-static bool BITMASK_IS_CLEAR(uint8_t *name, size_t size)
+static bool BITMASK_IS_CLEAR(const uint8_t *name, size_t size)
 {
 	uint32_t __n = BYTES_FOR_BITMASK(size);
 	bool clear = TRUE;
@@ -70,7 +71,7 @@ static bool BITMASK_IS_CLEAR(uint8_t *name, size_t size)
 	return clear;
 }
 
-static inline bool BITMASK_IS_FULL(uint8_t *map, size_t size)
+static inline bool BITMASK_IS_FULL(const uint8_t *map, size_t size)
 {
 	size_t nr_bytes = BYTES_FOR_BITMASK(size);
 
@@ -84,7 +85,7 @@ static inline bool BITMASK_IS_FULL(uint8_t *map, size_t size)
 	return TRUE;
 }
 
-static inline void PRINT_BITMASK(uint8_t *name, size_t size)
+static inline void PRINT_BITMASK(const uint8_t *name, size_t size)
 {
 	size_t nr_bytes = BYTES_FOR_BITMASK(size);
 

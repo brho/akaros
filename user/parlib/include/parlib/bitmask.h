@@ -4,7 +4,8 @@
 
 __BEGIN_DECLS
 
-static inline bool BITMASK_IS_SET_IN_RANGE(uint8_t* m, size_t beg, size_t end)
+static inline bool BITMASK_IS_SET_IN_RANGE(const uint8_t *m, size_t beg,
+                                           size_t end)
 {
 	for(size_t i=beg; i<end; i++) {
 		if(!GET_BITMASK_BIT(m, i))
@@ -13,7 +14,8 @@ static inline bool BITMASK_IS_SET_IN_RANGE(uint8_t* m, size_t beg, size_t end)
 	return TRUE;
 }
 
-static inline bool BITMASK_IS_CLR_IN_RANGE(uint8_t* m, size_t beg, size_t end)
+static inline bool BITMASK_IS_CLR_IN_RANGE(const uint8_t *m, size_t beg,
+                                           size_t end)
 {
 	for(size_t i=beg; i<end; i++) {
 		if(GET_BITMASK_BIT(m, i))
