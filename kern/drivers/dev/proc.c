@@ -428,7 +428,7 @@ static void build_maps_cb(struct vm_region *vmr, void *arg)
 	                       vmr->vm_prot & PROT_READ    ? 'r' : '-',
 	                       vmr->vm_prot & PROT_WRITE   ? 'w' : '-',
 	                       vmr->vm_prot & PROT_EXEC    ? 'x' : '-',
-	                       vmr->vm_flags & MAP_PRIVATE ? 'p' : '-',
+	                       vmr->vm_flags & MAP_PRIVATE ? 'p' : 's',
 	                       vmr->vm_file ? vmr->vm_foff : 0,
 	                       vmr->vm_file ? 1 : 0,	/* VFS == 1 for major */
 	                       0,
