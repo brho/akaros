@@ -102,48 +102,13 @@ void ancillary_state_init(void)
 		lcr4(rcr4() | CR4_OSXSAVE);
 		lxcr0(__proc_global_info.x86_default_xcr0);
 
-		/*
-		 * Build a default set of extended state values that we can later use
+		/* Build a default set of extended state values that we can later use
 		 * to initialize extended state on other cores, or restore on this
-		 * core. We need to use FNINIT to reset the FPU before saving, in case
-		 * boot agents used the FPU or it is dirty for some reason. An old
-		 * comment that used to be here said "had this happen on c89, which had
-		 * a full FP stack after booting." Note that FNINIT does not clear the
-		 * data registers, but it tags them all as empty (0b11).
+		 * core.  FNINIT won't actually do it - if you xsave after fninit, x87
+		 * will show up as active in xstate_bv[0].  Instead, we just need
+		 * the xstate_bv bits zeroed (and memset the rest for sanity's sake).
 		 */
-
-		// Zero the default extended state memory region before saving.
-		// It may be possible for memset to clobber SSE registers.
 		memset(&x86_default_fpu, 0x00, sizeof(struct ancillary_state));
-
-		/*
-		 * FNINIT clears FIP and FDP and, even though it is technically a
-		 * control instruction, it clears FOP while initializing the FPU.
-		 *
-		 * This marks the STX/MMX registers as empty in the FPU tag word,
-		 * but does not actually clear the values in the registers,
-		 * so we manually clear them in the xsave area after saving.
-		 */
-		asm volatile ("fninit");
-
-		/*
-		 * Save only the x87 FPU state so that the extended state registers
-		 * remain zeroed in the default. The MXCSR is in a separate state
-		 * component (SSE), so we manually set its value in the default state.
-		 *
-		 * We use XSAVE64 instead of XSAVEOPT64 (save_fp_state uses
-		 * XSAVEOPT64), because XSAVEOPT64 may decide to skip saving a state
-		 * component if that state component is in its initial configuration,
-		 * and we just used FNINIT to put the x87 in its initial configuration.
-		 * We can be confident that the x87 bit (bit 0) is set in xcr0, because
-		 * Intel requires it to be set at all times.
-		 */
-		edx = 0x0;
-		eax = 0x1;
-		asm volatile("xsave64 %0" : : "m"(x86_default_fpu), "a"(eax), "d"(edx));
-
-		// Clear junk that might have been saved from STX/MMX registers
-		memset(&(x86_default_fpu.st0_mm0), 0x00, 128);
 
 		/* We must set the MXCSR field in the default state struct to its
 		 * power-on value of 0x1f80. This masks all SIMD floating
@@ -160,7 +125,7 @@ void ancillary_state_init(void)
 		 * implemented for Akaros, this will function correctly for
 		 * all supported operating modes.
 		 */
-		 x86_default_fpu.fp_head_64d.mxcsr = 0x1f80;
+		x86_default_fpu.fp_head_64d.mxcsr = 0x1f80;
 	} else {
 		// Since no program should try to use XSAVE features
 		// on this processor, we set x86_default_xcr0 to 0x0
