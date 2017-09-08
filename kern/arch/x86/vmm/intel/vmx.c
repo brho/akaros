@@ -1452,17 +1452,13 @@ int vmx_ctl_set_exits(struct vmx_vmm *vmx, int vmm_exits)
 
 	toggle_want = (vmx_ctl_get_exits(vmx) ^ vmm_exits) & VMM_CTL_ALL_EXITS;
 	if (toggle_want & VMM_CTL_EXIT_HALT) {
-	    if (!vmx_control_can_be_changed(&cbec, CPU_BASED_HLT_EXITING)) {
-			set_error(ENOSYS, "VMX can't toggle EXIT_HALT");
-			return -1;
-		}
+	    if (!vmx_control_can_be_changed(&cbec, CPU_BASED_HLT_EXITING))
+			error(ENOSYS, "VMX can't toggle EXIT_HALT");
 		vmx_toggle_do |= CPU_BASED_HLT_EXITING;
 	}
 	if (toggle_want & VMM_CTL_EXIT_PAUSE) {
-	    if (!vmx_control_can_be_changed(&cbec, CPU_BASED_PAUSE_EXITING)) {
-			set_error(ENOSYS, "VMX can't toggle EXIT_PAUSE");
-			return -1;
-		}
+	    if (!vmx_control_can_be_changed(&cbec, CPU_BASED_PAUSE_EXITING))
+			error(ENOSYS, "VMX can't toggle EXIT_PAUSE");
 		vmx_toggle_do |= CPU_BASED_PAUSE_EXITING;
 	}
 	/* This is being read concurrently by load_guest_pcore. */

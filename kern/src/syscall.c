@@ -1512,45 +1512,44 @@ static int sys_vmm_poke_guest(struct proc *p, int guest_pcoreid)
 	return vmm_poke_guest(p, guest_pcoreid);
 }
 
-static int no_amd(void)
-{
-	set_error(ENOTSUP, "AMD VMMs unsupported");
-	return -1;
-}
-
 static int sys_vmm_ctl(struct proc *p, int cmd, unsigned long arg1,
                        unsigned long arg2, unsigned long arg3,
                        unsigned long arg4)
 {
+	ERRSTACK(1);
 	int ret;
+	struct vmm *vmm = &p->vmm;
 
 	/* Protects against concurrent setters and for gets that are not atomic
 	 * reads (say, multiple exec ctls). */
-	qlock(&p->vmm.qlock);
+	qlock(&vmm->qlock);
+	if (waserror()) {
+		qunlock(&vmm->qlock);
+		poperror();
+		return -1;
+	}
+	/* TODO: have this also turn us into a VM */
+	if (!vmm->vmmcp)
+		error(EINVAL, "Not a VMM yet.");
 	switch (cmd) {
 	case VMM_CTL_GET_EXITS:
-		if (p->vmm.amd)
-			ret = no_amd();
-		else
-			ret = vmx_ctl_get_exits(&p->vmm.vmx);
+		if (vmm->amd)
+			error(ENOTSUP, "AMD VMMs unsupported");
+		ret = vmx_ctl_get_exits(&vmm->vmx);
 		break;
 	case VMM_CTL_SET_EXITS:
-		if (arg1 & ~VMM_CTL_ALL_EXITS) {
-			set_error(EINVAL, "Bad vmm_ctl_exits %x (%x)", arg1,
-			          VMM_CTL_ALL_EXITS);
-			ret = -1;
-			break;
-		}
-		if (p->vmm.amd)
-			ret = no_amd();
-		else
-			ret = vmx_ctl_set_exits(&p->vmm.vmx, arg1);
+		if (arg1 & ~VMM_CTL_ALL_EXITS)
+			error(EINVAL, "Bad vmm_ctl_exits %x (%x)", arg1,
+			      VMM_CTL_ALL_EXITS);
+		if (vmm->amd)
+			error(ENOTSUP, "AMD VMMs unsupported");
+		ret = vmx_ctl_set_exits(&vmm->vmx, arg1);
 		break;
 	default:
-		set_error(EINVAL, "Bad vmm_ctl cmd %d", cmd);
-		ret = -1;
+		error(EINVAL, "Bad vmm_ctl cmd %d", cmd);
 	}
-	qunlock(&p->vmm.qlock);
+	qunlock(&vmm->qlock);
+	poperror();
 	return ret;
 }
 
