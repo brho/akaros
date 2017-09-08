@@ -19,7 +19,7 @@
 void print_cpuinfo(void)
 {
 	uint32_t eax, ebx, ecx, edx;
-	uint32_t model, family;
+	uint32_t model, family, ext_model, ext_family;
 	uint64_t msr_val;
 	char vendor_id[13];
 	int max_std_lvl, max_extd_lvl;
@@ -61,8 +61,14 @@ void print_cpuinfo(void)
 	cprintf("Largest Extended Function Number Supported: 0x%08x\n", eax);
 	max_extd_lvl = eax;
 	cpuid(1, 0x0, &eax, &ebx, &ecx, &edx);
-	family = ((eax & 0x0FF00000) >> 20) + ((eax & 0x00000F00) >> 8);
-	model = ((eax & 0x000F0000) >> 16) + ((eax & 0x000000F0) >> 4);
+	ext_family = (eax >> 20) & 0xff;
+	ext_model = (eax >> 16) & 0xf;
+	family = (eax >> 8) & 0xf;
+	model = (eax >> 4) & 0xf;
+	if ((family == 15) || (family == 6))
+		model += ext_model << 4;
+	if (family == 15)
+		family += ext_family;
 	cprintf("Family: %d\n", family);
 	cprintf("Model: %d\n", model);
 	cprintf("Stepping: %d\n", eax & 0x0000000F);
