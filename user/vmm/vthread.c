@@ -23,8 +23,7 @@ static void *page(void *addr, int count)
 	return mmap(addr, count * 4096, PROT_READ | PROT_WRITE, flags, -1, 0);
 }
 
-/* vmsetup is a basic helper function used by vthread_attr_init
- * and vthread_attr_kernel_init. */
+/* vmsetup is a basic helper function used by vthread_attr_init */
 static int vmsetup(struct virtual_machine *vm, int flags)
 {
 	struct vm_trapframe *vm_tf;
@@ -80,26 +79,6 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 int vthread_attr_init(struct virtual_machine *vm, int vmmflags)
 {
 	return vmsetup(vm, vmmflags);
-}
-
-/* vthread_attr_kernel_init sets up minimum basic attributes for
- * running a kernel, as opposed to just user mode.  This setup
- * includes an APIC page at 0xfee00000, to be shared by all cores. */
-int vthread_attr_kernel_init(struct virtual_machine *vm, int vmmflags)
-{
-	int ret;
-	int i;
-	uint32_t *apic;
-
-	ret = vmsetup(vm, vmmflags);
-	if (ret)
-		return ret;
-
-	for (i = 0; i < vm->nr_gpcs; i++) {
-		apic = vm->gpcis[i].apic_addr;
-		apic[0x30 / 4] = 0x01060015;
-	}
-	return 0;
 }
 
 #define DEFAULT_STACK_SIZE 65536

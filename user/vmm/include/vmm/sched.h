@@ -89,7 +89,6 @@ struct task_thread *vmm_run_task(struct virtual_machine *vm,
                                  void *(*func)(void *), void *arg);
 
 int vthread_attr_init(struct virtual_machine *vm, int vmmflags);
-int vthread_attr_kernel_init(struct virtual_machine *vm, int vmmflags);
 int vthread_create(struct virtual_machine *vm, int guest, void *rip, void *arg);
 
 __END_DECLS
