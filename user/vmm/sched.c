@@ -543,7 +543,7 @@ static void ev_handle_diag(struct event_msg *ev_msg, unsigned int ev_type,
 
 	fprintf(stderr, "\nSCHED stats:\n---------------\n");
 	for (int i = 0; i < vm->nr_gpcs; i++) {
-		gth = vm->gths[i];
+		gth = gpcid_to_gth(vm, i);
 		cth = gth->buddy;
 		fprintf(stderr, "\tGPC %2d: %lu resched, %lu gth runs, %lu ctl runs, %lu user-handled vmexits\n",
 				i,
@@ -597,7 +597,7 @@ int vmm_init(struct virtual_machine *vm, struct vmm_gpcore_init *gpcis,
 			return -1;
 		}
 	}
-	vm->gths = gths;
+	vm->__gths = gths;
 	uthread_mcp_init();
 	register_ev_handler(EV_FREE_APPLE_PIE, ev_handle_diag, NULL);
 	if (sched_is_greedy()) {

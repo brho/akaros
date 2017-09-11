@@ -203,7 +203,7 @@ static bool handle_vmcall_smpboot(struct guest_thread *gth)
 	}
 
 	/* Start up secondary core. */
-	vm_tf_ap = gth_to_vmtf(vm->gths[cur_pcores]);
+	vm_tf_ap = gpcid_to_vmtf(vm, cur_pcores);
 	/* We use the BSP's CR3 for now. This should be fine because they
 	 * change it later anyway. */
 	vm_tf_ap->tf_cr3 = vm_tf->tf_cr3;
@@ -216,7 +216,7 @@ static bool handle_vmcall_smpboot(struct guest_thread *gth)
 
 	vm->up_gpcs++;
 
-	start_guest_thread(vm->gths[cur_pcores]);
+	start_guest_thread(gpcid_to_gth(vm, cur_pcores));
 
 	return TRUE;
 }

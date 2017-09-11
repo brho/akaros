@@ -23,7 +23,7 @@ int vmm_interrupt_guest(struct virtual_machine *vm, unsigned int gpcoreid,
 		        vm->nr_gpcs);
 		return -1;
 	}
-	gth = vm->gths[gpcoreid];
+	gth = gpcid_to_gth(vm, gpcoreid);
 	gpci = gth_to_gpci(gth);
 	/* The OUTSTANDING_NOTIF bit (256) is one greater than the last valid
 	 * descriptor */

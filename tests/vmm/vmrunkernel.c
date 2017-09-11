@@ -694,14 +694,14 @@ int main(int argc, char **argv)
 
 	setup_paging(vm);
 
-	vm_tf = gth_to_vmtf(vm->gths[0]);
+	vm_tf = gpcid_to_vmtf(vm, 0);
 	vm_tf->tf_cr3 = (uint64_t) vm->root;
 	vm_tf->tf_rip = entry;
 	vm_tf->tf_rsp = 0xe0000;
 	vm_tf->tf_rsi = (uint64_t) bp;
 	vm->up_gpcs = 1;
 	fprintf(stderr, "Start guest: cr3 %p rip %p\n", vm_tf->tf_cr3, entry);
-	start_guest_thread(vm->gths[0]);
+	start_guest_thread(gpcid_to_gth(vm, 0));
 
 	uthread_sleep_forever();
 	return 0;

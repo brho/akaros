@@ -234,6 +234,7 @@ int main(int argc, char **argv)
 	uint64_t entry = 0;
 	int ret;
 	struct vm_trapframe *vm_tf;
+	struct guest_thread *gth;
 	int c;
 	int test = 0;
 	int option_index;
@@ -345,8 +346,9 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	vm.gths[0]->vmcall = linuxemu;
-	vm_tf = gth_to_vmtf(vm.gths[0]);
+	gth = gpcid_to_gth(&vm, 0);
+	gth->vmcall = linuxemu;
+	vm_tf = gth_to_vmtf(gth);
 
 	/* we can't use the default stack since we set one up
 	 * ourselves. */

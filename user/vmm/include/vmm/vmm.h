@@ -46,7 +46,7 @@ enum {
 
 /* Structure to encapsulate all of the bookkeeping for a VM. */
 struct virtual_machine {
-	struct guest_thread			**gths;
+	struct guest_thread			**__gths;
 	unsigned int				nr_gpcs;
 	/* up_gpcs should not need synchronization. only the BSP should be making
 	 * startup vmcalls. For security's sake we might still want to lock in the
@@ -126,7 +126,13 @@ static struct vmm_gpcore_init *gth_to_gpci(struct guest_thread *gth)
 static struct guest_thread *gpcid_to_gth(struct virtual_machine *vm,
                                          unsigned int gpc_id)
 {
-	return vm->gths[gpc_id];
+	return vm->__gths[gpc_id];
+}
+
+static struct vm_trapframe *gpcid_to_vmtf(struct virtual_machine *vm,
+                                          unsigned int gpc_id)
+{
+	return gth_to_vmtf(gpcid_to_gth(vm, gpc_id));
 }
 
 static struct virtual_machine *get_my_vm(void)

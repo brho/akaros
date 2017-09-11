@@ -30,6 +30,7 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 	int i, ret;
 	uint8_t *p;
 	struct vmm_gpcore_init *gpcis;
+	struct guest_thread *gth;
 
 	if (vm->vminit)
 		return -EBUSY;
@@ -65,8 +66,9 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 	free(gpcis);
 
 	for (i = 0; i < vm->nr_gpcs; i++) {
-		vm->gths[i]->halt_exit = vm->halt_exit;
-		vm_tf = gth_to_vmtf(vm->gths[i]);
+		gth = gpcid_to_gth(vm, i);
+		gth->halt_exit = vm->halt_exit;
+		vm_tf = gth_to_vmtf(gth);
 		vm_tf->tf_cr3 = (uint64_t) vm->root;
 	}
 	vm->vminit = 1;
@@ -99,7 +101,7 @@ int vthread_create(struct virtual_machine *vm, int guest, void *rip, void *arg)
 	if (guest > vm->nr_gpcs)
 		return -ENOENT;
 
-	vm_tf = gth_to_vmtf(vm->gths[guest]);
+	vm_tf = gpcid_to_vmtf(vm, guest);
 
 	/* For now we make the default VM stack pretty small.
 	 * We can grow it as needed. */
@@ -115,6 +117,6 @@ int vthread_create(struct virtual_machine *vm, int guest, void *rip, void *arg)
 	}
 	vm_tf->tf_rip = (uint64_t)rip;
 	vm_tf->tf_rdi = (uint64_t)arg;
-	start_guest_thread(vm->gths[guest]);
+	start_guest_thread(gpcid_to_gth(vm, guest));
 	return 0;
 }
