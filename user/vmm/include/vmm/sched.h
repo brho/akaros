@@ -34,6 +34,7 @@ struct guest_thread {
 	uth_mutex_t					*halt_mtx;
 	uth_cond_var_t				*halt_cv;
 	unsigned long				nr_vmexits;
+	void						*user_data;
 	// TODO: work out a real ops strategy.
 	bool (*vmcall)(struct guest_thread *gth, struct vm_trapframe *);
 };

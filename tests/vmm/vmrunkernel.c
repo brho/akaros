@@ -311,11 +311,11 @@ void *inject_timer_spurious(void *args)
 /* This injects the timer interrupt to the guest. */
 void *inject_timer(void *args)
 {
-	uint64_t gpcoreid = (uint64_t)args;
-	struct vmm_gpcore_init *gpci = &gpcis[gpcoreid];
+	struct guest_thread *gth = (struct guest_thread*)args;
+	struct vmm_gpcore_init *gpci = gth_to_gpci(gth);
 	uint8_t vector = ((uint32_t *)gpci->vapic_addr)[0x32] & 0xff;
 
-	vmm_interrupt_guest(vm, gpcoreid, vector);
+	vmm_interrupt_guest(vm, gth->gpc_id, vector);
 	return 0;
 }
 
@@ -329,8 +329,8 @@ void timer_alarm_handler(struct alarm_waiter *waiter)
 	uint32_t divide_config_reg;
 	uint32_t multiplier;
 	uint32_t timer_mode;
-	uint64_t gpcoreid = *((uint64_t *)waiter->data);
-	struct vmm_gpcore_init *gpci = &gpcis[gpcoreid];
+	struct guest_thread *gth = (struct guest_thread*)waiter->data;
+	struct vmm_gpcore_init *gpci = gth_to_gpci(gth);
 
 	vector = ((uint32_t *)gpci->vapic_addr)[0x32] & 0xff;
 	timer_mode = (((uint32_t *)gpci->vapic_addr)[0x32] >> 17) & 0x03;
@@ -351,7 +351,7 @@ void timer_alarm_handler(struct alarm_waiter *waiter)
 
 	/* We spin up a task to inject the timer because vmm_interrupt_guest
 	 * may block and we can't do that from vcore context. */
-	vmm_run_task(vm, inject_timer, (void *)gpcoreid);
+	vmm_run_task(vm, inject_timer, gth);
 }
 
 /* This sets up the structs for each of the guest pcore's timers, but
@@ -359,14 +359,14 @@ void timer_alarm_handler(struct alarm_waiter *waiter)
  * values to the x2apic msrs. */
 void init_timer_alarms(void)
 {
-	uint64_t *gpcoreids = malloc(sizeof(uint64_t) * vm->nr_gpcs);
-
 	for (uint64_t i = 0; i < vm->nr_gpcs; i++) {
 		struct alarm_waiter *timer_alarm = malloc(sizeof(struct alarm_waiter));
+		struct guest_thread *gth = gpcid_to_gth(vm, i);
 
-		gpcoreids[i] = i;
-		gpcis[i].user_data = (void *)timer_alarm;
-		timer_alarm->data = gpcoreids + i;
+		/* TODO: consider a struct to bundle a bunch of things, not just
+		 * timer_alarm. */
+		gth->user_data = (void *)timer_alarm;
+		timer_alarm->data = gth;
 		init_awaiter(timer_alarm, timer_alarm_handler);
 	}
 }

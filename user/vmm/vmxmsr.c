@@ -192,7 +192,7 @@ static int apic_icr_write(struct guest_thread *vm_thread,
 	return 0;
 }
 
-static int apic_timer_write(struct guest_thread *vm_thread,
+static int apic_timer_write(struct guest_thread *gth,
                             struct vmm_gpcore_init *gpci)
 {
 	uint32_t multiplier;
@@ -200,7 +200,7 @@ static int apic_timer_write(struct guest_thread *vm_thread,
 	uint32_t initial_count;
 	uint32_t divide_config_reg;
 	struct alarm_waiter *timer_waiter;
-	struct vm_trapframe *vm_tf = gth_to_vmtf(vm_thread);
+	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 	int apic_offset = vm_tf->tf_rcx & 0xff;
 
 	((uint32_t *)(gpci->vapic_addr))[apic_offset] =
@@ -210,9 +210,7 @@ static int apic_timer_write(struct guest_thread *vm_thread,
 	vector = ((uint32_t *)gpci->vapic_addr)[0x32] & 0xff;
 	initial_count = ((uint32_t *)gpci->vapic_addr)[0x38];
 	divide_config_reg = ((uint32_t *)gpci->vapic_addr)[0x3E];
-	timer_waiter = (struct alarm_waiter *)gpci->user_data;
-
-	uint64_t gpcoreid = *((uint64_t *)timer_waiter->data);
+	timer_waiter = (struct alarm_waiter*)gth->user_data;
 
 	/* This is a precaution on my part, in case the guest tries to look at
 	 * the current count on the lapic. I wanted it to be something other than

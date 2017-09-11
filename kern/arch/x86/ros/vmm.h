@@ -14,7 +14,6 @@ struct vmm_gpcore_init {
 	void					*posted_irq_desc;
 	void					*vapic_addr;
 	void					*apic_addr;
-	void					*user_data;
 	uintptr_t				fsbase;
 	uintptr_t				gsbase;
 };

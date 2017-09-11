@@ -106,6 +106,7 @@ int vmm_interrupt_guest(struct virtual_machine *vm, unsigned int gpcoreid,
 uintptr_t load_elf(char *filename, uint64_t offset, uint64_t *highest,
                    Elf64_Ehdr *ehdr_out);
 ssize_t setup_initrd(char *filename, void *membase, size_t memsize);
+
 /* Lookup helpers */
 
 static struct virtual_machine *gth_to_vm(struct guest_thread *gth)
@@ -123,6 +124,12 @@ static struct vmm_gpcore_init *gth_to_gpci(struct guest_thread *gth)
 	struct virtual_machine *vm = gth_to_vm(gth);
 
 	return &vm->gpcis[gth->gpc_id];
+}
+
+static struct guest_thread *gpcid_to_gth(struct virtual_machine *vm,
+                                         unsigned int gpc_id)
+{
+	return vm->gths[gpc_id];
 }
 
 static struct virtual_machine *get_my_vm(void)
