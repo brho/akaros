@@ -30,6 +30,7 @@
 #include <err.h>
 #include <vmm/linuxemu.h>
 #include <vmm/vmm.h>
+#include <vmm/vthread.h>
 
 struct vmm_gpcore_init gpci;
 bool linuxemu(struct guest_thread *gth, struct vm_trapframe *tf);
@@ -136,7 +137,6 @@ void dune_test(void *stack)
 static struct option long_options[] = {
 	{"aux",           required_argument, 0, 'a'},
 	{"debug",         no_argument,       0, 'd'},
-	{"vmmflags",      required_argument, 0, 'v'},
 	{"memsize",       required_argument, 0, 'm'},
 	{"memstart",      required_argument, 0, 'M'},
 	{"cmdline_extra", required_argument, 0, 'c'},
@@ -231,11 +231,8 @@ int main(int argc, char **argv)
 	void *tos;
 	int envc, auxc, extrac = 0;
 	struct elf_aux *auxv, *extra = NULL;
-	int vmmflags = 0;
 	uint64_t entry = 0;
-	int ret;
-	struct vm_trapframe *vm_tf;
-	struct guest_thread *gth;
+	struct vthread *vth;
 	int c;
 	int test = 0;
 	int option_index;
@@ -262,9 +259,6 @@ int main(int argc, char **argv)
 		case 'd':
 			fprintf(stderr, "SET DEBUG\n");
 			dune_debug++;
-			break;
-		case 'v':
-			vmmflags = strtoull(optarg, 0, 0);
 			break;
 		case 'm':
 			memsize = strtoull(optarg, 0, 0);
@@ -341,22 +335,12 @@ int main(int argc, char **argv)
 		fprintf(stderr, "populated stack at %p; argc %d, envc %d, auxc %d\n",
 		        tos, ac, envc, auxc);
 
-	ret = vthread_attr_init(&vm, vmmflags);
-	if (ret) {
-		fprintf(stderr, "vmm_init failed: %r\n");
-		exit(1);
-	}
-
-	gth = gpcid_to_gth(&vm, 0);
-	vm_tf = gth_to_vmtf(gth);
-
-	/* we can't use the default stack since we set one up
-	 * ourselves. */
-	vm_tf->tf_rsp = (uint64_t)tos;
 	if (dune_debug)
 		fprintf(stderr, "stack is %p\n", tos);
 
-	vthread_create(&vm, 0, (void *)entry, tos);
+	vth = vthread_alloc(&vm, 0);
+	vthread_init_ctx(vth, entry, (uintptr_t)tos, (uintptr_t)tos);
+	vthread_run(vth);
 
 	uthread_sleep_forever();
 	return 0;

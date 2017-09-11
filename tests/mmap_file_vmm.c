@@ -20,6 +20,7 @@
 #include <unistd.h>
 
 #include <vmm/vmm.h>
+#include <vmm/vthread.h>
 
 static struct virtual_machine vm = {.root_mtx = UTH_MUTEX_INIT};
 
@@ -82,13 +83,6 @@ int main(void)
 		exit(-1);
 	}
 
-	ret = vthread_attr_init(&vm, 0);
-	if (ret) {
-		fprintf(stderr, "vmm_init failed: %r\n");
-		exit(1);
-	}
-
-	fprintf(stderr, "Vthread attr init finished\n");
 	nr_pgs = 1;
 	void *loc = (void*) 0x1000000;
 

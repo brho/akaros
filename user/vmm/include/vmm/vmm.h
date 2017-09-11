@@ -54,7 +54,6 @@ struct virtual_machine {
 	 * up_gpcs refers to the number of guest pcores that have
 	 * been started so far. */
 	unsigned int				up_gpcs;
-	bool						vminit;
 
 	/* TODO: put these in appropriate structures.  e.g., virtio things in
 	 * something related to virtio.  low4k in something related to the guest's

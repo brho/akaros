@@ -11,7 +11,7 @@
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <vmm/vmm.h>
-
+#include <vmm/vthread.h>
 
 static void *page(void *addr, int count)
 {
@@ -23,16 +23,13 @@ static void *page(void *addr, int count)
 	return mmap(addr, count * 4096, PROT_READ | PROT_WRITE, flags, -1, 0);
 }
 
-/* vmsetup is a basic helper function used by vthread_attr_init */
-static int vmsetup(struct virtual_machine *vm, int flags)
+static void vmsetup(void *arg)
 {
+	struct virtual_machine *vm = (struct virtual_machine *)arg;
 	struct vm_trapframe *vm_tf;
 	int i, ret;
 	uint8_t *p;
 	struct vmm_gpcore_init *gpcis;
-
-	if (vm->vminit)
-		return -EBUSY;
 
 	if (vm->nr_gpcs == 0)
 		vm->nr_gpcs = 1;
@@ -43,10 +40,8 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 	 * all guests. Currently, the kernel requires them. */
 	for (i = 0; i < vm->nr_gpcs; i++) {
 		p = page(NULL, 3);
-		if (!p) {
-			werrstr("Can't allocate 3 pages for guest %d: %r", i);
-			return -1;
-		}
+		if (!p)
+			panic("Can't allocate 3 pages for guest %d: %r", i);
 		gpcis[i].posted_irq_desc = &p[0];
 		gpcis[i].vapic_addr = &p[4096];
 		gpcis[i].apic_addr = &p[8192];
@@ -59,61 +54,89 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 	/* Set up default page mappings. */
 	setup_paging(vm);
 
-	ret = vmm_init(vm, gpcis, flags);
-	if (ret)
-		return ret;
+	ret = vmm_init(vm, gpcis, 0);
+	assert(!ret);
 	free(gpcis);
 
 	for (i = 0; i < vm->nr_gpcs; i++) {
 		vm_tf = gpcid_to_vmtf(vm, i);
 		vm_tf->tf_cr3 = (uint64_t) vm->root;
 	}
-	vm->vminit = 1;
-
-	return 0;
 }
 
-/* vthread_addr sets up a virtual_machine struct such that functions
- * can start up VM guests.  It is like pthread_attr in that it sets up
- * default attributes and can be used in vthread_create calls. If
- * vm->nrgpcs is not set then the vm will be set up for 1 guest. */
-int vthread_attr_init(struct virtual_machine *vm, int vmmflags)
+struct vthread *vthread_alloc(struct virtual_machine *vm, int guest)
 {
-	return vmsetup(vm, vmmflags);
+	static parlib_once_t once = PARLIB_ONCE_INIT;
+
+	parlib_run_once(&once, vmsetup, vm);
+
+	if (guest > vm->nr_gpcs)
+		return NULL;
+	return (struct vthread*)gpcid_to_gth(vm, guest);
+}
+
+/* TODO: this is arch specific */
+void vthread_init_ctx(struct vthread *vth, uintptr_t entry_pt, uintptr_t arg,
+                      uintptr_t stacktop)
+{
+	struct vm_trapframe *vm_tf = vth_to_vmtf(vth);
+
+	vm_tf->tf_rip = entry_pt;
+	vm_tf->tf_rdi = arg;
+	vm_tf->tf_rsp = stacktop;
+}
+
+void vthread_run(struct vthread *vthread)
+{
+	start_guest_thread((struct guest_thread*)vthread);
 }
 
 #define DEFAULT_STACK_SIZE 65536
-/* vthread_create creates and starts a VM guest. The interface is intended
- * to be as much like pthread_create as possible. */
-int vthread_create(struct virtual_machine *vm, int guest, void *rip, void *arg)
+static uintptr_t alloc_stacktop(void)
 {
-	struct vm_trapframe *vm_tf;
 	int ret;
-	uint64_t *stack, *tos;
+	uintptr_t *stack, *tos;
 
-	if (!vm->vminit) {
-		return -EAGAIN;
+	ret = posix_memalign((void **)&stack, PGSIZE, DEFAULT_STACK_SIZE);
+	if (ret)
+		return 0;
+	/* touch the top word on the stack so we don't page fault
+	 * on that in the VM. */
+	tos = &stack[DEFAULT_STACK_SIZE / sizeof(uint64_t) - 1];
+	*tos = 0;
+	return (uintptr_t)tos;
+}
+
+static uintptr_t vth_get_stack(struct vthread *vth)
+{
+	struct guest_thread *gth = (struct guest_thread*)vth;
+	struct vthread_info *info = (struct vthread_info*)gth->user_data;
+	uintptr_t stacktop;
+
+	if (info) {
+		assert(info->stacktop);
+		return info->stacktop;
 	}
+	stacktop = alloc_stacktop();
+	assert(stacktop);
+	/* Yes, an evil part of me thought of using the top of the stack for this
+	 * struct's storage. */
+	gth->user_data = malloc(sizeof(struct vthread_info));
+	assert(gth->user_data);
+	info = (struct vthread_info*)gth->user_data;
+	info->stacktop = stacktop;
+	return stacktop;
+}
 
-	if (guest > vm->nr_gpcs)
-		return -ENOENT;
+struct vthread *vthread_create(struct virtual_machine *vm, int guest,
+                               void *entry, void *arg)
+{
+	struct vthread *vth;
 
-	vm_tf = gpcid_to_vmtf(vm, guest);
-
-	/* For now we make the default VM stack pretty small.
-	 * We can grow it as needed. */
-	if (!vm_tf->tf_rsp) {
-		ret = posix_memalign((void **)&stack, 4096, DEFAULT_STACK_SIZE);
-		if (ret)
-			return ret;
-		/* touch the top word on the stack so we don't page fault
-		 * on that in the VM. */
-		tos = &stack[DEFAULT_STACK_SIZE/sizeof(uint64_t) - 1];
-		*tos = 0;
-		vm_tf->tf_rsp = (uint64_t) tos;
-	}
-	vm_tf->tf_rip = (uint64_t)rip;
-	vm_tf->tf_rdi = (uint64_t)arg;
-	start_guest_thread(gpcid_to_gth(vm, guest));
-	return 0;
+	vth = vthread_alloc(vm, guest);
+	if (!vth)
+		return NULL;
+	vthread_init_ctx(vth, (uintptr_t)entry, (uintptr_t)arg, vth_get_stack(vth));
+	vthread_run(vth);
+	return vth;
 }
