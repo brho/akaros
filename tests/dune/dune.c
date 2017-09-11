@@ -38,7 +38,8 @@ bool linuxemu(struct guest_thread *gth, struct vm_trapframe *tf);
 extern char **environ;
 
 static struct virtual_machine vm = {.halt_exit = true,
-                                    .root_mtx = UTH_MUTEX_INIT};
+                                    .root_mtx = UTH_MUTEX_INIT,
+                                    .vmcall = linuxemu};
 
 static unsigned long long memsize = GiB;
 static uintptr_t memstart = MinMemory;
@@ -347,7 +348,6 @@ int main(int argc, char **argv)
 	}
 
 	gth = gpcid_to_gth(&vm, 0);
-	gth->vmcall = linuxemu;
 	vm_tf = gth_to_vmtf(gth);
 
 	/* we can't use the default stack since we set one up

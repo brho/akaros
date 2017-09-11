@@ -30,7 +30,6 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 	int i, ret;
 	uint8_t *p;
 	struct vmm_gpcore_init *gpcis;
-	struct guest_thread *gth;
 
 	if (vm->vminit)
 		return -EBUSY;
@@ -66,9 +65,7 @@ static int vmsetup(struct virtual_machine *vm, int flags)
 	free(gpcis);
 
 	for (i = 0; i < vm->nr_gpcs; i++) {
-		gth = gpcid_to_gth(vm, i);
-		gth->halt_exit = vm->halt_exit;
-		vm_tf = gth_to_vmtf(gth);
+		vm_tf = gpcid_to_vmtf(vm, i);
 		vm_tf->tf_cr3 = (uint64_t) vm->root;
 	}
 	vm->vminit = 1;

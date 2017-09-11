@@ -224,10 +224,11 @@ static bool handle_vmcall_smpboot(struct guest_thread *gth)
 static bool handle_vmcall(struct guest_thread *gth)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
+	struct virtual_machine *vm = gth_to_vm(gth);
 	bool retval = FALSE;
 
-	if (gth->vmcall)
-		return gth->vmcall(gth, vm_tf);
+	if (vm->vmcall)
+		return vm->vmcall(gth, vm_tf);
 
 	switch (vm_tf->tf_rax) {
 		case VMCALL_PRINTC:
@@ -298,8 +299,9 @@ static bool handle_apic_access(struct guest_thread *gth)
 static bool handle_halt(struct guest_thread *gth)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
+	struct virtual_machine *vm = gth_to_vm(gth);
 
-	if (gth->halt_exit)
+	if (vm->halt_exit)
 		return FALSE;
 	/* It's possible the guest disabled IRQs and halted, perhaps waiting on an
 	 * NMI or something.  If we need to support that, we can change this.  */

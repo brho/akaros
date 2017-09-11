@@ -80,6 +80,8 @@ struct virtual_machine {
 
 	/* Default value for whether guest threads halt on an exit. */
 	bool						halt_exit;
+	/* Override for vmcall (vthreads) */
+	bool (*vmcall)(struct guest_thread *gth, struct vm_trapframe *);
 };
 
 struct elf_aux {

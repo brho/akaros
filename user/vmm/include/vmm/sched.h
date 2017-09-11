@@ -31,14 +31,11 @@ struct guest_thread {
 	struct uthread				uthread;
 	struct ctlr_thread			*buddy;
 	unsigned int				gpc_id;
-	bool						halt_exit;
 	uth_mutex_t					*halt_mtx;
 	uth_cond_var_t				*halt_cv;
 	unsigned long				nr_vmexits;
 	struct vmm_gpcore_init		gpci;
 	void						*user_data;
-	// TODO: work out a real ops strategy.
-	bool (*vmcall)(struct guest_thread *gth, struct vm_trapframe *);
 };
 
 struct ctlr_thread {
