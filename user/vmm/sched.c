@@ -493,7 +493,8 @@ static void destroy_guest_thread(struct guest_thread *gth)
 }
 
 static struct guest_thread *create_guest_thread(struct virtual_machine *vm,
-                                                unsigned int gpcoreid)
+                                                unsigned int gpcoreid,
+                                                struct vmm_gpcore_init *gpci)
 {
 	struct guest_thread *gth;
 	struct ctlr_thread *cth;
@@ -512,6 +513,7 @@ static struct guest_thread *create_guest_thread(struct virtual_machine *vm,
 	gth->buddy = cth;
 	cth->buddy = gth;
 	gth->gpc_id = gpcoreid;
+	gth->gpci = *gpci;
 	cth->stacksize = VMM_THR_STACKSIZE;
 	cth->stacktop = __alloc_stack(cth->stacksize);
 	if (!cth->stacktop) {
@@ -560,7 +562,8 @@ static void ev_handle_diag(struct event_msg *ev_msg, unsigned int ev_type,
 	        atomic_read(&nr_unblk_guests), atomic_read(&nr_unblk_tasks));
 }
 
-int vmm_init(struct virtual_machine *vm, int flags)
+int vmm_init(struct virtual_machine *vm, struct vmm_gpcore_init *gpcis,
+             int flags)
 {
 	struct guest_thread **gths;
 
@@ -574,9 +577,9 @@ int vmm_init(struct virtual_machine *vm, int flags)
 	 * CPUID[0x1] will not have to total number of cores.  If we move that
 	 * handler to userspace, we can create the SMP-booted GPCs on the fly.
 	 *
-	 * We'd also have to deal with gths[] and gpcis[] growing dynamically, which
-	 * would require synchronization. */
-	if (syscall(SYS_vmm_add_gpcs, vm->nr_gpcs, vm->gpcis) != vm->nr_gpcs)
+	 * We'd also have to deal with gths[] growing dynamically, which would
+	 * require synchronization. */
+	if (syscall(SYS_vmm_add_gpcs, vm->nr_gpcs, gpcis) != vm->nr_gpcs)
 		return -1;
 	if (flags) {
 		if (syscall(SYS_vmm_ctl, VMM_CTL_SET_FLAGS, flags))
@@ -586,7 +589,7 @@ int vmm_init(struct virtual_machine *vm, int flags)
 	if (!gths)
 		return -1;
 	for (int i = 0; i < vm->nr_gpcs; i++) {
-		gths[i] = create_guest_thread(vm, i);
+		gths[i] = create_guest_thread(vm, i, &gpcis[i]);
 		if (!gths[i]) {
 			for (int j = 0; j < i; j++)
 				destroy_guest_thread(gths[j]);

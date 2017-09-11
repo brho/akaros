@@ -273,7 +273,8 @@ void alloc_intr_pages(void)
 	 * for the PIRs. Each VAPIC and PIR gets its own 4k page. */
 	pir = pages + (vm->nr_gpcs * PGSIZE);
 
-	/* Set the addresses in the gpcis. */
+	/* Set the addresses in the gpcis.  These gpcis get copied into the
+	 * guest_threads during their construction. */
 	for (int i = 0; i < vm->nr_gpcs; i++) {
 		gpcis[i].posted_irq_desc = pir + (PGSIZE * i);
 		gpcis[i].vapic_addr = pages + (PGSIZE * i);
@@ -299,7 +300,7 @@ void *inject_timer_spurious(void *args)
 	uint8_t vector;
 
 	for (int i = 0; i < vm->nr_gpcs; i++) {
-		curgpci = &gpcis[i];
+		curgpci = gth_to_gpci(gpcid_to_gth(vm, i));
 		vector = ((uint32_t *)curgpci->vapic_addr)[0x32] & 0xff;
 		initial_count = ((uint32_t *)curgpci->vapic_addr)[0x38];
 		if (initial_count && vector)
@@ -543,10 +544,10 @@ int main(int argc, char **argv)
 	// Set vm->nr_gpcs before it's referenced in the struct setups below.
 	vm->nr_gpcs = num_pcs;
 	fprintf(stderr, "NUM PCS: %d\n", num_pcs);
+	/* These are only used to be passed to vmm_init, which makes copies
+	 * internally */
 	gpcis = (struct vmm_gpcore_init *)
 	                malloc(num_pcs * sizeof(struct vmm_gpcore_init));
-	vm->gpcis = gpcis;
-
 	alloc_intr_pages();
 
 	memend = memstart + memsize - 1;
@@ -685,8 +686,9 @@ int main(int argc, char **argv)
 	cmdlinesz -= len;
 	cmdlinep += len;
 
-	ret = vmm_init(vm, vmmflags);
+	ret = vmm_init(vm, gpcis, vmmflags);
 	assert(!ret);
+	free(gpcis);
 
 	init_timer_alarms();
 

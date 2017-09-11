@@ -7,6 +7,7 @@
 #pragma once
 
 #include <parlib/uthread.h>
+#include <ros/arch/vmm.h>
 #include <sys/queue.h>
 
 __BEGIN_DECLS
@@ -34,6 +35,7 @@ struct guest_thread {
 	uth_mutex_t					*halt_mtx;
 	uth_cond_var_t				*halt_cv;
 	unsigned long				nr_vmexits;
+	struct vmm_gpcore_init		gpci;
 	void						*user_data;
 	// TODO: work out a real ops strategy.
 	bool (*vmcall)(struct guest_thread *gth, struct vm_trapframe *);
@@ -82,7 +84,8 @@ extern int vmm_sched_period_usec;
  * this initializer.
  *
  * Returns 0 on success, -1 o/w. */
-int vmm_init(struct virtual_machine *vm, int flags);
+int vmm_init(struct virtual_machine *vm, struct vmm_gpcore_init *gpcis,
+             int flags);
 /* Starts a guest thread/core. */
 void start_guest_thread(struct guest_thread *gth);
 /* Start and run a task thread. */

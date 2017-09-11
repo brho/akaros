@@ -54,7 +54,6 @@ struct virtual_machine {
 	 * up_gpcs refers to the number of guest pcores that have
 	 * been started so far. */
 	unsigned int				up_gpcs;
-	struct vmm_gpcore_init		*gpcis;
 	bool						vminit;
 
 	/* TODO: put these in appropriate structures.  e.g., virtio things in
@@ -121,9 +120,7 @@ static struct vm_trapframe *gth_to_vmtf(struct guest_thread *gth)
 
 static struct vmm_gpcore_init *gth_to_gpci(struct guest_thread *gth)
 {
-	struct virtual_machine *vm = gth_to_vm(gth);
-
-	return &vm->gpcis[gth->gpc_id];
+	return &gth->gpci;
 }
 
 static struct guest_thread *gpcid_to_gth(struct virtual_machine *vm,
