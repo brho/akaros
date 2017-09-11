@@ -597,6 +597,7 @@ int vmm_init(struct virtual_machine *vm, struct vmm_gpcore_init *gpcis,
 			return -1;
 		}
 	}
+	wmb(); /* All gths posted before advertising. */
 	vm->__gths = gths;
 	uthread_mcp_init();
 	register_ev_handler(EV_FREE_APPLE_PIE, ev_handle_diag, NULL);

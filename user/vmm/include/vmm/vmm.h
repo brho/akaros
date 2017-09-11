@@ -126,7 +126,16 @@ static struct vmm_gpcore_init *gth_to_gpci(struct guest_thread *gth)
 static struct guest_thread *gpcid_to_gth(struct virtual_machine *vm,
                                          unsigned int gpc_id)
 {
-	return vm->__gths[gpc_id];
+	struct guest_thread **array;
+	struct guest_thread *gth;
+
+	/* Syncing with any dynamic growth of __gths */
+	do {
+		array = ACCESS_ONCE(vm->__gths);
+		gth = array[gpc_id];
+		rmb();	/* read ret before rereading array pointer */
+	} while (array != ACCESS_ONCE(vm->__gths));
+	return gth;
 }
 
 static struct vm_trapframe *gpcid_to_vmtf(struct virtual_machine *vm,
