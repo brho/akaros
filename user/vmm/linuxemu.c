@@ -22,6 +22,12 @@
 // This is the maximum fd number we allow opened in dune
 #define DUNE_NR_FILE_DESC 100
 
+//Some defines used in linux syscalls
+#define FALLOC_FL_KEEP_SIZE 1
+#define FALLOC_FL_PUNCH_HOLE 2
+#define GRND_NONBLOCK 0x0001
+#define GRND_RANDOM 0x0002
+
 static int lemu_debug;
 
 static uth_mutex_t *lemu_logging_lock;
@@ -215,6 +221,27 @@ bool update_fd_map(int fd, const char *path)
 
 	uth_mutex_unlock(fd_table_lock);
 	return true;
+}
+
+void convert_stat_akaros_to_linux(struct stat *si_akaros,
+                                  struct linux_stat_amd64 *si)
+{
+	si->st_dev =  (uint64_t) si_akaros->st_dev;
+	si->st_ino = (uint64_t) si_akaros->st_ino;
+	si->st_mode = (uint32_t) si_akaros->st_mode;
+	si->st_nlink = (uint64_t) si_akaros->st_nlink;
+	si->st_uid = (uint32_t) si_akaros->st_uid;
+	si->st_gid = (uint32_t) si_akaros->st_gid;
+	si->st_rdev = (uint64_t) si_akaros->st_rdev;
+	si->st_size = (int64_t) si_akaros->st_size;
+	si->st_blksize = (int64_t) si_akaros->st_blksize;
+	si->st_blocks = (int64_t) si_akaros->st_blocks;
+
+	//For now the akaros timespec works out... this might change
+	//akaros timespec must be 2x int64_t for this to be valid
+	si->st_atim = si_akaros->st_atim;
+	si->st_mtim = si_akaros->st_mtim;
+	si->st_ctim = si_akaros->st_ctim;
 }
 
 /////////////////////////////////////
@@ -661,25 +688,164 @@ bool dune_sys_sched_yield(struct vm_trapframe *tf)
 
 bool dune_sys_fstat(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	struct stat si_akaros_val;
+	int fd = tf->tf_rdi;
+	struct linux_stat_amd64 *si = (struct linux_stat_amd64*) tf->tf_rsi;
+
+	// TODO(ganshun): Check if mmaped
+	if (!si) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", EFAULT);
+		tf->tf_rax = -EFAULT;
+		return true;
+	}
+
+	struct stat *si_akaros = &si_akaros_val;
+
+	// Make sure we zero out the data on the stack
+	memset((void*) si_akaros, 0, sizeof(struct stat));
+
+	int retval = fstat(fd, si_akaros);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		convert_stat_akaros_to_linux(si_akaros, si);
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
 }
 
 bool dune_sys_stat(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	struct stat si_akaros_val;
+	const char *path = (const char*) tf->tf_rdi;
+	struct linux_stat_amd64 *si = (struct linux_stat_amd64*) tf->tf_rsi;
+
+	// TODO(ganshun): Check if mmaped
+	if (!si) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", EFAULT);
+		tf->tf_rax = -EFAULT;
+		return true;
+	}
+
+	struct stat *si_akaros = &si_akaros_val;
+
+	// Make sure we zero out the data on the stack
+	memset((void*) si_akaros, 0, sizeof(struct stat));
+
+	int retval = stat(path, si_akaros);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		convert_stat_akaros_to_linux(si_akaros, si);
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
 }
 
 ///////////////////////////////////////////////////
 // Newly Implemented Syscalls
 ///////////////////////////////////////////////////
 
+// Dune implementation of fallocate, it just writes zeros for now
+int dune_fallocate(int fd, int mode, off_t offset, off_t len)
+{
+	if (!(mode & (FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE)))
+		return posix_fallocate(fd, offset, len);
+
+	if (offset < 0 || len <= 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	struct stat st;
+	int ret = fstat(fd, &st);
+
+	if (ret == -1) {
+		errno == EBADF;
+		return -1;
+	}
+	if (offset + len >= st.st_size) {
+		// Panic here as we cannot support changing the size of the file
+		// right now.
+		panic("dune_fallocate: we would write over the size of the file!");
+	}
+	if (S_ISFIFO(st.st_mode)) {
+		errno = ESPIPE;
+		return -1;
+	}
+	if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode))) {
+		errno = ENODEV;
+		return -1;
+	}
+
+	// TODO(ganshun): For punch hole, we just write zeros to the file for now
+	if ((mode & FALLOC_FL_PUNCH_HOLE) && (mode & FALLOC_FL_KEEP_SIZE)) {
+		const size_t buffer_size = 0x100000;
+		int pos;
+		ssize_t amt = 0;
+		size_t tot = 0;
+		size_t size;
+		char *buf = calloc(sizeof(char), buffer_size);
+
+		if (!buf)
+			panic("dune_fallocate: could not allocate a buffer\n");
+
+		for (pos = offset; pos < offset + len; pos += amt) {
+			size = len + offset - pos;
+			if (size > buffer_size)
+				size = buffer_size;
+			amt = write(fd, buf, size);
+			if (amt == -1) {
+				free(buf);
+				errno = EIO;
+				return -1;
+			}
+			tot += amt;
+			fprintf(stderr, "%d bytes written so far\n", tot);
+		}
+		free(buf);
+		return tot;
+	}
+
+	// Unsupported otherwise
+	errno = ENOSYS;
+	return -1;
+}
+
 // Fallocate syscall
 bool dune_sys_fallocate(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	int fd = (int) tf->tf_rdi;
+	int mode = (int) tf->tf_rsi;
+	off_t offset = (off_t) tf->tf_rdx;
+	off_t len = (off_t) tf->tf_r10;
+
+	int retval = dune_fallocate(fd, mode, offset, len);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
 }
 
 bool dune_sys_sched_getaffinity(struct vm_trapframe *tf)
@@ -688,16 +854,79 @@ bool dune_sys_sched_getaffinity(struct vm_trapframe *tf)
 	return false;
 }
 
+// We do not implement pselect; however, some applications may try to
+// use it as a portable way to sleep. If that is the case, then we
+// allow it
 bool dune_sys_pselect6(struct vm_trapframe *tf)
 {
-	// To Be Implemented
+	int nfds = (int) tf->tf_rdi;
+	fd_set *readfds = (fd_set *) tf->tf_rsi;
+	fd_set *writefds = (fd_set *) tf->tf_rdx;
+	fd_set *exceptfds = (fd_set *) tf->tf_r10;
+	const struct timespec *timeout = (const struct timespec *) tf->tf_r8;
+	const sigset_t *sigmask = (const sigset_t *) tf->tf_r9;
+
+	// Check if process wants to sleep
+	if (nfds == 0 && readfds == NULL && writefds == NULL && exceptfds == NULL
+	    && timeout != NULL) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "Sleeping for %ld seconds, %ld nanoseconds\n",
+		          timeout->tv_sec, timeout->tv_nsec);
+		nanosleep(timeout, NULL);
+		tf->tf_rax = 0;
+		return true;
+	}
+
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+	          "unimplemented, will now fail...\n");
 	return false;
 }
 
 bool dune_sys_getrandom(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	const char *random_source = "/dev/urandom";
+	void *buf = (void*) tf->tf_rdi;
+	size_t len = (size_t) tf->tf_rsi;
+	unsigned int flags = (unsigned int) tf->tf_rdx;
+
+	if (!buf) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "buffer inaccessable\n");
+		tf->tf_rax = -EFAULT;
+		return true;
+	}
+	if (flags & GRND_RANDOM || flags & GRND_NONBLOCK) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "unsupported flags specified\n");
+		tf->tf_rax = -EINVAL;
+		return true;
+	}
+
+	int fd = open(random_source, O_RDONLY);
+	int err = errno;
+
+	if (fd == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR opening random source %s, errno=%d\n", random_source,
+		           err);
+		return false;
+	}
+
+	ssize_t retval = read(fd, buf, len);
+
+	err = errno;
+	close(fd);
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR reading from random source %s, errno=%d\n",
+		          random_source, err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %zd\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
 }
 
 /////////////////////////////////////////////////////////////////
