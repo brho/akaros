@@ -49,6 +49,7 @@ struct virtual_machine {
 	/* Big mutext for pagetables and __gths/ nr_gpcs */
 	uth_mutex_t					mtx;
 	struct guest_thread			**__gths;
+	unsigned int				gth_array_elem;
 	unsigned int				nr_gpcs;
 	/* up_gpcs should not need synchronization. only the BSP should be making
 	 * startup vmcalls. For security's sake we might still want to lock in the
@@ -165,3 +166,7 @@ void *setup_biostables(struct virtual_machine *vm,
 void *populate_stack(uintptr_t *stack, int argc, char *argv[],
                          int envc, char *envp[],
                          int auxc, struct elf_aux auxv[]);
+/* For vthreads */
+struct guest_thread *create_guest_thread(struct virtual_machine *vm,
+                                         unsigned int gpcoreid,
+                                         struct vmm_gpcore_init *gpci);

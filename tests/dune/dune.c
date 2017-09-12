@@ -233,6 +233,7 @@ int main(int argc, char **argv)
 	struct elf_aux *auxv, *extra = NULL;
 	uint64_t entry = 0;
 	struct vthread *vth;
+	struct vmm_gpcore_init gpci[1];
 	int c;
 	int test = 0;
 	int option_index;
@@ -338,7 +339,8 @@ int main(int argc, char **argv)
 	if (dune_debug)
 		fprintf(stderr, "stack is %p\n", tos);
 
-	vth = vthread_alloc(&vm, 0);
+	gpci_init(gpci);
+	vth = vthread_alloc(&vm, gpci);
 	vthread_init_ctx(vth, entry, (uintptr_t)tos, (uintptr_t)tos);
 	vthread_run(vth);
 

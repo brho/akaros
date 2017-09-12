@@ -95,7 +95,7 @@ int main(void)
 
 	printf("MMap got addr %p\n", addr);
 	printf("Spawning worker vmthread thread, etc...\n");
-	vthread_create(&vm, 0, (void*)&worker_thread, NULL);
+	vthread_create(&vm, (void*)&worker_thread, NULL);
 
 	while (!safe_to_exit)
 		cpu_relax();

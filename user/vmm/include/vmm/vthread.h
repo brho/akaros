@@ -25,11 +25,18 @@ static struct vm_trapframe *vth_to_vmtf(struct vthread *vth)
 	return gth_to_vmtf((struct guest_thread*)vth);
 }
 
-struct vthread *vthread_alloc(struct virtual_machine *vm, int guest);
+static struct virtual_machine *vth_to_vm(struct vthread *vth)
+{
+	return gth_to_vm((struct guest_thread*)vth);
+}
+
+void gpci_init(struct vmm_gpcore_init *gpci);
+struct vthread *vthread_alloc(struct virtual_machine *vm,
+                              struct vmm_gpcore_init *gpci);
 void vthread_init_ctx(struct vthread *vth, uintptr_t entry_pt, uintptr_t arg,
                       uintptr_t stacktop);
 void vthread_run(struct vthread *vthread);
-struct vthread *vthread_create(struct virtual_machine *vm, int guest,
-                               void *entry, void *arg);
+struct vthread *vthread_create(struct virtual_machine *vm, void *entry,
+                               void *arg);
 
 __END_DECLS

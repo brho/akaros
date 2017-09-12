@@ -13,66 +13,98 @@
 #include <vmm/vmm.h>
 #include <vmm/vthread.h>
 
-static void *page(void *addr, int count)
+static void *pages(size_t count)
 {
 	void *v;
 	unsigned long flags = MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE;
 
-	if (addr)
-		flags |= MAP_FIXED;
-	return mmap(addr, count * 4096, PROT_READ | PROT_WRITE, flags, -1, 0);
+	return mmap(0, count * PGSIZE, PROT_READ | PROT_WRITE, flags, -1, 0);
 }
 
 static void vmsetup(void *arg)
 {
 	struct virtual_machine *vm = (struct virtual_machine *)arg;
-	struct vm_trapframe *vm_tf;
-	int i, ret;
-	uint8_t *p;
-	struct vmm_gpcore_init *gpcis;
 
-	if (vm->nr_gpcs == 0)
-		vm->nr_gpcs = 1;
-
-	gpcis = calloc(vm->nr_gpcs, sizeof(struct vmm_gpcore_init));
-
-	/* technically, we don't need these pages for the
-	 * all guests. Currently, the kernel requires them. */
-	for (i = 0; i < vm->nr_gpcs; i++) {
-		p = page(NULL, 3);
-		if (!p)
-			panic("Can't allocate 3 pages for guest %d: %r", i);
-		gpcis[i].posted_irq_desc = &p[0];
-		gpcis[i].vapic_addr = &p[4096];
-		gpcis[i].apic_addr = &p[8192];
-		/* TODO: once we are making these GPCs at the same time as vthreads, we
-		 * should set fsbase == the TLS desc of the vthread (if any). */
-		gpcis[i].fsbase = 0;
-		gpcis[i].gsbase = 0;
-	}
-
-	/* Set up default page mappings. */
 	setup_paging(vm);
-
-	ret = vmm_init(vm, gpcis, 0);
-	assert(!ret);
-	free(gpcis);
-
-	for (i = 0; i < vm->nr_gpcs; i++) {
-		vm_tf = gpcid_to_vmtf(vm, i);
-		vm_tf->tf_cr3 = (uint64_t) vm->root;
-	}
+	vm->nr_gpcs = 0;
+	vm->__gths = NULL;
+	vm->gth_array_elem = 0;
+	uthread_mcp_init();
 }
 
-struct vthread *vthread_alloc(struct virtual_machine *vm, int guest)
+void gpci_init(struct vmm_gpcore_init *gpci)
+{
+	uint8_t *p;
+
+	/* Technically, we don't need these pages for the all guests. Currently, the
+	 * kernel requires them. */
+	p = pages(3);
+	if (!p)
+		panic("Can't allocate 3 pages for guest: %r");
+	gpci->posted_irq_desc = &p[0];
+	gpci->vapic_addr = &p[4096];
+	gpci->apic_addr = &p[8192];
+	/* TODO: once we are making these GPCs at the same time as vthreads, we
+	 * should set fsbase == the TLS desc of the vthread (if any). */
+	gpci->fsbase = 0;
+	gpci->gsbase = 0;
+}
+
+/* Helper, grows the array of guest_threads in vm.  Concurrent readers
+ * (gpcid_to_gth()) need to use a seq-lock-style of concurrency.  They could
+ * read the old array even after we free it.
+ *
+ * Unlike in the kernel, concurrent readers in userspace shouldn't even read
+ * freed memory.  Electric fence could catch that fault.  Until we have a decent
+ * userspace RCU, we can avoid these faults WHP by just sleeping. */
+static void __grow_gth_array(struct virtual_machine *vm,
+                             unsigned int new_nr_gths)
+{
+	struct guest_thread **new_array, **old_array;
+	size_t new_nr_elem;
+
+	if (new_nr_gths <= vm->gth_array_elem)
+		return;
+	/* TODO: (RCU) we could defer the free */
+	old_array = vm->__gths;
+	new_nr_elem = MAX(vm->gth_array_elem * 2, new_nr_gths);
+	new_array = calloc(new_nr_elem, sizeof(void*));
+	assert(new_array);
+	memcpy(new_array, vm->__gths, sizeof(void*) * vm->nr_gpcs);
+	wmb();	/* all elements written before changing pointer */
+	vm->__gths = new_array;
+	wmb();	/* ptr written before potentially clobbering freed memory. */
+	uthread_usleep(1000);	/* hack for electric fence */
+	free(old_array);
+}
+
+void __add_gth_to_vm(struct virtual_machine *vm, struct guest_thread *gth)
+{
+	__grow_gth_array(vm, vm->nr_gpcs + 1);
+	vm->__gths[vm->nr_gpcs] = gth;
+	wmb();	/* concurrent readers will check nr_gpcs first */
+	vm->nr_gpcs++;
+}
+
+struct vthread *vthread_alloc(struct virtual_machine *vm,
+                              struct vmm_gpcore_init *gpci)
 {
 	static parlib_once_t once = PARLIB_ONCE_INIT;
+	struct guest_thread *gth;
+	int ret;
 
 	parlib_run_once(&once, vmsetup, vm);
 
-	if (guest > vm->nr_gpcs)
-		return NULL;
-	return (struct vthread*)gpcid_to_gth(vm, guest);
+	uth_mutex_lock(&vm->mtx);
+	ret = syscall(SYS_vmm_add_gpcs, 1, gpci);
+	assert(ret == 1);
+	gth = create_guest_thread(vm, vm->nr_gpcs, gpci);
+	assert(gth);
+	__add_gth_to_vm(vm, gth);
+	uth_mutex_unlock(&vm->mtx);
+	/* TODO: somewhat arch specific */
+	gth_to_vmtf(gth)->tf_cr3 = (uintptr_t)vm->root;
+	return (struct vthread*)gth;
 }
 
 /* TODO: this is arch specific */
@@ -92,7 +124,7 @@ void vthread_run(struct vthread *vthread)
 }
 
 #define DEFAULT_STACK_SIZE 65536
-static uintptr_t alloc_stacktop(void)
+static uintptr_t alloc_stacktop(struct virtual_machine *vm)
 {
 	int ret;
 	uintptr_t *stack, *tos;
@@ -100,6 +132,8 @@ static uintptr_t alloc_stacktop(void)
 	ret = posix_memalign((void **)&stack, PGSIZE, DEFAULT_STACK_SIZE);
 	if (ret)
 		return 0;
+	add_pte_entries(vm, (uintptr_t)stack,
+	                (uintptr_t)stack + DEFAULT_STACK_SIZE);
 	/* touch the top word on the stack so we don't page fault
 	 * on that in the VM. */
 	tos = &stack[DEFAULT_STACK_SIZE / sizeof(uint64_t) - 1];
@@ -117,7 +151,7 @@ static uintptr_t vth_get_stack(struct vthread *vth)
 		assert(info->stacktop);
 		return info->stacktop;
 	}
-	stacktop = alloc_stacktop();
+	stacktop = alloc_stacktop(vth_to_vm(vth));
 	assert(stacktop);
 	/* Yes, an evil part of me thought of using the top of the stack for this
 	 * struct's storage. */
@@ -128,12 +162,14 @@ static uintptr_t vth_get_stack(struct vthread *vth)
 	return stacktop;
 }
 
-struct vthread *vthread_create(struct virtual_machine *vm, int guest,
-                               void *entry, void *arg)
+struct vthread *vthread_create(struct virtual_machine *vm, void *entry,
+                               void *arg)
 {
 	struct vthread *vth;
+	struct vmm_gpcore_init gpci[1];
 
-	vth = vthread_alloc(vm, guest);
+	gpci_init(gpci);
+	vth = vthread_alloc(vm, gpci);
 	if (!vth)
 		return NULL;
 	vthread_init_ctx(vth, (uintptr_t)entry, (uintptr_t)arg, vth_get_stack(vth));

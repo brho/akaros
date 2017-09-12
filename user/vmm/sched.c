@@ -492,9 +492,9 @@ static void destroy_guest_thread(struct guest_thread *gth)
 	free(gth);
 }
 
-static struct guest_thread *create_guest_thread(struct virtual_machine *vm,
-                                                unsigned int gpcoreid,
-                                                struct vmm_gpcore_init *gpci)
+struct guest_thread *create_guest_thread(struct virtual_machine *vm,
+                                         unsigned int gpcoreid,
+                                         struct vmm_gpcore_init *gpci)
 {
 	struct guest_thread *gth;
 	struct ctlr_thread *cth;
