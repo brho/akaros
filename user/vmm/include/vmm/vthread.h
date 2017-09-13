@@ -42,4 +42,32 @@ void vthread_join(struct vthread *vth, void **retval_loc);
 /* Callback, here for sched.c */
 void __vthread_exited(struct vthread *vth);
 
+/* Vmcall support.
+ *
+ * Vthread apps can make their own vmcalls, either replacing this list or
+ * growing their own.  vth_handle_vmcall() will handle all of these.  Apps can
+ * start their list at VTH_VMCALL_NEXT. */
+
+#define VTH_VMCALL_NULL			0
+#define VTH_VMCALL_PRINTC		1
+#define VTH_VMCALL_EXIT			2
+#define VTH_VMCALL_NEXT			3
+
+/* TODO: arch-specific */
+static long raw_vmcall(long arg0, long arg1, long arg2, long arg3, long arg4,
+                       unsigned int vmcall_nr)
+{
+	long ret;
+	register long r8 asm ("r8") = arg4;
+
+	asm volatile("vmcall"
+	             : "=a"(ret)
+	             : "a"(vmcall_nr), "D"(arg0), "S"(arg1), "d"(arg2), "c"(arg3),
+	               "r"(r8));
+	return ret;
+}
+
+long vmcall(unsigned int vmcall_nr, ...);
+bool vth_handle_vmcall(struct guest_thread *gth, struct vm_trapframe *vm_tf);
+
 __END_DECLS

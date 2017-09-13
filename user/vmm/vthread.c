@@ -227,3 +227,40 @@ void vthread_join(struct vthread *vth, void **retval_loc)
 
 	uthread_join((struct uthread*)cth, retval_loc);
 }
+
+long vmcall(unsigned int vmcall_nr, ...)
+{
+	va_list vl;
+	long a0, a1, a2, a3, a4;
+
+	va_start(vl, vmcall_nr);
+	a0 = va_arg(vl, long);
+	a1 = va_arg(vl, long);
+	a2 = va_arg(vl, long);
+	a3 = va_arg(vl, long);
+	a4 = va_arg(vl, long);
+	va_end(vl);
+	return raw_vmcall(a0, a1, a2, a3, a4, vmcall_nr);
+}
+
+bool vth_handle_vmcall(struct guest_thread *gth, struct vm_trapframe *vm_tf)
+{
+	switch (vm_tf->tf_rax) {
+	case VTH_VMCALL_NULL:
+		goto out_ok;
+	case VTH_VMCALL_PRINTC:
+		fprintf(stdout, "%c", vm_tf->tf_rdi);
+		fflush(stdout);
+		goto out_ok;
+	case VTH_VMCALL_EXIT:
+		uth_2ls_thread_exit((void*)vm_tf->tf_rdi);
+		assert(0);
+	default:
+		fprintf(stderr, "Unknown syscall nr %d\n", vm_tf->tf_rax);
+		return FALSE;
+	}
+	assert(0);
+out_ok:
+	vm_tf->tf_rip += 3;
+	return TRUE;
+}
