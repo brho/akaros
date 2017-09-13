@@ -307,8 +307,8 @@ void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr)
 		new_thread->sigstate.mask = 0;
 	__sigemptyset(&new_thread->sigstate.pending);
 	new_thread->sigstate.data = NULL;
-	/* They should have zero'd the uthread.  Let's check critical things: */
-	assert(!new_thread->flags && !new_thread->sysc);
+	new_thread->flags = 0;
+	new_thread->sysc = NULL;
 	/* the utf holds the GP context of the uthread (set by the 2LS earlier).
 	 * There is no FP context to be restored yet.  We only save the FPU when we
 	 * were interrupted off a core. */
