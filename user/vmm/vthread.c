@@ -10,8 +10,12 @@
 #include <parlib/uthread.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
+#include <sys/queue.h>
 #include <vmm/vmm.h>
 #include <vmm/vthread.h>
+
+static struct vmm_thread_tq parked_vths = TAILQ_HEAD_INITIALIZER(parked_vths);
+static struct spin_pdr_lock park_lock = SPINPDR_INITIALIZER;
 
 static void *pages(size_t count)
 {
@@ -86,15 +90,55 @@ void __add_gth_to_vm(struct virtual_machine *vm, struct guest_thread *gth)
 	vm->nr_gpcs++;
 }
 
+/* If we fully destroy these uthreads, we'll need to call uthread_cleanup() */
+void __vthread_exited(struct vthread *vth)
+{
+	struct virtual_machine *vm = vth_to_vm(vth);
+
+	spin_pdr_lock(&park_lock);
+	TAILQ_INSERT_HEAD(&parked_vths, (struct vmm_thread*)vth, tq_next);
+	spin_pdr_unlock(&park_lock);
+}
+
+/* The tricky part is that we need to reinit the threads */
+static struct vthread *get_parked_vth(struct virtual_machine *vm)
+{
+	struct vmm_thread *vmth;
+	struct guest_thread *gth;
+	struct ctlr_thread *cth;
+	/* These are from create_guest_thread() */
+	struct uth_thread_attr gth_attr = {.want_tls = FALSE};
+	struct uth_thread_attr cth_attr = {.want_tls = TRUE};
+
+	spin_pdr_lock(&park_lock);
+	vmth = TAILQ_FIRST(&parked_vths);
+	if (!vmth) {
+		spin_pdr_unlock(&park_lock);
+		return NULL;
+	}
+	TAILQ_REMOVE(&parked_vths, vmth, tq_next);
+	spin_pdr_unlock(&park_lock);
+
+	gth = (struct guest_thread*)vmth;
+	cth = gth->buddy;
+	uthread_init((struct uthread*)gth, &gth_attr);
+	uthread_init((struct uthread*)cth, &cth_attr);
+	return (struct vthread*)gth;
+}
+
 struct vthread *vthread_alloc(struct virtual_machine *vm,
                               struct vmm_gpcore_init *gpci)
 {
 	static parlib_once_t once = PARLIB_ONCE_INIT;
 	struct guest_thread *gth;
+	struct vthread *vth;
 	int ret;
 
 	parlib_run_once(&once, vmsetup, vm);
 
+	vth = get_parked_vth(vm);
+	if (vth)
+		return vth;
 	uth_mutex_lock(&vm->mtx);
 	ret = syscall(SYS_vmm_add_gpcs, 1, gpci);
 	assert(ret == 1);
@@ -175,4 +219,11 @@ struct vthread *vthread_create(struct virtual_machine *vm, void *entry,
 	vthread_init_ctx(vth, (uintptr_t)entry, (uintptr_t)arg, vth_get_stack(vth));
 	vthread_run(vth);
 	return vth;
+}
+
+void vthread_join(struct vthread *vth, void **retval_loc)
+{
+	struct ctlr_thread *cth = ((struct guest_thread*)vth)->buddy;
+
+	uthread_join((struct uthread*)cth, retval_loc);
 }

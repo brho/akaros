@@ -6,6 +6,7 @@
 
 #include <vmm/sched.h>
 #include <vmm/vmm.h>
+#include <vmm/vthread.h>
 #include <sys/mman.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -463,22 +464,41 @@ static void task_thread_dtor(void *obj, void *priv)
 {
 	struct task_thread *tth = (struct task_thread*)obj;
 
+	uthread_cleanup((struct uthread*)tth);
 	__free_stack(tth->stacktop, tth->stacksize);
+}
+
+static void task_thread_exit(struct task_thread *tth)
+{
+	struct uthread *uth = (struct uthread*)tth;
+
+	if (uth->flags & UTHREAD_IS_THREAD0)
+		return;
+	kmem_cache_free(task_thread_cache, tth);
+}
+
+static void ctlr_thread_exit(struct ctlr_thread *cth)
+{
+	__vthread_exited((struct vthread*)cth->buddy);
 }
 
 static void vmm_thread_exited(struct uthread *uth)
 {
 	struct vmm_thread *vth = (struct vmm_thread*)uth;
-	struct task_thread *tth = (struct task_thread*)uth;
 
-	/* Catch bugs.  Right now, only tasks threads can exit. */
-	assert(vth->type == VMM_THREAD_TASK);
+	assert(vth->type != VMM_THREAD_GUEST);
 
-	acct_thread_blocked((struct vmm_thread*)tth);
-	uthread_cleanup(uth);
-	if (uth->flags & UTHREAD_IS_THREAD0)
-		return;
-	kmem_cache_free(task_thread_cache, tth);
+	acct_thread_blocked(vth);
+	switch (vth->type) {
+	case VMM_THREAD_TASK:
+		task_thread_exit((struct task_thread*)uth);
+		break;
+	case VMM_THREAD_CTLR:
+		ctlr_thread_exit((struct ctlr_thread*)uth);
+		break;
+	case VMM_THREAD_GUEST:
+		panic("Guest threads shouldn't be able to exit");
+	}
 }
 
 static void destroy_guest_thread(struct guest_thread *gth)

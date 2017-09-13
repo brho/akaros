@@ -38,5 +38,8 @@ void vthread_init_ctx(struct vthread *vth, uintptr_t entry_pt, uintptr_t arg,
 void vthread_run(struct vthread *vthread);
 struct vthread *vthread_create(struct virtual_machine *vm, void *entry,
                                void *arg);
+void vthread_join(struct vthread *vth, void **retval_loc);
+/* Callback, here for sched.c */
+void __vthread_exited(struct vthread *vth);
 
 __END_DECLS
