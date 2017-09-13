@@ -720,11 +720,15 @@ void __attribute__((noreturn)) run_uthread(struct uthread *uthread)
 	 * SW, FP should never be saved. */
 	switch (uthread->u_ctx.type) {
 	case ROS_HW_CTX:
-	case ROS_VM_CTX:
 		assert(uthread->flags & UTHREAD_FPSAVED);
 		break;
 	case ROS_SW_CTX:
 		assert(!(uthread->flags & UTHREAD_FPSAVED));
+		break;
+	case ROS_VM_CTX:
+		/* Don't care.  This gives it the state of the vcore when it starts up.
+		 * If we care about leaking FPU / XMM state, we can create a new one for
+		 * every VM TF (or vthread reuse). */
 		break;
 	}
 	if (has_refl_fault(&uthread->u_ctx)) {

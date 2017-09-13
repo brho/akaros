@@ -521,12 +521,8 @@ static struct guest_thread *create_guest_thread(struct virtual_machine *vm,
 	}
 	gth->uthread.u_ctx.type = ROS_VM_CTX;
 	gth->uthread.u_ctx.tf.vm_tf.tf_guest_pcoreid = gpcoreid;
-	/* No need to init the ctlr.  It gets re-init'd each time it starts. */
 	uthread_init((struct uthread*)gth, &gth_attr);
 	uthread_init((struct uthread*)cth, &cth_attr);
-	/* TODO: give it a correct FP state.  Our current one is probably fine */
-	restore_fp_state(&gth->uthread.as);
-	gth->uthread.flags |= UTHREAD_FPSAVED;
 	gth->halt_mtx = uth_mutex_alloc();
 	gth->halt_cv = uth_cond_var_alloc();
 	return gth;
