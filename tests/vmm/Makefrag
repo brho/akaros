@@ -1,6 +1,6 @@
 VMM_TESTS_DIR = $(TESTS_DIR)/vmm
 
-VMM_TESTS_CFLAGS += $(CFLAGS_TESTS) -Wunused -Werror
+VMM_TESTS_CFLAGS += $(CFLAGS_TESTS)
 
 ALL_VMM_TEST_FILES := $(wildcard $(VMM_TESTS_DIR)/*.c)
 
