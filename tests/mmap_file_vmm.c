@@ -22,7 +22,7 @@
 #include <vmm/vmm.h>
 #include <vmm/vthread.h>
 
-static struct virtual_machine vm = {.root_mtx = UTH_MUTEX_INIT};
+static struct virtual_machine vm = {.mtx = UTH_MUTEX_INIT};
 
 int safe_to_exit;
 void *addr;

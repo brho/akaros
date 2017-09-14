@@ -46,6 +46,8 @@ enum {
 
 /* Structure to encapsulate all of the bookkeeping for a VM. */
 struct virtual_machine {
+	/* Big mutext for pagetables and __gths/ nr_gpcs */
+	uth_mutex_t					mtx;
 	struct guest_thread			**__gths;
 	unsigned int				nr_gpcs;
 	/* up_gpcs should not need synchronization. only the BSP should be making
@@ -74,8 +76,6 @@ struct virtual_machine {
 	 * however. setup_paging now updates this to point to the initial set of
 	 * page tables for the guest. */
 	void						*root;
-	/* lock to control access to root */
-	uth_mutex_t					root_mtx;
 
 	/* Default value for whether guest threads halt on an exit. */
 	bool						halt_exit;

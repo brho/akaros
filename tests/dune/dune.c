@@ -39,7 +39,7 @@ bool linuxemu(struct guest_thread *gth, struct vm_trapframe *tf);
 extern char **environ;
 
 static struct virtual_machine vm = {.halt_exit = true,
-                                    .root_mtx = UTH_MUTEX_INIT,
+                                    .mtx = UTH_MUTEX_INIT,
                                     .vmcall = linuxemu};
 
 static unsigned long long memsize = GiB;

@@ -39,7 +39,7 @@
 #include <sys/uio.h>
 #include <parlib/opts.h>
 
-struct virtual_machine local_vm = {.root_mtx = UTH_MUTEX_INIT},
+struct virtual_machine local_vm = {.mtx = UTH_MUTEX_INIT},
                             *vm = &local_vm;
 
 struct vmm_gpcore_init *gpcis;

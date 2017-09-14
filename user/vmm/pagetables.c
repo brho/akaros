@@ -52,7 +52,7 @@ void add_pte_entries(struct virtual_machine *vm, uintptr_t start, uintptr_t end)
 	/* We check once if we can use 1Gb pages and die if we can't. */
 	parlib_run_once(&once, check_jumbo_pages, NULL);
 
-	uth_mutex_lock(&vm->root_mtx);
+	uth_mutex_lock(&vm->mtx);
 	p512 = vm->root;
 	if (!p512)
 		panic("vm->root page table pointer was not set!");
@@ -77,7 +77,7 @@ void add_pte_entries(struct virtual_machine *vm, uintptr_t start, uintptr_t end)
 			p1->pte[pml3] = cur_page | PTE_KERN_RW | PTE_PS;
 		}
 	}
-	uth_mutex_unlock(&vm->root_mtx);
+	uth_mutex_unlock(&vm->mtx);
 }
 
 /* This function sets up the default page tables for the guest. It parses
