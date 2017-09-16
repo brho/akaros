@@ -159,8 +159,6 @@
 #include "vmx.h"
 #include "../vmm.h"
 
-#include "cpufeature.h"
-
 #include <trap.h>
 
 #include <smp.h>

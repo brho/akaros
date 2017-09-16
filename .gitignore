@@ -21,7 +21,6 @@ kern/include/arch
 kern/src/arch
 kern/src/build_info.*
 kern/src/kconfig_info.c
-kern/src/error.c
 user/parlib/include/parlib/arch
 user/parlib/syscall_tbl.c
 Documentation/doxygen/rosdoc
