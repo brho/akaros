@@ -10,7 +10,6 @@
 #include <arch/init.h>
 #include <mm.h>
 #include <elf.h>
-#include <frontend.h>
 
 #include <kmalloc.h>
 #include <assert.h>

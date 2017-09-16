@@ -23,7 +23,6 @@
 #include <kmalloc.h>
 #include <profiler.h>
 #include <stdio.h>
-#include <frontend.h>
 #include <hashtable.h>
 #include <bitmask.h>
 #include <vfs.h>
@@ -1734,11 +1733,6 @@ static intreg_t sys_close(struct proc *p, int fd)
 	retval = sysclose(fd);
 	return retval;
 }
-
-/* kept around til we remove the last ufe */
-#define ufe(which,a0,a1,a2,a3) \
-	frontend_syscall_errno(p,APPSERVER_SYSCALL_##which,\
-	                   (int)(a0),(int)(a1),(int)(a2),(int)(a3))
 
 static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 {

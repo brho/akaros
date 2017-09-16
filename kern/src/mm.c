@@ -13,7 +13,6 @@
  * Note that if we were called from kern/src/syscall.c, we probably don't have
  * an edible reference to p. */
 
-#include <frontend.h>
 #include <ros/common.h>
 #include <pmap.h>
 #include <mm.h>

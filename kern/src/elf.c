@@ -1,5 +1,4 @@
 #include <mm.h>
-#include <frontend.h>
 #include <string.h>
 #include <kmalloc.h>
 #include <syscall.h>

@@ -27,7 +27,6 @@
 #include <hashtable.h>
 #include <radix.h>
 #include <mm.h>
-#include <frontend.h>
 #include <ex_table.h>
 #include <percpu.h>
 
@@ -149,7 +148,6 @@ void kernel_init(multiboot_info_t *mboot_info)
 	percpu_init();
 	kthread_init();					/* might need to tweak when this happens */
 	vmr_init();
-	file_init();
 	page_check();
 	idt_init();
 	/* After kthread_init and idt_init, we can use a real kstack. */

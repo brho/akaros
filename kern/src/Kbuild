@@ -47,7 +47,6 @@ obj-y						+= fdtap.o
 obj-$(CONFIG_COREALLOC_FCFS) += corealloc_fcfs.o
 obj-y						+= find_next_bit.o
 obj-y						+= find_last_bit.o
-obj-y						+= frontend.o
 obj-y						+= hashtable.o
 obj-y						+= hexdump.o
 obj-y						+= init.o

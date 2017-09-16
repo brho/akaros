@@ -19,7 +19,6 @@
 #include <hashtable.h>
 #include <slab.h>
 #include <sys/queue.h>
-#include <frontend.h>
 #include <monitor.h>
 #include <elf.h>
 #include <arsc_server.h>
@@ -451,7 +450,6 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	hashlock_init_irqsave(p->ucq_hashlock, HASHLOCK_DEFAULT_SZ);
 
 	atomic_inc(&num_envs);
-	frontend_proc_init(p);
 	plan9setup(p, parent, flags);
 	devalarm_init(p);
 	TAILQ_INIT(&p->abortable_sleepers);
@@ -528,7 +526,6 @@ static void __proc_free(struct kref *kref)
 	kref_put(&p->fs_env.pwd->d_kref);
 	/* now we'll finally decref files for the file-backed vmrs */
 	unmap_and_destroy_vmrs(p);
-	frontend_proc_free(p);	/* TODO: please remove me one day */
 	/* Remove us from the pid_hash and give our PID back (in that order). */
 	spin_lock(&pid_hash_lock);
 	hash_ret = hashtable_remove(pid_hash, (void*)(long)p->pid);
