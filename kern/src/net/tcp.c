@@ -2345,11 +2345,8 @@ void update(struct conv *s, Tcp * seg)
 	tpriv = s->p->priv;
 	tcb = (Tcpctl *) s->ptcl;
 
-	/* if everything has been acked, force output(?) */
-	if (seq_gt(seg->ack, tcb->snd.nxt)) {
-		tcb->flags |= FORCE;
+	if (!seq_within(seg->ack, tcb->snd.una, tcb->snd.nxt))
 		return;
-	}
 
 	acked = seg->ack - tcb->snd.una;
 	tcb->snd.una = seg->ack;
@@ -2462,8 +2459,14 @@ void update(struct conv *s, Tcp * seg)
 	}
 
 done:
-	if (qdiscard(s->wq, acked) < acked)
+	if (qdiscard(s->wq, acked) < acked) {
 		tcb->flgcnt--;
+		/* This happened due to another bug where acked was very large
+		 * (negative), which was interpreted as "hey, one less flag, since they
+		 * acked one of our flags (like a SYN).  If flgcnt goes negative,
+		 * get_xmit_segment() will attempt to send out large packets. */
+		assert(tcb->flgcnt >= 0);
+	}
 
 	if (seq_gt(seg->ack, tcb->snd.urg))
 		tcb->snd.urg = seg->ack;
