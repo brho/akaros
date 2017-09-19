@@ -18,11 +18,12 @@
 #include <dlfcn.h>
 #include <sys/mman.h>
 #include <futex.h>
+#include <sys/epoll.h>
 
 // This is the maximum fd number we allow opened in dune
 #define DUNE_NR_FILE_DESC 100
 
-//Some defines used in linux syscalls
+// Some defines used in linux syscalls
 #define FALLOC_FL_KEEP_SIZE 1
 #define FALLOC_FL_PUNCH_HOLE 2
 #define GRND_NONBLOCK 0x0001
@@ -848,10 +849,11 @@ bool dune_sys_fallocate(struct vm_trapframe *tf)
 	return true;
 }
 
+// Currently unsupported
 bool dune_sys_sched_getaffinity(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = -ENOSYS;
+	return true;
 }
 
 // We do not implement pselect; however, some applications may try to
@@ -936,84 +938,132 @@ bool dune_sys_getrandom(struct vm_trapframe *tf)
 
 bool dune_sys_getgroups(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = 0;
+	return true;
 }
 
 
 bool dune_sys_geteuid(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = 0;
+	return true;
 }
 
 bool dune_sys_getegid(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = 0;
+	return true;
 }
 
 
 bool dune_sys_getuid(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = 0;
+	return true;
 }
+
 
 bool dune_sys_getgid(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = 0;
+	return true;
 }
 
+// TODO(ganshun): implement mincore
 bool dune_sys_mincore(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = -ENOMEM;
+	return true;
 }
 
 bool dune_sys_rt_sigprocmask(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	int retval = sigprocmask(tf->tf_rdi, (const sigset_t*) tf->tf_rsi,
+	                         (sigset_t*) tf->tf_rdx);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
 }
 
+// TODO(ganshun): sigaltstack needs to implemented for the guest
 bool dune_sys_sigaltstack(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = 0;
+	return true;
 }
 
+
+// TODO(ganshun): more signal code, we need to be careful with this one,
+// we should not register guest signal handlers in akaros
 bool dune_sys_rt_sigaction(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = 0;
+	return true;
 }
 
+//TODO(ganshun): we do not support epoll currently except for create and wait
 bool dune_sys_epoll_create1(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	int flags = 0;
+	// TODO(ganshun): epoll_create is not fully supported for all flags
+	// so we ignore the flags variable in the trapframe since it is not used.
+	int retval = epoll_create1(flags);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
 }
 
 bool dune_sys_epoll_wait(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	int epfd = (int) tf->tf_rdi;
+	struct epoll_event *events = (struct epoll_event*) tf->tf_rsi;
+	int maxevents = (int) tf->tf_rdx;
+	int timeout = (int) tf->tf_r10;
+	int retval = epoll_wait(epfd, events, maxevents, timeout);
+	int err = errno;
+
+	if (retval == -1) {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
+		          "ERROR %d\n", err);
+		tf->tf_rax = -err;
+	} else {
+		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
+		          "SUCCESS %d\n", retval);
+		tf->tf_rax = retval;
+	}
+	return true;
 }
 
 // Unimplemented
 bool dune_sys_epoll_ctl(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = -ENOSYS;
+	return true;
 }
 
 // Unimplemented
 bool dune_sys_fstatfs(struct vm_trapframe *tf)
 {
-	// To Be Implemented
-	return false;
+	tf->tf_rax = -ENOSYS;
+	return true;
 }
 
 // Main syscall table
