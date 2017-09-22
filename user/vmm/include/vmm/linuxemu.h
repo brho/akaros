@@ -27,9 +27,6 @@ struct linux_stat_amd64 {
 
 #define DUNE_MAX_NUM_SYSCALLS 1024
 
-// TODO: Remove this once we have better management for gpcs
-#define MAX_GPCS 12
-
 extern struct dune_sys_table_entry dune_syscall_table[];
 
 bool init_linuxemu(void);
