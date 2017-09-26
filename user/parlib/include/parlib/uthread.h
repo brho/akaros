@@ -206,6 +206,11 @@ static inline struct user_context *get_cur_uth_ctx(void)
 		return &vcpd_of(vcore_id())->uthread_ctx;
 }
 
+static inline bool cur_uth_is_sw_ctx(void)
+{
+	return get_cur_uth_ctx()->type == ROS_SW_CTX;
+}
+
 #define uthread_set_tls_var(uth, name, val)                                    \
 ({                                                                             \
 	typeof(val) __val = val;                                                   \

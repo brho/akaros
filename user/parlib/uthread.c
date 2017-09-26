@@ -260,9 +260,19 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
+
 	/* Should always have notifications disabled when coming in here. */
 	assert(!notif_is_enabled(vcoreid));
 	assert(in_vcore_context());
+	/* It's possible to have our FPSAVED already, e.g. any vcore reentry (refl
+	 * fault, some preemption handling, etc) if cur_uth wasn't reset.  In those
+	 * cases, the FP state should be the same in the processor and in the uth,
+	 * so we might be able to drop the FPSAVED check/branch. */
+	if (current_uthread && !(current_uthread->flags & UTHREAD_FPSAVED) &&
+	    !cur_uth_is_sw_ctx()) {
+		save_fp_state(&current_uthread->as);
+		current_uthread->flags |= UTHREAD_FPSAVED;
+	}
 	/* If someone is stealing our uthread (from when we were preempted before),
 	 * we can't touch our uthread.  But we might be the last vcore around, so
 	 * we'll handle preemption events (spammed to our public mbox).
@@ -670,11 +680,18 @@ void __attribute__((noreturn)) run_current_uthread(void)
 	struct uthread *uth;
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
+
 	assert(current_uthread);
 	assert(current_uthread->state == UT_RUNNING);
 	/* Uth was already running, should not have been saved */
 	assert(!(current_uthread->flags & UTHREAD_SAVED));
-	assert(!(current_uthread->flags & UTHREAD_FPSAVED));
+	/* SW CTX FP wasn't saved, but HW/VM was.  There might be some case where
+	 * a VMTF hadn't run yet, and thus wasn't interrupted, but it shouldn't have
+	 * made it to be current_uthread. */
+	if (cur_uth_is_sw_ctx())
+		assert(!(current_uthread->flags & UTHREAD_FPSAVED));
+	else
+		assert(current_uthread->flags & UTHREAD_FPSAVED);
 	printd("[U] Vcore %d is restarting uthread %08p\n", vcoreid,
 	       current_uthread);
 	if (has_refl_fault(&vcpd->uthread_ctx)) {
@@ -688,9 +705,11 @@ void __attribute__((noreturn)) run_current_uthread(void)
 		set_stack_pointer((void*)vcpd->vcore_stack);
 		vcore_entry();
 	}
-	/* Go ahead and start the uthread */
+	if (current_uthread->flags & UTHREAD_FPSAVED) {
+		current_uthread->flags &= ~UTHREAD_FPSAVED;
+		restore_fp_state(&current_uthread->as);
+	}
 	set_uthread_tls(current_uthread, vcoreid);
-	/* Run, using the TF in the VCPD.  FP state should already be loaded */
 	pop_user_ctx(&vcpd->uthread_ctx, vcoreid);
 	assert(0);
 }
@@ -713,11 +732,12 @@ void __attribute__((noreturn)) run_uthread(struct uthread *uthread)
 {
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
+
 	assert(!current_uthread);
 	assert(uthread->state == UT_NOT_RUNNING);
 	assert(uthread->flags & UTHREAD_SAVED);
-	/* For HW/VM CTX, FPSAVED must match UTH SAVE (and both be on here).  For
-	 * SW, FP should never be saved. */
+	/* For HW CTX, FPSAVED must match UTH SAVE (and both be on here).  For SW,
+	 * FP should never be saved. */
 	switch (uthread->u_ctx.type) {
 	case ROS_HW_CTX:
 		assert(uthread->flags & UTHREAD_FPSAVED);
@@ -767,7 +787,10 @@ static void __run_current_uthread_raw(void)
 	 * to vcore context.  (note the kernel turned it off for us) */
 	vcpd->notif_pending = TRUE;
 	assert(!(current_uthread->flags & UTHREAD_SAVED));
-	assert(!(current_uthread->flags & UTHREAD_FPSAVED));
+	if (current_uthread->flags & UTHREAD_FPSAVED) {
+		current_uthread->flags &= ~UTHREAD_FPSAVED;
+		restore_fp_state(&current_uthread->as);
+	}
 	set_uthread_tls(current_uthread, vcoreid);
 	pop_user_ctx_raw(&vcpd->uthread_ctx, vcoreid);
 	assert(0);
@@ -797,7 +820,8 @@ static void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread,
 {
 	assert(uthread);
 	if (uthread->flags & UTHREAD_SAVED) {
-		/* I don't know of scenarios where HW/VM ctxs FP state differs from GP*/
+		/* GP saved -> FP saved, but not iff.  FP could be saved due to
+		 * aggressive save/restore. */
 		switch (uthread->u_ctx.type) {
 		case ROS_HW_CTX:
 		case ROS_VM_CTX:
@@ -815,9 +839,15 @@ static void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread,
 		assert(!(uthread->flags & UTHREAD_FPSAVED));
 		return;
 	}
-	/* HW contexts also should not have it saved either.  Should be either in
-	 * the VCPD or the FPU.  Yes, this is the same assert. */
-	assert(!(uthread->flags & UTHREAD_FPSAVED));
+	/* We might have aggressively saved for non-SW ctx in vc_entry before we got
+	 * to the event handler. */
+	if (uthread->flags & UTHREAD_FPSAVED) {
+		/* If this fails, we're remote.  But the target vcore should not be in
+		 * uth context (which is when we'd be stealing a uthread) with FPSAVED,
+		 * just like how it shouldn't have GP saved. */
+		assert(vcore_local);
+		return;
+	}
 	/* When we're dealing with the uthread running on our own vcore, the FP
 	 * state is in the actual FPU, not VCPD.  It might also be in VCPD, but it
 	 * will always be in the FPU (the kernel maintains this for us, in the event
