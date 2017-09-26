@@ -297,6 +297,7 @@
 #include <stdio.h>
 #include <kmalloc.h>
 #include <time.h>
+#include <smp.h>
 #include <ros/procinfo.h>
 
 #define STAT_SIZE_DEF 10000
@@ -760,4 +761,82 @@ void test_tsc_cycles(void)
 	printk("%llu (100,000) ticks passed, run twice to load the icache\n", end);
 
 	enable_irqsave(&irq_state);
+}
+
+static inline __attribute__((always_inline))
+uint64_t pmc_cycles(void)
+{
+	unsigned int a = 0, d = 0;
+	int ecx = (1 << 30) + 1;
+
+	asm volatile("lfence; rdpmc" : "=a"(a), "=d"(d) : "c"(ecx));
+	return ((uint64_t)a) | (((uint64_t)d) << 32);
+}
+
+/* Does a basic test for interference.  You should kfunc this, often after
+ * starting the monitor on another core.  You can spam it with ipi_spam().
+ * You'll also need the PMCs to run.  Easiest way is with:
+ * $ perf stat -e cycles sleep 9999999. */
+void interference_test(void)
+{
+	#define THRESHOLD 200
+	uint64_t low_samples[THRESHOLD] = {0};
+	uint64_t deadline = sec2tsc(5);	/* assumes TSC and cycles are close */
+	uint64_t start, diff;
+	size_t nr_below_thresh = 0;
+	size_t nr_over_thresh = 0;
+	size_t total = 0;
+	size_t max = 0;
+
+    deadline += pmc_cycles();
+	enable_irq();
+	do {
+		total++;
+		start = pmc_cycles();
+		diff = pmc_cycles() - start;
+		if (diff < COUNT_OF(low_samples))
+			low_samples[diff]++;
+		max = diff > max ? diff : max;
+		if (diff < THRESHOLD)
+			nr_below_thresh++;
+		else
+			nr_over_thresh++;
+		if (!start) {
+			warn("rdpmc got 0, is perf stat -e cycles running? (aborting)");
+			break;
+		}
+	} while (start < deadline);
+	disable_irq();
+
+	printk("\nCore %d\n--------\n", core_id());
+	for (int i = 0; i < COUNT_OF(low_samples); i++) {
+		if (low_samples[i])
+			printk("\t[ %2d ] : %lu\n", i, low_samples[i]);
+	}
+	printk("Total loops %lu, threshold %u\n", total, THRESHOLD);
+	printk("Nr over thresh %lu\n", nr_over_thresh);
+	printk("Nr below thresh %lu\n", nr_below_thresh);
+	printk("Max %lu\n", max);
+}
+
+/* Kfunc this to spam a core with IPIs */
+void ipi_spam(int coreid)
+{
+	for (int i = 0; i < 1000; i++) {
+		send_ipi(coreid, I_POKE_CORE);
+		udelay(1000);
+	}
+}
+
+/* Kfunc this to halt with IRQs off.  Note this doesn't fully work as
+ * advertised.  Keyboard and NIC IRQs still wake it up, but LAPIC timers don't
+ * seem to. */
+void superhalt(void)
+{
+	unsigned int x86_cstate = X86_MWAIT_C2;
+
+	disable_irq();
+	asm volatile("monitor" : : "a"(KERNBASE), "c"(0), "d"(0));
+	asm volatile("mwait" : : "c"(0x0), "a"(x86_cstate) : "memory");
+	printk("Core %d woke from superhalt!\n", core_id());
 }
