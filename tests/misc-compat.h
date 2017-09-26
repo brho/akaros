@@ -18,6 +18,7 @@
 #endif
 
 #include <sys/param.h> /* MIN/MAX */
+#include <unistd.h>
 
 /* not quite, since akaros udelay is a busy wait */
 #define udelay(usec) usleep(usec)
@@ -52,7 +53,14 @@ static void uth_enable_notifs(void)
 {
 }
 
+static int get_pcoreid(void)
+{
+	return -1;
+}
+
 #define printd(args...) {}
+
+#define COUNT_OF(x) (sizeof((x))/sizeof((x)[0]))
 
 #ifdef __x86_64__
 

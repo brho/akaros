@@ -41,6 +41,7 @@ static inline uint64_t vcore_account_resume_nsec(uint32_t vcoreid);
 static inline uint64_t vcore_account_total_nsec(uint32_t vcoreid);
 static inline void cpu_relax_any(void);
 static inline bool __in_fake_parlib(void);
+static inline int get_pcoreid(void);
 
 void vcore_lib_init(void);
 void vcore_change_to_m(void);
@@ -209,6 +210,11 @@ static inline bool __in_fake_parlib(void)
 	static char dummy;
 
 	return (uintptr_t)&dummy > BRK_START;
+}
+
+static inline int get_pcoreid(void)
+{
+	return __procinfo.vcoremap[vcore_id()].pcoreid;
 }
 
 #ifndef __PIC__
