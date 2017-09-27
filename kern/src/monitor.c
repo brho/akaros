@@ -882,6 +882,9 @@ static int runcmd(char *real_buf, struct hw_trapframe *hw_tf) {
 	// Parse the command buffer into whitespace-separated arguments
 	argc = 0;
 	argv[argc] = 0;
+	/* Discard initial 'm ', which is a common mistake when using 'm' a lot */
+	if ((buf[0] == 'm') && (buf[1] == ' '))
+		buf += 2;
 	while (1) {
 		// gobble whitespace
 		while (*buf && strchr(WHITESPACE, *buf))
