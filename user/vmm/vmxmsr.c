@@ -177,10 +177,12 @@ static int apic_icr_write(struct guest_thread *vm_thread,
 			vmm_interrupt_guest(vm, destination, vector);
 		}
 		break;
+	case 0x5:	/* INIT */
+	case 0x6:	/* SIPI */
+		/* We don't use INIT/SIPI for SMP boot.  The guest is still allowed to
+		 * try to make them for now. */
+		break;
 	default:
-		/* This is not a terrible error, we don't currently support
-		 * SIPIs and INIT IPIs. The guest is allowed to try to make
-		 * them for now even though we don't do anything. */
 		fprintf(stderr, "Unsupported IPI type %d!\n", type);
 		break;
 	}
