@@ -14,6 +14,8 @@
 #include <string.h>
 #include <slab.h>
 #include <kmalloc.h>
+#include <hash.h>
+#include <arch/types.h>
 
 /*
 Credit for primes table: Aaron Krowne
@@ -48,10 +50,7 @@ void hashtable_init(void)
 /* Common hash/equals functions.  Don't call these directly. */
 size_t __generic_hash(void *k)
 {
-	/* 0x9e370001UL used by Linux (32 bit)
-	 * (prime approx to the golden ratio to the max integer, IAW Knuth)
-	 */
-	return (size_t)k * 0x9e370001UL;
+	return hash_long((unsigned long)k, BITS_PER_LONG);
 }
 
 ssize_t __generic_eq(void *k1, void *k2)
