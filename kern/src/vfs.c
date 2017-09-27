@@ -29,6 +29,32 @@ struct kmem_cache *dentry_kcache; // not to be confused with the dcache
 struct kmem_cache *inode_kcache;
 struct kmem_cache *file_kcache;
 
+enum {
+	VFS_MTIME,
+	VFS_CTIME,
+	VFS_ATIME,
+};
+
+/* mtime implies ctime implies atime. */
+static void set_acmtime(struct inode *inode, int which)
+{
+	struct timespec now = nsec2timespec(epoch_nsec());
+
+	switch (which) {
+	case VFS_MTIME:
+		inode->i_mtime.tv_sec = now.tv_sec;
+		inode->i_mtime.tv_nsec = now.tv_nsec;
+		/* fall through */
+	case VFS_CTIME:
+		inode->i_ctime.tv_sec = now.tv_sec;
+		inode->i_ctime.tv_nsec = now.tv_nsec;
+		/* fall through */
+	case VFS_ATIME:
+		inode->i_atime.tv_sec = now.tv_sec;
+		inode->i_atime.tv_nsec = now.tv_nsec;
+	}
+}
+
 /* Mounts fs from dev_name at mnt_pt in namespace ns.  There could be no mnt_pt,
  * such as with the root of (the default) namespace.  Not sure how it would work
  * with multiple namespaces on the same FS yet.  Note if you mount the same FS
@@ -1026,7 +1052,6 @@ void load_inode(struct dentry *dentry, unsigned long ino)
  * note we don't pass this an nd, like Linux does... */
 static struct inode *create_inode(struct dentry *dentry, int mode)
 {
-	struct timespec now = nsec2timespec(epoch_nsec());
 	/* note it is the i_ino that uniquely identifies a file in the specific
 	 * filesystem.  there's a diff between creating an inode (even for an in-use
 	 * ino) and then filling it in, and vs creating a brand new one.
@@ -1039,12 +1064,7 @@ static struct inode *create_inode(struct dentry *dentry, int mode)
 	inode->i_nlink = 1;
 	inode->i_size = 0;
 	inode->i_blocks = 0;
-	inode->i_atime.tv_sec = now.tv_sec;
-	inode->i_ctime.tv_sec = now.tv_sec;
-	inode->i_mtime.tv_sec = now.tv_sec;
-	inode->i_atime.tv_nsec = now.tv_nsec;
-	inode->i_ctime.tv_nsec = now.tv_nsec;
-	inode->i_mtime.tv_nsec = now.tv_nsec;
+	set_acmtime(inode, VFS_MTIME);
 	inode->i_bdev = inode->i_sb->s_bdev;
 	/* when we have notions of users, do something here: */
 	inode->i_uid = 0;
@@ -1061,6 +1081,7 @@ int create_file(struct inode *dir, struct dentry *dentry, int mode)
 	if (!new_file)
 		return -1;
 	dir->i_op->create(dir, dentry, mode, 0);
+	set_acmtime(dir, VFS_MTIME);
 	icache_put(new_file->i_sb, new_file);
 	kref_put(&new_file->i_kref);
 	return 0;
@@ -1081,6 +1102,7 @@ int create_dir(struct inode *dir, struct dentry *dentry, int mode)
 	assert(parent && parent == TAILQ_LAST(&dir->i_dentry, dentry_tailq));
 	/* parent dentry tracks dentry as a subdir, weak reference */
 	TAILQ_INSERT_TAIL(&parent->d_subdirs, dentry, d_subdirs_link);
+	set_acmtime(dir, VFS_MTIME);
 	icache_put(new_dir->i_sb, new_dir);
 	kref_put(&new_dir->i_kref);
 	return 0;
@@ -1095,6 +1117,7 @@ int create_symlink(struct inode *dir, struct dentry *dentry,
 	if (!new_sym)
 		return -1;
 	dir->i_op->symlink(dir, dentry, symname);
+	set_acmtime(dir, VFS_MTIME);
 	icache_put(new_sym->i_sb, new_sym);
 	kref_put(&new_sym->i_kref);
 	return 0;
@@ -1268,6 +1291,7 @@ ssize_t generic_file_read(struct file *file, char *buf, size_t count,
 	 * safe.  but at least it'll be a value that one of the concurrent ops could
 	 * have produced (compared to *offset_changed_concurrently += count. */
 	*offset = orig_off + count;
+	set_acmtime(file->f_dentry->d_inode, VFS_ATIME);
 	return count;
 }
 
@@ -1334,6 +1358,7 @@ ssize_t generic_file_write(struct file *file, const char *buf, size_t count,
 	}
 	assert(buf == buf_end);
 	*offset = orig_off + count;
+	set_acmtime(file->f_dentry->d_inode, VFS_MTIME);
 	return count;
 }
 
@@ -1387,6 +1412,7 @@ ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
 	/* important to tell them how much they got.  they often keep going til they
 	 * get 0 back (in the case of ls).  It's also how much has been read, but it
 	 * isn't how much the f_pos has moved (which is opaque to the VFS). */
+	set_acmtime(file->f_dentry->d_inode, VFS_ATIME);
 	return amt_copied;
 }
 
@@ -1520,6 +1546,7 @@ int do_symlink(char *path, const char *symname, int mode)
 	parent_i = nd->dentry->d_inode;
 	if (create_symlink(parent_i, sym_d, symname, mode))
 		goto out_sym_d;
+	set_acmtime(parent_i, VFS_MTIME);
 	dcache_put(sym_d->d_sb, sym_d);
 	retval = 0;				/* Note the fall through to the exit paths */
 out_sym_d:
@@ -1578,6 +1605,7 @@ int do_link(char *old_path, char *new_path)
 		set_errno(-error);
 		goto out_both_ds;
 	}
+	set_acmtime(parent_dir, VFS_MTIME);
 	/* Finally stitch it up */
 	inode = old_d->d_inode;
 	kref_get(&inode->i_kref, 1);
@@ -1629,6 +1657,7 @@ int do_unlink(char *path)
 		set_errno(-error);
 		goto out_dentry;
 	}
+	set_acmtime(parent_dir, VFS_MTIME);
 	/* Now that our parent doesn't track us, we need to make sure we aren't
 	 * findable via the dentry cache.  DYING, so we will be freed in
 	 * dentry_release() */
@@ -1671,6 +1700,7 @@ int do_file_chmod(struct file *file, int mode)
 	else
 	#endif
 		file->f_dentry->d_inode->i_mode = (mode & S_PMASK) | old_mode_ftype;
+	set_acmtime(file->f_dentry->d_inode, VFS_CTIME);
 	return 0;
 }
 
@@ -1705,6 +1735,7 @@ int do_mkdir(char *path, int mode)
 	parent_i = nd->dentry->d_inode;
 	if (create_dir(parent_i, dentry, mode))
 		goto out_dentry;
+	set_acmtime(parent_i, VFS_MTIME);
 	dcache_put(dentry->d_sb, dentry);
 	retval = 0;				/* Note the fall through to the exit paths */
 out_dentry:
@@ -1754,6 +1785,7 @@ int do_rmdir(char *path)
 		set_errno(-error);
 		goto out_dentry;
 	}
+	set_acmtime(parent_i, VFS_MTIME);
 	/* Now that our parent doesn't track us, we need to make sure we aren't
 	 * findable via the dentry cache.  DYING, so we will be freed in
 	 * dentry_release() */
@@ -1850,6 +1882,7 @@ ssize_t pipe_file_read(struct file *file, char *buf, size_t count,
 	if (amt_copied)
 		__cv_broadcast(&pii->p_cv);
 	cv_unlock(&pii->p_cv);
+	set_acmtime(file->f_dentry->d_inode, VFS_ATIME);
 	return amt_copied;
 }
 
@@ -1904,6 +1937,7 @@ ssize_t pipe_file_write(struct file *file, const char *buf, size_t count,
 	if (amt_copied)
 		__cv_broadcast(&pii->p_cv);
 	cv_unlock(&pii->p_cv);
+	set_acmtime(file->f_dentry->d_inode, VFS_MTIME);
 	return amt_copied;
 }
 
@@ -2060,7 +2094,6 @@ int do_rename(char *old_path, char *new_path)
 	struct dentry *old_d, *new_d, *unlink_d;
 	int error;
 	int retval = 0;
-	struct timespec now;
 
 	nd_o->intent = LOOKUP_ACCESS; /* maybe, might need another type */
 
@@ -2188,16 +2221,9 @@ int do_rename(char *old_path, char *new_path)
 	 * replace a potentially negative dentry for new_d (now called old_d) */
 	dcache_put(old_dir_d->d_sb, old_d);
 
-	/* TODO could have a helper for this, but it's going away soon */
-	now = nsec2timespec(epoch_nsec());
-	old_dir_i->i_ctime.tv_sec = now.tv_sec;
-	old_dir_i->i_mtime.tv_sec = now.tv_sec;
-	old_dir_i->i_ctime.tv_nsec = now.tv_nsec;
-	old_dir_i->i_mtime.tv_nsec = now.tv_nsec;
-	new_dir_i->i_ctime.tv_sec = now.tv_sec;
-	new_dir_i->i_mtime.tv_sec = now.tv_sec;
-	new_dir_i->i_ctime.tv_nsec = now.tv_nsec;
-	new_dir_i->i_mtime.tv_nsec = now.tv_nsec;
+	set_acmtime(old_dir_i, VFS_MTIME);
+	set_acmtime(new_dir_i, VFS_MTIME);
+	set_acmtime(old_d->d_inode, VFS_CTIME);
 
 	/* fall-through */
 out_paths_and_refs:
@@ -2214,7 +2240,7 @@ out_old_path:
 int do_truncate(struct inode *inode, off64_t len)
 {
 	off64_t old_len;
-	struct timespec now;
+
 	if (len < 0) {
 		set_errno(EINVAL);
 		return -1;
@@ -2239,11 +2265,7 @@ int do_truncate(struct inode *inode, off64_t len)
 		pm_remove_contig(inode->i_mapping, old_len >> PGSHIFT,
 		                 (len >> PGSHIFT) - (old_len >> PGSHIFT));
 	}
-	now = nsec2timespec(epoch_nsec());
-	inode->i_ctime.tv_sec = now.tv_sec;
-	inode->i_mtime.tv_sec = now.tv_sec;
-	inode->i_ctime.tv_nsec = now.tv_nsec;
-	inode->i_mtime.tv_nsec = now.tv_nsec;
+	set_acmtime(inode, VFS_MTIME);
 	return 0;
 }
 
