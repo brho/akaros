@@ -140,11 +140,12 @@ int mon_reboot(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 static int __showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	struct proc *p;
+	struct proc *p = NULL;
 	uintptr_t start;
 	size_t size;
 	pgdir_t pgdir;
 	pid_t pid;
+
 	if (argc < 3) {
 		printk("Shows virtual -> physical mappings for a virt addr range.\n");
 		printk("Usage: showmapping PID START_ADDR [END_ADDR]\n");
@@ -169,6 +170,8 @@ static int __showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
 		return 1;
 	}
 	show_mapping(pgdir, start, size);
+	if (p)
+		proc_decref(p);
 	return 0;
 }
 
