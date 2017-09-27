@@ -423,7 +423,7 @@ int get_va_perms(pgdir_t pgdir, const void *va)
 #define check_sym_va(sym, addr)                                                \
 ({                                                                             \
 	if ((sym) != (addr))                                                       \
-		printk("Error: " #sym " is %p, should be " #addr "\n", sym);           \
+		panic("Error: " #sym " is %p, should be " #addr, sym);                 \
 })
 
 static void check_syms_va(void)
@@ -444,7 +444,7 @@ static void check_syms_va(void)
 	check_sym_va(UGDATA,         0x00007f7fff9ff000);
 	check_sym_va(UMAPTOP,        0x00007f7fff9ff000);
 	check_sym_va(USTACKTOP,      0x00007f7fff9ff000);
-	check_sym_va(BRK_END,        0x0000400000000000);
+	check_sym_va(BRK_END,        0x0000300000000000);
 }
 
 /* Initializes anything related to virtual memory.  Paging is already on, but we
