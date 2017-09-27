@@ -621,7 +621,7 @@ static int sys_nanosleep(struct proc *p,
 		poperror();
 		return -1;
 	}
-	sysc_save_str("nanosleep for %d usec", usec);
+	sysc_save_str("nanosleep for %lu usec", usec);
 	kthread_usleep(usec);
 	poperror();
 	return 0;

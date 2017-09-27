@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <parlib/parlib.h>
+#include <unistd.h>
+#include <limits.h>
 
 int main(int argc, char **argv)
 {
@@ -12,7 +13,6 @@ int main(int argc, char **argv)
 	}
 	sleep_time = atoi(argv[1]);
 	if (sleep_time < 0)
-		exit(-1);
-	sys_block(sleep_time * 1000000);
-	return 0;
+		sleep_time = UINT_MAX;
+	return sleep(sleep_time);
 }
