@@ -3,11 +3,13 @@
 #
 # Resolves functions from an Akaros user backtrace.
 # Pipe a backtrace (echo "huge-copy-paste" | ./thisfile.sh) to it.
-# Be sure to set your environment paths for the SOLIBS and BIN
+#
+# Be sure to set your environment paths for the SOLIBS and BIN, or use the
+# defaults, which require AKAROS_ROOT.
 
-: ${SOLIBS_PREFIX:=~/akaros/ros-kernel/kern/kfs/lib/}
+: ${SOLIBS_PREFIX:=$AKAROS_ROOT/kern/kfs/lib/}
 : ${SO_REGEX:=.*so$}
-: ${BIN_PREFIX:=~/akaros/ros-kernel/kern/kfs/bin/}
+: ${BIN_PREFIX:=$AKAROS_ROOT/kern/kfs/bin/}
 
 # takes the path to the binary and offset (offset in hex), prints name of the
 # function where the offset is in the binary.  basically a wrapper for
