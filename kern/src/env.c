@@ -91,16 +91,6 @@ env_setup_vm_error_i:
 	return -ENOMEM;
 }
 
-#define PER_CPU_THING(type,name)\
-type SLOCKED(name##_lock) * RWPROTECT name;\
-type SLOCKED(name##_lock) *\
-(get_per_cpu_##name)()\
-{\
-	{ R_PERMITTED(global(name))\
-		return &name[core_id()];\
-	}\
-}
-
 /* Frees (decrefs) all memory mapped in the given range */
 void env_user_mem_free(env_t* e, void* start, size_t len)
 {
