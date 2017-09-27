@@ -165,9 +165,8 @@ void print_cpuinfo(void)
 	/* Regardless, make sure userspace can access rdtsc (and rdtscp) */
 	lcr4(rcr4() & ~CR4_TSD);
 	printk("1 GB Jumbo pages %ssupported\n", edx & (1 << 26) ? "" : "not ");
-	printk("FS/GS MSRs %ssupported\n", edx & (1 << 29) ? "" : "not ");
 	if (!(edx & (1 << 29))) {
-		printk("Can't handle no FS/GS MSRs!\n");
+		printk("Not 64 bit, refusing to boot!\n");
 		while (1)
 			asm volatile ("hlt");
 	}
