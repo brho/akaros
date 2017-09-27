@@ -72,6 +72,10 @@ static command_t commands[] = {
 	{ "kpfret", "Attempt to idle after a kernel fault", mon_kpfret},
 	{ "ks", "Kernel scheduler hacks", mon_ks},
 	{ "coreinfo", "Print diagnostics for a core", mon_coreinfo},
+	{ "hexdump", "Hexdump PID's memory (0 for kernel)", mon_hexdump},
+	{ "hd", "Hexdump PID's memory (0 for kernel)", mon_hexdump},
+	{ "pahexdump", "Hexdump physical memory", mon_pahexdump},
+	{ "phd", "Hexdump physical memory", mon_pahexdump},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -1282,5 +1286,54 @@ int mon_coreinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 		/* Can happen during early boot */
 		printk("\tNo kthread!\n");
 	}
+	return 0;
+}
+
+int mon_hexdump(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	struct proc *p = NULL;
+	uintptr_t switch_state;
+	pid_t pid;
+	uintptr_t start;
+	size_t len;
+
+	assert(argc >= 1);
+	if (argc < 4) {
+		printk("Usage: %s PID ADDR LEN\n", argv[0]);
+		printk("    PID == 0 for kernel / don't care\n");
+		return 1;
+	}
+	pid = strtol(argv[1], 0, 0);
+	start = strtoul(argv[2], 0, 0);
+	len = strtoul(argv[3], 0, 0);
+	if (pid) {
+		p = pid2proc(pid);
+		if (!p) {
+			printk("No proc with pid %d\n", pid);
+			return 1;
+		}
+		switch_state = switch_to(p);
+	}
+	hexdump((void*)start, len);
+	if (p) {
+		switch_back(p, switch_state);
+		proc_decref(p);
+	}
+	return 0;
+}
+
+int mon_pahexdump(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	uintptr_t start;
+	size_t len;
+
+	assert(argc >= 1);
+	if (argc < 3) {
+		printk("Usage: %s PHYS_ADDR LEN\n", argv[0]);
+		return 1;
+	}
+	start = strtoul(argv[1], 0, 0);
+	len = strtoul(argv[2], 0, 0);
+	pahexdump(start, len);
 	return 0;
 }

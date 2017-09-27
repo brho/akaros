@@ -42,3 +42,5 @@ int mon_px(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_kpfret(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_ks(int argc, char **argv, struct hw_trapframe *hw_tf);
 int mon_coreinfo(int argc, char **argv, struct hw_trapframe *hw_tf);
+int mon_hexdump(int argc, char **argv, struct hw_trapframe *hw_tf);
+int mon_pahexdump(int argc, char **argv, struct hw_trapframe *hw_tf);
