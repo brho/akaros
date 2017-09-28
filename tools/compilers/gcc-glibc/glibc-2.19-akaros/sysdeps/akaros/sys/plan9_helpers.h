@@ -74,7 +74,7 @@ extern void _sock_ingetaddr(Rock *, struct sockaddr_in *, socklen_t *,
 							const char *);
 extern int _sock_strip_opts(int type);
 extern int _sock_get_opts(int type);
-extern int _sock_lookup_listen_fd(int sock_fd);
+extern int _sock_lookup_listen_fd(int sock_fd, bool can_open);
 extern int _sock_open_ctlfd(Rock *r);
 
 int get_sibling_fd(int fd, const char *sibling);

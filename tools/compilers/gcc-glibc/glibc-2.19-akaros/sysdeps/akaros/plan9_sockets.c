@@ -318,15 +318,13 @@ int _sock_get_opts(int type)
 /* Opens the FD for "listen", and attaches it to the Rock.  When the dfd (and
  * thus the Rock) closes, we'll close the listen file too.  Returns the FD on
  * success, -1 on error.  This is racy, like a lot of other Rock stuff. */
-static int _rock_get_listen_fd(Rock *r)
+static int _rock_open_listen_fd(Rock *r)
 {
 	char listen_file[Ctlsize + 3];
 	char *p;
 	int ret;
 	int open_flags;
 
-	if (r->has_listen_fd)
-		return r->listen_fd;
 	if (r->ctl == NULL || r->ctl[0] != '/') {
 		fprintf(stderr, "r->ctl corrupt: '%s' (domain = %d)\n",
 		        (r->ctl == NULL ? "NULL" : r->ctl), r->domain);
@@ -358,13 +356,17 @@ static int _rock_get_listen_fd(Rock *r)
 
 /* Used by user/iplib (e.g. epoll).  Returns an FD for the listen file, opened
  * O_PATH, for this conversation.  Returns -1 on error. */
-int _sock_lookup_listen_fd(int sock_fd)
+int _sock_lookup_listen_fd(int sock_fd, bool can_open)
 {
 	Rock *r = _sock_findrock(sock_fd, 0);
 
 	if (!r || r->domain == PF_UNIX)
 		return -1;
-	return _rock_get_listen_fd(r);
+	if (r->has_listen_fd)
+		return r->listen_fd;
+	if (!can_open)
+		return -1;
+	return _rock_open_listen_fd(r);
 }
 
 /* Given an FD, opens the FD with the name 'sibling' in the same directory.
