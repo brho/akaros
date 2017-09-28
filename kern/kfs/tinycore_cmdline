@@ -11,5 +11,4 @@ earlyprintk=vmcall,keep
  pit=none
  nortc
  nozswap
- noinvpcid
  noht
