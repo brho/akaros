@@ -204,6 +204,11 @@ static void snprintf_to_trace(struct systrace_record *trace, const char *fmt,
 		trace->datalen += rc;
 }
 
+static bool trace_data_full(struct systrace_record *trace)
+{
+	return trace->datalen == sizeof(trace->data);
+}
+
 /* Starts a trace for p running sysc, attaching it to kthread.  Pairs with
  * systrace_finish_trace(). */
 static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
@@ -296,6 +301,20 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 						   sysc->arg1,
 						   (char *)sysc->arg2,
 						   sysc->arg3);
+		break;
+	case SYS_tap_fds:
+		for (size_t i = 0; i < (size_t)sysc->arg1; i++) {
+			struct fd_tap_req *tap_reqs = (struct fd_tap_req*)sysc->arg0;
+			int fd, cmd, filter;
+
+			tap_reqs += i;
+			copy_from_user(&fd, &tap_reqs->fd, sizeof(fd));
+			copy_from_user(&cmd, &tap_reqs->cmd, sizeof(cmd));
+			copy_from_user(&filter, &tap_reqs->filter, sizeof(filter));
+			snprintf_to_trace(trace, "%d (%d 0x%x), ", fd, cmd, filter);
+			if (trace_data_full(trace))
+				break;
+		}
 		break;
 	}
 	systrace_output(trace, p->strace, TRUE);
