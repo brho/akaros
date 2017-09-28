@@ -435,6 +435,8 @@ static void finish_current_sysc(long retval)
 	 * this is somewhat hacky, since errno might get set unnecessarily */
 	if ((current_errstr()[0] != 0) && !get_errno())
 		set_errno(EUNSPECIFIED);
+	sysc->err = pcpui->cur_kthread->errno;
+	strncpy(sysc->errstr, pcpui->cur_kthread->errstr, MAX_ERRSTR_LEN);
 	free_sysc_str(pcpui->cur_kthread);
 	systrace_finish_trace(pcpui->cur_kthread, retval);
 	pcpui = &per_cpu_info[core_id()];	/* reload again */
@@ -447,42 +449,44 @@ static void finish_current_sysc(long retval)
 void set_errno(int errno)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	if (pcpui->cur_kthread && pcpui->cur_kthread->sysc)
-		pcpui->cur_kthread->sysc->err = errno;
+
+	if (pcpui->cur_kthread)
+		pcpui->cur_kthread->errno = errno;
 }
 
 /* Callable by any function while executing a syscall (or otherwise, actually).
  */
 int get_errno(void)
 {
-	/* if there's no errno to get, that's not an error I guess. */
-	int errno = 0;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	if (pcpui->cur_kthread && pcpui->cur_kthread->sysc)
-		errno = pcpui->cur_kthread->sysc->err;
-	return errno;
+
+	if (pcpui->cur_kthread)
+		return pcpui->cur_kthread->errno;
+	/* if there's no errno to get, that's not an error I guess. */
+	return 0;
 }
 
 void unset_errno(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	if (!pcpui->cur_kthread || !pcpui->cur_kthread->sysc)
+
+	if (!pcpui->cur_kthread)
 		return;
-	pcpui->cur_kthread->sysc->err = 0;
-	pcpui->cur_kthread->sysc->errstr[0] = '\0';
+	pcpui->cur_kthread->errno = 0;
+	pcpui->cur_kthread->errstr[0] = '\0';
 }
 
 void vset_errstr(const char *fmt, va_list ap)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
-	if (!pcpui->cur_kthread || !pcpui->cur_kthread->sysc)
+	if (!pcpui->cur_kthread)
 		return;
 
-	vsnprintf(pcpui->cur_kthread->sysc->errstr, MAX_ERRSTR_LEN, fmt, ap);
+	vsnprintf(pcpui->cur_kthread->errstr, MAX_ERRSTR_LEN, fmt, ap);
 
 	/* TODO: likely not needed */
-	pcpui->cur_kthread->sysc->errstr[MAX_ERRSTR_LEN - 1] = '\0';
+	pcpui->cur_kthread->errstr[MAX_ERRSTR_LEN - 1] = '\0';
 }
 
 void set_errstr(const char *fmt, ...)
@@ -498,9 +502,10 @@ void set_errstr(const char *fmt, ...)
 char *current_errstr(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	if (!pcpui->cur_kthread || !pcpui->cur_kthread->sysc)
+
+	if (!pcpui->cur_kthread)
 		return "no errstr";
-	return pcpui->cur_kthread->sysc->errstr;
+	return pcpui->cur_kthread->errstr;
 }
 
 void set_error(int error, const char *fmt, ...)
@@ -2771,6 +2776,7 @@ void run_local_syscall(struct syscall *sysc)
 		return;
 	}
 	pcpui->cur_kthread->sysc = sysc;	/* let the core know which sysc it is */
+	unset_errno();
 	systrace_start_trace(pcpui->cur_kthread, sysc);
 	pcpui = &per_cpu_info[core_id()];	/* reload again */
 	alloc_sysc_str(pcpui->cur_kthread);

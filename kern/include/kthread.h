@@ -9,6 +9,7 @@
 #pragma once
 
 #include <ros/common.h>
+#include <ros/syscall.h>
 #include <trap.h>
 #include <sys/queue.h>
 #include <atomic.h>
@@ -45,6 +46,8 @@ struct kthread {
 	int							flags;
 	char						*name;
 	char						generic_buf[GENBUF_SZ];
+	int							errno;
+	char						errstr[MAX_ERRSTR_LEN];
 	struct systrace_record		*strace;
 };
 
