@@ -878,6 +878,9 @@ void send_ipi(uint32_t os_coreid, uint8_t vector)
 static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 {
 	uint32_t eax, ebx, ecx, edx;
+	const uint32_t *sigptr;
+	const char kvm_sig[] = "KVMKVMKVM\0\0\0";
+	const char akaros_sig[] = "AKAROSINSIDE";
 
 	if (tf->tf_rax == 0x0B)
 		return FALSE;	// Handle in userspace.
@@ -912,13 +915,28 @@ static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 			break;
 		/* Signal the use of KVM. */
 		case 0x40000000:
+			sigptr = (const uint32_t *)kvm_sig;
 			eax = 0;
-			ebx = 0x4b4d564b;
-			ecx = 0x564b4d56;
-			edx = 0x0000004d;
+			ebx = sigptr[0];
+			ecx = sigptr[1];
+			edx = sigptr[2];
 			break;
 		/* Hypervisor Features. */
 		case 0x40000003:
+			/* Unset the monitor capability bit so that the guest does not try
+			 * to use monitor/mwait. */
+			edx &= ~(1 << 0);
+			break;
+		/* Signal the use of AKAROS. */
+		case 0x40000100:
+			sigptr = (const uint32_t *)akaros_sig;
+			eax = 0;
+			ebx = sigptr[0];
+			ecx = sigptr[1];
+			edx = sigptr[2];
+			break;
+		/* Hypervisor Features. */
+		case 0x40000103:
 			/* Unset the monitor capability bit so that the guest does not try
 			 * to use monitor/mwait. */
 			edx &= ~(1 << 0);
