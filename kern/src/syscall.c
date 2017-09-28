@@ -399,8 +399,9 @@ static void free_sysc_str(struct kthread *kth)
 #endif /* CONFIG_SYSCALL_STRING_SAVING */
 
 /* Helper to finish a syscall, signalling if appropriate */
-static void finish_sysc(struct syscall *sysc, struct proc *p)
+static void finish_sysc(struct syscall *sysc, struct proc *p, long retval)
 {
+	sysc->retval = retval;
 	/* Atomically turn on the LOCK and SC_DONE flag.  The lock tells userspace
 	 * we're messing with the flags and to not proceed.  We use it instead of
 	 * CASing with userspace.  We need the atomics since we're racing with
@@ -423,12 +424,22 @@ static void finish_sysc(struct syscall *sysc, struct proc *p)
  *
  * *sysc is in user memory, and should be pinned (TODO: UMEM).  There may be
  * issues with unpinning this if we never return. */
-static void finish_current_sysc(int retval)
+static void finish_current_sysc(long retval)
 {
+	/* Need to re-load pcpui, in case we migrated */
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	assert(pcpui->cur_kthread->sysc);
-	pcpui->cur_kthread->sysc->retval = retval;
-	finish_sysc(pcpui->cur_kthread->sysc, pcpui->cur_proc);
+	struct syscall *sysc = pcpui->cur_kthread->sysc;
+
+	assert(sysc);
+	/* Some 9ns paths set errstr, but not errno.  glibc will ignore errstr.
+	 * this is somewhat hacky, since errno might get set unnecessarily */
+	if ((current_errstr()[0] != 0) && !get_errno())
+		set_errno(EUNSPECIFIED);
+	free_sysc_str(pcpui->cur_kthread);
+	systrace_finish_trace(pcpui->cur_kthread, retval);
+	pcpui = &per_cpu_info[core_id()];	/* reload again */
+	finish_sysc(pcpui->cur_kthread->sysc, pcpui->cur_proc, retval);
+	pcpui->cur_kthread->sysc = NULL;
 }
 
 /* Callable by any function while executing a syscall (or otherwise, actually).
@@ -809,14 +820,9 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 
 static int sys_proc_yield(struct proc *p, bool being_nice)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	/* proc_yield() often doesn't return - we need to set the syscall retval
-	 * early.  If it doesn't return, it expects to eat our reference (for now).
-	 */
-	free_sysc_str(pcpui->cur_kthread);
-	systrace_finish_trace(pcpui->cur_kthread, 0);
-	finish_sysc(pcpui->cur_kthread->sysc, pcpui->cur_proc);
-	pcpui->cur_kthread->sysc = 0;	/* don't touch sysc again */
+	/* proc_yield() often doesn't return - we need to finish the syscall early.
+	 * If it doesn't return, it expects to eat our reference (for now). */
+	finish_current_sysc(0);
 	proc_incref(p, 1);
 	proc_yield(p, being_nice);
 	proc_decref(p);
@@ -873,7 +879,8 @@ static ssize_t sys_fork(env_t* e)
 	 * is cloned before we return for the original process.  If we ever do CoW
 	 * for forked memory, this will be the first place that gets CoW'd. */
 	temp = switch_to(env);
-	finish_current_sysc(0);
+	pcpui = &per_cpu_info[core_id()];	/* reload in case of migration */
+	finish_sysc(pcpui->cur_kthread->sysc, env, 0);
 	switch_back(env, temp);
 
 	/* Copy some state from the original proc into the new proc. */
@@ -1050,6 +1057,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	if (load_elf(p, program, argc, argv, envc, envp)) {
 		kref_put(&program->f_kref);
 		user_memdup_free(p, kargenv);
+		systrace_finish_trace(pcpui->cur_kthread, -1);
 		/* Note this is an inedible reference, but proc_destroy now returns */
 		proc_destroy(p);
 		/* We don't want to do anything else - we just need to not accidentally
@@ -1068,12 +1076,11 @@ mid_error:
 	 * error value (errno is already set). */
 	kref_put(&program->f_kref);
 early_error:
+	/* Note the t_path is passed to proc_replace_binary_path for success */
 	free_path(p, t_path);
 	finish_current_sysc(-1);
-	systrace_finish_trace(pcpui->cur_kthread, -1);
 success:
 	user_memdup_free(p, kargenv);
-	free_sysc_str(pcpui->cur_kthread);
 	/* Here's how we restart the new (on success) or old (on failure) proc: */
 	spin_lock(&p->proc_lock);
 	__seq_start_write(&p->procinfo->coremap_seqctr);
@@ -1083,6 +1090,10 @@ success:
 	spin_unlock(&p->proc_lock);
 	proc_wakeup(p);
 all_out:
+	/* This free and setting sysc = NULL may happen twice (early errors do it),
+	 * but they are idempotent. */
+	free_sysc_str(pcpui->cur_kthread);
+	pcpui->cur_kthread->sysc = NULL;
 	/* we can't return, since we'd write retvals to the old location of the
 	 * syscall struct (which has been freed and is in the old userspace) (or has
 	 * already been written to).*/
@@ -2750,6 +2761,7 @@ void run_local_syscall(struct syscall *sysc)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct proc *p = pcpui->cur_proc;
+	long retval;
 
 	/* In lieu of pinning, we just check the sysc and will PF on the user addr
 	 * later (if the addr was unmapped).  Which is the plan for all UMEM. */
@@ -2764,19 +2776,9 @@ void run_local_syscall(struct syscall *sysc)
 	alloc_sysc_str(pcpui->cur_kthread);
 	/* syscall() does not return for exec and yield, so put any cleanup in there
 	 * too. */
-	sysc->retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
-	                       sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
-	/* Need to re-load pcpui, in case we migrated */
-	pcpui = &per_cpu_info[core_id()];
-	free_sysc_str(pcpui->cur_kthread);
-	systrace_finish_trace(pcpui->cur_kthread, sysc->retval);
-	pcpui = &per_cpu_info[core_id()];	/* reload again */
-	/* Some 9ns paths set errstr, but not errno.  glibc will ignore errstr.
-	 * this is somewhat hacky, since errno might get set unnecessarily */
-	if ((current_errstr()[0] != 0) && (!sysc->err))
-		sysc->err = EUNSPECIFIED;
-	finish_sysc(sysc, pcpui->cur_proc);
-	pcpui->cur_kthread->sysc = NULL;	/* No longer working on sysc */
+	retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
+	                 sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
+	finish_current_sysc(retval);
 }
 
 /* A process can trap and call this function, which will set up the core to
