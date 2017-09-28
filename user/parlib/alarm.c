@@ -139,12 +139,10 @@ static void reset_tchain_times(struct timer_chain *tchain)
 
 static void devalarm_forked(void)
 {
-	/* We need to poison the FDs too, in case the child attempts to use the
-	 * alarms.  It'd be chaos if they read/wrote to an arbitrary open FD. */
 	close(global_tchain.ctlfd);
-	global_tchain.ctlfd = -42;
 	close(global_tchain.timerfd);
-	global_tchain.timerfd = -42;
+	if (devalarm_get_fds(&global_tchain.ctlfd, &global_tchain.timerfd, NULL))
+		perror("Useralarm on fork");
 }
 
 static void __attribute__((constructor)) alarm_service_ctor(void)
