@@ -27,6 +27,8 @@ void backtrace_user_frame(uintptr_t pc, uintptr_t fp);
 void backtrace_hwtf(struct hw_trapframe *hw_tf);
 /* Backtraces a user context */
 void backtrace_user_ctx(struct proc *p, struct user_context *ctx);
+/* Backtraces the current user context, if there is one */
+void backtrace_current_ctx(void);
 
 /*** Programmatic Backtraces */
 /* Backtraces a PC/FP, stores results in *pcs, with no protections */

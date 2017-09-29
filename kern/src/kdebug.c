@@ -281,6 +281,12 @@ void backtrace_user_ctx(struct proc *p, struct user_context *ctx)
 	switch_back(p, st_save);
 }
 
+void backtrace_current_ctx(void)
+{
+	if (current)
+		backtrace_user_ctx(current, current_ctx);
+}
+
 static spinlock_t __px_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 void px_lock(void)
 {
