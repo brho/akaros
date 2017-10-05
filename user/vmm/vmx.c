@@ -19,6 +19,7 @@
 #include <vmm/virtio_ids.h>
 #include <ros/arch/vmx.h>
 #include <vmm/sched.h>
+#include <vmm/util.h>
 #include <ros/arch/mmu.h>
 #include <ros/arch/trapframe.h>
 
@@ -28,7 +29,7 @@ char *vmxexit[] = {
 
 void showstatus(FILE *f, struct guest_thread *vm_thread)
 {
-	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
+	struct vm_trapframe *vm_tf = gth_to_vmtf(vm_thread);
 	int shutdown = vm_tf->tf_exit_reason;
 	char *when = shutdown & VMX_EXIT_REASONS_FAILED_VMENTRY ? "entry" : "exit";
 	shutdown &= ~VMX_EXIT_REASONS_FAILED_VMENTRY;
@@ -39,6 +40,7 @@ void showstatus(FILE *f, struct guest_thread *vm_thread)
 	        vm_tf->tf_guest_pcoreid, when, reason, shutdown,
 			vm_tf->tf_exit_reason);
 	fprintf_vm_tf(f, vm_tf);
+	backtrace_guest_thread(f, vm_thread);
 }
 
 /* Convert a kernel guest virtual address to physical address.

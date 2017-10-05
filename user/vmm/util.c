@@ -4,6 +4,7 @@
  * Utility functions. */
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -11,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <vmm/util.h>
+#include <vmm/vmm.h>
 
 ssize_t cat(char *filename, void *where, size_t memsize)
 {
@@ -53,4 +55,30 @@ ssize_t cat(char *filename, void *where, size_t memsize)
 
 	close(fd);
 	return tot;
+}
+
+void backtrace_guest_thread(FILE *f, struct guest_thread *vm_thread)
+{
+	struct vm_trapframe *vm_tf = gth_to_vmtf(vm_thread);
+	uintptr_t guest_pc, guest_fp, host_fp;
+	uintptr_t frame[2];
+
+	guest_pc = vm_tf->tf_rip;
+	guest_fp = vm_tf->tf_rbp;
+
+	/* The BT should work for any code using frame pointers.  Most of the time,
+	 * this will be vmlinux, and calling it that helps our backtrace.  This
+	 * spits out the format that is parsed by bt-akaros.sh. */
+	fprintf(f, "Backtracing guest, vmlinux is assumed, but check addrs\n");
+	for (int i = 1; i < 30; i++) {
+		fprintf(f, "#%02d Addr %p is in vmlinux at offset %p\n", i, guest_pc,
+		        guest_pc);
+		if (!guest_fp)
+			break;
+		if (gvatogpa(vm_thread, guest_fp, &host_fp))
+			break;
+		memcpy(frame, (void*)host_fp, 2 * sizeof(uintptr_t));
+		guest_pc = frame[1];
+		guest_fp = frame[0];
+	}
 }

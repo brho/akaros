@@ -6,6 +6,9 @@
 
 #pragma once
 
+#include <vmm/sched.h>
+#include <stdio.h>
+
 /* Test for alignment, e.g. 2^6 */
 #define ALIGNED(p, a)	(!(((uintptr_t)(p)) & ((a)-1)))
 /* Aligns x up to the mask, e.g. (2^6 - 1) (round up if any mask bits are set)*/
@@ -21,3 +24,4 @@
 #define IS_PWR2(x) ((x) && !((x) & (x - 1)))
 
 ssize_t cat(char *file, void *where, size_t size);
+void backtrace_guest_thread(FILE *f, struct guest_thread *vm_thread);
