@@ -78,6 +78,7 @@ void *blk_request(void *_vq)
 		 * The second is the actual data.
 		 * The third contains just the status byte.
 		 */
+		assert(olen + ilen == 3);
 
 		status = iov[2].iov_base;
 		if (!status)
