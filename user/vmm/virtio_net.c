@@ -89,10 +89,14 @@ void *net_receiveq_fn(void *_vq)
 				"  See virtio-v1.0-cs04 s5.3.6.1 Device Operation");
 		}
 
-		/* For receive the virtio header is in iov[0], so we only want
-		 * the packet to be read into iov[1] and above.
-		 */
-		num_read = vnet_receive_packet(iov + 1, ilen - 1);
+		/* The virtio_net header comes first.  We'll assume they didn't break
+		 * the header across IOVs, but earlier versions of Linux did break out
+		 * the payload into the second IOV. */
+		net_header = iov[0].iov_base;
+		assert(iov[0].iov_len >= VIRTIO_HEADER_SIZE);
+		iov_strip_bytes(iov, ilen, VIRTIO_HEADER_SIZE);
+
+		num_read = vnet_receive_packet(iov, ilen);
 		if (num_read < 0) {
 			free(iov);
 			VIRTIO_DEV_ERRX(vq->vqdev,
@@ -106,8 +110,9 @@ void *net_receiveq_fn(void *_vq)
 		 * num_buffers will always be 1 if VIRTIO_NET_F_MRG_RXBUF is not
 		 * negotiated.
 		 */
-		net_header = iov[0].iov_base;
 		net_header->num_buffers = 1;
+		net_header->flags = 0;
+		net_header->gso_type = VIRTIO_NET_HDR_GSO_NONE;
 		virtio_add_used_desc(vq, head, num_read + VIRTIO_HEADER_SIZE);
 
 		virtio_mmio_set_vring_irq(dev);
