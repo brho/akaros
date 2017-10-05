@@ -166,6 +166,7 @@ int io(struct guest_thread *vm_thread)
 		printf("(out rax, edx): unhandled IO address dx @%p is 0x%x\n", ip8, edx);
 		return 0;
 	}
+	/* TODO: sort out these various OUT operations */
 	// out %al, %dx
 	if (*ip8 == 0xee) {
 		vm_tf->tf_rip += 1;
@@ -197,6 +198,16 @@ int io(struct guest_thread *vm_thread)
 		printf("out al, dx: unhandled IO address dx @%p is 0x%x\n", ip8, edx);
 		return 0;
 	}
+	/* Silently accept OUT imm8, al */
+	if (*ip8 == 0xe6) {
+		vm_tf->tf_rip += 2;
+		return 0;
+	}
+	/* Silently accept OUT dx, ax with opcode size modifier */
+	if (*ip16 ==  0xef66) {
+		vm_tf->tf_rip += 2;
+		return 0;
+	}
 	if (*ip8 == 0xec) {
 		vm_tf->tf_rip += 1;
 		//printf("configread8 ");
@@ -212,11 +223,6 @@ int io(struct guest_thread *vm_thread)
 		}
 		//printf("configread32 ");
 		configread32(edx, &vm_tf->tf_rax);
-		return 0;
-	}
-	/* Detects when something is written to the PIC. */
-	if (*ip8 == 0xe6) {
-		vm_tf->tf_rip += 2;
 		return 0;
 	}
 	/* Detects when something is read from the PIC, so
