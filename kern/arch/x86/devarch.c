@@ -90,8 +90,8 @@ static struct dirtab archdir[Qmax] = {
 	{"c-state", {Qcstate, 0}, 0, 0666},
 	{"p-state", {Qpstate, 0}, 0, 0666},
 };
-/* White list entries needs to be ordered by start address, and never overlap.
- */
+
+/* White list entries must not overlap. */
 #define MSR_MAX_VAR_COUNTERS 16
 #define MSR_MAX_FIX_COUNTERS 4
 
@@ -107,6 +107,7 @@ static struct address_range msr_wr_wlist[] = {
 	ADDRESS_RANGE(MSR_CORE_PERF_FIXED_CTR0,
 				  MSR_CORE_PERF_FIXED_CTR0 + MSR_MAX_FIX_COUNTERS - 1),
 	ADDRESS_RANGE(MSR_CORE_PERF_FIXED_CTR_CTRL, MSR_CORE_PERF_GLOBAL_OVF_CTRL),
+	ADDRESS_RANGE(MSR_IA32_MPERF, MSR_IA32_APERF),
 };
 int gdbactive = 0;
 
