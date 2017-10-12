@@ -133,3 +133,29 @@ void unlock_page(struct page *page)
 	atomic_and(&page->pg_flags, ~PG_LOCKED);
 	sem_up(&page->pg_sem);
 }
+
+static void *__jumbo_pml2_alloc(struct arena *a, size_t size, int flags)
+{
+	return arena_xalloc(a, size, PML2_PTE_REACH, 0, 0, NULL, NULL, flags);
+}
+
+static struct arena *jumbo_pml2_arena;
+
+/* Just for example; we could add qcaches too.  Do this after kmalloc_init(). */
+void jumbo_arena_init(void)
+{
+	jumbo_pml2_arena = arena_create("jumbo_pml2", NULL, 0, PML2_PTE_REACH,
+	                                __jumbo_pml2_alloc, arena_xfree,
+	                                base_arena, 0, MEM_WAIT);
+	assert(jumbo_pml2_arena);
+}
+
+void *jumbo_page_alloc(size_t nr, int flags)
+{
+	return arena_alloc(jumbo_pml2_arena, nr * PML2_PTE_REACH, flags);
+}
+
+void jumbo_page_free(void *buf, size_t nr)
+{
+	arena_free(jumbo_pml2_arena, buf, nr * PML2_PTE_REACH);
+}
