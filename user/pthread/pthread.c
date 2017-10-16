@@ -770,9 +770,13 @@ int pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type)
 
 int pthread_mutex_init(pthread_mutex_t *m, const pthread_mutexattr_t *attr)
 {
-	if (!__pthread_mutex_type_ok(attr->type))
-		return EINVAL;
-	m->type = attr->type;
+	if (attr) {
+		if (!__pthread_mutex_type_ok(attr->type))
+			return EINVAL;
+		m->type = attr->type;
+	} else {
+		m->type = PTHREAD_MUTEX_NORMAL;
+	}
 	switch (m->type) {
 	case PTHREAD_MUTEX_NORMAL:
 		uth_mutex_init(&m->mtx);
