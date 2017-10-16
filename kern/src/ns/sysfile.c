@@ -48,11 +48,11 @@ enum {
 				 * let's not yet exceed a common MSIZE. */
 };
 
-int newfd(struct chan *c, int oflags)
+int newfd(struct chan *c, int low_fd, int oflags, bool must_use_low)
 {
-	int ret = insert_obj_fdt(&current->open_files, c, 0,
+	int ret = insert_obj_fdt(&current->open_files, c, low_fd,
 	                         oflags & O_CLOEXEC ? FD_CLOEXEC : 0,
-	                         FALSE, FALSE);
+	                         must_use_low, FALSE);
 	if (ret >= 0)
 		cclose(c);
 	return ret;
@@ -199,7 +199,8 @@ int syscreate(char *path, int mode, uint32_t perm)
 		cclose(c);
 		nexterror();
 	}
-	fd = newfd(c, mode);	/* 9ns mode is the O_FLAGS and perm is glibc mode */
+	/* 9ns mode is the O_FLAGS and perm is glibc mode */
+	fd = newfd(c, 0, mode, FALSE);
 	if (fd < 0)
 		error(-fd, ERROR_FIXME);
 	poperror();
@@ -208,7 +209,7 @@ int syscreate(char *path, int mode, uint32_t perm)
 	return fd;
 }
 
-int sysdup(int old)
+int sysdup(int old, int low_fd, bool must_use_low)
 {
 	ERRSTACK(1);
 	int fd;
@@ -223,7 +224,7 @@ int sysdup(int old)
 		cclose(c);
 		error(EPERM, ERROR_FIXME);
 	}
-	fd = newfd(c, 0);
+	fd = newfd(c, low_fd, 0, must_use_low);
 	if (fd < 0) {
 		cclose(c);
 		error(-fd, ERROR_FIXME);
@@ -313,7 +314,7 @@ int sysfauth(int fd, char *aname)
 		nexterror();
 	}
 
-	fd = newfd(ac, 0);
+	fd = newfd(ac, 0, 0, FALSE);
 	if (fd < 0)
 		error(-fd, ERROR_FIXME);
 	poperror();	/* ac */
@@ -526,7 +527,7 @@ int sysopenat(int fromfd, char *path, int vfs_flags)
 			error(EINVAL, "Cannot openat from a non-O_PATH FD");
 		c = namec_from(from, path, Aopen, vfs_flags, 0);
 	}
-	fd = newfd(c, vfs_flags);
+	fd = newfd(c, 0, vfs_flags, FALSE);
 	if (fd < 0)
 		error(-fd, ERROR_FIXME);
 	poperror();

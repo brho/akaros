@@ -56,11 +56,30 @@ bool test_open_lots_and_spawn(void)
 	return TRUE;
 }
 
+bool test_pipe_dup2(void)
+{
+	int pipefd[2];
+	int ret;
+
+	ret = pipe(pipefd);
+	UT_ASSERT(!ret);
+	ret = dup2(pipefd[0], 100);
+	UT_ASSERT(ret == 100);
+	ret = close(100);
+	UT_ASSERT(!ret);
+	ret = close(pipefd[0]);
+	UT_ASSERT(!ret);
+	ret = close(pipefd[1]);
+	UT_ASSERT(!ret);
+	return TRUE;
+}
+
 /* <--- End definition of test cases ---> */
 
 struct utest utests[] = {
 	UTEST_REG(openat),
 	UTEST_REG(open_lots_and_spawn),
+	UTEST_REG(pipe_dup2),
 };
 int num_utests = sizeof(utests) / sizeof(struct utest);
 

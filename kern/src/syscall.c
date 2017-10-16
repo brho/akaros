@@ -1867,7 +1867,13 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
 		/* 9ns hack */
 		switch (cmd) {
 			case (F_DUPFD):
-				return sysdup(fd);
+				newfd = arg1;
+				if (newfd < 0) {
+					set_errno(EBADF);
+					return -1;
+				}
+				/* TODO: glibc uses regular DUPFD for dup2, which is racy. */
+				return sysdup(fd, newfd, FALSE);
 			case (F_GETFD):
 			case (F_SETFD):
 			case (F_SYNC):
@@ -1889,7 +1895,12 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
 	/* TODO: these are racy */
 	switch (cmd) {
 		case (F_DUPFD):
-			retval = insert_file(&p->open_files, file, arg1, FALSE, FALSE);
+			newfd = arg1;
+			if (newfd < 0) {
+				set_errno(EBADF);
+				return -1;
+			}
+			retval = insert_file(&p->open_files, file, newfd, FALSE, FALSE);
 			if (retval < 0) {
 				set_errno(-retval);
 				retval = -1;

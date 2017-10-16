@@ -942,7 +942,7 @@ void cmderror(struct cmdbuf *cb, char *s);
 struct cmdtab *lookupcmd(struct cmdbuf *cb, struct cmdtab *ctab, int nctab);
 
 /* kern/src/ns/sysfile.c */
-int newfd(struct chan *c, int oflags);
+int newfd(struct chan *c, int low_fd, int oflags, bool must_use_low);
 struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
                       int iref);
 long kchanio(void *vc, void *buf, int n, int mode);
@@ -952,7 +952,7 @@ int syschdir(char *path);
 int grpclose(struct fd_table *fdt, int fd);
 int sysclose(int fd);
 int syscreate(char *path, int mode, uint32_t perm);
-int sysdup(int old);
+int sysdup(int old, int low_fd, bool must_use_low);
 int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
                struct proc *to_proc, unsigned int to_fd);
 int sysfstat(int fd, uint8_t*, int n);
