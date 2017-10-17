@@ -1884,10 +1884,7 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
 				return fd_getfl(fd);
 			case (F_SETFL):
 				return fd_setfl(fd, arg1);
-			default:
-				warn("Unsupported fcntl cmd %d\n", cmd);
 		}
-		/* not really ever calling this, even for badf, due to the switch */
 		set_errno(EBADF);
 		return -1;
 	}
@@ -1935,7 +1932,8 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
 			retval = 0;
 			break;
 		default:
-			warn("Unsupported fcntl cmd %d\n", cmd);
+			set_errno(EINVAL);
+			retval = -1;
 	}
 	kref_put(&file->f_kref);
 	return retval;
