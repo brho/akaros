@@ -176,7 +176,8 @@ static bool parse_pfm_encoding(const char *str, struct perf_eventsel *sel)
 	sel->ev.event = encode.codes[0];
 	x86_handle_pseudo_encoding(sel);
 	sel->type = PERF_TYPE_RAW;
-	sel->config = PMEV_GET_MASK(sel->ev.event) | PMEV_GET_EVENT(sel->ev.event);
+	sel->config = (PMEV_GET_MASK(sel->ev.event) << 8) |
+	              PMEV_GET_EVENT(sel->ev.event);
 	return TRUE;
 }
 
@@ -279,7 +280,8 @@ static bool parse_raw_encoding(const char *str, struct perf_eventsel *sel)
 	 * exactly what the user asked us for - which also means no fixed counters
 	 * for them (unless we want a :f: token or something). */
 	sel->type = PERF_TYPE_RAW;
-	sel->config = PMEV_GET_MASK(sel->ev.event) | PMEV_GET_EVENT(sel->ev.event);
+	sel->config = (PMEV_GET_MASK(sel->ev.event) << 8) |
+	              PMEV_GET_EVENT(sel->ev.event);
 	return TRUE;
 }
 
