@@ -29,6 +29,7 @@ size_t ros_get_low_latency_core_count(void);
 size_t ros_total_cores(void);
 void ros_parse_cores(const char *str, struct core_set *cores);
 void ros_get_all_cores_set(struct core_set *cores);
+void ros_get_no_cores_set(struct core_set *cores);
 void ros_not_core_set(struct core_set *dcs);
 void ros_and_core_sets(struct core_set *dcs, const struct core_set *scs);
 void ros_or_core_sets(struct core_set *dcs, const struct core_set *scs);

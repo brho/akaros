@@ -20,6 +20,7 @@ static const unsigned int llcores[] = {
 
 void ros_get_low_latency_core_set(struct core_set *cores)
 {
+	ros_get_no_cores_set(cores);
 	for (size_t i = 0; i < COUNT_OF(llcores); i++)
 		ros_set_bit(cores, llcores[i]);
 }
@@ -115,6 +116,13 @@ void ros_get_all_cores_set(struct core_set *cores)
 	size_t max_cores = ros_total_cores();
 
 	memset(cores->core_set, 0xff, DIV_ROUND_UP(max_cores, CHAR_BIT));
+}
+
+void ros_get_no_cores_set(struct core_set *cores)
+{
+	size_t max_cores = ros_total_cores();
+
+	memset(cores->core_set, 0, DIV_ROUND_UP(max_cores, CHAR_BIT));
 }
 
 void ros_not_core_set(struct core_set *dcs)
