@@ -13,23 +13,43 @@
 #include <assert.h>
 #include <stdio.h>
 #include <ros/procinfo.h>
+#include <arch/uaccess.h>
 
 static uint16_t pit_divisor;
 static uint8_t pit_mode;
 
-// timer init calibrates both tsc timer and lapic timer using PIT
-void timer_init(void){
+static uint64_t compute_tsc_freq(void)
+{
+	uint64_t tscval[2];
+
 	/* some boards have this unmasked early on. */
 	pic_mask_irq(0, 0 + PIC1_OFFSET);
-	uint64_t tscval[2];
-	long timercount[2];
 	pit_set_timer(0xffff, TIMER_RATEGEN);
-	// assume tsc exist
 	tscval[0] = read_tsc();
 	udelay_pit(1000000);
 	tscval[1] = read_tsc();
-	__proc_global_info.tsc_freq = tscval[1] - tscval[0];
-	cprintf("TSC Frequency: %llu\n", __proc_global_info.tsc_freq);
+	return tscval[1] - tscval[0];
+}
+
+static void set_tsc_freq(void)
+{
+	uint64_t msr_val, tsc_freq;
+	bool computed = FALSE;
+
+	if (read_msr_safe(MSR_PLATFORM_INFO, &msr_val)) {
+		tsc_freq = compute_tsc_freq();
+		computed = TRUE;
+	} else {
+		tsc_freq = __proc_global_info.bus_freq * ((msr_val >> 8) & 0xff);
+	}
+	__proc_global_info.tsc_freq = tsc_freq;
+	printk("TSC Frequency: %llu%s\n", tsc_freq, computed ? " (computed)" : "");
+}
+
+static uint64_t compute_bus_freq(void)
+{
+	uint32_t timercount[2];
+
 	__lapic_set_timer(0xffffffff, IdtLAPIC_TIMER, FALSE,
 	                  LAPIC_TIMER_DIVISOR_BITS);
 	// Mask the LAPIC Timer, so we never receive this interrupt (minor race)
@@ -37,14 +57,82 @@ void timer_init(void){
 	timercount[0] = apicrget(MSR_LAPIC_CURRENT_COUNT);
 	udelay_pit(1000000);
 	timercount[1] = apicrget(MSR_LAPIC_CURRENT_COUNT);
-	__proc_global_info.bus_freq = (timercount[0] - timercount[1])
-	                         * LAPIC_TIMER_DIVISOR_VAL;
-	assert(__proc_global_info.bus_freq);
 	/* The time base for the timer is derived from the processor's bus clock,
 	 * divided by the value specified in the divide configuration register.
 	 * Note we mult and div by the divisor, saving the actual freq (even though
 	 * we don't use it yet). */
-	cprintf("Bus Frequency: %llu\n", __proc_global_info.bus_freq);
+	return (timercount[0] - timercount[1]) * LAPIC_TIMER_DIVISOR_VAL;
+}
+
+static uint64_t lookup_bus_freq(void)
+{
+	/* Got these from the good book for any model supporting MSR_PLATFORM_INFO.
+	 * If they don't support that MSR, we're going to compute the TSC anyways.
+	 *
+	 * A couple models weren't in the book, but were reported at:
+	 * http://a4lg.com/tech/x86/database/x86-families-and-models.en.html.
+	 * Feel free to add more.  If we fail here, we'll compute it manually and be
+	 * off slightly. */
+	switch ((x86_family << 16) | x86_model) {
+	case 0x6001a:
+	case 0x6001e:
+	case 0x6001f:
+	case 0x6002e:
+		/* Nehalem */
+		return 133333333;
+	case 0x60025:
+	case 0x6002c:
+	case 0x6002f:	/* from a4lg.com */
+		/* Westmere */
+		return 133333333;
+	case 0x6002a:
+	case 0x6002d:
+		/* Sandy Bridge */
+		return 100000000;
+	case 0x6003a:	/* from a4lg.com */
+	case 0x6003e:
+		/* Ivy Bridge */
+		return 100000000;
+	case 0x6003c:
+	case 0x6003f:
+	case 0x60045:
+	case 0x60046:
+		/* Haswell */
+		return 100000000;
+	case 0x6003d:
+	case 0x6004f:
+	case 0x60056:
+		/* Broadwell */
+		return 100000000;
+	case 0x6004d:
+		/* Sky Lake */
+		return 100000000;
+	case 0x60057:
+		/* Knights Landing */
+		return 100000000;
+	}
+	return 0;
+}
+
+static void set_bus_freq(void)
+{
+	uint64_t bus_freq;
+	bool computed = FALSE;
+
+	bus_freq = lookup_bus_freq();
+	if (!bus_freq) {
+		bus_freq = compute_bus_freq();
+		computed = TRUE;
+	}
+	__proc_global_info.bus_freq = bus_freq;
+	printk("Bus Frequency: %llu%s\n", bus_freq, computed ? " (computed)" : "");
+}
+
+void timer_init(void)
+{
+	set_bus_freq();
+	assert(__proc_global_info.bus_freq);
+	set_tsc_freq();
 }
 
 void pit_set_timer(uint32_t divisor, uint32_t mode)

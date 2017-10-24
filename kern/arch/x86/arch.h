@@ -33,6 +33,7 @@ __reset_stack_pointer(void *arg, uintptr_t sp, void (*f)(void *));
 /* in trap.c */
 void send_ipi(uint32_t os_coreid, uint8_t vector);
 /* in cpuinfo.c */
+int x86_family, x86_model, x86_stepping;
 void print_cpuinfo(void);
 void show_mapping(pgdir_t pgdir, uintptr_t start, size_t size);
 int vendor_id(char *);

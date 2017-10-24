@@ -15,6 +15,8 @@
 #include <string.h>
 #include <cpu_feat.h>
 
+int x86_family, x86_model, x86_stepping;
+
 /* Check Intel's SDM 2a for Table 3-17 for the cpuid leaves */
 void print_cpuinfo(void)
 {
@@ -69,9 +71,12 @@ void print_cpuinfo(void)
 		model += ext_model << 4;
 	if (family == 15)
 		family += ext_family;
-	cprintf("Family: %d\n", family);
-	cprintf("Model: %d\n", model);
-	cprintf("Stepping: %d\n", eax & 0x0000000F);
+	x86_family = family;
+	x86_model = model;
+	x86_stepping = eax & 0xf;
+	printk("Family: %d\n", x86_family);
+	printk("Model: %d\n", x86_model);
+	printk("Stepping: %d\n", x86_stepping);
 	// eventually can fill this out with SDM Vol3B App B info, or
 	// better yet with stepping info.  or cpuid 8000_000{2,3,4}
 	switch ( family << 8 | model ) {
