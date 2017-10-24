@@ -61,6 +61,15 @@ unsigned int get_pstate(void)
 	return (perf_ctl & 0xff00) >> 8;
 }
 
+unsigned int get_actual_pstate(void)
+{
+	uint64_t perf_status;
+
+	if (read_msr_safe(MSR_IA32_PERF_STATUS, &perf_status))
+		return 0;
+	return (perf_status & 0xff00) >> 8;
+}
+
 void set_cstate(unsigned int cstate)
 {
 	/* No real need to lock for an assignment.  Any core can set this, and other
