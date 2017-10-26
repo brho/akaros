@@ -138,7 +138,7 @@ static uint64_t perfmon_apply_fixevent_mask(uint64_t event, int idx,
 		m |= (1 << 0);
 	if (PMEV_GET_USR(event))
 		m |= (1 << 1);
-	if (PMEV_GET_ANYTH(event) && (cpu_caps.perfmon_version >= 3))
+	if (PMEV_GET_ANYTH(event))
 		m |= (1 << 2);
 	if (PMEV_GET_INTEN(event))
 		m |= (1 << 3);
@@ -588,6 +588,11 @@ int perfmon_open_event(const struct core_set *cset, struct perfmon_session *ps,
 		perfmon_destroy_alloc(pa);
 		nexterror();
 	}
+	/* Ensure the user did not set reserved bits or otherwise give us a bad
+	 * event.  pev (now pa->ev) must be a valid IA32_PERFEVTSEL MSR. */
+	pa->ev.event &= 0xffffffff;
+	if (cpu_caps.perfmon_version < 3)
+		PMEV_SET_ANYTH(pa->ev.event, 0);
 	/* Ensure we're turning on the event.  The user could have forgotten to set
 	 * it.  Our tracking of whether or not a counter is in use depends on it
 	 * being enabled, or at least that some bit is set. */
