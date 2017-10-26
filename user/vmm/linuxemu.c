@@ -159,7 +159,7 @@ bool get_absolute_path_from_fd(int fd, const char *path, char **absolute_path)
 
 //Akaros open flags are different than linux
 //This function converts them
-int translate_open_flags(int flags)
+int convert_open_flags_ltoa(int flags)
 {
 	int lower3bits = flags & 0x7;
 	int otherstuff = flags & ~(0x7);
@@ -174,13 +174,34 @@ int translate_open_flags(int flags)
 	case 2:
 		otherstuff |= O_RDWR;
 		break;
-	case 3:
-		otherstuff |= O_ACCMODE;
+	default:
+		// TODO(ganshun): We panic here for now if they are trying behavior we
+		// do not expect
+		panic("linuxemu, convert_open_flags_ltoa: unknown open flags provided\n");
+		break;
+	}
+	return otherstuff;
+}
+
+int convert_open_flags_atol(int flags)
+{
+	int lower3bits = flags & 0x7;
+	int otherstuff = flags & ~(0x7);
+
+	switch (lower3bits) {
+	case O_RDONLY:
+		otherstuff |= 0;
+		break;
+	case O_WRONLY:
+		otherstuff |= 1;
+		break;
+	case O_RDWR:
+		otherstuff |= 2;
 		break;
 	default:
 		// TODO(ganshun): We panic here for now if they are trying behavior we
 		// do not expect
-		panic("linuxemu, translate_open_flags: unknown open flags provided\n");
+		panic("linuxemu, convert_open_flags_atol: unknown open flags provided\n");
 		break;
 	}
 	return otherstuff;
@@ -281,6 +302,9 @@ bool dune_sys_fcntl(struct vm_trapframe *tf)
 		          "ERROR %d\n", err);
 		tf->tf_rax = -err;
 	} else {
+		// TODO(ganshun): fix fcntl SETFL, ak flags are different.
+		if (tf->tf_rsi == 3)
+			retval = convert_open_flags_atol(retval);
 		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
 		          "SUCCESS %d\n", retval);
 		tf->tf_rax = retval;
@@ -514,12 +538,13 @@ bool dune_sys_open(struct vm_trapframe *tf)
 {
 	const char *file = (const char *) tf->tf_rdi;
 	int flags = tf->tf_rsi;
+	int mode = tf->tf_rdx;
 
-	flags = translate_open_flags(flags);
+	flags = convert_open_flags_ltoa(flags);
 	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
 	          "Trying to open \"%s\"\n", file);
 
-	int retval  = open(file, flags);
+	int retval  = open(file, flags, mode);
 	int err = errno;
 
 	if (retval == -1) {
@@ -556,8 +581,7 @@ bool dune_sys_openat(struct vm_trapframe *tf)
 		      tf->tf_guest_pcoreid, dune_syscall_table[tf->tf_rax].name, fd, s);
 	}
 
-	flags = translate_open_flags(flags);
-
+	flags = convert_open_flags_ltoa(flags);
 	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
 	          "trying to open absolute path %s with translated flags %p\n",
 	          s, flags);
