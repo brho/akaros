@@ -80,8 +80,8 @@ void pmem_init(struct multiboot_info *mbi)
 	printk("Max physical RAM (appx, bytes): %lu\n", max_pmem);
 	printk("Max addressable physical RAM (appx): %lu\n", max_paddr);
 	printk("Highest page number (including reserved): %lu\n", max_nr_pages);
-	/* We should init the page structs, but zeroing happens to work, since the
-	 * sems are not irqsave. */
+	/* We should init the page structs, but zeroing happens to work, except for
+	 * the sems.  Those are init'd by the page cache before they are used. */
 	pages = (struct page*)boot_zalloc(max_nr_pages * sizeof(struct page),
 	                                  PGSIZE);
 	base_arena_init(mbi);

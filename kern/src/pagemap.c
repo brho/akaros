@@ -202,7 +202,10 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 		/* important that UP_TO_DATE is not set.  once we put it in the PM,
 		 * others can find it, and we still need to fill it. */
 		atomic_set(&page->pg_flags, PG_LOCKED | PG_PAGEMAP);
-		page->pg_sem.nr_signals = 0;	/* preemptively locking */
+		/* The sem needs to be initted before anyone can try to lock it, meaning
+		 * before it is in the page cache.  We also want it locked preemptively,
+		 * by setting signals = 0. */
+		sem_init(&page->pg_sem, 0);
 		error = pm_insert_page(pm, index, page);
 		switch (error) {
 			case 0:
