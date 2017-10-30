@@ -112,6 +112,7 @@ void free_cont_pages(void *buf, size_t order)
 /* Frees the page */
 void page_decref(page_t *page)
 {
+	assert(!page_is_pagemap(page));
 	kpages_free(page2kva(page), PGSIZE);
 }
 

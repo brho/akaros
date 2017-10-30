@@ -66,4 +66,5 @@ void pm_add_vmr(struct page_map *pm, struct vm_region *vmr);
 void pm_remove_vmr(struct page_map *pm, struct vm_region *vmr);
 int pm_remove_contig(struct page_map *pm, unsigned long index,
                      unsigned long nr_pgs);
+void pm_page_asserter(struct page *page, char *str);
 void print_page_map_info(struct page_map *pm);

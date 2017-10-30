@@ -70,11 +70,17 @@ static int pm_slot_check_refcnt(void *slot_val)
 
 static void *pm_slot_inc_refcnt(void *slot_val)
 {
-	return (void*)((unsigned long)slot_val + (1UL << PM_REFCNT_SHIFT));
+	void *ret;
+
+	ret = (void*)((unsigned long)slot_val + (1UL << PM_REFCNT_SHIFT));
+	/* Catches previously negative refcnts */
+	assert(pm_slot_check_refcnt(ret) > 0);
+	return ret;
 }
 
 static void *pm_slot_dec_refcnt(void *slot_val)
 {
+	assert(pm_slot_check_refcnt(slot_val) > 0);
 	return (void*)((unsigned long)slot_val - (1UL << PM_REFCNT_SHIFT));
 }
 
@@ -181,7 +187,10 @@ static int pm_insert_page(struct page_map *pm, unsigned long index,
 void pm_put_page(struct page *page)
 {
 	void **tree_slot = page->pg_tree_slot;
+
 	assert(tree_slot);
+	assert(pm_slot_get_page(*tree_slot) == page);
+	assert(pm_slot_check_refcnt(*tree_slot) > 0);
 	/* decref, don't care about CASing */
 	atomic_add((atomic_t*)tree_slot, -(1UL << PM_REFCNT_SHIFT));
 }
@@ -214,15 +223,19 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 			case -EEXIST:
 				/* the page was mapped already (benign race), just get rid of
 				 * our page and try again (the only case that uses the while) */
+				atomic_set(&page->pg_flags, 0);
 				page_decref(page);
 				page = pm_find_page(pm, index);
 				break;
 			default:
+				atomic_set(&page->pg_flags, 0);
 				page_decref(page);
 				return error;
 		}
 	}
-	assert(page && pm_slot_check_refcnt(*page->pg_tree_slot));
+	assert(page);
+	assert(pm_slot_check_refcnt(*page->pg_tree_slot));
+	assert(pm_slot_get_page(*page->pg_tree_slot) == page);
 	if (atomic_read(&page->pg_flags) & PG_UPTODATE) {
 		*pp = page;
 		printd("pm %p FOUND page %p, addr %p, idx %d\n", pm, page,
@@ -608,4 +621,15 @@ void print_page_map_info(struct page_map *pm)
 		       vmr_i->vm_prot, vmr_i->vm_flags, vmr_i->vm_file, vmr_i->vm_foff);
 	}
 	spin_unlock(&pm->pm_lock);
+}
+
+void pm_page_asserter(struct page *page, char *str)
+{
+	void **tree_slot = page->pg_tree_slot;
+
+	if (!page_is_pagemap(page))
+		return;
+	assert(tree_slot);
+	assert(pm_slot_get_page(*tree_slot) == page);
+	assert(pm_slot_check_refcnt(*tree_slot) > 0);
 }
