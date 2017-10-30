@@ -2869,3 +2869,12 @@ void print_sysc(struct proc *p, struct syscall *sysc)
 	       sysc->arg5);
 	switch_back(p, old_p);
 }
+
+/* Called when we try to return from a panic. */
+void kth_panic_sysc(struct kthread *kth)
+{
+	kth->sysc = NULL;
+	/* We actually could block here, but that might be OK, since we cleared
+	 * cur_kthread->sysc.  As OK as anything is after a panic... */
+	systrace_finish_trace(kth, -12345);
+}

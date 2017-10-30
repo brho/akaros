@@ -255,12 +255,19 @@ void _panic(const char *file, int line, const char *fmt,...)
 	cprintf("\n");
 	va_end(ap);
 
-dead:
 	monitor(NULL);
-	/* We could consider turning the lock checker back on here, but things are
-	 * probably a mess anyways, and with it on we would probably lock up right
-	 * away when we idle. */
-	//pcpui->__lock_checking_enabled++;
+	if (pcpui->cur_proc) {
+		printk("panic killing proc %d\n", pcpui->cur_proc->pid);
+		proc_destroy(pcpui->cur_proc);
+	}
+	/* Yikes!  We're claiming to be not in IRQ/trap ctx and not holding any
+	 * locks.  Obviously we could be wrong, and could easily deadlock.  We could
+	 * be in an IRQ handler, an unhandled kernel fault, or just a 'normal' panic
+	 * in a syscall - any of which can involve unrestore invariants. */
+	pcpui->__ctx_depth = 0;
+	pcpui->lock_depth = 0;
+	if (pcpui->cur_kthread)
+		kth_panic_sysc(pcpui->cur_kthread);
 	smp_idle();
 }
 

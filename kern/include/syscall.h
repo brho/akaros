@@ -87,3 +87,4 @@ void __signal_syscall(struct syscall *sysc, struct proc *p);
 /* Utility */
 bool syscall_uses_fd(struct syscall *sysc, int fd);
 void print_sysc(struct proc *p, struct syscall *sysc);
+void kth_panic_sysc(struct kthread *kth);
