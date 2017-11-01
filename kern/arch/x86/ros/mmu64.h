@@ -185,10 +185,9 @@ typedef struct x86_pgdir {
 #define VPT_TOP			0xffffff0000000000
 #define VPT				(VPT_TOP - PML4_PTE_REACH)
 /* Helper to return the current outer pgdir via the VPT mapping. */
-#define VPD (VPT + ((VPT & 0x0000ffffffffffff) >> 9) +                         \
-                   ((VPT & 0x0000ffffffffffff) >> 18) +                        \
-                   ((VPT & 0x0000ffffffffffff) >> 27))
-#define vpd VPD
+#define PML4_VIA_VPT (VPT + ((VPT & 0x0000ffffffffffff) >> 9) +                \
+                     ((VPT & 0x0000ffffffffffff) >> 18) +                      \
+                     ((VPT & 0x0000ffffffffffff) >> 27))
 
 /* Top of the kernel virtual mapping area (KERNBASE) */
 #define KERN_VMAP_TOP	(VPT)
