@@ -154,6 +154,9 @@
 
 #define MAX_PCI_BAR			6
 
+/* Nothing yet, but this helps with Linux drivers. */
+struct device {
+};
 
 struct pci_bar {
 	uint32_t					raw_bar;
@@ -169,6 +172,7 @@ struct pci_device {
 	char						name[9];
 	spinlock_t					lock;
 	void						*dev_data;	/* device private pointer */
+	struct device				device;
 	bool						in_use;		/* prevent double discovery */
 	uint8_t						bus;
 	uint8_t						dev;

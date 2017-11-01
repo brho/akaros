@@ -853,10 +853,9 @@ struct firmware {
 	size_t size;
 };
 
-/* the ignored param is a &pcidev->dev in linux, which is a struct dev.  our
- * pcidev->dev is the "slot" */
 static inline int request_firmware(const struct firmware **fwp,
-                                   const char *file_name, uint8_t *ignored)
+                                   const char *file_name,
+								   struct device *ignored)
 {
 	struct firmware *ret_fw;
 	struct file *fw_file;

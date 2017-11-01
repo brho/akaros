@@ -370,9 +370,6 @@ struct cpu_rmap {
 
 extern unsigned long saved_max_pfn;
 
-struct device {
-};
-
 struct device_attribute {
 };
 
