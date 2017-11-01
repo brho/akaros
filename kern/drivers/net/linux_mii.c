@@ -33,7 +33,7 @@
 #include <linux/ethtool.h>
 #include <linux/mii.h>
 
-static u32 mii_get_an(struct mii_if_info *mii, u16 addr)
+static uint32_t mii_get_an(struct mii_if_info *mii, uint16_t addr)
 {
 	int advert;
 
@@ -54,9 +54,9 @@ static u32 mii_get_an(struct mii_if_info *mii, u16 addr)
  */
 int mii_ethtool_gset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 {
-	struct net_device *dev = mii->dev;
-	u16 bmcr, bmsr, ctrl1000 = 0, stat1000 = 0;
-	u32 nego;
+	struct ether *dev = mii->dev;
+	uint16_t bmcr, bmsr, ctrl1000 = 0, stat1000 = 0;
+	uint32_t nego;
 
 	ecmd->supported =
 	    (SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
@@ -145,9 +145,9 @@ int mii_ethtool_gset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 void mii_ethtool_get_link_ksettings(struct mii_if_info *mii,
 				    struct ethtool_link_ksettings *cmd)
 {
-	struct net_device *dev = mii->dev;
-	u16 bmcr, bmsr, ctrl1000 = 0, stat1000 = 0;
-	u32 nego, supported, advertising, lp_advertising;
+	struct ether *dev = mii->dev;
+	uint16_t bmcr, bmsr, ctrl1000 = 0, stat1000 = 0;
+	uint32_t nego, supported, advertising, lp_advertising;
 
 	supported = (SUPPORTED_10baseT_Half | SUPPORTED_10baseT_Full |
 		     SUPPORTED_100baseT_Half | SUPPORTED_100baseT_Full |
@@ -236,8 +236,8 @@ void mii_ethtool_get_link_ksettings(struct mii_if_info *mii,
  */
 int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 {
-	struct net_device *dev = mii->dev;
-	u32 speed = ethtool_cmd_speed(ecmd);
+	struct ether *dev = mii->dev;
+	uint32_t speed = ethtool_cmd_speed(ecmd);
 
 	if (speed != SPEED_10 &&
 	    speed != SPEED_100 &&
@@ -259,8 +259,8 @@ int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 	/* ignore supported, maxtxpkt, maxrxpkt */
 
 	if (ecmd->autoneg == AUTONEG_ENABLE) {
-		u32 bmcr, advert, tmp;
-		u32 advert2 = 0, tmp2 = 0;
+		uint32_t bmcr, advert, tmp;
+		uint32_t advert2 = 0, tmp2 = 0;
 
 		if ((ecmd->advertising & (ADVERTISED_10baseT_Half |
 					  ADVERTISED_10baseT_Full |
@@ -296,7 +296,7 @@ int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 
 		mii->force_media = 0;
 	} else {
-		u32 bmcr, tmp;
+		uint32_t bmcr, tmp;
 
 		/* turn off auto negotiation, set speed and duplexity */
 		bmcr = mii->mdio_read(dev, mii->phy_id, MII_BMCR);
@@ -329,8 +329,8 @@ int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 int mii_ethtool_set_link_ksettings(struct mii_if_info *mii,
 				   const struct ethtool_link_ksettings *cmd)
 {
-	struct net_device *dev = mii->dev;
-	u32 speed = cmd->base.speed;
+	struct ether *dev = mii->dev;
+	uint32_t speed = cmd->base.speed;
 
 	if (speed != SPEED_10 &&
 	    speed != SPEED_100 &&
@@ -351,9 +351,9 @@ int mii_ethtool_set_link_ksettings(struct mii_if_info *mii,
 	/* ignore supported, maxtxpkt, maxrxpkt */
 
 	if (cmd->base.autoneg == AUTONEG_ENABLE) {
-		u32 bmcr, advert, tmp;
-		u32 advert2 = 0, tmp2 = 0;
-		u32 advertising;
+		uint32_t bmcr, advert, tmp;
+		uint32_t advert2 = 0, tmp2 = 0;
+		uint32_t advertising;
 
 		ethtool_convert_link_mode_to_legacy_u32(
 			&advertising, cmd->link_modes.advertising);
@@ -393,7 +393,7 @@ int mii_ethtool_set_link_ksettings(struct mii_if_info *mii,
 
 		mii->force_media = 0;
 	} else {
-		u32 bmcr, tmp;
+		uint32_t bmcr, tmp;
 
 		/* turn off auto negotiation, set speed and duplexity */
 		bmcr = mii->mdio_read(dev, mii->phy_id, MII_BMCR);
@@ -606,7 +606,7 @@ int generic_mii_ioctl(struct mii_if_info *mii_if,
 		break;
 
 	case SIOCSMIIREG: {
-		u16 val = mii_data->val_in;
+		uint16_t val = mii_data->val_in;
 
 		if (mii_data->phy_id == mii_if->phy_id) {
 			switch(mii_data->reg_num) {

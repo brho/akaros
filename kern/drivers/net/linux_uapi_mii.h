@@ -153,10 +153,10 @@
 
 /* This structure is used in all SIOCxMIIxxx ioctl calls */
 struct mii_ioctl_data {
-	__u16		phy_id;
-	__u16		reg_num;
-	__u16		val_in;
-	__u16		val_out;
+	uint16_t		phy_id;
+	uint16_t		reg_num;
+	uint16_t		val_in;
+	uint16_t		val_out;
 };
 
 #endif /* _UAPI__LINUX_MII_H__ */

@@ -23,9 +23,10 @@ struct mii_if_info {
 	unsigned int force_media : 1;	/* is autoneg. disabled? */
 	unsigned int supports_gmii : 1; /* are GMII registers supported? */
 
-	struct net_device *dev;
-	int (*mdio_read) (struct net_device *dev, int phy_id, int location);
-	void (*mdio_write) (struct net_device *dev, int phy_id, int location, int val);
+	struct ether *dev;
+	int (*mdio_read) (struct ether *dev, int phy_id, int location);
+	void (*mdio_write) (struct ether *dev, int phy_id, int location,
+			    int val);
 };
 
 extern int mii_link_ok (struct mii_if_info *mii);
@@ -110,9 +111,9 @@ static inline unsigned int mii_duplex (unsigned int duplex_lock,
  * settings to phy autonegotiation advertisements for the
  * MII_ADVERTISE register.
  */
-static inline u32 ethtool_adv_to_mii_adv_t(u32 ethadv)
+static inline uint32_t ethtool_adv_to_mii_adv_t(uint32_t ethadv)
 {
-	u32 result = 0;
+	uint32_t result = 0;
 
 	if (ethadv & ADVERTISED_10baseT_Half)
 		result |= ADVERTISE_10HALF;
@@ -137,9 +138,9 @@ static inline u32 ethtool_adv_to_mii_adv_t(u32 ethadv)
  * A small helper function that translates MII_ADVERTISE bits
  * to ethtool advertisement settings.
  */
-static inline u32 mii_adv_to_ethtool_adv_t(u32 adv)
+static inline uint32_t mii_adv_to_ethtool_adv_t(uint32_t adv)
 {
-	u32 result = 0;
+	uint32_t result = 0;
 
 	if (adv & ADVERTISE_10HALF)
 		result |= ADVERTISED_10baseT_Half;
@@ -165,9 +166,9 @@ static inline u32 mii_adv_to_ethtool_adv_t(u32 adv)
  * settings to phy autonegotiation advertisements for the
  * MII_CTRL1000 register when in 1000T mode.
  */
-static inline u32 ethtool_adv_to_mii_ctrl1000_t(u32 ethadv)
+static inline uint32_t ethtool_adv_to_mii_ctrl1000_t(uint32_t ethadv)
 {
-	u32 result = 0;
+	uint32_t result = 0;
 
 	if (ethadv & ADVERTISED_1000baseT_Half)
 		result |= ADVERTISE_1000HALF;
@@ -185,9 +186,9 @@ static inline u32 ethtool_adv_to_mii_ctrl1000_t(u32 ethadv)
  * bits, when in 1000Base-T mode, to ethtool
  * advertisement settings.
  */
-static inline u32 mii_ctrl1000_to_ethtool_adv_t(u32 adv)
+static inline uint32_t mii_ctrl1000_to_ethtool_adv_t(uint32_t adv)
 {
-	u32 result = 0;
+	uint32_t result = 0;
 
 	if (adv & ADVERTISE_1000HALF)
 		result |= ADVERTISED_1000baseT_Half;
@@ -205,9 +206,9 @@ static inline u32 mii_ctrl1000_to_ethtool_adv_t(u32 adv)
  * bits, when in 1000Base-T mode, to ethtool
  * LP advertisement settings.
  */
-static inline u32 mii_lpa_to_ethtool_lpa_t(u32 lpa)
+static inline uint32_t mii_lpa_to_ethtool_lpa_t(uint32_t lpa)
 {
-	u32 result = 0;
+	uint32_t result = 0;
 
 	if (lpa & LPA_LPACK)
 		result |= ADVERTISED_Autoneg;
@@ -223,9 +224,9 @@ static inline u32 mii_lpa_to_ethtool_lpa_t(u32 lpa)
  * bits, when in 1000Base-T mode, to ethtool
  * advertisement settings.
  */
-static inline u32 mii_stat1000_to_ethtool_lpa_t(u32 lpa)
+static inline uint32_t mii_stat1000_to_ethtool_lpa_t(uint32_t lpa)
 {
-	u32 result = 0;
+	uint32_t result = 0;
 
 	if (lpa & LPA_1000HALF)
 		result |= ADVERTISED_1000baseT_Half;
@@ -243,9 +244,9 @@ static inline u32 mii_stat1000_to_ethtool_lpa_t(u32 lpa)
  * settings to phy autonegotiation advertisements for the
  * MII_CTRL1000 register when in 1000Base-X mode.
  */
-static inline u32 ethtool_adv_to_mii_adv_x(u32 ethadv)
+static inline uint32_t ethtool_adv_to_mii_adv_x(uint32_t ethadv)
 {
-	u32 result = 0;
+	uint32_t result = 0;
 
 	if (ethadv & ADVERTISED_1000baseT_Half)
 		result |= ADVERTISE_1000XHALF;
@@ -267,9 +268,9 @@ static inline u32 ethtool_adv_to_mii_adv_x(u32 ethadv)
  * bits, when in 1000Base-X mode, to ethtool
  * advertisement settings.
  */
-static inline u32 mii_adv_to_ethtool_adv_x(u32 adv)
+static inline uint32_t mii_adv_to_ethtool_adv_x(uint32_t adv)
 {
-	u32 result = 0;
+	uint32_t result = 0;
 
 	if (adv & ADVERTISE_1000XHALF)
 		result |= ADVERTISED_1000baseT_Half;
@@ -291,9 +292,9 @@ static inline u32 mii_adv_to_ethtool_adv_x(u32 adv)
  * bits, when in 1000Base-X mode, to ethtool
  * LP advertisement settings.
  */
-static inline u32 mii_lpa_to_ethtool_lpa_x(u32 lpa)
+static inline uint32_t mii_lpa_to_ethtool_lpa_x(uint32_t lpa)
 {
-	u32 result = 0;
+	uint32_t result = 0;
 
 	if (lpa & LPA_LPACK)
 		result |= ADVERTISED_Autoneg;
@@ -305,9 +306,9 @@ static inline u32 mii_lpa_to_ethtool_lpa_x(u32 lpa)
  * mii_advertise_flowctrl - get flow control advertisement flags
  * @cap: Flow control capabilities (FLOW_CTRL_RX, FLOW_CTRL_TX or both)
  */
-static inline u16 mii_advertise_flowctrl(int cap)
+static inline uint16_t mii_advertise_flowctrl(int cap)
 {
-	u16 adv = 0;
+	uint16_t adv = 0;
 
 	if (cap & FLOW_CTRL_RX)
 		adv = ADVERTISE_PAUSE_CAP | ADVERTISE_PAUSE_ASYM;
@@ -324,9 +325,10 @@ static inline u16 mii_advertise_flowctrl(int cap)
  *
  * Resolve full duplex flow control as per IEEE 802.3-2005 table 28B-3
  */
-static inline u8 mii_resolve_flowctrl_fdx(u16 lcladv, u16 rmtadv)
+static inline uint8_t mii_resolve_flowctrl_fdx(uint16_t lcladv,
+					       uint16_t rmtadv)
 {
-	u8 cap = 0;
+	uint8_t cap = 0;
 
 	if (lcladv & rmtadv & ADVERTISE_PAUSE_CAP) {
 		cap = FLOW_CTRL_TX | FLOW_CTRL_RX;
