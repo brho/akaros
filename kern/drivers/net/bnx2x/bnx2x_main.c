@@ -12823,11 +12823,11 @@ static int bnx2x_init_dev(struct bnx2x *bp, struct pci_device *pdev,
 			goto err_out_disable;
 		}
 
-		pci_set_master(pdev);
+		pci_set_bus_master(pdev);
 		pci_save_state(pdev);
 	}
 #else
-		pci_set_master(pdev);
+		pci_set_bus_master(pdev);
 #endif
 
 #if 0 // AKAROS_PORT  We can probably do these
@@ -13778,7 +13778,7 @@ static pci_ers_result_t bnx2x_io_slot_reset(struct pci_device *pdev)
 		return PCI_ERS_RESULT_DISCONNECT;
 	}
 
-	pci_set_master(pdev);
+	pci_set_bus_master(pdev);
 	pci_restore_state(pdev);
 	pci_save_state(pdev);
 

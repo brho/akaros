@@ -3326,7 +3326,7 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 		goto err_disable_pdev;
 	}
 
-	pci_set_master(pdev);
+	pci_set_bus_master(pdev);
 
 	err = pci_set_dma_mask(pdev, DMA_BIT_MASK(64));
 	if (err) {
@@ -3706,7 +3706,7 @@ static pci_ers_result_t mlx4_pci_slot_reset(struct pci_device *pdev)
 		return PCI_ERS_RESULT_DISCONNECT;
 	}
 
-	pci_set_master(pdev);
+	pci_set_bus_master(pdev);
 	pci_restore_state(pdev);
 	pci_save_state(pdev);
 
