@@ -153,13 +153,6 @@ expression E;
 @@
 -p->hw_enc_features = E;
 
-// yes, that's a max max trans unit...
-@@
-struct ether *p;
-@@
--p->mtu
-+p->maxmtu
-
 @@
 struct ether *p;
 @@

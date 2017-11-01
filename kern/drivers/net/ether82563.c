@@ -2211,7 +2211,8 @@ static int pnp(struct ether *edev, int type)
 	edev->irq = ctlr->pcidev->irqline;
 	edev->tbdf = pci_to_tbdf(ctlr->pcidev);
 	edev->mbps = 1000;
-	edev->maxmtu = ctlr->rbsz - ETHERHDRSIZE;
+	edev->max_mtu = ctlr->rbsz - ETHERHDRSIZE;
+	edev->mtu = edev->mtu;
 	memmove(edev->ea, ctlr->ra, Eaddrlen);
 
 	/*

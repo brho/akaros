@@ -86,7 +86,7 @@ struct chan *etherattach(char *spec)
 		nexterror();
 	}
 	if (vlanid) {
-		if (ether->maxmtu < ETHERMAXTU + 4)
+		if (ether->max_mtu < ETHERMAXTU + 4)
 			error(EFAIL, "interface cannot support 802.1 tags");
 		vlan = vlanalloc(ether, vlanid);
 		chan = devattach(devname(), spec);
@@ -440,8 +440,8 @@ static int etheroq(struct ether *ether, struct block *bp)
 		ether = ether->ctlr;
 	}
 
-	if ((ether->feat & NETF_PADMIN) == 0 && BLEN(bp) < ether->minmtu)
-		bp = adjustblock(bp, ether->minmtu);
+	if ((ether->feat & NETF_PADMIN) == 0 && BLEN(bp) < ether->min_mtu)
+		bp = adjustblock(bp, ether->min_mtu);
 
 	qbwrite(ether->oq, bp);
 	if (ether->transmit != NULL)
@@ -492,7 +492,7 @@ static long etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
 		error(EINVAL, ERROR_FIXME);
 	}
 
-	if (n > ether->maxmtu + ETHERHDRSIZE)
+	if (n > ether->mtu + ETHERHDRSIZE)
 		error(E2BIG, ERROR_FIXME);
 	bp = block_alloc(n, MEM_WAIT);
 	if (waserror()) {
@@ -534,7 +534,7 @@ static long etherbwrite(struct chan *chan, struct block *bp, uint32_t unused)
 		runlock(&ether->rwlock);
 		nexterror();
 	}
-	if (n > ether->maxmtu + ETHERHDRSIZE && (bp->flag & Btso) == 0) {
+	if (n > ether->mtu + ETHERHDRSIZE && (bp->flag & Btso) == 0) {
 		freeb(bp);
 		error(E2BIG, ERROR_FIXME);
 	}
@@ -629,8 +629,9 @@ static struct ether *vlanalloc(struct ether *ether, int id)
 	vlan->mbps = ether->mbps;
 	vlan->fullduplex = ether->fullduplex;
 	vlan->encry = ether->encry;
-	vlan->minmtu = ether->minmtu;
-	vlan->maxmtu = ether->maxmtu;
+	vlan->mtu = ether->mtu;
+	vlan->min_mtu = ether->min_mtu;
+	vlan->max_mtu = ether->max_mtu;
 	vlan->ctlrno = ether->ctlrno;
 	vlan->vlanid = id;
 	vlan->alen = Eaddrlen;
@@ -696,8 +697,9 @@ static void etherreset(void)
 		qlock_init(&ether->vlq);
 		ether->ctlrno = ctlrno;
 		ether->mbps = 10;
-		ether->minmtu = ETHERMINTU;
-		ether->maxmtu = ETHERMAXTU;
+		ether->mtu = ETHERMAXTU;
+		ether->min_mtu = ETHERMINTU;
+		ether->max_mtu = ETHERMAXTU;
 		/* looked like irq type, we don't have these yet */
 		//ether->netif.itype = -1;
 

@@ -1070,8 +1070,9 @@ struct ether {
 	int irq;
 	unsigned int tbdf;
 	int port;
-	int minmtu;
-	int maxmtu;
+	int mtu;
+	int min_mtu;
+	int max_mtu;
 	uint8_t ea[Eaddrlen];
 	int encry;
 

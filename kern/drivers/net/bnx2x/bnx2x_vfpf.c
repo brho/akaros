@@ -624,11 +624,11 @@ int bnx2x_vfpf_setup_q(struct bnx2x *bp, struct bnx2x_fastpath *fp,
 	req->rxq.vf_sb = fp_idx;
 	req->rxq.sb_index = HC_INDEX_ETH_RX_CQ_CONS;
 	req->rxq.hc_rate = bp->rx_ticks ? 1000000/bp->rx_ticks : 0;
-	req->rxq.mtu = bp->dev->maxmtu;
+	req->rxq.mtu = bp->dev->mtu;
 	req->rxq.buf_sz = fp->rx_buf_size;
 	req->rxq.sge_buf_sz = BCM_PAGE_SIZE * PAGES_PER_SGE;
 	req->rxq.tpa_agg_sz = tpa_agg_size;
-	req->rxq.max_sge_pkt = SGE_PAGE_ALIGN(bp->dev->maxmtu) >> SGE_PAGE_SHIFT;
+	req->rxq.max_sge_pkt = SGE_PAGE_ALIGN(bp->dev->mtu) >> SGE_PAGE_SHIFT;
 	req->rxq.max_sge_pkt = ((req->rxq.max_sge_pkt + PAGES_PER_SGE - 1) &
 			  (~(PAGES_PER_SGE-1))) >> PAGES_PER_SGE_SHIFT;
 	req->rxq.flags = flags;

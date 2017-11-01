@@ -1004,7 +1004,7 @@ static int bnx2x_rx_int(struct bnx2x_fastpath *fp, int budget)
 		 */
 		/* TODO: AKAROS_PORT always copy out the packet for now. */
 		if (1) {
-//		if ((bp->dev->maxmtu > ETH_MAX_PACKET_SIZE) &&
+//		if ((bp->dev->mtu > ETH_MAX_PACKET_SIZE) &&
 //		    (len <= RX_COPY_THRESH)) {
 			block = block_alloc(len, MEM_ATOMIC);
 			if (block == NULL) {
@@ -1391,7 +1391,7 @@ void bnx2x_init_rx_rings(struct bnx2x *bp)
 		struct bnx2x_fastpath *fp = &bp->fp[j];
 
 		DP(NETIF_MSG_IFUP,
-		   "mtu %d  rx_buf_size %d\n", bp->dev->maxmtu, fp->rx_buf_size);
+		   "mtu %d  rx_buf_size %d\n", bp->dev->mtu, fp->rx_buf_size);
 
 		if (!fp->disable_tpa) {
 			/* Fill the per-aggregation pool */
@@ -2057,7 +2057,7 @@ static void bnx2x_set_rx_buf_size(struct bnx2x *bp)
 			 */
 			mtu = BNX2X_FCOE_MINI_JUMBO_MTU;
 		else
-			mtu = bp->dev->maxmtu;
+			mtu = bp->dev->mtu;
 		/* AKAROS_PORT XME struct block alignment and size issues? */
 		fp->rx_buf_size = BNX2X_FW_RX_ALIGN_START +
 				  IP_HEADER_ALIGNMENT_PADDING +
@@ -2526,7 +2526,7 @@ static void bnx2x_bz_fp(struct bnx2x *bp, int index)
 	 */
 	fp->disable_tpa = !(bp->flags & TPA_ENABLE_FLAG ||
 				  (bp->flags & GRO_ENABLE_FLAG &&
-				   bnx2x_mtu_allows_gro(bp->dev->maxmtu)));
+				   bnx2x_mtu_allows_gro(bp->dev->mtu)));
 	if (bp->flags & TPA_ENABLE_FLAG)
 		fp->mode = TPA_MODE_LRO;
 	else if (bp->flags & GRO_ENABLE_FLAG)
@@ -4888,7 +4888,7 @@ int bnx2x_change_mtu(struct ether *dev, int new_mtu)
 	 * because the actual alloc size is
 	 * only updated as part of load
 	 */
-	dev->maxmtu = new_mtu;
+	dev->mtu = new_mtu;
 
 	return bnx2x_reload_if_running(dev);
 }

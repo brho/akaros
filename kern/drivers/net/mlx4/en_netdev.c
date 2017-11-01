@@ -1358,7 +1358,7 @@ static void mlx4_en_set_default_moderation(struct mlx4_en_priv *priv)
 	priv->tx_frames = MLX4_EN_TX_COAL_PKTS;
 	priv->tx_usecs = MLX4_EN_TX_COAL_TIME;
 	en_dbg(INTR, priv, "Default coalesing params for mtu:%d - rx_frames:%d rx_usecs:%d\n",
-	       priv->dev->maxmtu, priv->rx_frames, priv->rx_usecs);
+	       priv->dev->mtu, priv->rx_frames, priv->rx_usecs);
 
 	/* Setup cq moderation params */
 	for (i = 0; i < priv->rx_ring_num; i++) {
@@ -1578,7 +1578,7 @@ int mlx4_en_start_port(struct ether *dev)
 #endif
 
 	/* Calculate Rx buf size */
-	dev->maxmtu = MIN(dev->maxmtu, priv->max_mtu);
+	dev->mtu = MIN(dev->mtu, priv->max_mtu);
 	mlx4_en_calc_rx_buf(dev);
 	en_dbg(DRV, priv, "Rx buf size:%d\n", priv->rx_skb_size);
 
@@ -2140,13 +2140,13 @@ static int mlx4_en_change_mtu(struct ether *dev, int new_mtu)
 	int err = 0;
 
 	en_dbg(DRV, priv, "Change MTU called - current:%d new:%d\n",
-		 dev->maxmtu, new_mtu);
+		 dev->mtu, new_mtu);
 
 	if ((new_mtu < MLX4_EN_MIN_MTU) || (new_mtu > priv->max_mtu)) {
 		en_err(priv, "Bad MTU size:%d.\n", new_mtu);
 		return -EPERM;
 	}
-	dev->maxmtu = new_mtu;
+	dev->mtu = new_mtu;
 
 	if (netif_running(dev)) {
 		qlock(&mdev->state_lock);
