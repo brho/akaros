@@ -1935,7 +1935,7 @@ igbereset(struct ctlr* ctlr)
 static void
 igbepci(void)
 {
-	int cls, id;
+	int id;
 	struct pci_device *pcidev;
 	struct ctlr *ctlr;
 	void *mem;
@@ -1978,22 +1978,7 @@ igbepci(void)
 			printd("igbe: can't map %p\n", pcidev->bar[0].mmio_base32);
 			continue;
 		}
-		cls = pcidev_read8(pcidev, PCI_CLSZ_REG);
-		switch(cls){
-			default:
-				printd("igbe: unexpected CLS - %d\n", cls*4);
-				break;
-			case 0x00:
-			case 0xFF:
-				/* bogus value; use a sane default.  cls is set in DWORD (u32)
-				 * units. */
-				cls = ARCH_CL_SIZE / sizeof(long);
-				pcidev_write8(pcidev, PCI_CLSZ_REG, cls);
-				break;
-			case 0x08:
-			case 0x10:
-				break;
-		}
+		pci_set_cacheline_size(pcidev);
 		ctlr = kzmalloc(sizeof(struct ctlr), 0);
 		if(ctlr == NULL) {
 			vunmap_vmem((uintptr_t)mem, pcidev->bar[0].mmio_sz);
@@ -2010,7 +1995,7 @@ igbepci(void)
 		ctlr->port = pcidev->bar[0].raw_bar & ~0x0f;
 		ctlr->pci = pcidev;
 		ctlr->id = id;
-		ctlr->cls = cls * sizeof(long);
+		ctlr->cls = pcidev_read8(pcidev, PCI_CLSZ_REG);
 		ctlr->nic = mem;
 
 		if(igbereset(ctlr)){

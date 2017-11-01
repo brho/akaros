@@ -264,6 +264,9 @@ void pci_dump_config(struct pci_device *pcidev, size_t len);
 int pci_find_cap(struct pci_device *pcidev, uint8_t cap_id, uint32_t *cap_reg);
 unsigned int pci_to_tbdf(struct pci_device *pcidev);
 uintptr_t pci_map_membar(struct pci_device *dev, int bir);
+int pci_set_cacheline_size(struct pci_device *dev);
+int pci_set_mwi(struct pci_device *dev);
+void pci_clear_mwi(struct pci_device *dev);
 static inline void pci_set_drvdata(struct pci_device *pcidev, void *data);
 static inline void *pci_get_drvdata(struct pci_device *pcidev);
 

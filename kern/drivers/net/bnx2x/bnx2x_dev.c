@@ -354,7 +354,7 @@ static int bnx2x_reset(struct bnx2x *ctlr)
 
 static void bnx2x_pci(void)
 {
-	int cls, id;
+	int id;
 	struct pci_device *pcidev;
 	struct bnx2x *ctlr;
 	const struct pci_device_id *pci_id;
@@ -378,22 +378,7 @@ static void bnx2x_pci(void)
 
 		/* MMIO, pci_bus_master, etc, are all done in bnx2x_attach */
 
-		cls = pcidev_read8(pcidev, PCI_CLSZ_REG);
-		switch (cls) {
-			default:
-				printd("bnx2x: unexpected CLS - %d\n", cls * 4);
-				break;
-			case 0x00:
-			case 0xFF:
-				/* bogus value; use a sane default.  cls is set in DWORD (u32)
-				 * units. */
-				cls = ARCH_CL_SIZE / sizeof(long);
-				pcidev_write8(pcidev, PCI_CLSZ_REG, cls);
-				break;
-			case 0x08:
-			case 0x10:
-				break;
-		}
+		pci_set_cacheline_size(pcidev);
 
 		ctlr = kzmalloc(sizeof(struct bnx2x), 0);
 		if (ctlr == NULL)

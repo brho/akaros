@@ -620,3 +620,55 @@ uintptr_t pci_map_membar(struct pci_device *dev, int bir)
 		return 0;
 	return vmap_pmem_nocache(paddr, sz);
 }
+
+/* The following were ported from Linux:
+ *
+ * pci_set_cacheline_size
+ * pci_set_mwi
+ * pci_clear_mwi
+ */
+int pci_set_cacheline_size(struct pci_device *dev)
+{
+	uint8_t cl_sz;
+	uint8_t pci_cache_line_size = ARCH_CL_SIZE >> 2;
+
+	cl_sz = pcidev_read8(dev, PCI_CACHE_LINE_SIZE);
+	/* Validate current setting: the PCI_CACHE_LINE_SIZE must be equal to or
+	 * multiple of the right value. */
+	if (cl_sz >= pci_cache_line_size && (cl_sz % pci_cache_line_size) == 0)
+		return 0;
+	pcidev_write8(dev, PCI_CACHE_LINE_SIZE, pci_cache_line_size);
+	cl_sz = pcidev_read8(dev, PCI_CACHE_LINE_SIZE);
+	if (cl_sz == pci_cache_line_size)
+		return 0;
+	printk("PCI device %s does not support cache line size of %d\n",
+	       dev->name, pci_cache_line_size << 2);
+	return -EINVAL;
+}
+
+int pci_set_mwi(struct pci_device *dev)
+{
+	int rc;
+	uint16_t cmd;
+
+	rc = pci_set_cacheline_size(dev);
+	if (rc)
+		return rc;
+	cmd = pcidev_read16(dev, PCI_COMMAND);
+	if (!(cmd & PCI_COMMAND_INVALIDATE)) {
+		cmd |= PCI_COMMAND_INVALIDATE;
+		pcidev_write16(dev, PCI_COMMAND, cmd);
+	}
+	return 0;
+}
+
+void pci_clear_mwi(struct pci_device *dev)
+{
+	uint16_t cmd;
+
+	cmd = pcidev_read16(dev, PCI_COMMAND);
+	if (cmd & PCI_COMMAND_INVALIDATE) {
+		cmd &= ~PCI_COMMAND_INVALIDATE;
+		pcidev_write16(dev, PCI_COMMAND, cmd);
+	}
+}
