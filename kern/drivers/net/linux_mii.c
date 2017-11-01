@@ -27,11 +27,7 @@
 
  */
 
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/netdevice.h>
-#include <linux/ethtool.h>
-#include <linux/mii.h>
+#include "linux_mii.h"
 
 static uint32_t mii_get_an(struct mii_if_info *mii, uint16_t addr)
 {
@@ -42,6 +38,7 @@ static uint32_t mii_get_an(struct mii_if_info *mii, uint16_t addr)
 	return mii_lpa_to_ethtool_lpa_t(advert);
 }
 
+#if 0 // AKAROS_PORT
 /**
  * mii_ethtool_gset - get settings that are specified in @ecmd
  * @mii: MII interface
@@ -416,6 +413,7 @@ int mii_ethtool_set_link_ksettings(struct mii_if_info *mii,
 	}
 	return 0;
 }
+#endif
 
 /**
  * mii_check_gmii_support - check if the MII supports Gb interfaces
@@ -571,6 +569,7 @@ unsigned int mii_check_media (struct mii_if_info *mii,
 	return 0; /* duplex did not change */
 }
 
+#if 0 // AKAROS_PORT
 /**
  * generic_mii_ioctl - main MII ioctl interface
  * @mii_if: the MII interface
@@ -649,19 +648,4 @@ int generic_mii_ioctl(struct mii_if_info *mii_if,
 
 	return rc;
 }
-
-MODULE_AUTHOR ("Jeff Garzik <jgarzik@pobox.com>");
-MODULE_DESCRIPTION ("MII hardware support library");
-MODULE_LICENSE("GPL");
-
-EXPORT_SYMBOL(mii_link_ok);
-EXPORT_SYMBOL(mii_nway_restart);
-EXPORT_SYMBOL(mii_ethtool_gset);
-EXPORT_SYMBOL(mii_ethtool_get_link_ksettings);
-EXPORT_SYMBOL(mii_ethtool_sset);
-EXPORT_SYMBOL(mii_ethtool_set_link_ksettings);
-EXPORT_SYMBOL(mii_check_link);
-EXPORT_SYMBOL(mii_check_media);
-EXPORT_SYMBOL(mii_check_gmii_support);
-EXPORT_SYMBOL(generic_mii_ioctl);
-
+#endif

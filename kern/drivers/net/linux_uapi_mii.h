@@ -5,11 +5,9 @@
  * Copyright (C) 1996, 1999, 2001 David S. Miller (davem@redhat.com)
  */
 
-#ifndef _UAPI__LINUX_MII_H__
-#define _UAPI__LINUX_MII_H__
+#pragma once
 
-#include <linux/types.h>
-#include <linux/ethtool.h>
+#include <linux_compat.h>
 
 /* Generic MII registers. */
 #define MII_BMCR		0x00	/* Basic mode control register */
@@ -158,5 +156,3 @@ struct mii_ioctl_data {
 	uint16_t		val_in;
 	uint16_t		val_out;
 };
-
-#endif /* _UAPI__LINUX_MII_H__ */
