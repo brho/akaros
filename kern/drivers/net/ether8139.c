@@ -589,7 +589,7 @@ static void rtl8139interrupt(struct hw_trapframe *tf, void *arg)
 
 				if (!(tsd & Tcok)) {
 					if (tsd & Tun) {
-						if (ctlr->etxth < ETHERMAXTU / 32)
+						if (ctlr->etxth < (ETHERMAXTU + ETHERHDRSIZE) / 32)
 							ctlr->etxth++;
 					}
 					edev->oerrs++;

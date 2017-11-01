@@ -222,7 +222,7 @@ enum {					/* Ring sizes  (<= 1024) */
 	Nrd		= 128,		/* Receive Ring */
 };
 
-#define Mps ROUNDUP(ETHERMAXTU + 4, 128)
+#define Mps ROUNDUP(ETHERMAXTU + ETHERHDR_LEN + 4, 128)
 
 typedef struct Dtcc Dtcc;
 struct Dtcc {

@@ -86,7 +86,7 @@ struct chan *etherattach(char *spec)
 		nexterror();
 	}
 	if (vlanid) {
-		if (ether->max_mtu < ETHERMAXTU + 4)
+		if (ether->max_mtu < ETHERMAXTU + ETHERHDRSIZE + 4)
 			error(EFAIL, "interface cannot support 802.1 tags");
 		vlan = vlanalloc(ether, vlanid);
 		chan = devattach(devname(), spec);
