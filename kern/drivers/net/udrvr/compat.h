@@ -129,7 +129,6 @@ void sg_free_table(struct sg_table *ptr);
 #define	__releases(x)
 #define	__acquire(x)			(void)0
 #define	__release(x)			(void)0
-#define uninitialized_var(x)		x = *(&(x))
 
 /* From include/asm-generic/bug.h: move to compat_todo.h */
 #define WARN_ON(condition) ({                                           \

@@ -15,3 +15,13 @@
 #endif /* #ifdef __GNUC__ */
 
 #define __always_inline inline __attribute__((always_inline))
+
+#ifdef __GNUC__
+
+#define uninitialized_var(x) x = x
+
+#elif defined(__clang__)
+
+#define uninitialized_var(x) x = *(&(x))
+
+#endif
