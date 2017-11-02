@@ -614,6 +614,20 @@ struct pci_device_id {
 	unsigned long driver_data;		/* Data private to the driver */
 };
 
+static const struct pci_device_id *
+srch_linux_pci_tbl(const struct pci_device_id *tbl, struct pci_device *needle)
+{
+	const struct pci_device_id *i;
+
+	for (i = tbl; i->vendor; i++) {
+		if ((needle->ven_id == i->vendor) && (needle->dev_id == i->device))
+			break;
+	}
+	if (i->vendor)
+		return i;
+	return 0;
+}
+
 #define PCI_ANY_ID (~0)
 /* This macro is used in setting device_id entries */
 #define PCI_VDEVICE(vend, dev) \

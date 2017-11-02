@@ -234,19 +234,6 @@ static const struct pci_device_id bnx2x_pci_tbl[] = {
 	{ 0 }
 };
 
-const struct pci_device_id *srch_linux_pci_tbl(const struct pci_device_id *tbl,
-                                               struct pci_device *needle)
-{
-	const struct pci_device_id *i;
-	for (i = tbl; i->vendor; i++) {
-		if ((needle->ven_id == i->vendor) && (needle->dev_id == i->device))
-			break;
-	}
-	if (i->vendor)
-		return i;
-	return 0;
-}
-
 const struct pci_device_id *srch_bnx2x_pci_tbl(struct pci_device *needle)
 {
 	const struct pci_device_id *tbl = bnx2x_pci_tbl;
