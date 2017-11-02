@@ -155,7 +155,7 @@ int mlx4_en_DUMP_ETH_STATS(struct mlx4_en_dev *mdev, uint8_t port,
 	struct mlx4_en_stat_out_mbox *mlx4_en_stats;
 	struct mlx4_en_stat_out_flow_control_mbox *flowstats;
 	struct mlx4_en_priv *priv = netdev_priv(mdev->pndev[port]);
-	struct net_device_stats *stats = &priv->stats;
+	struct netif_stats *stats = &priv->stats;
 	struct mlx4_cmd_mailbox *mailbox;
 	uint64_t in_mod = reset << 8 | port;
 	int err;

@@ -1142,9 +1142,8 @@ static int bnx2x_storm_stats_update(struct bnx2x *bp)
 
 static void bnx2x_net_stats_update(struct bnx2x *bp)
 {
-#if 0 // AKAROS_PORT XME skipping net_stats_update
 	struct bnx2x_eth_stats *estats = &bp->eth_stats;
-	struct net_device_stats *nstats = &bp->dev->stats;
+	struct netif_stats *nstats = &bp->dev->stats;
 	unsigned long tmp;
 	int i;
 
@@ -1209,7 +1208,6 @@ static void bnx2x_net_stats_update(struct bnx2x *bp)
 	nstats->tx_errors = nstats->tx_aborted_errors +
 			    nstats->tx_carrier_errors +
 	    bnx2x_hilo(&estats->tx_stat_dot3statsinternalmactransmiterrors_hi);
-#endif
 }
 
 static void bnx2x_drv_stats_update(struct bnx2x *bp)
@@ -1692,9 +1690,7 @@ void bnx2x_stats_init(struct bnx2x *bp)
 void bnx2x_save_statistics(struct bnx2x *bp)
 {
 	int i;
-panic("Not implemented");
-#if 0 // AKAROS_PORT
-	struct net_device_stats *nstats = &bp->dev->stats;
+	struct netif_stats *nstats = &bp->dev->stats;
 
 	/* save queue statistics */
 	for_each_eth_queue(bp, i) {
@@ -1732,7 +1728,6 @@ panic("Not implemented");
 		UPDATE_FW_STAT_OLD(brb_truncate_discard);
 		UPDATE_FW_STAT_OLD(mac_discard);
 	}
-#endif
 }
 
 void bnx2x_afex_collect_stats(struct bnx2x *bp, void *void_afex_stats,

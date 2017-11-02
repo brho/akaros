@@ -111,6 +111,20 @@ typedef __wsum;
 -net_device
 +ether
 
+// Akaros's netif_stats is Linux's rtnl_link_stats64, which is a superset (byte
+// for byte) of net_device_stats.
+@@
+@@
+ struct
+-rtnl_link_stats64
++netif_stats
+
+@@
+@@
+ struct
+-net_device_stats
++netif_stats
+
 @@
 struct pci_device *p;
 @@

@@ -1331,7 +1331,7 @@ static void mlx4_en_tx_timeout(struct ether *dev)
 }
 
 
-static struct net_device_stats *mlx4_en_get_stats(struct ether *dev)
+static struct netif_stats *mlx4_en_get_stats(struct ether *dev)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 

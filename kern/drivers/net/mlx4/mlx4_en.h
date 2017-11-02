@@ -495,8 +495,8 @@ struct mlx4_en_priv {
 	struct mlx4_en_port_profile *prof;
 	struct ether *dev;
 	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
-	struct net_device_stats stats;
-	struct net_device_stats ret_stats;
+	struct netif_stats stats;
+	struct netif_stats ret_stats;
 	struct mlx4_en_port_state port_state;
 	spinlock_t stats_lock;
 #if 0 // AKAROS_PORT

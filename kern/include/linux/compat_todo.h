@@ -939,11 +939,6 @@ typedef struct cpumask cpumask_var_t[1];
 struct notifier_block {
 };
 
-struct net_device_stats {
-	unsigned long tx_dropped;
-	unsigned long rx_dropped;
-};
-
 struct hwtstamp_config {
 	int flags;
 	int tx_type;
