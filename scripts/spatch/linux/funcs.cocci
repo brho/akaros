@@ -296,6 +296,12 @@ expression STMT;
 +assert(!(STMT))
 
 @@
+expression STMT;
+@@
+-BUILD_BUG_ON(STMT)
++static_assert(!(STMT))
+
+@@
 @@
 -BUG()
 +panic("BUG")
@@ -318,4 +324,16 @@ expression STMT;
 @@
 @@
 -WARN_ON_ONCE
-+warn_on-once
++warn_on_once
+
+@@
+expression P;
+@@
+-pci_set_master(P)
++pci_set_bus_master(P)
+
+@@
+expression P;
+@@
+-pci_clear_master(P)
++pci_clr_bus_master(P)

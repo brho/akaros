@@ -276,7 +276,7 @@ static inline void complete(struct completion *x)
 static inline void wait_for_completion(struct completion *x)
 {
 	while (!x->done)
-		rmb();
+		cmb();
 }
 
 static inline unsigned long wait_for_completion_timeout(struct completion *x,
@@ -285,16 +285,20 @@ static inline unsigned long wait_for_completion_timeout(struct completion *x,
 	printd("Core %d: wait_for_completion_timeout %p\n", core_id(), x);
 	while (!x->done) {
 		if (timeout) {
-			volatile int i = 100000;
-			while (i--);
+			kthread_usleep(1000);
 			timeout--;
-			rmb();
+			cmb();
 		} else {
 			break;
 		}
 	}
 	return timeout;
 }
+
+/* The timer functions (e.g. mod_timer) expect to set an actual time.  These
+ * hacks do relative time.  Hopefully some users will use jiffies + rel_time
+ * when using mod_timer (like r8169 does). */
+#define jiffies 0
 
 struct timer_list {
 	spinlock_t lock;
@@ -311,6 +315,14 @@ static inline void init_timer(struct timer_list *timer)
 	timer->delay = 0;
 	timer->function = 0;
 	timer->data = 0;
+}
+
+static inline void setup_timer(struct timer_list *timer,
+                               void (*func)(unsigned long), unsigned long data)
+{
+	init_timer(timer);
+	timer->function = func;
+	timer->data = data;
 }
 
 static void __timer_wrapper(uint32_t srcid, long a0, long a1, long a2)
@@ -481,33 +493,36 @@ static inline void __raw_writeq(uint64_t value, volatile void *addr)
 #define EXPORT_SYMBOL_GPL(...)
 
 /* linux/gfp.h */
-#define  __GFP_DMA		0x01u
-#define  __GFP_HIGHMEM		0x02u
-#define  __GFP_DMA32		0x04u
-#define  __GFP_MOVABLE		0x08u
-#define  __GFP_WAIT		0x10u
-#define  __GFP_HIGH		0x20u
-#define  __GFP_IO		0x40u
-#define  __GFP_FS		0x80u
-#define  __GFP_COLD		0x100u
-#define  __GFP_NOWARN		0x200u
-#define  __GFP_REPEAT		0x400u
-#define  __GFP_NOFAIL		0x800u
-#define  __GFP_NORETRY		0x1000u
-#define  __GFP_MEMALLOC		0x2000u
-#define  __GFP_COMP		0x4000u
-#define  __GFP_ZERO		0x8000u
-#define  __GFP_NOMEMALLOC	0x10000u
-#define  __GFP_HARDWALL		0x20000u
-#define  __GFP_THISNODE		0x40000u
-#define  __GFP_RECLAIMABLE	0x80000u
-#define  __GFP_NOACCOUNT	0x100000u
-#define  __GFP_NOTRACK		0x200000u
-#define  __GFP_NO_KSWAPD	0x400000u
-#define  __GFP_OTHER_NODE	0x800000u
-#define  __GFP_WRITE		0x1000000u
-/* If the above are modified, __GFP_BITS_SHIFT may need updating */
-
+/* These are all set to 0.  Silently passing flags to Akaros's memory allocator
+ * is dangerous - we could be turning on some Akaros feature that shares the
+ * same bit.
+ *
+ * Similarly, note that some Linux flags (__GFP_ZERO) is not here.  Those flags
+ * need to be dealt with.  Silently ignoring them will cause errors. */
+#define  __GFP_DMA 0
+#define  __GFP_HIGHMEM 0
+#define  __GFP_DMA32 0
+#define  __GFP_MOVABLE 0
+#define  __GFP_WAIT 0
+#define  __GFP_HIGH 0
+#define  __GFP_IO 0
+#define  __GFP_FS 0
+#define  __GFP_COLD 0
+#define  __GFP_NOWARN 0
+#define  __GFP_REPEAT 0
+#define  __GFP_NOFAIL 0
+#define  __GFP_NORETRY 0
+#define  __GFP_MEMALLOC 0
+#define  __GFP_COMP 0
+#define  __GFP_NOMEMALLOC 0
+#define  __GFP_HARDWALL 0
+#define  __GFP_THISNODE 0
+#define  __GFP_RECLAIMABLE 0
+#define  __GFP_NOACCOUNT 0
+#define  __GFP_NOTRACK 0
+#define  __GFP_NO_KSWAPD 0
+#define  __GFP_OTHER_NODE 0
+#define  __GFP_WRITE 0
 #define GFP_HIGHUSER 0
 
 /* linux/kernel.h */
@@ -596,6 +611,7 @@ enum pci_bus_speed {
 #define __le32_to_cpu(x) (x)
 
 #define swab32 __builtin_bswap32
+#define swab16 __builtin_bswap16
 
 #define cond_resched() { /* XXX */ \
 	volatile int i = 100000; \
@@ -704,7 +720,7 @@ extern void __bad_unaligned_access_size(void);
 
 #define vmalloc_node(...) (0 /* XXX */)
 /* needed by icm.c: */
-#define kmalloc_node(size, flags, node) 0
+#define kmalloc_node(size, flags, node) kmalloc(size, flags)
 #define alloc_pages_node(nid, gfp_mask, order) 0
 
 struct scatterlist {
@@ -889,9 +905,6 @@ static inline void get_random_bytes(char *buf, int nbytes)
 
 #define ATOMIC_INIT(i) (i)
 
-/* linux/ioport.h */
-#define IORESOURCE_MEM		0x00000200
-
 /* linux/pci_ids.h */
 #define PCI_VENDOR_ID_MELLANOX          0x15b3
 
@@ -979,6 +992,7 @@ enum {
 #define IPPROTO_TCP 6
 #define IPPROTO_UDP 17
 #define IPPROTO_GRE 47
+#define IPPROTO_RAW 255
 
 #define IFNAMSIZ 16
 #define MAX_ADDR_LEN 32

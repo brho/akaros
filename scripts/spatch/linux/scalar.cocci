@@ -96,6 +96,11 @@ typedef __wsum;
 
 @@
 @@
+-ETH_DATA_LEN
++ETHERMAXTU
+
+@@
+@@
  struct
 -pci_dev
 +pci_device
@@ -111,6 +116,24 @@ struct pci_device *p;
 @@
 -p->irq
 +p->irqline
+
+@@
+struct pci_device *p;
+@@
+-p->subsystem_vendor
++pci_get_subvendor(p)
+
+@@
+struct pci_device *p;
+@@
+-p->subsystem_device
++pci_get_subdevice(p)
+
+@@
+struct pci_device *p;
+@@
+-p->dev
++p->device
 
 @@
 struct ether *p;
@@ -154,6 +177,12 @@ struct ether *p;
 expression E;
 @@
 -p->addr_len = E;
+
+@@
+struct ether *p;
+@@
+-p->addr_len
++Eaddrlen
 
 @@
 struct ether *p;

@@ -1,4 +1,5 @@
 /* Copyright (c) 2015 Google Inc.
+ * Copyright (C) 1991-2017, the Linux Kernel authors
  *
  * Dumping ground for converting between Akaros and Linux. */
 
@@ -46,6 +47,7 @@
 #endif
 #define RCU_INIT_POINTER(dst, src) rcu_assign_pointer(dst, src)
 #define synchronize_rcu()
+#define synchronize_sched()
 
 #define atomic_cmpxchg(_addr, _old, _new)                                      \
 ({                                                                             \
@@ -78,6 +80,8 @@ typedef int gfp_t;
 #define dma_unmap_addr_set(PTR, ADDR_NAME, VAL)  do { } while (0)
 #define dma_unmap_len(PTR, LEN_NAME)             (0)
 #define dma_unmap_len_set(PTR, LEN_NAME, VAL)    do { } while (0)
+#define DMA_BIT_MASK(n) (((n) == 64) ? ~0ULL : ((1ULL << (n)) - 1))
+#define DMA_MASK_NONE 0x0ULL
 
 enum dma_data_direction {
 	DMA_BIDIRECTIONAL = 0,
@@ -139,9 +143,13 @@ static inline int __dma_mapping_error(dma_addr_t dma_addr)
 #define dma_sync_single_for_cpu(...)
 #define dma_sync_single_for_device(...)
 
-/* Wrappers to avoid struct device.  Might want that one of these days */
+/* Wrappers to avoid struct device.  Might want that one of these days.
+ *
+ * Note dma_alloc_coherent() does a zalloc.  Some Linux drivers (r8169)
+ * accidentally assume the memory is zeroed, which may be what Linux allocators
+ * often do. */
 #define dma_alloc_coherent(dev, size, dma_handlep, flag)                       \
-	__dma_alloc_coherent(size, dma_handlep, flag)
+	__dma_zalloc_coherent(size, dma_handlep, flag)
 
 #define dma_zalloc_coherent(dev, size, dma_handlep, flag)                      \
 	__dma_zalloc_coherent(size, dma_handlep, flag)
@@ -186,6 +194,13 @@ typedef int pm_message_t;
  * down_interruptible/down_timeout.  Akaros doesn't have the latter. */
 #define down_interruptible(sem) ({sem_down(sem); 0;})
 #define down_timeout(sem, timeout) ({sem_down(sem); 0;})
+
+static void msleep(unsigned int msecs)
+{
+	kthread_usleep(msecs * 1000);
+}
+
+#define mdelay(x) udelay((x) * 1000)
 
 #define local_bh_disable() cmb()
 #define local_bh_enable() cmb()
@@ -235,6 +250,16 @@ typedef int pm_message_t;
 #define netdev_info(dev, fmt, ...) \
 	printk("[netdev]: " fmt, ##__VA_ARGS__)
 #define netdev_dbg(dev, fmt, ...) \
+	printk("[netdev]: " fmt, ##__VA_ARGS__)
+#define netif_err(priv, type, dev, fmt, ...) \
+	printk("[netdev]: " fmt, ##__VA_ARGS__)
+#define netif_warn(priv, type, dev, fmt, ...) \
+	printk("[netdev]: " fmt, ##__VA_ARGS__)
+#define netif_notice(priv, type, dev, fmt, ...) \
+	printk("[netdev]: " fmt, ##__VA_ARGS__)
+#define netif_info(priv, type, dev, fmt, ...) \
+	printk("[netdev]: " fmt, ##__VA_ARGS__)
+#define netif_dbg(priv, type, dev, fmt, ...) \
 	printk("[netdev]: " fmt, ##__VA_ARGS__)
 #define dev_err(dev, fmt, ...) \
 	printk("[dev]: " fmt, ##__VA_ARGS__)
@@ -376,6 +401,19 @@ enum {
 #define ADVERTISED_56000baseSR4_Full    (1 << 29)
 #define ADVERTISED_56000baseLR4_Full    (1 << 30)
 
+/* Wake-On-Lan options. */
+#define WAKE_PHY        (1 << 0)
+#define WAKE_UCAST      (1 << 1)
+#define WAKE_MCAST      (1 << 2)
+#define WAKE_BCAST      (1 << 3)
+#define WAKE_ARP        (1 << 4)
+#define WAKE_MAGIC      (1 << 5)
+#define WAKE_MAGICSECURE    (1 << 6) /* only meaningful if WAKE_MAGIC */
+
+/* Enable or disable autonegotiation. */
+#define AUTONEG_DISABLE     0x00
+#define AUTONEG_ENABLE      0x01
+
 enum ethtool_test_flags {
 	ETH_TEST_FL_OFFLINE = (1 << 0),
 	ETH_TEST_FL_FAILED  = (1 << 1),
@@ -464,6 +502,21 @@ static inline void *netdev_priv(struct ether *dev)
 	return dev->ctlr;
 }
 
+/* We do our linker table magic and other nonsense.  Keeping these around to
+ * show the code's intent. */
+static int register_netdev(struct ether *dev)
+{
+	return 0;
+}
+
+static void unregister_netdev(struct ether *dev)
+{
+}
+
+static void free_netdev(struct ether *dev)
+{
+}
+
 /* u64 on linux, but a u32 on plan 9.  the typedef is probably a good idea */
 typedef unsigned int netdev_features_t;
 
@@ -495,6 +548,8 @@ typedef unsigned int netdev_features_t;
 #define NETIF_F_HW_VLAN_CTAG_TX		0
 #define NETIF_F_HIGHDMA				0
 #define NETIF_F_HW_VLAN_CTAG_RX		0
+#define NETIF_F_TSO_MANGLEID		0
+#define NETIF_F_ALL_TSO (NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_TSO_ECN | NETIF_F_TSO_MANGLEID)
 
 #define netif_msg_drv(p)		((p)->msg_enable & NETIF_MSG_DRV)
 #define netif_msg_probe(p)		((p)->msg_enable & NETIF_MSG_PROBE)
@@ -511,6 +566,18 @@ typedef unsigned int netdev_features_t;
 #define netif_msg_pktdata(p)	((p)->msg_enable & NETIF_MSG_PKTDATA)
 #define netif_msg_hw(p)			((p)->msg_enable & NETIF_MSG_HW)
 #define netif_msg_wol(p)		((p)->msg_enable & NETIF_MSG_WOL)
+
+static inline uint32_t netif_msg_init(int debug_value,
+                                      int default_msg_enable_bits)
+{
+	/* use default */
+	if (debug_value < 0 || debug_value >= (sizeof(uint32_t) * 8))
+		return default_msg_enable_bits;
+	if (debug_value == 0)	/* no output */
+		return 0;
+	/* set low N bits */
+	return (1 << debug_value) - 1;
+}
 
 enum netdev_state_t {
 	__LINK_STATE_START,
@@ -553,9 +620,18 @@ struct pci_device_id {
     .vendor = PCI_VENDOR_ID_##vend, .device = (dev), \
     .subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID, 0, 0
 
+#define PCI_DEVICE(vend, dev) \
+    .vendor = (vend), .device = (dev), \
+    .subvendor = PCI_ANY_ID, .subdevice = PCI_ANY_ID
+
 /* Linux also has its own table of vendor ids.  We have the pci_defs table, but
  * this is a bootstrap issue. */
 #define PCI_VENDOR_ID_BROADCOM      0x14e4
+#define PCI_VENDOR_ID_REALTEK       0x10ec
+#define PCI_VENDOR_ID_DLINK         0x1186
+#define PCI_VENDOR_ID_AT            0x1259
+#define PCI_VENDOR_ID_LINKSYS       0x1737
+#define PCI_VENDOR_ID_GIGABYTE      0x1458
 
 /* I'd like to spatch all of the pci methods, but I don't know how to do the
  * reads.  Since we're not doing the reads, then no sense doing the writes. */
@@ -627,12 +703,28 @@ static inline void *pci_resource_end(struct pci_device *dev, int bir)
 	return (void*)(pci_get_membar(dev, bir) + pci_resource_len(dev, bir));
 }
 
+#define IORESOURCE_TYPE_BITS    0x00001f00  /* Resource type */
+#define IORESOURCE_IO       0x00000100  /* PCI/ISA I/O ports */
+#define IORESOURCE_MEM      0x00000200
+
+static inline int pci_resource_flags(struct pci_device *pdev, int bir)
+{
+	return pci_get_membar(pdev, bir) ? IORESOURCE_MEM : IORESOURCE_IO;
+}
+
+/* Linux stores this in the device to avoid lookups, which we can consider. */
+static bool pci_is_pcie(struct pci_device *dev)
+{
+	return pci_find_cap(dev, PCI_CAP_ID_EXP, NULL) == 0 ? TRUE : FALSE;
+}
+
 /* Hacked up version of Linux's.  Assuming reg's are implemented and
  * read_config never fails. */
 static int pcie_capability_read_word(struct pci_device *dev, int pos,
                                      uint16_t *val)
 {
 	uint32_t pcie_cap;
+
 	*val = 0;
 	if (pos & 1)
 		return -EINVAL;
@@ -642,15 +734,72 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
 	return 0;
 }
 
+static int pcie_capability_write_word(struct pci_device *dev, int pos,
+                                      uint16_t val)
+{
+	uint32_t pcie_cap;
+
+	if (pos & 3)
+		return -EINVAL;
+	if (pci_find_cap(dev, PCI_CAP_ID_EXP, &pcie_cap))
+		return -EINVAL;
+	pci_write_config_word(dev, pcie_cap + pos, val);
+	return 0;
+}
+
+static int pcie_capability_clear_and_set_word(struct pci_device *dev, int pos,
+                                              uint16_t clear, uint16_t set)
+{
+	int ret;
+	uint16_t val;
+
+	ret = pcie_capability_read_word(dev, pos, &val);
+	if (ret)
+		return ret;
+	val &= ~clear;
+	val |= set;
+	return pcie_capability_write_word(dev, pos, val);
+}
+
+static int pcie_capability_clear_word(struct pci_device *dev, int pos,
+                                      uint16_t clear)
+{
+	return pcie_capability_clear_and_set_word(dev, pos, clear, 0);
+}
+
+static int pcie_capability_set_word(struct pci_device *dev, int pos,
+                                    uint16_t set)
+{
+	return pcie_capability_clear_and_set_word(dev, pos, 0, set);
+}
+
+/* Faking it */
+static int pci_request_regions(struct pci_device *pdev, const char *res_name)
+{
+	return 0;
+}
+
+static void pci_release_regions(struct pci_device *pdev)
+{
+}
+
+static bool pci_dev_run_wake(struct pci_device *dev)
+{
+	return FALSE;
+}
+
 #define ioremap_nocache(paddr, sz) \
         (void*)vmap_pmem_nocache((uintptr_t)paddr, sz)
 #define ioremap(paddr, sz) (void*)vmap_pmem((uintptr_t)paddr, sz)
 #define pci_ioremap_bar(dev, bir) (void*)pci_map_membar(dev, bir)
-#define pci_set_master(x) pci_set_bus_master(x)
+#define pci_disable_link_state(...)
 
 #define dev_addr_add(dev, addr, type) ({memcpy((dev)->ea, addr, Eaddrlen); 0;})
 #define dev_addr_del(...)
 
+/* Some of these might be important.  Mostly we need to rewrite whatever is
+ * using them, but we can leave the functions around to remind us what the code
+ * is supposed to do, especially for things we don't support yet. */
 #define SET_NETDEV_DEV(...)
 #define netif_carrier_off(...)
 #define netif_carrier_on(...)
@@ -660,13 +809,20 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
 #define netif_tx_start_all_queues(...)
 #define netif_tx_start_queue(...)
 #define netif_tx_stop_queue(...)
+#define netif_start_queue(...)
+#define netif_stop_queue(...)
+#define netif_wake_queue(...)
+#define netif_device_detach(...)
+#define netif_queue_stopped(...) (FALSE)
 #define netif_napi_add(...)
+#define netif_napi_del(...)
 #define napi_hash_add(...)
 #define napi_enable(...)
 #define napi_disable(...)
 #define napi_schedule(...)
 #define napi_schedule_irqoff(...)
 #define napi_complete(...)
+#define free_irq(...)	/* We don't free yet! */
 /* picks a random, valid mac addr for dev */
 #define eth_hw_addr_random(...)
 /* checks if the MAC is not 0 and not multicast (all 1s) */
@@ -674,7 +830,9 @@ static int pcie_capability_read_word(struct pci_device *dev, int pos,
 /* The flag this checks is set on before open.  Turned off on failure, etc. */
 #define netif_running(dev) (TRUE)
 #define netdev_tx_sent_queue(...)
+#define netdev_update_features(...)
 #define skb_tx_timestamp(...)
+#define net_ratelimit() (TRUE)
 
 #define NET_SKB_PAD 0 		/* padding for SKBs.  Ignoring it for now */
 #define MAX_SKB_FRAGS 16	/* we'll probably delete code using this */
@@ -757,5 +915,75 @@ static inline bool ether_addr_equal(const uint8_t *addr1, const uint8_t *addr2)
 	return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2])) == 0;
 #endif
 }
+
+/* Linux uses this interface for 64 bit stats on 32 bit machines.  We're 64 bit
+ * only, so we can ignore the 32 bit versions. */
+struct u64_stats_sync {
+};
+
+static inline void u64_stats_init(struct u64_stats_sync *syncp)
+{
+}
+
+static inline void u64_stats_update_begin(struct u64_stats_sync *syncp)
+{
+}
+
+static inline void u64_stats_update_end(struct u64_stats_sync *syncp)
+{
+}
+
+static inline void u64_stats_update_begin_raw(struct u64_stats_sync *syncp)
+{
+}
+
+static inline void u64_stats_update_end_raw(struct u64_stats_sync *syncp)
+{
+}
+
+static inline unsigned int
+__u64_stats_fetch_begin(const struct u64_stats_sync *syncp)
+{
+	return 0;
+}
+
+static inline unsigned int
+u64_stats_fetch_begin(const struct u64_stats_sync *syncp)
+{
+	return __u64_stats_fetch_begin(syncp);
+}
+
+static inline bool __u64_stats_fetch_retry(const struct u64_stats_sync *syncp,
+                                           unsigned int start)
+{
+	return false;
+}
+
+static inline bool u64_stats_fetch_retry(const struct u64_stats_sync *syncp,
+					 unsigned int start)
+{
+	return __u64_stats_fetch_retry(syncp, start);
+}
+
+static inline unsigned int
+u64_stats_fetch_begin_irq(const struct u64_stats_sync *syncp)
+{
+	return __u64_stats_fetch_begin(syncp);
+}
+
+static inline bool u64_stats_fetch_retry_irq(const struct u64_stats_sync *syncp,
+                                             unsigned int start)
+{
+	return __u64_stats_fetch_retry(syncp, start);
+}
+
+#define pm_request_resume(...) (1)
+#define pm_schedule_suspend(...) (-ENOSYS)
+#define pm_runtime_get_noresume(...)
+#define pm_runtime_active(...) (true)
+#define pm_runtime_put_noidle(...)
+#define pm_runtime_get_sync(...) (1)
+#define pm_runtime_put_sync(...) (-ENOSYS)
+#define device_set_wakeup_enable(...) (-EINVAL)
 
 #include <linux/compat_todo.h>
