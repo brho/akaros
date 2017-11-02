@@ -8,30 +8,8 @@
  * See MAINTAINERS file for support contact information.
  */
 
-#include <linux/module.h>
-#include <linux/moduleparam.h>
-#include <linux/pci.h>
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/delay.h>
-#include <linux/ethtool.h>
-#include <linux/mii.h>
-#include <linux/if_vlan.h>
-#include <linux/crc32.h>
-#include <linux/in.h>
-#include <linux/ip.h>
-#include <linux/tcp.h>
-#include <linux/interrupt.h>
-#include <linux/dma-mapping.h>
-#include <linux/pm_runtime.h>
-#include <linux/firmware.h>
-#include <linux/pci-aspm.h>
-#include <linux/prefetch.h>
-#include <linux/ipv6.h>
-#include <net/ip6_checksum.h>
-
-#include <asm/io.h>
-#include <asm/irq.h>
+#include <linux_compat.h>
+#include "linux_mii.h"
 
 #define RTL8169_VERSION "2.3LK-NAPI"
 #define MODULENAME "r8169"
@@ -58,15 +36,9 @@
 #define FIRMWARE_8107E_2	"rtl_nic/rtl8107e-2.fw"
 
 #ifdef RTL8169_DEBUG
-#define assert(expr) \
-	if (!(expr)) {					\
-		printk( "Assertion failed! %s,%s,%s,line=%d\n",	\
-		#expr,__FILE__,__func__,__LINE__);		\
-	}
 #define dprintk(fmt, args...) \
 	do { printk(KERN_DEBUG PFX fmt, ## args); } while (0)
 #else
-#define assert(expr) do {} while (0)
 #define dprintk(fmt, args...)	do {} while (0)
 #endif /* RTL8169_DEBUG */
 
@@ -818,13 +790,17 @@ struct rtl8169_private {
 
 	int (*set_speed)(struct ether *, uint8_t aneg, uint16_t sp,
 			 uint8_t dpx, uint32_t adv);
+#if 0 // AKAROS_PORT
 	int (*get_link_ksettings)(struct ether *,
 				  struct ethtool_link_ksettings *);
+#endif
 	void (*phy_reset_enable)(struct rtl8169_private *tp);
 	void (*hw_start)(struct ether *);
 	unsigned int (*phy_reset_pending)(struct rtl8169_private *tp);
 	unsigned int (*link_ok)(void __iomem *);
+#if 0 // AKAROS_PORT
 	int (*do_ioctl)(struct rtl8169_private *tp, struct mii_ioctl_data *data, int cmd);
+#endif
 	bool (*tso_csum)(struct rtl8169_private *, struct sk_buff *,
 			 uint32_t *);
 
@@ -1757,6 +1733,7 @@ static uint32_t __rtl8169_get_wol(struct rtl8169_private *tp)
 	return wolopts;
 }
 
+#if 0 // AKAROS_PORT
 static void rtl8169_get_wol(struct ether *dev, struct ethtool_wolinfo *wol)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
@@ -1776,6 +1753,7 @@ static void rtl8169_get_wol(struct ether *dev, struct ethtool_wolinfo *wol)
 
 	pm_runtime_put_noidle(d);
 }
+#endif
 
 static void __rtl8169_set_wol(struct rtl8169_private *tp, uint32_t wolopts)
 {
@@ -1861,6 +1839,7 @@ static void __rtl8169_set_wol(struct rtl8169_private *tp, uint32_t wolopts)
 	RTL_W8(Cfg9346, Cfg9346_Lock);
 }
 
+#if 0 // AKAROS_PORT
 static int rtl8169_set_wol(struct ether *dev, struct ethtool_wolinfo *wol)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
@@ -1887,12 +1866,14 @@ static int rtl8169_set_wol(struct ether *dev, struct ethtool_wolinfo *wol)
 
 	return 0;
 }
+#endif
 
 static const char *rtl_lookup_firmware_name(struct rtl8169_private *tp)
 {
 	return rtl_chip_infos[tp->mac_version].fw_name;
 }
 
+#if 0 // AKAROS_PORT
 static void rtl8169_get_drvinfo(struct ether *dev,
 				struct ethtool_drvinfo *info)
 {
@@ -1907,6 +1888,7 @@ static void rtl8169_get_drvinfo(struct ether *dev,
 		strlcpy(info->fw_version, rtl_fw->version,
 			sizeof(info->fw_version));
 }
+#endif
 
 static int rtl8169_get_regs_len(struct ether *dev)
 {
@@ -2037,6 +2019,7 @@ out:
 	return ret;
 }
 
+#if 0 // AKAROS_PORT
 static int rtl8169_set_settings(struct ether *dev, struct ethtool_cmd *cmd)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
@@ -2051,6 +2034,7 @@ static int rtl8169_set_settings(struct ether *dev, struct ethtool_cmd *cmd)
 
 	return ret;
 }
+#endif
 
 static netdev_features_t rtl8169_fix_features(struct ether *dev,
 	netdev_features_t features)
@@ -2116,19 +2100,26 @@ static int rtl8169_set_features(struct ether *dev,
 
 static inline uint32_t rtl8169_tx_vlan_tag(struct sk_buff *skb)
 {
+#if 0 // AKAROS_PORT
 	return (skb_vlan_tag_present(skb)) ?
 		TxVlanTag | swab16(skb_vlan_tag_get(skb)) : 0x00;
+#else
+	return 0;
+#endif
 }
 
 static void rtl8169_rx_vlan_tag(struct RxDesc *desc, struct sk_buff *skb)
 {
 	uint32_t opts2 = le32_to_cpu(desc->opts2);
 
+#if 0 // AKAROS_PORT
 	if (opts2 & RxVlanTag)
 		__vlan_hwaccel_put_tag(skb, cpu_to_be16(ETH_P_8021Q),
 				       swab16(opts2 & 0xffff));
+#endif
 }
 
+#if 0 // AKAROS_PORT
 static int rtl8169_get_link_ksettings_tbi(struct ether *dev,
 					  struct ethtool_link_ksettings *cmd)
 {
@@ -2192,6 +2183,7 @@ static void rtl8169_get_regs(struct ether *dev, struct ethtool_regs *regs,
 		memcpy_fromio(dw++, data++, 4);
 	rtl_unlock_work(tp);
 }
+#endif
 
 static uint32_t rtl8169_get_msglevel(struct ether *dev)
 {
@@ -2329,6 +2321,7 @@ static bool rtl8169_init_counter_offsets(struct ether *dev)
 	return ret;
 }
 
+#if 0 // AKAROS_PORT
 static void rtl8169_get_ethtool_stats(struct ether *dev,
 				      struct ethtool_stats *stats,
 				      uint64_t *data)
@@ -2360,6 +2353,7 @@ static void rtl8169_get_ethtool_stats(struct ether *dev,
 	data[11] = le16_to_cpu(counters->tx_aborted);
 	data[12] = le16_to_cpu(counters->tx_underun);
 }
+#endif
 
 static void rtl8169_get_strings(struct ether *dev, uint32_t stringset,
 				uint8_t *data)
@@ -2378,6 +2372,7 @@ static int rtl8169_nway_reset(struct ether *dev)
 	return mii_nway_restart(&tp->mii);
 }
 
+#if 0 // AKAROS_PORT
 static const struct ethtool_ops rtl8169_ethtool_ops = {
 	.get_drvinfo		= rtl8169_get_drvinfo,
 	.get_regs_len		= rtl8169_get_regs_len,
@@ -2395,6 +2390,7 @@ static const struct ethtool_ops rtl8169_ethtool_ops = {
 	.nway_reset		= rtl8169_nway_reset,
 	.get_link_ksettings	= rtl8169_get_link_ksettings,
 };
+#endif
 
 static void rtl8169_get_mac_version(struct rtl8169_private *tp,
 				    struct ether *dev,
@@ -4534,6 +4530,7 @@ static int rtl_set_mac_address(struct ether *dev, void *p)
 	return 0;
 }
 
+#if 0 // AKAROS_PORT
 static int rtl8169_ioctl(struct ether *dev, struct ifreq *ifr, int cmd)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
@@ -4565,12 +4562,15 @@ static int rtl_tbi_ioctl(struct rtl8169_private *tp, struct mii_ioctl_data *data
 {
 	return -EOPNOTSUPP;
 }
+#endif
 
 static void rtl_disable_msi(struct pci_device *pdev,
 			    struct rtl8169_private *tp)
 {
 	if (tp->features & RTL_FEATURE_MSI) {
+#if 0 // AKAROS_PORT_TODO
 		pci_disable_msi(pdev);
+#endif
 		tp->features &= ~RTL_FEATURE_MSI;
 	}
 }
@@ -5386,6 +5386,7 @@ static void rtl_set_rx_mode(struct ether *dev)
 	int rx_mode;
 	uint32_t tmp = 0;
 
+#if 0 // AKAROS_PORT_TODO guts of how to do broadcast, multi, normal rx
 	if (dev->flags & IFF_PROMISC) {
 		/* Unconditionally log net taps. */
 		netif_notice(tp, link, dev, "Promiscuous mode enabled\n");
@@ -5409,6 +5410,7 @@ static void rtl_set_rx_mode(struct ether *dev)
 			rx_mode |= AcceptMulticast;
 		}
 	}
+#endif
 
 	if (dev->feat & NETIF_F_RXALL)
 		rx_mode |= (AcceptErr | AcceptRunt);
@@ -6764,6 +6766,8 @@ static inline void *rtl8169_align(void *data)
 static struct sk_buff *rtl8169_alloc_rx_data(struct rtl8169_private *tp,
 					     struct RxDesc *desc)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO rx buffers
 	void *data;
 	dma_addr_t mapping;
 	struct device *d = &tp->pci_dev->device;
@@ -6795,6 +6799,7 @@ static struct sk_buff *rtl8169_alloc_rx_data(struct rtl8169_private *tp,
 err_out:
 	kfree(data);
 	return NULL;
+#endif
 }
 
 static void rtl8169_rx_clear(struct rtl8169_private *tp)
@@ -6881,7 +6886,9 @@ static void rtl8169_tx_clear_range(struct rtl8169_private *tp, uint32_t start,
 			rtl8169_unmap_tx_skb(&tp->pci_dev->device, tx_skb,
 					     tp->TxDescArray + entry);
 			if (skb) {
+				#if 0 // AKAROS_PORT_TODO
 				dev_consume_skb_any(skb);
+				#endif
 				tx_skb->skb = NULL;
 			}
 		}
@@ -6927,6 +6934,8 @@ static void rtl8169_tx_timeout(struct ether *dev)
 static int rtl8169_xmit_frags(struct rtl8169_private *tp, struct sk_buff *skb,
 			      uint32_t *opts)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	struct skb_shared_info *info = skb_shinfo(skb);
 	unsigned int cur_frag, entry;
 	struct TxDesc *uninitialized_var(txd);
@@ -6973,11 +6982,15 @@ static int rtl8169_xmit_frags(struct rtl8169_private *tp, struct sk_buff *skb,
 err_out:
 	rtl8169_tx_clear_range(tp, tp->cur_tx + 1, cur_frag);
 	return -EIO;
+#endif
 }
 
 static bool rtl_test_hw_pad_bug(struct rtl8169_private *tp, struct sk_buff *skb)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	return skb->len < ETH_ZLEN && tp->mac_version == RTL_GIGA_MAC_VER_34;
+#endif
 }
 
 static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
@@ -6989,6 +7002,8 @@ static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
 static void r8169_csum_workaround(struct rtl8169_private *tp,
 				  struct sk_buff *skb)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	if (skb_shinfo(skb)->gso_size) {
 		netdev_features_t features = tp->dev->feat;
 		struct sk_buff *segs, *nskb;
@@ -7019,6 +7034,7 @@ drop:
 		stats->tx_dropped++;
 		dev_kfree_skb_any(skb);
 	}
+#endif
 }
 
 /* msdn_giant_send_check()
@@ -7027,6 +7043,8 @@ drop:
  */
 static int msdn_giant_send_check(struct sk_buff *skb)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	const struct ipv6hdr *ipv6h;
 	struct tcphdr *th;
 	int ret;
@@ -7042,16 +7060,20 @@ static int msdn_giant_send_check(struct sk_buff *skb)
 	th->check = ~tcp_v6_check(0, &ipv6h->saddr, &ipv6h->daddr, 0);
 
 	return ret;
+#endif
 }
 
 static inline __be16 get_protocol(struct sk_buff *skb)
 {
 	__be16 protocol;
 
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	if (skb->protocol == cpu_to_be16(ETH_P_8021Q))
 		protocol = vlan_eth_hdr(skb)->h_vlan_encapsulated_proto;
 	else
 		protocol = skb->protocol;
+#endif
 
 	return protocol;
 }
@@ -7059,6 +7081,8 @@ static inline __be16 get_protocol(struct sk_buff *skb)
 static bool rtl8169_tso_csum_v1(struct rtl8169_private *tp,
 				struct sk_buff *skb, uint32_t *opts)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	uint32_t mss = skb_shinfo(skb)->gso_size;
 
 	if (mss) {
@@ -7076,11 +7100,14 @@ static bool rtl8169_tso_csum_v1(struct rtl8169_private *tp,
 	}
 
 	return true;
+#endif
 }
 
 static bool rtl8169_tso_csum_v2(struct rtl8169_private *tp,
 				struct sk_buff *skb, uint32_t *opts)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	uint32_t transport_offset = (uint32_t)skb_transport_offset(skb);
 	uint32_t mss = skb_shinfo(skb)->gso_size;
 
@@ -7154,6 +7181,7 @@ static bool rtl8169_tso_csum_v2(struct rtl8169_private *tp,
 	}
 
 	return true;
+#endif
 }
 
 static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
@@ -7169,6 +7197,8 @@ static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
 	uint32_t opts[2];
 	int frags;
 
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	if (unlikely(!TX_FRAGS_READY_FOR(tp, skb_shinfo(skb)->nr_frags))) {
 		netif_err(tp, drv, dev, "BUG! Tx Ring full when queue awake!\n");
 		goto err_stop_0;
@@ -7257,6 +7287,7 @@ err_stop_0:
 	netif_stop_queue(dev);
 	dev->stats.tx_dropped++;
 	return NETDEV_TX_BUSY;
+#endif
 }
 
 static void rtl8169_pcierr_interrupt(struct ether *dev)
@@ -7279,9 +7310,12 @@ static void rtl8169_pcierr_interrupt(struct ether *dev)
 	 *
 	 * Feel free to adjust to your needs.
 	 */
+/* Wasn't clear who sets broken_parity_status */
+#if 0 // AKAROS_PORT
 	if (pdev->broken_parity_status)
 		pci_cmd &= ~PCI_COMMAND_PARITY;
 	else
+#endif
 		pci_cmd |= PCI_COMMAND_SERR | PCI_COMMAND_PARITY;
 
 	pci_write_config_word(pdev, PCI_COMMAND, pci_cmd);
@@ -7308,6 +7342,8 @@ static void rtl8169_pcierr_interrupt(struct ether *dev)
 
 static void rtl_tx(struct ether *dev, struct rtl8169_private *tp)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	unsigned int dirty_tx, tx_left;
 
 	dirty_tx = tp->dirty_tx;
@@ -7369,6 +7405,7 @@ static void rtl_tx(struct ether *dev, struct rtl8169_private *tp)
 			RTL_W8(TxPoll, NPQ);
 		}
 	}
+#endif
 }
 
 static inline int rtl8169_fragmented_frame(uint32_t status)
@@ -7380,11 +7417,14 @@ static inline void rtl8169_rx_csum(struct sk_buff *skb, uint32_t opts1)
 {
 	uint32_t status = opts1 & RxProtoMask;
 
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	if (((status == RxProtoTCP) && !(opts1 & TCPFail)) ||
 	    ((status == RxProtoUDP) && !(opts1 & UDPFail)))
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
 	else
 		skb_checksum_none_assert(skb);
+#endif
 }
 
 static struct sk_buff *rtl8169_try_rx_copy(void *data,
@@ -7392,6 +7432,8 @@ static struct sk_buff *rtl8169_try_rx_copy(void *data,
 					   int pkt_size,
 					   dma_addr_t addr)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	struct sk_buff *skb;
 	struct device *d = &tp->pci_dev->device;
 
@@ -7404,11 +7446,14 @@ static struct sk_buff *rtl8169_try_rx_copy(void *data,
 	dma_sync_single_for_device(d, addr, pkt_size, DMA_FROM_DEVICE);
 
 	return skb;
+#endif
 }
 
 static int rtl_rx(struct ether *dev, struct rtl8169_private *tp,
 		  uint32_t budget)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	unsigned int cur_rx, rx_left;
 	unsigned int count;
 
@@ -7501,10 +7546,13 @@ release_descriptor:
 	tp->cur_rx = cur_rx;
 
 	return count;
+#endif
 }
 
 static void rtl8169_interrupt(struct hw_trapframe *hw_tf, void *dev_instance)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	struct ether *dev = dev_instance;
 	struct rtl8169_private *tp = netdev_priv(dev);
 	int handled = 0;
@@ -7521,6 +7569,7 @@ static void rtl8169_interrupt(struct hw_trapframe *hw_tf, void *dev_instance)
 		}
 	}
 	return IRQ_RETVAL(handled);
+#endif
 }
 
 /*
@@ -7591,6 +7640,8 @@ out_unlock:
 
 static int rtl8169_poll(struct napi_struct *napi, int budget)
 {
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	struct rtl8169_private *tp = container_of(napi, struct rtl8169_private, napi);
 	struct ether *dev = tp->dev;
 	uint16_t enable_mask = RTL_EVENT_NAPI | tp->event_slow;
@@ -7620,6 +7671,7 @@ static int rtl8169_poll(struct napi_struct *napi, int budget)
 	}
 
 	return work_done;
+#endif
 }
 
 static void rtl8169_rx_missed(struct ether *dev, void __iomem *ioaddr)
@@ -7735,8 +7787,12 @@ static int rtl_open(struct ether *dev)
 
 	rtl_request_firmware(tp);
 
+	panic("Not implemented");
+#if 0 // AKAROS_PORT_TODO
 	retval = register_irq(pdev->irqline, rtl8169_interrupt, dev,
 			      pci_to_tbdf(PCIDEV));
+#endif
+
 	if (retval < 0)
 		goto err_release_fw_2;
 
@@ -8004,11 +8060,14 @@ static void rtl_shutdown(struct pci_device *pdev)
 
 	rtl8169_net_suspend(dev);
 
+#if 0 // AKAROS_PORT
 	/* Restore original MAC address */
 	rtl_rar_set(tp, dev->perm_addr);
+#endif
 
 	rtl8169_hw_reset(tp);
 
+#if 0 // AKAROS_PORT
 	if (system_state == SYSTEM_POWER_OFF) {
 		if (__rtl8169_get_wol(tp) & WAKE_ANY) {
 			rtl_wol_suspend_quirk(tp);
@@ -8018,6 +8077,7 @@ static void rtl_shutdown(struct pci_device *pdev)
 		pci_wake_from_d3(pdev, true);
 		pci_set_power_state(pdev, PCI_D3hot);
 	}
+#endif
 
 	pm_runtime_put_noidle(d);
 }
@@ -8049,13 +8109,17 @@ static void rtl_remove_one(struct pci_device *pdev)
 	if (pci_dev_run_wake(pdev))
 		pm_runtime_get_noresume(&pdev->device);
 
+#if 0 // AKAROS_PORT
 	/* restore original MAC address */
 	rtl_rar_set(tp, dev->perm_addr);
+#endif
+
 
 	rtl_disable_msi(pdev, tp);
 	rtl8169_release_board(pdev, dev, tp->mmio_addr);
 }
 
+#if 0 // AKAROS_PORT
 static const struct net_device_ops rtl_netdev_ops = {
 	.ndo_open		= rtl_open,
 	.ndo_stop		= rtl8169_close,
@@ -8074,6 +8138,7 @@ static const struct net_device_ops rtl_netdev_ops = {
 #endif
 
 };
+#endif
 
 static const struct rtl_cfg_info {
 	void (*hw_start)(struct ether *);
@@ -8120,7 +8185,11 @@ static unsigned rtl_try_msi(struct rtl8169_private *tp,
 
 	cfg2 = RTL_R8(Config2) & ~MSIEnable;
 	if (cfg->features & RTL_FEATURE_MSI) {
+#if 0 // AKAROS_PORT_TODO
 		if (pci_enable_msi(tp->pci_dev)) {
+#else
+		if (-1) {
+#endif
 			netif_info(tp, hw, tp->dev, "no MSI. Back to INTx.\n");
 		} else {
 			cfg2 |= MSIEnable;
@@ -8227,7 +8296,11 @@ static int rtl_init_one(struct pci_device *pdev,
 		       MODULENAME, RTL8169_VERSION);
 	}
 
+#if 0 // AKAROS_PORT_TODO
 	dev = alloc_etherdev(sizeof (*tp));
+#else
+	dev = NULL;
+#endif
 	if (!dev) {
 		rc = -ENOMEM;
 		goto out;
@@ -8380,18 +8453,26 @@ static int rtl_init_one(struct pci_device *pdev,
 
 	if (rtl_tbi_enabled(tp)) {
 		tp->set_speed = rtl8169_set_speed_tbi;
+#if 0 // AKAROS_PORT
 		tp->get_link_ksettings = rtl8169_get_link_ksettings_tbi;
+#endif
 		tp->phy_reset_enable = rtl8169_tbi_reset_enable;
 		tp->phy_reset_pending = rtl8169_tbi_reset_pending;
 		tp->link_ok = rtl8169_tbi_link_ok;
+#if 0 // AKAROS_PORT
 		tp->do_ioctl = rtl_tbi_ioctl;
+#endif
 	} else {
 		tp->set_speed = rtl8169_set_speed_xmii;
+#if 0 // AKAROS_PORT
 		tp->get_link_ksettings = rtl8169_get_link_ksettings_xmii;
+#endif
 		tp->phy_reset_enable = rtl8169_xmii_reset_enable;
 		tp->phy_reset_pending = rtl8169_xmii_reset_pending;
 		tp->link_ok = rtl8169_xmii_link_ok;
+#if 0 // AKAROS_PORT
 		tp->do_ioctl = rtl_xmii_ioctl;
+#endif
 	}
 
 	qlock_init(&tp->wk.mutex);
@@ -8534,6 +8615,7 @@ err_out_free_dev_1:
 	goto out;
 }
 
+#if 0 // AKAROS_PORT
 static struct pci_driver rtl8169_pci_driver = {
 	.name		= MODULENAME,
 	.id_table	= rtl8169_pci_tbl,
@@ -8544,3 +8626,4 @@ static struct pci_driver rtl8169_pci_driver = {
 };
 
 module_pci_driver(rtl8169_pci_driver);
+#endif

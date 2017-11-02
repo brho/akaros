@@ -10,3 +10,4 @@ obj-y							+= ether82563.o
 obj-y							+= ethermii.o
 obj-y							+= etherigbe.o
 obj-y							+= linux_mii.o
+obj-y							+= r8169.o
