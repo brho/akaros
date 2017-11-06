@@ -33,6 +33,7 @@
 
 #include <linux/mlx4/cq.h>
 #include <linux/mlx4/qp.h>
+#include <net/tcp.h>
 #include "mlx4_en.h"
 
 int mlx4_en_create_tx_ring(struct mlx4_en_priv *priv,
@@ -740,7 +741,7 @@ static size_t get_lso_hdr_size(struct block *block)
 {
 	if (!(block->flag & Btso))
 		return 0;
-	return block->transport_header_end;
+	return block->transport_offset + tcp_hdrlen(block);
 }
 
 netdev_tx_t mlx4_send_packet(struct block *block, struct mlx4_en_priv *priv,

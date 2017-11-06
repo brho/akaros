@@ -404,3 +404,19 @@ static inline uint32_t seq_min(uint32_t x, uint32_t y)
 {
 	return seq_le(x, y) ? x : y;
 }
+
+/* Caller needs to know we're TCP and with transport_offset set, which is
+ * usually on the outbound network path. */
+static inline struct tcphdr *tcp_hdr(struct block *bp)
+{
+	return (struct tcphdr*)(bp->rp + bp->transport_offset);
+}
+
+static inline size_t tcp_hdrlen(struct block *bp)
+{
+	struct tcphdr *hdr = tcp_hdr(bp);
+	uint8_t data_offset;
+
+	data_offset = hdr->tcpflag[0] & 0x0f;
+	return data_offset * 4;
+}

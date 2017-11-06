@@ -776,8 +776,8 @@ static struct block *htontcp6(Tcp *tcph, struct block *data, Tcp6hdr *ph,
 	data = alloc_or_pad_block(data, hdrlen + TCP6_PKT);
 	if (data == NULL)
 		return NULL;
-	/* relative to the block start (bp->rp) */
-	data->transport_header_end = hdrlen + TCP6_PKT;
+	/* relative to the block start (bp->rp).  Note TCP structs include IP. */
+	data->transport_offset = offsetof(Tcp6hdr, tcpsport);
 
 	/* copy in pseudo ip header plus port numbers */
 	h = (Tcp6hdr *) (data->rp);
@@ -826,8 +826,8 @@ static struct block *htontcp4(Tcp *tcph, struct block *data, Tcp4hdr *ph,
 	data = alloc_or_pad_block(data, hdrlen + TCP4_PKT);
 	if (data == NULL)
 		return NULL;
-	/* relative to the block start (bp->rp) */
-	data->transport_header_end = hdrlen + TCP4_PKT;
+	/* relative to the block start (bp->rp).  Note TCP structs include IP. */
+	data->transport_offset = offsetof(Tcp4hdr, tcpsport);
 
 	/* copy in pseudo ip header plus port numbers */
 	h = (Tcp4hdr *) (data->rp);
