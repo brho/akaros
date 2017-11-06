@@ -132,6 +132,19 @@ struct tcptimer {
 	void *arg;
 };
 
+struct tcphdr {
+	uint8_t tcpsport[2];
+	uint8_t tcpdport[2];
+	uint8_t tcpseq[4];
+	uint8_t tcpack[4];
+	uint8_t tcpflag[2];
+	uint8_t tcpwin[2];
+	uint8_t tcpcksum[2];
+	uint8_t tcpurg[2];
+	/* Options segment */
+	uint8_t tcpopt[1];
+};
+
 /*
  *  v4 and v6 pseudo headers used for
  *  checksuming tcp
@@ -148,16 +161,7 @@ struct tcp4hdr {
 	uint8_t tcplen[2];
 	uint8_t tcpsrc[4];
 	uint8_t tcpdst[4];
-	uint8_t tcpsport[2];
-	uint8_t tcpdport[2];
-	uint8_t tcpseq[4];
-	uint8_t tcpack[4];
-	uint8_t tcpflag[2];
-	uint8_t tcpwin[2];
-	uint8_t tcpcksum[2];
-	uint8_t tcpurg[2];
-	/* Options segment */
-	uint8_t tcpopt[1];
+	struct tcphdr;
 };
 
 typedef struct tcp6hdr Tcp6hdr;
@@ -168,16 +172,7 @@ struct tcp6hdr {
 	uint8_t ttl;
 	uint8_t tcpsrc[IPaddrlen];
 	uint8_t tcpdst[IPaddrlen];
-	uint8_t tcpsport[2];
-	uint8_t tcpdport[2];
-	uint8_t tcpseq[4];
-	uint8_t tcpack[4];
-	uint8_t tcpflag[2];
-	uint8_t tcpwin[2];
-	uint8_t tcpcksum[2];
-	uint8_t tcpurg[2];
-	/* Options segment */
-	uint8_t tcpopt[1];
+	struct tcphdr;
 };
 
 struct sack_block {
