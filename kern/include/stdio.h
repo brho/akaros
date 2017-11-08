@@ -16,8 +16,13 @@
 #endif
 
 #define printk(args...) cprintf(args)
-#define I_AM_HERE printk("Core %d is in %s() at %s:%d\n", core_id(), \
-                         __FUNCTION__, __FILE__, __LINE__);
+#define __I_AM_HERE_GUTS "Core %d is in %s() at %s:%d\n", core_id(), \
+                         __func__, __FILE__, __LINE__
+
+#define I_AM_HERE printk(__I_AM_HERE_GUTS)
+#define I_AM_HERE_x printx(__I_AM_HERE_GUTS)
+#define I_AM_HERE_t trace_printk(__I_AM_HERE_GUTS)
+#define I_AM_HERE_tx trace_printx(__I_AM_HERE_GUTS)
 
 // lib/stdio.c
 void	cputchar(int c);
