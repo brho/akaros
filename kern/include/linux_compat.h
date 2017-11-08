@@ -531,7 +531,7 @@ typedef unsigned int netdev_features_t;
  * it.  For transmits, the stack needs to know in advance if the device can
  * handle the checksum or not. */
 #define NETIF_F_RXHASH				0
-#define NETIF_F_RXCSUM				0
+#define NETIF_F_RXCSUM				NETF_RXCSUM
 #define NETIF_F_LRO					NETF_LRO
 #define NETIF_F_GRO					0
 #define NETIF_F_LOOPBACK			0

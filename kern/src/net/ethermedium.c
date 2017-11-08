@@ -163,6 +163,10 @@ static unsigned int parsefeat(char *ptr)
 		feat |= NETF_SG;
 	if (strstr(ptr, "tso"))
 		feat |= NETF_TSO;
+	if (strstr(ptr, "lro"))
+		feat |= NETF_LRO;
+	if (strstr(ptr, "rxcsum"))
+		feat |= NETF_RXCSUM;
 	return feat;
 }
 

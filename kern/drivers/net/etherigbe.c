@@ -2041,6 +2041,9 @@ igbepnp(struct ether* edev)
 	edev->tbdf = pci_to_tbdf(ctlr->pci);
 	edev->mbps = 1000;
 	memmove(edev->ea, ctlr->ra, Eaddrlen);
+	/* Jim or whoever have this turned on already.  We might be capable of other
+	 * features. */
+	edev->feat = NETF_RXCSUM;
 
 	/*
 	 * Linkage to the generic ethernet driver.

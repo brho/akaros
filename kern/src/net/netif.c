@@ -316,6 +316,8 @@ netifread(struct ether *nif, struct chan *c, void *a, long n,
 				j += snprintf(p + j, READSTR - j, "tso ");
 			if (nif->feat & NETF_LRO)
 				j += snprintf(p + j, READSTR - j, "lro ");
+			if (nif->feat & NETF_RXCSUM)
+				j += snprintf(p + j, READSTR - j, "rxcsum ");
 			snprintf(p + j, READSTR - j, "\n");
 			n = readstr(offset, a, n, p);
 			kfree(p);

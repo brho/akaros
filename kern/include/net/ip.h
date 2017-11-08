@@ -1005,6 +1005,7 @@ struct netaddr {
 #define NETF_PADMIN_SHIFT	(NETF_BASE_SHIFT + 0)
 #define NETF_SG_SHIFT		(NETF_BASE_SHIFT + 1)
 #define NETF_LRO_SHIFT		(NETF_BASE_SHIFT + 2)
+#define NETF_RXCSUM_SHIFT	(NETF_BASE_SHIFT + 3)
 enum {
 	NETF_IPCK = (1 << NS_IPCK_SHIFT),	/* xmit ip checksum */
 	NETF_UDPCK = (1 << NS_UDPCK_SHIFT),	/* xmit udp checksum */
@@ -1013,6 +1014,7 @@ enum {
 	NETF_SG	= (1 << NETF_SG_SHIFT),		/* device can do scatter/gather */
 	NETF_TSO = (1 << NS_TSO_SHIFT),		/* device can do TSO */
 	NETF_LRO = (1 << NETF_LRO_SHIFT),	/* device can do LRO */
+	NETF_RXCSUM = (1 << NETF_RXCSUM_SHIFT),	/* device can do rx checksums */
 };
 
 /* Linux's rtnl_link_stats64 */
