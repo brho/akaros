@@ -281,6 +281,7 @@ struct tcpctl {
 	uint32_t ts_recent;			/* timestamp received around last_ack_sent */
 	uint32_t last_ack_sent;		/* to determine when to update timestamp */
 	bool sack_ok;				/* Can use SACK for this connection */
+	struct Ipifc *ifc;			/* Uncounted ref */
 
 	union {
 		Tcp4hdr tcp4hdr;
@@ -318,6 +319,7 @@ struct limbo {
 	uint8_t rexmits;			/* number of retransmissions */
 	bool sack_ok;				/* other side said SACK_OK */
 	uint32_t ts_val;			/* timestamp val from sender */
+	struct Ipifc *ifc;			/* Uncounted ref */
 };
 
 enum {

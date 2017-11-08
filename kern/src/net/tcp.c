@@ -491,13 +491,10 @@ static void localclose(struct conv *s, char *reason)
 }
 
 /* mtu (- TCP + IP hdr len) of 1st hop */
-static int tcpmtu(struct Proto *tcp, uint8_t *addr, int version, int *scale,
-                  uint8_t *flags)
+static int tcpmtu(struct Ipifc *ifc, int version, int *scale)
 {
-	struct Ipifc *ifc;
 	int mtu;
 
-	ifc = findipifc(tcp->f, addr, 0);
 	switch (version) {
 		default:
 		case V4:
@@ -511,12 +508,20 @@ static int tcpmtu(struct Proto *tcp, uint8_t *addr, int version, int *scale,
 				mtu = ifc->maxtu - ifc->m->hsize - (TCP6_PKT + TCP6_HDRSIZE);
 			break;
 	}
-	*flags &= ~TSO;
-	if (ifc && (ifc->feat & NETF_TSO))
-		*flags |= TSO;
 	*scale = HaveWS | 7;
 
 	return mtu;
+}
+
+static void tcb_check_tso(Tcpctl *tcb)
+{
+	/* This can happen if the netdev isn't up yet. */
+	if (!tcb->ifc)
+		return;
+	if (tcb->ifc->feat & NETF_TSO)
+		tcb->flags |= TSO;
+	else
+		tcb->flags &= ~TSO;
 }
 
 static void inittcpctl(struct conv *s, int mode)
@@ -578,6 +583,7 @@ static void inittcpctl(struct conv *s, int mode)
 		}
 	}
 
+	tcb->ifc = findipifc(s->p->f, s->laddr, 0);
 	tcb->mss = mss;
 	tcb->typical_mss = mss;
 	tcb->cwind = tcb->typical_mss * CWIND_SCALE;
@@ -587,6 +593,7 @@ static void inittcpctl(struct conv *s, int mode)
 	tcb->rcv.wnd = QMAX;
 	tcb->rcv.scale = 0;
 	tcb->snd.scale = 0;
+	tcb_check_tso(tcb);
 }
 
 /*
@@ -1019,8 +1026,7 @@ static void tcpsndsyn(struct conv *s, Tcpctl *tcb)
 	tcb->sndsyntime = NOW;
 
 	/* set desired mss and scale */
-	tcb->mss = tcpmtu(s->p, s->laddr, s->ipversion, &tcb->scale,
-			  &tcb->flags);
+	tcb->mss = tcpmtu(tcb->ifc, s->ipversion, &tcb->scale);
 }
 
 static void sndrst(struct Proto *tcp, uint8_t *source, uint8_t *dest,
@@ -1192,12 +1198,13 @@ static int sndsynack(struct Proto *tcp, Limbo *lp)
 		default:
 			panic("sndrst: version %d", lp->version);
 	}
+	lp->ifc = findipifc(tcp->f, lp->laddr, 0);
 
 	seg.seq = lp->iss;
 	seg.ack = lp->irs + 1;
 	seg.flags = SYN | ACK;
 	seg.urg = 0;
-	seg.mss = tcpmtu(tcp, lp->laddr, lp->version, &scale, &flag);
+	seg.mss = tcpmtu(lp->ifc, lp->version, &scale);
 	seg.wnd = QMAX;
 	seg.ts_val = lp->ts_val;
 	seg.nr_sacks = 0;
@@ -1491,9 +1498,11 @@ static struct conv *tcpincoming(struct conv *s, Tcp *segp, uint8_t *src,
 	 * actually decided on when we agreed to them in the SYNACK we sent.  We
 	 * didn't create an actual TCB until now, so we can copy those decisions out
 	 * of the limbo tracker and into the TCB. */
+	tcb->ifc = lp->ifc;
 	tcb->sack_ok = lp->sack_ok;
 	/* window scaling */
 	tcpsetscale(new, tcb, lp->rcvscale, lp->sndscale);
+	tcb_check_tso(tcb);
 
 	tcb->snd.wnd = segp->wnd;
 	tcb->cwind = tcb->typical_mss * CWIND_SCALE;
