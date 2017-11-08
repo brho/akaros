@@ -417,6 +417,6 @@ static inline size_t tcp_hdrlen(struct block *bp)
 	struct tcphdr *hdr = tcp_hdr(bp);
 	uint8_t data_offset;
 
-	data_offset = hdr->tcpflag[0] & 0x0f;
+	data_offset = hdr->tcpflag[0] >> 4;
 	return data_offset * 4;
 }

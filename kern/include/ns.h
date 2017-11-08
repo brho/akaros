@@ -387,6 +387,7 @@ struct block {
 	uint16_t checksum_start;		/* off from start of block to start csum */
 	uint16_t checksum_offset;		/* off from checksum_start to store csum */
 	uint16_t mss;               /* TCP MSS for TSO */
+	uint16_t network_offset;	/* offset from start */
 	uint16_t transport_offset;	/* offset from start */
 	/* might want something to track the next free extra_data slot */
 	size_t extra_len;

@@ -74,6 +74,9 @@ struct block *block_alloc(size_t size, int mem_flags)
 	b->extra_len = 0;
 	b->nr_extra_bufs = 0;
 	b->extra_data = 0;
+	b->mss = 0;
+	b->network_offset = 0;
+	b->transport_offset = 0;
 
 	addr = (uintptr_t) b;
 	addr = ROUNDUP(addr + sizeof(struct block), BLOCKALIGN);

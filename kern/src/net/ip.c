@@ -40,7 +40,6 @@
 #include <smp.h>
 #include <net/ip.h>
 
-typedef struct Ip4hdr Ip4hdr;
 typedef struct IP IP;
 typedef struct Fragment4 Fragment4;
 typedef struct Fragment6 Fragment6;
@@ -58,19 +57,6 @@ enum {
 
 #define BLKIPVER(xp)	(((struct Ip4hdr*)((xp)->rp))->vihl&0xF0)
 #define NEXT_ID(x) (__sync_add_and_fetch(&(x), 1))
-
-struct Ip4hdr {
-	uint8_t vihl;				/* Version and header length */
-	uint8_t tos;				/* Type of service */
-	uint8_t length[2];			/* packet length */
-	uint8_t id[2];				/* ip->identification */
-	uint8_t frag[2];			/* Fragment information */
-	uint8_t ttl;				/* Time to live */
-	uint8_t proto;				/* Protocol */
-	uint8_t cksum[2];			/* Header checksum */
-	uint8_t src[4];				/* IP source */
-	uint8_t dst[4];				/* IP destination */
-};
 
 /* MIB II counters */
 enum {

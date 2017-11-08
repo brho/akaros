@@ -732,10 +732,24 @@ extern void (*igmpreportfn) (struct Ipifc * unused_ipifc,
 
 /* from RFC 2460 */
 
-typedef struct Ip6hdr Ip6hdr;
+typedef struct Ip4hdr Ip4hdr;
+typedef struct ip6hdr Ip6hdr;
 typedef struct Opthdr Opthdr;
 typedef struct Routinghdr Routinghdr;
 typedef struct Fraghdr6 Fraghdr6;
+
+struct Ip4hdr {
+	uint8_t vihl;				/* Version and header length */
+	uint8_t tos;				/* Type of service */
+	uint8_t length[2];			/* packet length */
+	uint8_t id[2];				/* ip->identification */
+	uint8_t frag[2];			/* Fragment information */
+	uint8_t ttl;				/* Time to live */
+	uint8_t proto;				/* Protocol */
+	uint8_t cksum[2];			/* Header checksum */
+	uint8_t src[4];				/* IP source */
+	uint8_t dst[4];				/* IP destination */
+};
 
 struct ip6hdr {
 	uint8_t vcf[4];				// version:4, traffic class:8, flow label:20
@@ -865,6 +879,23 @@ enum {
 	DELAY_FIRST_PROBE_TIME = 5000,
 
 };
+
+static inline struct Ip4hdr *ipv4_hdr(struct block *bp)
+{
+	return (struct Ip4hdr*)(bp->rp + bp->network_offset);
+}
+
+static inline struct ip6hdr *ipv6_hdr(struct block *bp)
+{
+	return (struct ip6hdr*)(bp->rp + bp->network_offset);
+}
+
+static inline unsigned int ip_version(struct block *bp)
+{
+	struct Ip4hdr *hdr = ipv4_hdr(bp);
+
+	return hdr->vihl >> 4;
+}
 
 extern void ipv62smcast(uint8_t *, uint8_t *);
 extern void icmpns(struct Fs *f, uint8_t * src, int suni, uint8_t * targ,

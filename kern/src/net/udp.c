@@ -331,6 +331,7 @@ void udpkick(void *x, struct block *bp)
 				   ~ptclcsum(bp, UDP4_PHDR_OFF, UDP4_PHDR_SZ));
 			bp->checksum_start = UDP4_IPHDR_SZ;
 			bp->checksum_offset = uh4->udpcksum - uh4->udpsport;
+			bp->network_offset = 0;
 			bp->transport_offset = offsetof(Udp4hdr, udpsport);
 			bp->flag |= Budpck;
 			uh4->vihl = IP_VER4;
@@ -370,6 +371,7 @@ void udpkick(void *x, struct block *bp)
 				   ptclcsum(bp, UDP6_PHDR_OFF,
 							dlen + UDP_UDPHDR_SZ + UDP6_PHDR_SZ));
 			memset(uh6, 0, 8);
+			bp->network_offset = 0;
 			bp->transport_offset = offsetof(Udp6hdr, udpsport);
 			uh6->viclfl[0] = IP_VER6;
 			hnputs(uh6->len, ptcllen);

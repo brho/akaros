@@ -777,6 +777,7 @@ static struct block *htontcp6(Tcp *tcph, struct block *data, Tcp6hdr *ph,
 	if (data == NULL)
 		return NULL;
 	/* relative to the block start (bp->rp).  Note TCP structs include IP. */
+	data->network_offset = 0;
 	data->transport_offset = offsetof(Tcp6hdr, tcpsport);
 
 	/* copy in pseudo ip header plus port numbers */
@@ -827,6 +828,7 @@ static struct block *htontcp4(Tcp *tcph, struct block *data, Tcp4hdr *ph,
 	if (data == NULL)
 		return NULL;
 	/* relative to the block start (bp->rp).  Note TCP structs include IP. */
+	data->network_offset = 0;
 	data->transport_offset = offsetof(Tcp4hdr, tcpsport);
 
 	/* copy in pseudo ip header plus port numbers */
