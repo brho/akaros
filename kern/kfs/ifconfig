@@ -1,7 +1,40 @@
 #!/bin/ash
 
-NIC='0'
-MAC=`cat "#ether/ether$NIC/addr"`
+/bin/bind -b '#cons' /dev
+
+NIC=0
+while true; do
+	cat "#ether.$NIC" 2>&1 > /dev/null
+
+	# cat will fail if there is no device.  We can only tell by trying
+	if [ $? -ne 0 ]; then
+		break
+	fi
+
+	# the cfg files ID machines by the MAC of their preferred NIC
+	MAC=`cat "#ether.$NIC/ether$NIC/addr"`
+	if [ -d /etc/network/local.d ]
+	then
+		for cfg in /etc/network/local.d/*
+		do
+			source $cfg
+		done
+	fi
+
+	# cfg files set $me when they have a match
+	if [ "x$me" != "x" ]; then
+		break;
+	fi
+
+	let NIC=$NIC+1
+done
+
+# Default back to ether.0 when we didn't find anything
+if [ "x$me" == "x" ]; then
+	NIC=0
+fi
+
+MAC=`cat "#ether.$NIC/ether$NIC/addr"`
 
 export cputype=amd64
 export objtype=$cputype
@@ -17,14 +50,11 @@ then
 	do
 		source $cfg
 	done
-else
-	echo '/etc/network/local.d not found'
 fi
 
 #
 # Set up the initial namespace for starting networking.
 #
-/bin/bind -b '#cons' /dev
 /bin/bind -b '#random' /dev
 /bin/bind -a '#capability' /dev
 /bin/bind -a '#sd' /dev
