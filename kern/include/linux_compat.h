@@ -207,7 +207,7 @@ static void msleep(unsigned int msecs)
 
 /* Linux printk front ends */
 #ifndef pr_fmt
-#define pr_fmt(fmt) "bnx2x:" fmt
+#define pr_fmt(fmt) fmt
 #endif
 
 #define KERN_EMERG ""
@@ -243,24 +243,28 @@ static void msleep(unsigned int msecs)
 	printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_cont(fmt, ...) \
 	printk(KERN_CONT pr_fmt(fmt), ##__VA_ARGS__)
+
+#define __print_netif_name(dev) (dev)->drv_name[0] ? (dev)->drv_name : "netdev"
+
 #define netdev_printk(lvl, dev, fmt, ...) \
-	printk("[netdev]: " fmt, ##__VA_ARGS__)
+	printk("[%s]: " fmt, __print_netif_name(dev), ##__VA_ARGS__)
 #define netdev_err(dev, fmt, ...) \
-	printk("[netdev]: " fmt, ##__VA_ARGS__)
+	printk("[%s]: " fmt, __print_netif_name(dev), ##__VA_ARGS__)
 #define netdev_info(dev, fmt, ...) \
-	printk("[netdev]: " fmt, ##__VA_ARGS__)
+	printk("[%s]: " fmt, __print_netif_name(dev), ##__VA_ARGS__)
 #define netdev_dbg(dev, fmt, ...) \
-	printk("[netdev]: " fmt, ##__VA_ARGS__)
+	printk("[%s]: " fmt, __print_netif_name(dev), ##__VA_ARGS__)
 #define netif_err(priv, type, dev, fmt, ...) \
-	printk("[netdev]: " fmt, ##__VA_ARGS__)
+	printk("[%s]: " fmt, __print_netif_name(dev), ##__VA_ARGS__)
 #define netif_warn(priv, type, dev, fmt, ...) \
-	printk("[netdev]: " fmt, ##__VA_ARGS__)
+	printk("[%s]: " fmt, __print_netif_name(dev), ##__VA_ARGS__)
 #define netif_notice(priv, type, dev, fmt, ...) \
-	printk("[netdev]: " fmt, ##__VA_ARGS__)
+	printk("[%s]: " fmt, __print_netif_name(dev), ##__VA_ARGS__)
 #define netif_info(priv, type, dev, fmt, ...) \
-	printk("[netdev]: " fmt, ##__VA_ARGS__)
+	printk("[%s]: " fmt, __print_netif_name(dev), ##__VA_ARGS__)
 #define netif_dbg(priv, type, dev, fmt, ...) \
-	printk("[netdev]: " fmt, ##__VA_ARGS__)
+	printk("[%s]: " fmt, __print_netif_name(dev), ##__VA_ARGS__)
+
 #define dev_err(dev, fmt, ...) \
 	printk("[dev]: " fmt, ##__VA_ARGS__)
 #define dev_info(dev, fmt, ...) \

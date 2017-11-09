@@ -283,7 +283,9 @@ netifread(struct ether *nif, struct chan *c, void *a, long n,
 			p = kzmalloc(READSTR, 0);
 			if (p == NULL)
 				return 0;
-			j = snprintf(p, READSTR, "in: %d\n", nif->inpackets);
+			j = 0;
+			j += snprintf(p + j, READSTR - j, "driver: %s\n", nif->drv_name);
+			j += snprintf(p + j, READSTR - j, "in: %d\n", nif->inpackets);
 			j += snprintf(p + j, READSTR - j, "link: %d\n", nif->link);
 			j += snprintf(p + j, READSTR - j, "out: %d\n", nif->outpackets);
 			j += snprintf(p + j, READSTR - j, "crc errs: %d\n", nif->crcs);

@@ -3931,6 +3931,7 @@ static int mlx4_pnp(struct ether *edev)
 
 	persist = pci_get_drvdata(pdev);
 	persist->edev = edev;
+	strlcpy(edev->drv_name, "mlx4", KNAMELEN);
 	mlx4_en_init();
 
 	/*

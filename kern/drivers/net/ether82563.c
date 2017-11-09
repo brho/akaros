@@ -2206,6 +2206,7 @@ static int pnp(struct ether *edev, int type)
 		return -1;
 
 	edev->ctlr = ctlr;
+	strlcpy(edev->drv_name, "i82563", KNAMELEN);
 	ctlr->edev = edev;	/* point back to Ether* */
 	edev->port = ctlr->mmio_paddr;
 	edev->irq = ctlr->pcidev->irqline;

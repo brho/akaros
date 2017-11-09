@@ -759,6 +759,7 @@ static int rtl8139pnp(struct ether *edev)
 	printd("RTL8139 driver found %s at %02x:%02x.%x\n", rtl8139pci[i].name,
 		   ctlr->pcidev->bus, ctlr->pcidev->dev, ctlr->pcidev->func);
 	edev->ctlr = ctlr;
+	strlcpy(edev->drv_name, "r8139", KNAMELEN);
 	edev->port = ctlr->port;
 	edev->irq = ctlr->pcidev->irqline;
 

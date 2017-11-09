@@ -1060,6 +1060,7 @@ struct netif {
 
 	/* multiplexing */
 	char name[KNAMELEN];		/* for top level directory */
+	char drv_name[KNAMELEN];	/* device driver name */
 	int nfile;					/* max number of Netfiles */
 	struct netfile **f;
 

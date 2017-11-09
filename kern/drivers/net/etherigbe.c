@@ -2036,6 +2036,7 @@ igbepnp(struct ether* edev)
 		return -1;
 
 	edev->ctlr = ctlr;
+	strlcpy(edev->drv_name, "igbe", KNAMELEN);
 	edev->port = ctlr->port;
 	edev->irq = ctlr->pci->irqline;
 	edev->tbdf = pci_to_tbdf(ctlr->pci);

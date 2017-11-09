@@ -423,6 +423,7 @@ static int bnx2x_pnp(struct ether *edev)
 
 	edev->ctlr = ctlr;
 	ctlr->edev = edev;
+	strlcpy(edev->drv_name, "bnx2x", KNAMELEN);
 
 	//edev->port = ctlr->port;	/* might just remove this from devether */
 	edev->irq = ctlr->pcidev->irqline;
