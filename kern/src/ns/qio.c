@@ -1027,6 +1027,7 @@ static int __blist_clone_to(struct block *blist, struct block *newb, int len,
 	unsigned int nr_bufs = 0;
 	unsigned int b_idx, newb_idx = 0;
 	uint8_t *first_main_body = 0;
+	ssize_t sofar = 0;
 
 	/* find the first block; keep offset relative to the latest b in the list */
 	for (b = blist; b; b = b->next) {
@@ -1039,9 +1040,14 @@ static int __blist_clone_to(struct block *blist, struct block *newb, int len,
 	if (!b)
 		return 0;
 	first = b;
+	sofar -= offset;	/* don't count the remaining offset in the first b */
 	/* upper bound for how many buffers we'll need in newb */
 	for (/* b is set*/; b; b = b->next) {
-		nr_bufs += 1 + b->nr_extra_bufs;	/* 1 for the main body */
+		nr_bufs += BHLEN(b) ? 1 : 0;
+		nr_bufs += b->nr_extra_bufs; /* still assuming nr_extra == nr_valid */
+		sofar += BLEN(b);
+		if (sofar > len)
+			break;
 	}
 	/* we might be holding a spinlock here, so we won't wait for kmalloc */
 	if (block_add_extd(newb, nr_bufs, 0) != 0) {
@@ -1073,8 +1079,10 @@ static int __blist_clone_to(struct block *blist, struct block *newb, int len,
 			}
 			offset = 0;
 		} else {
-			len -= point_to_body(b, b->rp, newb, newb_idx, len);
-			newb_idx++;
+			if (BHLEN(b)) {
+				len -= point_to_body(b, b->rp, newb, newb_idx, len);
+				newb_idx++;
+			}
 		}
 		/* knock out all remaining bufs.  we only did one point_to_ op by now,
 		 * and any point_to_ could be our last if it consumed all of len. */
