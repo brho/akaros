@@ -176,6 +176,28 @@ int block_append_extra(struct block *b, uintptr_t base, uint32_t off,
 	return 0;
 }
 
+/* There's metadata in each block related to the data payload.  For instance,
+ * the TSO mss, the offsets to various headers, whether csums are needed, etc.
+ * When you create a new block, like in copyblock, this will copy those bits
+ * over. */
+void block_copy_metadata(struct block *new_b, struct block *old_b)
+{
+	new_b->flag |= (old_b->flag & BCKSUM_FLAGS);
+	new_b->tx_csum_offset = old_b->tx_csum_offset;
+	new_b->mss = old_b->mss;
+	new_b->network_offset = old_b->network_offset;
+	new_b->transport_offset = old_b->transport_offset;
+}
+
+void block_reset_metadata(struct block *b)
+{
+	b->flag &= ~BCKSUM_FLAGS;
+	b->tx_csum_offset = 0;
+	b->mss = 0;
+	b->network_offset = 0;
+	b->transport_offset = 0;
+}
+
 void free_block_extra(struct block *b)
 {
 	struct extra_bdata *ebd;

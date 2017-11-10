@@ -320,8 +320,9 @@ static struct block *mkechoreply(struct Proto *icmp, struct block *bp)
 	uint8_t ip[4];
 
 	/* we're repurposing bp to send it back out.  we need to remove any inbound
-	 * checksum flags (which were saying the HW did the checksum) */
-	bp->flag &= ~BCKSUM_FLAGS;
+	 * checksum flags (which were saying the HW did the checksum) and any other
+	 * metadata.  We might need to fill in some of the metadata too. */
+	block_reset_metadata(bp);
 	q = (Icmp *) bp->rp;
 	q->vihl = IP_VER4;
 	memmove(ip, q->src, sizeof(q->dst));

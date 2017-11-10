@@ -131,11 +131,6 @@ struct block *padblock(struct block *bp, int size)
 {
 	int n;
 	struct block *nbp;
-	uint8_t bcksum = bp->flag & BCKSUM_FLAGS;
-	uint16_t tx_csum_offset = bp->tx_csum_offset;
-	uint16_t mss = bp->mss;
-	uint16_t network_offset = bp->network_offset;
-	uint16_t transport_offset = bp->transport_offset;
 
 	QDEBUG checkb(bp, "padblock 1");
 	if (size >= 0) {
@@ -152,6 +147,7 @@ struct block *padblock(struct block *bp, int size)
 		n = BLEN(bp);
 		padblockcnt++;
 		nbp = block_alloc(size + n, MEM_WAIT);
+		block_copy_metadata(nbp, bp);
 		nbp->rp += size;
 		nbp->wp = nbp->rp;
 		memmove(nbp->wp, bp->rp, n);
@@ -172,16 +168,10 @@ struct block *padblock(struct block *bp, int size)
 		n = BLEN(bp);
 		padblockcnt++;
 		nbp = block_alloc(size + n, MEM_WAIT);
+		block_copy_metadata(nbp, bp);
 		memmove(nbp->wp, bp->rp, n);
 		nbp->wp += n;
 		freeb(bp);
-	}
-	if (bcksum) {
-		nbp->flag |= bcksum;
-		nbp->tx_csum_offset = tx_csum_offset;
-		nbp->mss = mss;
-		nbp->network_offset = network_offset;
-		nbp->transport_offset = transport_offset;
 	}
 	QDEBUG checkb(nbp, "padblock 1");
 	return nbp;
@@ -266,14 +256,7 @@ struct block *copyblock(struct block *bp, int mem_flags)
 		amt = copy_to_block_body(newb, (void*)ebd->base + ebd->off, ebd->len);
 		assert(amt == ebd->len);
 	}
-	/* TODO: any other flags that need copied over? */
-	if (bp->flag & BCKSUM_FLAGS) {
-		newb->flag |= (bp->flag & BCKSUM_FLAGS);
-		newb->tx_csum_offset = bp->tx_csum_offset;
-		newb->mss = bp->mss;
-		newb->network_offset = bp->network_offset;
-		newb->transport_offset = bp->transport_offset;
-	}
+	block_copy_metadata(newb, bp);
 	copyblockcnt++;
 	QDEBUG checkb(newb, "copyblock 1");
 	return newb;

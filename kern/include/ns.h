@@ -656,6 +656,8 @@ struct block *block_alloc(size_t, int);
 int block_add_extd(struct block *b, unsigned int nr_bufs, int mem_flags);
 int block_append_extra(struct block *b, uintptr_t base, uint32_t off,
                        uint32_t len, int mem_flags);
+void block_copy_metadata(struct block *new_b, struct block *old_b);
+void block_reset_metadata(struct block *b);
 int anyhigher(void);
 int anyready(void);
 void _assert(char *unused_char_p_t);
