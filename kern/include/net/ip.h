@@ -686,7 +686,7 @@ extern uint32_t restrict_mtu(uint8_t * unused_uint8_p_t, uint32_t);
  * protocol-independent manner, hence the tx_csum_offset. */
 static inline void ptclcsum_finalize(struct block *bp, unsigned int feat)
 {
-	unsigned int flag = bp->flag & BCKSUM_FLAGS;
+	unsigned int flag = bp->flag & BLOCK_TRANS_TX_CSUM;
 	uint8_t *csum_store;
 
 	if (flag && (flag & feat) != flag) {
@@ -698,7 +698,7 @@ static inline void ptclcsum_finalize(struct block *bp, unsigned int feat)
 		hnputs((uint16_t *)csum_store,
 		       ptclcsum(bp, bp->transport_offset,
 				BLEN(bp) - bp->transport_offset));
-		bp->flag &= ~BCKSUM_FLAGS;
+		bp->flag &= ~BLOCK_TRANS_TX_CSUM;
 	}
 }
 

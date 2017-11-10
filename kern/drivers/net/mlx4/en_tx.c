@@ -872,8 +872,7 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct mlx4_en_priv *priv,
 
 	/* Prepare ctrl segement apart opcode+ownership */
 	tx_desc->ctrl.srcrb_flags = priv->ctrl_flags;
-	if (likely(block->flag & BCKSUM_FLAGS)) {
-		assert(block->flag & (Budpck | Btcpck));
+	if (likely(block->flag & BLOCK_TRANS_TX_CSUM)) {
 		tx_desc->ctrl.srcrb_flags |= cpu_to_be32(MLX4_WQE_CTRL_IP_CSUM |
 		                                         MLX4_WQE_CTRL_TCP_UDP_CSUM);
 		ring->tx_csum++;

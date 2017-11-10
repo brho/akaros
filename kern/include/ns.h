@@ -359,13 +359,15 @@ enum {
 
 enum {
 	BFREE = (1 << 1),
-	Bipck = (1 << NS_IPCK_SHIFT),	/* ip checksum */
-	Budpck = (1 << NS_UDPCK_SHIFT),	/* udp checksum */
-	Btcpck = (1 << NS_TCPCK_SHIFT),	/* tcp checksum */
-	Bpktck = (1 << NS_PKTCK_SHIFT),	/* packet checksum */
-	Btso = (1 << NS_TSO_SHIFT),	/* TSO */
+	Bipck = (1 << NS_IPCK_SHIFT),	/* ip checksum (rx) */
+	Budpck = (1 << NS_UDPCK_SHIFT),	/* udp checksum (rx), needed (tx) */
+	Btcpck = (1 << NS_TCPCK_SHIFT),	/* tcp checksum (rx), needed (tx) */
+	Bpktck = (1 << NS_PKTCK_SHIFT),	/* packet checksum (rx, maybe) */
+	Btso = (1 << NS_TSO_SHIFT),		/* TSO desired (tx) */
 };
-#define BCKSUM_FLAGS (Bipck|Budpck|Btcpck|Bpktck|Btso)
+#define BLOCK_META_FLAGS (Bipck | Budpck | Btcpck | Bpktck | Btso)
+#define BLOCK_TRANS_TX_CSUM (Budpck | Btcpck)
+#define BLOCK_RX_CSUM (Bipck | Budpck | Btcpck)
 
 struct extra_bdata {
 	uintptr_t base;

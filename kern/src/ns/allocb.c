@@ -182,7 +182,7 @@ int block_append_extra(struct block *b, uintptr_t base, uint32_t off,
  * over. */
 void block_copy_metadata(struct block *new_b, struct block *old_b)
 {
-	new_b->flag |= (old_b->flag & BCKSUM_FLAGS);
+	new_b->flag |= (old_b->flag & BLOCK_META_FLAGS);
 	new_b->tx_csum_offset = old_b->tx_csum_offset;
 	new_b->mss = old_b->mss;
 	new_b->network_offset = old_b->network_offset;
@@ -191,7 +191,7 @@ void block_copy_metadata(struct block *new_b, struct block *old_b)
 
 void block_reset_metadata(struct block *b)
 {
-	b->flag &= ~BCKSUM_FLAGS;
+	b->flag &= ~BLOCK_META_FLAGS;
 	b->tx_csum_offset = 0;
 	b->mss = 0;
 	b->network_offset = 0;
