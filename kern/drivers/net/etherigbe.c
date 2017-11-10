@@ -1188,7 +1188,6 @@ igberproc(void* arg)
 						ctlr->tcpcs++;
 						bp->flag |= Btcpck|Budpck;
 					}
-					bp->checksum = rd->checksum;
 					bp->flag |= Bpktck;
 				}
 				etheriq(edev, bp, 1);

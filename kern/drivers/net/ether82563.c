@@ -1253,7 +1253,6 @@ static void ckcksums(struct ctlr *ctlr, struct rd *rd, struct block *bp)
 			ctlr->tcpcs++;
 			bp->flag |= Btcpck | Budpck;
 		}
-		bp->checksum = rd->checksum;
 		bp->flag |= Bpktck;
 	}
 }

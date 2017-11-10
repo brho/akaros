@@ -383,7 +383,6 @@ struct block {
 	uint8_t *base;				/* start of the buffer */
 	void (*free) (struct block *);
 	uint16_t flag;
-	uint16_t checksum;			/* IP checksum of complete packet (minus media header) */
 	uint16_t checksum_start;		/* off from start of block to start csum */
 	uint16_t checksum_offset;		/* off from checksum_start to store csum */
 	uint16_t mss;               /* TCP MSS for TSO */
