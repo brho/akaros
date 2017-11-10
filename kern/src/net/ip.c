@@ -249,6 +249,9 @@ ipoput4(struct Fs *f,
 
 	ip = f->ip;
 
+	/* Sanity check for our transport protocols. */
+	if (bp->mss)
+		assert(bp->flag & Btso);
 	/* Fill out the ip header */
 	eh = (struct Ip4hdr *)(bp->rp);
 

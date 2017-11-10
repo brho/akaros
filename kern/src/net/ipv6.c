@@ -163,6 +163,9 @@ int ipoput6(struct Fs *f, struct block *bp,
 
 	ip = f->ip;
 
+	/* Sanity check for our transport protocols. */
+	if (bp->mss)
+		assert(bp->flag & Btso);
 	/* Fill out the ip header */
 	eh = (struct ip6hdr *)(bp->rp);
 

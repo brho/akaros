@@ -676,20 +676,28 @@ extern void ip_init(struct Fs *);
 extern void update_mtucache(uint8_t * unused_uint8_p_t, uint32_t);
 extern uint32_t restrict_mtu(uint8_t * unused_uint8_p_t, uint32_t);
 
+/* We support transport layer checksum offloading.  If a NIC doesn't support
+ * it, we'll finish it in software here.
+ *
+ * We've checksummed pseudo header in advance.  The remaining bits that need to
+ * be csummed is the entire transport layer (header + data).  The NICs (and
+ * this function) expect the PH to be done already and stored in the transport
+ * layer's csum location.  This function wants to know where that is in a
+ * protocol-independent manner, hence the tx_csum_offset. */
 static inline void ptclcsum_finalize(struct block *bp, unsigned int feat)
 {
 	unsigned int flag = bp->flag & BCKSUM_FLAGS;
 	uint8_t *csum_store;
 
 	if (flag && (flag & feat) != flag) {
-		csum_store = bp->rp + bp->checksum_start + bp->checksum_offset;
+		csum_store = bp->rp + bp->transport_offset + bp->tx_csum_offset;
 		/* NOTE pseudo-header partial checksum (if any) is already placed at
 		 * csum_store (e.g. tcpcksum), and the ptclcsum() below will include
 		 * that partial checksum as part of the calculation.
 		 */
 		hnputs((uint16_t *)csum_store,
-		       ptclcsum(bp, bp->checksum_start,
-				BLEN(bp) - bp->checksum_start));
+		       ptclcsum(bp, bp->transport_offset,
+				BLEN(bp) - bp->transport_offset));
 		bp->flag &= ~BCKSUM_FLAGS;
 	}
 }

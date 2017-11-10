@@ -132,8 +132,7 @@ struct block *padblock(struct block *bp, int size)
 	int n;
 	struct block *nbp;
 	uint8_t bcksum = bp->flag & BCKSUM_FLAGS;
-	uint16_t checksum_start = bp->checksum_start;
-	uint16_t checksum_offset = bp->checksum_offset;
+	uint16_t tx_csum_offset = bp->tx_csum_offset;
 	uint16_t mss = bp->mss;
 	uint16_t network_offset = bp->network_offset;
 	uint16_t transport_offset = bp->transport_offset;
@@ -141,7 +140,6 @@ struct block *padblock(struct block *bp, int size)
 	QDEBUG checkb(bp, "padblock 1");
 	if (size >= 0) {
 		if (bp->rp - bp->base >= size) {
-			bp->checksum_start += size;
 			bp->network_offset += size;
 			bp->transport_offset += size;
 			bp->rp -= size;
@@ -180,8 +178,7 @@ struct block *padblock(struct block *bp, int size)
 	}
 	if (bcksum) {
 		nbp->flag |= bcksum;
-		nbp->checksum_start = checksum_start;
-		nbp->checksum_offset = checksum_offset;
+		nbp->tx_csum_offset = tx_csum_offset;
 		nbp->mss = mss;
 		nbp->network_offset = network_offset;
 		nbp->transport_offset = transport_offset;
@@ -272,8 +269,7 @@ struct block *copyblock(struct block *bp, int mem_flags)
 	/* TODO: any other flags that need copied over? */
 	if (bp->flag & BCKSUM_FLAGS) {
 		newb->flag |= (bp->flag & BCKSUM_FLAGS);
-		newb->checksum_start = bp->checksum_start;
-		newb->checksum_offset = bp->checksum_offset;
+		newb->tx_csum_offset = bp->tx_csum_offset;
 		newb->mss = bp->mss;
 		newb->network_offset = bp->network_offset;
 		newb->transport_offset = bp->transport_offset;

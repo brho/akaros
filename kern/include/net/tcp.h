@@ -145,9 +145,12 @@ struct tcphdr {
 	uint8_t tcpopt[1];
 };
 
-/*
- *  v4 and v6 pseudo headers used for
- *  checksuming tcp
+/* v4 and v6 pseudo headers used for checksumming tcp
+ *
+ * Note the field layout is the same for a real IP packet.  "Unused" in v4 is
+ * the TTL slot, but it's the 'zeros' for the TCP PH csum.  Similarly, tcplen is
+ * the IP csum slot.  Later on, it'll get overwritten in the IP stack or in
+ * hardware.  The struct tcp4hdr (or rather bp->rp) will be cast to an Ip4hdr.
  */
 typedef struct tcp4hdr Tcp4hdr;
 struct tcp4hdr {

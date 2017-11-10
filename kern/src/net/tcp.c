@@ -855,10 +855,10 @@ static struct block *htontcp4(Tcp *tcph, struct block *data, Tcp4hdr *ph,
 	if (tcb != NULL && tcb->nochecksum) {
 		h->tcpcksum[0] = h->tcpcksum[1] = 0;
 	} else {
+		assert(data->transport_offset == TCP4_IPLEN + TCP4_PHDRSIZE);
 		csum = ~ptclcsum(data, TCP4_IPLEN, TCP4_PHDRSIZE);
 		hnputs(h->tcpcksum, csum);
-		data->checksum_start = TCP4_IPLEN + TCP4_PHDRSIZE;
-		data->checksum_offset = ph->tcpcksum - ph->tcpsport;
+		data->tx_csum_offset = ph->tcpcksum - ph->tcpsport;
 		data->flag |= Btcpck;
 	}
 
