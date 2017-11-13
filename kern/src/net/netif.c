@@ -772,3 +772,71 @@ static char *netmulti(struct ether *nif, struct netfile *f, uint8_t * addr,
 	}
 	return 0;
 }
+
+/* Prints the contents of stats to [va + offset, va + offset + amt). */
+ssize_t linux_ifstat(struct netif_stats *stats, void *va, size_t amt,
+                     off_t offset)
+{
+	char *p;
+	size_t sofar = 0;
+	ssize_t ret;
+
+	p = kzmalloc(READSTR, MEM_WAIT);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx pkts            : %lu\n", stats->rx_packets);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "tx pkts            : %lu\n", stats->tx_packets);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx bytes           : %lu\n", stats->rx_bytes);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "tx bytes           : %lu\n", stats->tx_bytes);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx errors          : %lu\n", stats->rx_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "tx errors          : %lu\n", stats->tx_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx dropped         : %lu\n", stats->rx_dropped);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "tx dropped         : %lu\n", stats->tx_dropped);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "multicast          : %lu\n", stats->multicast);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "collisions         : %lu\n", stats->collisions);
+	sofar += snprintf(p + sofar, READSTR - sofar, "\n");
+
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx length errors   : %lu\n", stats->rx_length_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx over errors     : %lu\n", stats->rx_over_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx crc errors      : %lu\n", stats->rx_crc_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx frame errors    : %lu\n", stats->rx_frame_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx fifo errors     : %lu\n", stats->rx_fifo_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx missed errors   : %lu\n", stats->rx_missed_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar, "\n");
+
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "tx aborted errors  : %lu\n", stats->tx_aborted_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "tx carrier errors  : %lu\n", stats->tx_carrier_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "tx fifo errors     : %lu\n", stats->tx_fifo_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "tx heartbeat errors: %lu\n", stats->tx_heartbeat_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "tx window errors   : %lu\n", stats->tx_window_errors);
+	sofar += snprintf(p + sofar, READSTR - sofar, "\n");
+
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx compressed      : %lu\n", stats->rx_compressed);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "tx compressed      : %lu\n", stats->tx_compressed);
+	sofar += snprintf(p + sofar, READSTR - sofar,
+	                  "rx nohandler       : %lu\n", stats->rx_nohandler);
+	ret = readstr(offset, va, amt, p);
+	kfree(p);
+	return ret;
+}

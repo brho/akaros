@@ -1119,6 +1119,8 @@ struct block *netifbread(struct ether *, struct chan *, long, uint32_t);
 long netifwrite(struct ether *, struct chan *, void *, long);
 int netifwstat(struct ether *, struct chan *, uint8_t *, int);
 int netifstat(struct ether *, struct chan *, uint8_t *, int);
+ssize_t linux_ifstat(struct netif_stats *stats, void *va, size_t amt,
+                     off_t offset);
 int activemulti(struct ether *, uint8_t *, int);
 
 /*
