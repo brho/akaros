@@ -1077,7 +1077,8 @@ struct netif {
 	int alen;					/* address length */
 	int mbps;					/* megabits per sec */
 	int link;					/* link status */
-	unsigned int feat;				/* dev features */
+	unsigned int feat;			/* dev features turned on */
+	unsigned int hw_features;	/* dev features available */
 	uint8_t addr[Nmaxaddr];
 	uint8_t bcast[Nmaxaddr];
 	struct netaddr *maddr;		/* known multicast addresses */

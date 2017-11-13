@@ -262,6 +262,28 @@ struct chan *netifopen(struct ether *nif, struct chan *c, int omode)
 	return c;
 }
 
+/* Helper for building the features for netifread */
+static int feature_appender(int features, char *p, int sofar)
+{
+	if (features & NETF_IPCK)
+		sofar += snprintf(p + sofar, READSTR - sofar, "ipck ");
+	if (features & NETF_UDPCK)
+		sofar += snprintf(p + sofar, READSTR - sofar, "udpck ");
+	if (features & NETF_TCPCK)
+		sofar += snprintf(p + sofar, READSTR - sofar, "tcpck ");
+	if (features & NETF_PADMIN)
+		sofar += snprintf(p + sofar, READSTR - sofar, "padmin ");
+	if (features & NETF_SG)
+		sofar += snprintf(p + sofar, READSTR - sofar, "sg ");
+	if (features & NETF_TSO)
+		sofar += snprintf(p + sofar, READSTR - sofar, "tso ");
+	if (features & NETF_LRO)
+		sofar += snprintf(p + sofar, READSTR - sofar, "lro ");
+	if (features & NETF_RXCSUM)
+		sofar += snprintf(p + sofar, READSTR - sofar, "rxcsum ");
+	return sofar;
+}
+
 long
 netifread(struct ether *nif, struct chan *c, void *a, long n,
 	  uint32_t offset)
@@ -303,24 +325,15 @@ netifread(struct ether *nif, struct chan *c, void *a, long n,
 			for (i = 0; i < nif->alen; i++)
 				j += snprintf(p + j, READSTR - j, "%02.2x", nif->addr[i]);
 			j += snprintf(p + j, READSTR - j, "\n");
+
 			j += snprintf(p + j, READSTR - j, "feat: ");
-			if (nif->feat & NETF_IPCK)
-				j += snprintf(p + j, READSTR - j, "ipck ");
-			if (nif->feat & NETF_UDPCK)
-				j += snprintf(p + j, READSTR - j, "udpck ");
-			if (nif->feat & NETF_TCPCK)
-				j += snprintf(p + j, READSTR - j, "tcpck ");
-			if (nif->feat & NETF_PADMIN)
-				j += snprintf(p + j, READSTR - j, "padmin ");
-			if (nif->feat & NETF_SG)
-				j += snprintf(p + j, READSTR - j, "sg ");
-			if (nif->feat & NETF_TSO)
-				j += snprintf(p + j, READSTR - j, "tso ");
-			if (nif->feat & NETF_LRO)
-				j += snprintf(p + j, READSTR - j, "lro ");
-			if (nif->feat & NETF_RXCSUM)
-				j += snprintf(p + j, READSTR - j, "rxcsum ");
-			snprintf(p + j, READSTR - j, "\n");
+			j = feature_appender(nif->feat, p, j);
+			j += snprintf(p + j, READSTR - j, "\n");
+
+			j += snprintf(p + j, READSTR - j, "hw_features: ");
+			j = feature_appender(nif->hw_features, p, j);
+			j += snprintf(p + j, READSTR - j, "\n");
+
 			n = readstr(offset, a, n, p);
 			kfree(p);
 			return n;

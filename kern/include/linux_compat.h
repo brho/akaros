@@ -524,11 +524,6 @@ static void free_netdev(struct ether *dev)
 /* u64 on linux, but a u32 on plan 9.  the typedef is probably a good idea */
 typedef unsigned int netdev_features_t;
 
-/* Linux has features, hw_features, and a couple others.  Plan 9 just has
- * features.  This #define should work for merging hw and regular features.  We
- * spatched away the hw_enc and vlan feats. */
-#define hw_features feat
-
 /* Attempted conversions for plan 9 features.  For some things, like rx
  * checksums, the driver flags the block (e.g. Budpck) to say if a receive
  * checksum was already done.  There is no flag for saying the device can do
