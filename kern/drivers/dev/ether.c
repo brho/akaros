@@ -695,6 +695,7 @@ static void etherreset(void)
 		memset(ether, 0, sizeof(struct ether));
 		rwinit(&ether->rwlock);
 		qlock_init(&ether->vlq);
+		rendez_init(&ether->link_rz);
 		ether->ctlrno = ctlrno;
 		ether->mbps = 10;
 		ether->mtu = ETHERMAXTU;

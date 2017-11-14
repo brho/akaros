@@ -1543,6 +1543,7 @@ static void i82563lproc(void *v)
 				edev->mbps = speedtab[sp];
 			if (prevlink == 0 && ctlr->type == i218)
 				k1fix(ctlr);	/* link newly up: kludge away */
+			netif_carrier_on(edev);
 		} else
 			ctlr->didk1fix = 0;	/* force fix at next link up */
 		prevlink = edev->link;

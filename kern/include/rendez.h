@@ -44,6 +44,8 @@ struct rendez {
 	struct cond_var				cv;
 };
 
+typedef int (*rendez_cond_t)(void *arg);
+
 void rendez_init(struct rendez *rv);
 void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg);
 void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,

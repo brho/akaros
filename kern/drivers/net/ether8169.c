@@ -859,6 +859,7 @@ rtl8169attach(struct ether* edev)
 	printd("%s: speed %d fd %d link %d rfc %d tfc %d\n",
 		edev->name, phy->speed, phy->fd, phy->link, phy->rfc,
 	       phy->tfc);
+	netif_carrier_on(edev);
 }
 
 static void

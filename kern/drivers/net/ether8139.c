@@ -414,6 +414,7 @@ static void rtl8139init(struct ether *edev)
 	csr32w(ctlr, Rcr, ctlr->rcr);
 
 	spin_unlock_irqsave(&ctlr->ilock);
+	netif_carrier_on(edev);
 }
 
 static void rtl8139attach(struct ether *edev)

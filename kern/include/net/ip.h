@@ -1076,7 +1076,9 @@ struct netif {
 	int limit;					/* flow control */
 	int alen;					/* address length */
 	int mbps;					/* megabits per sec */
-	int link;					/* link status */
+	int link;					/* link status (seems to be driver specific) */
+	struct rendez link_rz;
+	bool link_is_up;
 	unsigned int feat;			/* dev features turned on */
 	unsigned int hw_features;	/* dev features available */
 	uint8_t addr[Nmaxaddr];
@@ -1179,6 +1181,27 @@ struct ether {
 
 	struct netif;
 };
+
+static inline void netif_carrier_on(struct ether *edev)
+{
+	edev->link_is_up = TRUE;
+	rendez_wakeup(&edev->link_rz);
+}
+
+static inline bool netif_carrier_ok(struct ether *edev)
+{
+	return edev->link_is_up;
+}
+
+static inline void netif_carrier_off(struct ether *edev)
+{
+	edev->link_is_up = FALSE;
+}
+
+static void netif_wait_for_carrier(struct ether *edev)
+{
+	rendez_sleep(&edev->link_rz, (rendez_cond_t)netif_carrier_ok, edev);
+}
 
 extern struct block *etheriq(struct ether *, struct block *, int);
 extern void addethercard(char *unused_char_p_t, int (*)(struct ether *));

@@ -899,6 +899,7 @@ igbelproc(void* arg)
 		csr32w(ctlr, Ctrl, ctrl);
 
 enable:
+		netif_carrier_on(edev);
 		ctlr->lim = 0;
 		igbeim(ctlr, Lsc);
 

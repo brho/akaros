@@ -1008,11 +1008,6 @@ static inline void eth_broadcast_addr(uint8_t *addr)
 	memset(addr, 0xff, Eaddrlen);
 }
 
-static inline bool netif_carrier_ok(struct ether *dev)
-{
-	return true; // XXX
-}
-
 #define BOND_LINK_FAIL 1
 #define BOND_LINK_UP 2
 #define BOND_MODE_8023AD 1

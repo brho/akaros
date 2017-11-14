@@ -814,8 +814,6 @@ static bool pci_dev_run_wake(struct pci_device *dev)
  * using them, but we can leave the functions around to remind us what the code
  * is supposed to do, especially for things we don't support yet. */
 #define SET_NETDEV_DEV(...)
-#define netif_carrier_off(...)
-#define netif_carrier_on(...)
 /* May need to do something with edev's queues or flags. */
 #define netif_tx_wake_all_queues(...)
 #define netif_tx_wake_queue(...)

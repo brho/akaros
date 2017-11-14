@@ -414,6 +414,10 @@ long netifwrite(struct ether *nif, struct chan *c, void *a, long n)
 
 	f = nif->f[NETID(c->qid.path)];
 	if ((p = matchtoken(buf, "connect")) != 0) {
+		/* We'd like to not use the NIC until it has come up fully -
+		 * auto-negotiation is done and packets will get sent out.  This is
+		 * about the best place to do it. */
+		netif_wait_for_carrier(nif);
 		type = strtol(p, 0, 0);	/* allows any base, though usually hex */
 		if (typeinuse(nif, type))
 			error(EBUSY, ERROR_FIXME);
