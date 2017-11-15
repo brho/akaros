@@ -1088,6 +1088,9 @@ struct netif {
 	int prom;					/* number of promiscuous opens */
 	int scan;					/* number of base station scanners */
 	int all;					/* number of -1 multiplexors */
+	/* Analogous to linux's IFF_PROMISC flags, currently used by linux drivers,
+	 * pending a rewrite of ow promiscuous works */
+	int rx_mode;
 
 	/* 9ns statistics */
 	int misses;
