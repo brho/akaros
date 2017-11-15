@@ -1236,5 +1236,5 @@ rtl8169pnp(struct ether* edev)
 
 linker_func_3(ether8169link)
 {
-	addethercard("rtl8169", rtl8169pnp);
+	//addethercard("rtl8169", rtl8169pnp);
 }

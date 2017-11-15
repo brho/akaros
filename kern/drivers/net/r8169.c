@@ -10,6 +10,7 @@
 
 #include <linux_compat.h>
 #include "linux_mii.h"
+#include <net/tcp.h>
 
 #define RTL8169_VERSION "2.3LK-NAPI"
 #define MODULENAME "r8169"
@@ -696,7 +697,7 @@ struct RxDesc {
 };
 
 struct ring_info {
-	struct sk_buff	*skb;
+	struct block	*block;
 	uint32_t		len;
 	uint8_t		__pad[sizeof(void *) - sizeof(uint32_t)];
 };
@@ -744,7 +745,22 @@ struct rtl8169_stats {
 	struct u64_stats_sync	syncp;
 };
 
+struct rtl_poke_args {
+	struct ether *edev;
+	struct rtl8169_private *tp;
+};
+
 struct rtl8169_private {
+	/* 9ns compat */
+	struct pci_device			*pcidev;
+	struct ether				*edev;
+	TAILQ_ENTRY(rtl8169_private) link9ns;
+	const struct pci_device_id	*pci_id;			/* for navigating pci/pnp */
+	struct rendez				irq_task;			/* bottom half IRQ */
+	struct poke_tracker			poker;				/* tx concurrency */
+	bool						active;
+	bool						attached;
+
 	void __iomem *mmio_addr;	/* memory map physical address */
 	struct pci_device *pci_dev;
 	struct ether *dev;
@@ -801,7 +817,7 @@ struct rtl8169_private {
 #if 0 // AKAROS_PORT
 	int (*do_ioctl)(struct rtl8169_private *tp, struct mii_ioctl_data *data, int cmd);
 #endif
-	bool (*tso_csum)(struct rtl8169_private *, struct sk_buff *,
+	bool (*tso_csum)(struct rtl8169_private *, struct block *,
 			 uint32_t *);
 
 	struct {
@@ -2010,6 +2026,8 @@ static int rtl8169_set_speed(struct ether *dev,
 	if (ret < 0)
 		goto out;
 
+	dev->mbps = speed;
+
 	if (netif_running(dev) && (autoneg == AUTONEG_ENABLE) &&
 	    (advertising & ADVERTISED_1000baseT_Full) &&
 	    !pci_is_pcie(tp->pci_dev)) {
@@ -2098,13 +2116,13 @@ static int rtl8169_set_features(struct ether *dev,
 }
 
 
-static inline uint32_t rtl8169_tx_vlan_tag(struct sk_buff *skb)
+static inline uint32_t rtl8169_tx_vlan_tag(struct block *bp)
 {
 #if 0 // AKAROS_PORT
 	return (skb_vlan_tag_present(skb)) ?
 		TxVlanTag | swab16(skb_vlan_tag_get(skb)) : 0x00;
 #else
-	return 0;
+	return 0x00;
 #endif
 }
 
@@ -4568,7 +4586,8 @@ static void rtl_disable_msi(struct pci_device *pdev,
 			    struct rtl8169_private *tp)
 {
 	if (tp->features & RTL_FEATURE_MSI) {
-#if 0 // AKAROS_PORT_TODO
+/* On Akaros, this will only work if you do it before register_irq() */
+#if 0 // AKAROS_PORT
 		pci_disable_msi(pdev);
 #endif
 		tp->features &= ~RTL_FEATURE_MSI;
@@ -5386,14 +5405,19 @@ static void rtl_set_rx_mode(struct ether *dev)
 	int rx_mode;
 	uint32_t tmp = 0;
 
-#if 0 // AKAROS_PORT_TODO guts of how to do broadcast, multi, normal rx
-	if (dev->flags & IFF_PROMISC) {
+	if (dev->rx_mode & IFF_PROMISC) {
 		/* Unconditionally log net taps. */
 		netif_notice(tp, link, dev, "Promiscuous mode enabled\n");
 		rx_mode =
 		    AcceptBroadcast | AcceptMulticast | AcceptMyPhys |
 		    AcceptAllPhys;
 		mc_filter[1] = mc_filter[0] = 0xffffffff;
+	} else {
+		mc_filter[1] = mc_filter[0] = 0;
+		rx_mode = AcceptBroadcast | AcceptMyPhys;
+	}
+/* Here's how they do multicast, if we ever care */
+#if 0 // AKAROS_PORT
 	} else if ((netdev_mc_count(dev) > multicast_filter_limit) ||
 		   (dev->flags & IFF_ALLMULTI)) {
 		/* Too many to filter perfectly -- accept all multicasts. */
@@ -6763,16 +6787,19 @@ static inline void *rtl8169_align(void *data)
 	return (void *)ALIGN((long)data, 16);
 }
 
-static struct sk_buff *rtl8169_alloc_rx_data(struct rtl8169_private *tp,
+/* Note this allocates memory and during RX, memcpys that to an skb/block. */
+static void *rtl8169_alloc_rx_data(struct rtl8169_private *tp,
 					     struct RxDesc *desc)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO rx buffers
 	void *data;
 	dma_addr_t mapping;
 	struct device *d = &tp->pci_dev->device;
 	struct ether *dev = tp->dev;
+#if 0 // AKAROS_PORT
 	int node = dev->dev.parent ? dev_to_node(dev->dev.parent) : -1;
+#else
+	int node = 0;
+#endif
 
 	data = kmalloc_node(rx_buf_sz, MEM_WAIT, node);
 	if (!data)
@@ -6799,7 +6826,6 @@ static struct sk_buff *rtl8169_alloc_rx_data(struct rtl8169_private *tp,
 err_out:
 	kfree(data);
 	return NULL;
-#endif
 }
 
 static void rtl8169_rx_clear(struct rtl8169_private *tp)
@@ -6881,15 +6907,13 @@ static void rtl8169_tx_clear_range(struct rtl8169_private *tp, uint32_t start,
 		unsigned int len = tx_skb->len;
 
 		if (len) {
-			struct sk_buff *skb = tx_skb->skb;
+			struct block *bp = tx_skb->block;
 
 			rtl8169_unmap_tx_skb(&tp->pci_dev->device, tx_skb,
 					     tp->TxDescArray + entry);
-			if (skb) {
-				#if 0 // AKAROS_PORT_TODO
-				dev_consume_skb_any(skb);
-				#endif
-				tx_skb->skb = NULL;
+			if (bp) {
+				freeb(bp);
+				tx_skb->block = NULL;
 			}
 		}
 	}
@@ -6924,6 +6948,8 @@ static void rtl_reset_work(struct rtl8169_private *tp)
 	rtl8169_check_link_status(dev, tp, tp->mmio_addr);
 }
 
+/* In Linux, the network stack has a watchdog that triggers this.  We can ignore
+ * it.  Probably. */
 static void rtl8169_tx_timeout(struct ether *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
@@ -6931,28 +6957,30 @@ static void rtl8169_tx_timeout(struct ether *dev)
 	rtl_schedule_task(tp, RTL_FLAG_TASK_RESET_PENDING);
 }
 
-static int rtl8169_xmit_frags(struct rtl8169_private *tp, struct sk_buff *skb,
+static int rtl8169_xmit_frags(struct rtl8169_private *tp, struct block *bp,
 			      uint32_t *opts)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
-	struct skb_shared_info *info = skb_shinfo(skb);
 	unsigned int cur_frag, entry;
 	struct TxDesc *uninitialized_var(txd);
 	struct device *d = &tp->pci_dev->device;
 
 	entry = tp->cur_tx;
-	for (cur_frag = 0; cur_frag < info->nr_frags; cur_frag++) {
-		const skb_frag_t *frag = info->frags + cur_frag;
+	/* Don't use cur_frag for the loop.  ebd may have holes, but we only
+	 * increment cur_frag for valid frags / ebds. */
+	cur_frag = 0;
+	for (int i = 0; i < bp->nr_extra_bufs; i++) {
+		const struct extra_bdata *ebd = &bp->extra_data[i];
 		dma_addr_t mapping;
 		uint32_t status, len;
 		void *addr;
 
+		if (!ebd->base || !ebd->len)
+			continue;
 		entry = (entry + 1) % NUM_TX_DESC;
 
 		txd = tp->TxDescArray + entry;
-		len = skb_frag_size(frag);
-		addr = skb_frag_address(frag);
+		len = ebd->len;
+		addr = (void*)(ebd->base + ebd->off);
 		mapping = dma_map_single(d, addr, len, DMA_TO_DEVICE);
 		if (unlikely(dma_mapping_error(d, mapping))) {
 			if (net_ratelimit())
@@ -6970,10 +6998,14 @@ static int rtl8169_xmit_frags(struct rtl8169_private *tp, struct sk_buff *skb,
 		txd->addr = cpu_to_le64(mapping);
 
 		tp->tx_skb[entry].len = len;
+		/* Tracking how many frags we're sending.  The expectation from the
+		 * Linux code is that cur_frag is 0-indexed during the loop, and
+		 * incremented at the end.  This only seems to matter for err_out. */
+		cur_frag++;
 	}
 
 	if (cur_frag) {
-		tp->tx_skb[entry].skb = skb;
+		tp->tx_skb[entry].block = bp;
 		txd->opts1 |= cpu_to_le32(LastFrag);
 	}
 
@@ -6982,29 +7014,27 @@ static int rtl8169_xmit_frags(struct rtl8169_private *tp, struct sk_buff *skb,
 err_out:
 	rtl8169_tx_clear_range(tp, tp->cur_tx + 1, cur_frag);
 	return -EIO;
-#endif
 }
 
-static bool rtl_test_hw_pad_bug(struct rtl8169_private *tp, struct sk_buff *skb)
+static bool rtl_test_hw_pad_bug(struct rtl8169_private *tp, struct block *bp)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
-	return skb->len < ETH_ZLEN && tp->mac_version == RTL_GIGA_MAC_VER_34;
-#endif
+	return BLEN(bp) < ETH_ZLEN && tp->mac_version == RTL_GIGA_MAC_VER_34;
 }
 
-static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
-				      struct ether *dev);
+static netdev_tx_t rtl8169_start_xmit(struct block *bp, struct ether *dev);
+
 /* r8169_csum_workaround()
  * The hw limites the value the transport offset. When the offset is out of the
  * range, calculate the checksum by sw.
  */
 static void r8169_csum_workaround(struct rtl8169_private *tp,
-				  struct sk_buff *skb)
+				  struct block *bp)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
-	if (skb_shinfo(skb)->gso_size) {
+	if (bp->mss) {
+		/* Need to break the large packet up into smaller segments.  Would need
+		 * support from higher in the stack. */
+		panic("Not implemented");
+#if 0 // AKAROS_PORT
 		netdev_features_t features = tp->dev->feat;
 		struct sk_buff *segs, *nskb;
 
@@ -7021,95 +7051,87 @@ static void r8169_csum_workaround(struct rtl8169_private *tp,
 		} while (segs);
 
 		dev_consume_skb_any(skb);
-	} else if (skb->ip_summed == CHECKSUM_PARTIAL) {
-		if (skb_checksum_help(skb) < 0)
-			goto drop;
-
-		rtl8169_start_xmit(skb, tp->dev);
+#endif
+	} else if (bp->flag & BLOCK_TRANS_TX_CSUM) {
+		/* Yes, finalize checks the bp->flag too, but we wanted to know if we
+		 * should even try, and o/w drop. */
+		ptclcsum_finalize(bp, 0);
+		rtl8169_start_xmit(bp, tp->dev);
 	} else {
 		struct netif_stats *stats;
 
 drop:
 		stats = &tp->dev->stats;
 		stats->tx_dropped++;
-		dev_kfree_skb_any(skb);
+		freeb(bp);
 	}
-#endif
 }
 
 /* msdn_giant_send_check()
  * According to the document of microsoft, the TCP Pseudo Header excludes the
  * packet length for IPv6 TCP large packets.
- */
-static int msdn_giant_send_check(struct sk_buff *skb)
+ *
+ * brho: This does a pseudo header xsum calculation, replacing whatever the
+ * network stack did with a PH that didn't include the length (or rather treated
+ * len = 0).  That's not in the spec for what the TCPv6 xsum should do, but it
+ * might be an idiosyncracy of the NIC.
+ *
+ * If TCP xsums on IPv6 are broken, look here.  This is completely untested.  We
+ * might be better off grabbing some of Linux's csum functions (TODO). */
+static int msdn_giant_send_check(struct block *bp)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
-	const struct ipv6hdr *ipv6h;
+	struct ip6hdr *ipv6h;
 	struct tcphdr *th;
-	int ret;
 
-	ret = skb_cow_head(skb, 0);
-	if (ret)
-		return ret;
+	ipv6h = ipv6_hdr(bp);
+	th = tcp_hdr(bp);
 
-	ipv6h = ipv6_hdr(skb);
-	th = tcp_hdr(skb);
+#if 0 // AKAROS_PORT
+	th->tcpcksum = 0;
+	th->tcpcksum = ~tcp_v6_check(0, &ipv6h->saddr, &ipv6h->daddr, 0);
+#else
+	/* Instead of recaclulating (which we aren't set up for), we'll try to
+	 * change the len from len to 0. */
+	uint16_t xsum = nhgets(th->tcpcksum);
+	uint16_t len = nhgets(ipv6h->ploadlen);
 
-	th->check = 0;
-	th->check = ~tcp_v6_check(0, &ipv6h->saddr, &ipv6h->daddr, 0);
-
-	return ret;
-#endif
-}
-
-static inline __be16 get_protocol(struct sk_buff *skb)
-{
-	__be16 protocol;
-
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
-	if (skb->protocol == cpu_to_be16(ETH_P_8021Q))
-		protocol = vlan_eth_hdr(skb)->h_vlan_encapsulated_proto;
-	else
-		protocol = skb->protocol;
+	/* RFC 1624 */
+	xsum = ~xsum + ~len + 0;
+	while (xsum >> 16)
+		xsum = (xsum & 0xffff) + (xsum >> 16);
+	xsum = ~xsum;
+	hnputs(th->tcpcksum, xsum);
 #endif
 
-	return protocol;
+	return 0;
 }
 
 static bool rtl8169_tso_csum_v1(struct rtl8169_private *tp,
-				struct sk_buff *skb, uint32_t *opts)
+				struct block *bp, uint32_t *opts)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
-	uint32_t mss = skb_shinfo(skb)->gso_size;
+	uint32_t mss = bp->mss;
 
 	if (mss) {
 		opts[0] |= TD_LSO;
 		opts[0] |= MIN(mss, TD_MSS_MAX) << TD0_MSS_SHIFT;
-	} else if (skb->ip_summed == CHECKSUM_PARTIAL) {
-		const struct iphdr *ip = ip_hdr(skb);
-
-		if (ip->protocol == IPPROTO_TCP)
+	} else if (bp->flag & BLOCK_TRANS_TX_CSUM) {
+		if (bp->flag & Btcpck)
 			opts[0] |= TD0_IP_CS | TD0_TCP_CS;
-		else if (ip->protocol == IPPROTO_UDP)
+		else if (bp->flag & Budpck)
 			opts[0] |= TD0_IP_CS | TD0_UDP_CS;
 		else
 			warn_on_once(1);
 	}
 
 	return true;
-#endif
 }
 
+
 static bool rtl8169_tso_csum_v2(struct rtl8169_private *tp,
-				struct sk_buff *skb, uint32_t *opts)
+				struct block *bp, uint32_t *opts)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
-	uint32_t transport_offset = (uint32_t)skb_transport_offset(skb);
-	uint32_t mss = skb_shinfo(skb)->gso_size;
+	uint32_t transport_offset = (uint32_t)bp->transport_offset;
+	uint32_t mss = bp->mss;
 
 	if (mss) {
 		if (transport_offset > GTTCPHO_MAX) {
@@ -7119,13 +7141,13 @@ static bool rtl8169_tso_csum_v2(struct rtl8169_private *tp,
 			return false;
 		}
 
-		switch (get_protocol(skb)) {
-		case cpu_to_be16(ETH_P_IP):
+		switch (ip_version(bp)) {
+		case 4:
 			opts[0] |= TD1_GTSENV4;
 			break;
 
-		case cpu_to_be16(ETH_P_IPV6):
-			if (msdn_giant_send_check(skb))
+		case 6:
+			if (msdn_giant_send_check(bp))
 				return false;
 
 			opts[0] |= TD1_GTSENV6;
@@ -7138,11 +7160,15 @@ static bool rtl8169_tso_csum_v2(struct rtl8169_private *tp,
 
 		opts[0] |= transport_offset << GTTCPHO_SHIFT;
 		opts[1] |= MIN(mss, TD_MSS_MAX) << TD1_MSS_SHIFT;
-	} else if (skb->ip_summed == CHECKSUM_PARTIAL) {
+	} else if (bp->flag & BLOCK_TRANS_TX_CSUM) {
 		uint8_t ip_protocol;
 
-		if (unlikely(rtl_test_hw_pad_bug(tp, skb)))
-			return !(skb_checksum_help(skb) || eth_skb_pad(skb));
+		/* Linux would conditionally pad it the packet if the hardware can't do
+		 * it (which is my interpretation of seeing eth_skb_pad / ETH_ZLEN
+		 * padding/checks.  On Akaros, we'll tell the ethernet layer to do it
+		 * for the bad models (grep NETF_PADMIN), and leave the checks in here
+		 * for sanity. */
+		assert(!rtl_test_hw_pad_bug(tp, bp));
 
 		if (transport_offset > TCPHO_MAX) {
 			netif_warn(tp, tx_err, tp->dev,
@@ -7151,15 +7177,15 @@ static bool rtl8169_tso_csum_v2(struct rtl8169_private *tp,
 			return false;
 		}
 
-		switch (get_protocol(skb)) {
-		case cpu_to_be16(ETH_P_IP):
+		switch (ip_version(bp)) {
+		case 4:
 			opts[1] |= TD1_IPv4_CS;
-			ip_protocol = ip_hdr(skb)->protocol;
+			ip_protocol = ipv4_hdr(bp)->proto;
 			break;
 
-		case cpu_to_be16(ETH_P_IPV6):
+		case 6:
 			opts[1] |= TD1_IPv6_CS;
-			ip_protocol = ipv6_hdr(skb)->nexthdr;
+			ip_protocol = ipv6_hdr(bp)->proto;
 			break;
 
 		default:
@@ -7167,6 +7193,7 @@ static bool rtl8169_tso_csum_v2(struct rtl8169_private *tp,
 			break;
 		}
 
+		/* Note Akaros could check the specific BLOCK_TRANS_TX_CSUM flag */
 		if (ip_protocol == IPPROTO_TCP)
 			opts[1] |= TD1_TCP_CS;
 		else if (ip_protocol == IPPROTO_UDP)
@@ -7176,16 +7203,13 @@ static bool rtl8169_tso_csum_v2(struct rtl8169_private *tp,
 
 		opts[1] |= transport_offset << TCPHO_SHIFT;
 	} else {
-		if (unlikely(rtl_test_hw_pad_bug(tp, skb)))
-			return !eth_skb_pad(skb);
+		assert(!rtl_test_hw_pad_bug(tp, bp));
 	}
 
 	return true;
-#endif
 }
 
-static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
-				      struct ether *dev)
+static netdev_tx_t rtl8169_start_xmit(struct block *bp, struct ether *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
 	unsigned int entry = tp->cur_tx % NUM_TX_DESC;
@@ -7197,9 +7221,9 @@ static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
 	uint32_t opts[2];
 	int frags;
 
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
-	if (unlikely(!TX_FRAGS_READY_FOR(tp, skb_shinfo(skb)->nr_frags))) {
+	/* TODO: This isn't quite nr_frags, since there could be holes.  Should fix
+	 * the block extra data to track valid segments. */
+	if (unlikely(!TX_FRAGS_READY_FOR(tp, bp->nr_extra_bufs))) {
 		netif_err(tp, drv, dev, "BUG! Tx Ring full when queue awake!\n");
 		goto err_stop_0;
 	}
@@ -7207,16 +7231,19 @@ static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
 	if (unlikely(le32_to_cpu(txd->opts1) & DescOwn))
 		goto err_stop_0;
 
-	opts[1] = cpu_to_le32(rtl8169_tx_vlan_tag(skb));
+	opts[1] = cpu_to_le32(rtl8169_tx_vlan_tag(bp));
 	opts[0] = DescOwn;
 
-	if (!tp->tso_csum(tp, skb, opts)) {
-		r8169_csum_workaround(tp, skb);
+	if (!tp->tso_csum(tp, bp, opts)) {
+		r8169_csum_workaround(tp, bp);
 		return NETDEV_TX_OK;
 	}
 
-	len = skb_headlen(skb);
-	mapping = dma_map_single(d, skb->data, len, DMA_TO_DEVICE);
+	len = BHLEN(bp);
+	/* I think we always have some sort of header in BHLEN.  If not, change the
+	 * rest of this to handle it. */
+	assert(len);
+	mapping = dma_map_single(d, bp->rp, len, DMA_TO_DEVICE);
 	if (unlikely(dma_mapping_error(d, mapping))) {
 		if (net_ratelimit())
 			netif_err(tp, drv, dev, "Failed to map TX DMA!\n");
@@ -7226,19 +7253,19 @@ static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
 	tp->tx_skb[entry].len = len;
 	txd->addr = cpu_to_le64(mapping);
 
-	frags = rtl8169_xmit_frags(tp, skb, opts);
+	frags = rtl8169_xmit_frags(tp, bp, opts);
 	if (frags < 0)
 		goto err_dma_1;
 	else if (frags)
 		opts[0] |= FirstFrag;
 	else {
 		opts[0] |= FirstFrag | LastFrag;
-		tp->tx_skb[entry].skb = skb;
+		tp->tx_skb[entry].block = bp;
 	}
 
 	txd->opts2 = cpu_to_le32(opts[1]);
 
-	skb_tx_timestamp(skb);
+	skb_tx_timestamp(bp);
 
 	/* Force memory writes to complete before releasing descriptor */
 	bus_wmb();
@@ -7256,30 +7283,16 @@ static netdev_tx_t rtl8169_start_xmit(struct sk_buff *skb,
 
 	bus_wmb();
 
-	if (!TX_FRAGS_READY_FOR(tp, MAX_SKB_FRAGS)) {
-		/* Avoid wrongly optimistic queue wake-up: rtl_tx thread must
-		 * not miss a ring update when it notices a stopped queue.
-		 */
-		wmb();
-		netif_stop_queue(dev);
-		/* Sync with rtl_tx:
-		 * - publish queue status and cur_tx ring index (write barrier)
-		 * - refresh dirty_tx ring index (read barrier).
-		 * May the current thread have a pessimistic view of the ring
-		 * status and forget to wake up queue, a racing rtl_tx thread
-		 * can't.
-		 */
-		mb();
-		if (TX_FRAGS_READY_FOR(tp, MAX_SKB_FRAGS))
-			netif_wake_queue(dev);
-	}
+	/* Linux calls netif_stop_queue if (!TX_FRAGS_READY_FOR(tp, MAX_SKB_FRAGS))
+	 *
+	 * We do our backpressure in __rtl_xmit_poke. */
 
 	return NETDEV_TX_OK;
 
 err_dma_1:
 	rtl8169_unmap_tx_skb(d, tp->tx_skb + entry, txd);
 err_dma_0:
-	dev_kfree_skb_any(skb);
+	freeb(bp);
 	dev->stats.tx_dropped++;
 	return NETDEV_TX_OK;
 
@@ -7287,7 +7300,6 @@ err_stop_0:
 	netif_stop_queue(dev);
 	dev->stats.tx_dropped++;
 	return NETDEV_TX_BUSY;
-#endif
 }
 
 static void rtl8169_pcierr_interrupt(struct ether *dev)
@@ -7342,8 +7354,6 @@ static void rtl8169_pcierr_interrupt(struct ether *dev)
 
 static void rtl_tx(struct ether *dev, struct rtl8169_private *tp)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
 	unsigned int dirty_tx, tx_left;
 
 	dirty_tx = tp->dirty_tx;
@@ -7370,10 +7380,10 @@ static void rtl_tx(struct ether *dev, struct rtl8169_private *tp)
 		if (status & LastFrag) {
 			u64_stats_update_begin(&tp->tx_stats.syncp);
 			tp->tx_stats.packets++;
-			tp->tx_stats.bytes += tx_skb->skb->len;
+			tp->tx_stats.bytes += BLEN(tx_skb->block);
 			u64_stats_update_end(&tp->tx_stats.syncp);
-			dev_consume_skb_any(tx_skb->skb);
-			tx_skb->skb = NULL;
+			freeb(tx_skb->block);
+			tx_skb->block = NULL;
 		}
 		dirty_tx++;
 		tx_left--;
@@ -7381,18 +7391,9 @@ static void rtl_tx(struct ether *dev, struct rtl8169_private *tp)
 
 	if (tp->dirty_tx != dirty_tx) {
 		tp->dirty_tx = dirty_tx;
-		/* Sync with rtl8169_start_xmit:
-		 * - publish dirty_tx ring index (write barrier)
-		 * - refresh cur_tx ring index and queue status (read barrier)
-		 * May the current thread miss the stopped queue condition,
-		 * a racing xmit thread can only have a right view of the
-		 * ring status.
-		 */
-		mb();
-		if (netif_queue_stopped(dev) &&
-		    TX_FRAGS_READY_FOR(tp, MAX_SKB_FRAGS)) {
-			netif_wake_queue(dev);
-		}
+		/* Linux stops the netif here (based on TX_FRAGS_READY_FOR(tp,
+		 * MAX_SKB_FRAGS)).  It stops the netif before the hack. */
+
 		/*
 		 * 8168 hack: TxPoll requests are lost when the Tx packets are
 		 * too close. Let's kick an extra TxPoll request when a burst
@@ -7404,8 +7405,17 @@ static void rtl_tx(struct ether *dev, struct rtl8169_private *tp)
 
 			RTL_W8(TxPoll, NPQ);
 		}
+
+		/* I'm not sure if this needs to happen after the TxPoll hack.  The
+		 * netif is woken first on linux, but there might be a napi ordering,
+		 * where the expectation is that the TxPoll hack happens before the
+		 * netif stop (and potentially start) */
+		struct rtl_poke_args args[1];
+
+		args->edev = dev;
+		args->tp = tp;
+		poke(&tp->poker, args);
 	}
-#endif
 }
 
 static inline int rtl8169_fragmented_frame(uint32_t status)
@@ -7413,47 +7423,39 @@ static inline int rtl8169_fragmented_frame(uint32_t status)
 	return (status & (FirstFrag | LastFrag)) != (FirstFrag | LastFrag);
 }
 
-static inline void rtl8169_rx_csum(struct sk_buff *skb, uint32_t opts1)
+static inline void rtl8169_rx_csum(struct block *bp, uint32_t opts1)
 {
 	uint32_t status = opts1 & RxProtoMask;
 
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
+	/* Linux marked CHECKSUM_UNNECESSARY here.  We might need to do something
+	 * with Bipck still. */
 	if (((status == RxProtoTCP) && !(opts1 & TCPFail)) ||
 	    ((status == RxProtoUDP) && !(opts1 & UDPFail)))
-		skb->ip_summed = CHECKSUM_UNNECESSARY;
+		bp->flag |= Btcpck | Budpck;
 	else
-		skb_checksum_none_assert(skb);
-#endif
+		assert(!(bp->flag & BLOCK_RX_CSUM));
 }
 
-static struct sk_buff *rtl8169_try_rx_copy(void *data,
-					   struct rtl8169_private *tp,
-					   int pkt_size,
-					   dma_addr_t addr)
+static struct block *rtl8169_try_rx_copy(void *data, struct rtl8169_private *tp,
+                                         int pkt_size, dma_addr_t addr)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
-	struct sk_buff *skb;
+	struct block *bp;
 	struct device *d = &tp->pci_dev->device;
 
 	data = rtl8169_align(data);
 	dma_sync_single_for_cpu(d, addr, pkt_size, DMA_FROM_DEVICE);
 	prefetch(data);
-	skb = napi_alloc_skb(&tp->napi, pkt_size);
-	if (skb)
-		memcpy(skb->data, data, pkt_size);
+	bp = block_alloc(pkt_size, MEM_ATOMIC);
+	if (bp)
+		memcpy(bp->wp, data, pkt_size);
 	dma_sync_single_for_device(d, addr, pkt_size, DMA_FROM_DEVICE);
 
-	return skb;
-#endif
+	return bp;
 }
 
 static int rtl_rx(struct ether *dev, struct rtl8169_private *tp,
 		  uint32_t budget)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
 	unsigned int cur_rx, rx_left;
 	unsigned int count;
 
@@ -7492,7 +7494,7 @@ static int rtl_rx(struct ether *dev, struct rtl8169_private *tp,
 			    (dev->feat & NETIF_F_RXALL))
 				goto process_pkt;
 		} else {
-			struct sk_buff *skb;
+			struct block *bp;
 			dma_addr_t addr;
 			int pkt_size;
 
@@ -7514,23 +7516,28 @@ process_pkt:
 				goto release_descriptor;
 			}
 
-			skb = rtl8169_try_rx_copy(tp->Rx_databuff[entry],
+			bp = rtl8169_try_rx_copy(tp->Rx_databuff[entry],
 						  tp, pkt_size, addr);
-			if (!skb) {
+			if (!bp) {
 				dev->stats.rx_dropped++;
 				goto release_descriptor;
 			}
 
-			rtl8169_rx_csum(skb, status);
-			skb_put(skb, pkt_size);
+			rtl8169_rx_csum(bp, status);
+			bp->wp += pkt_size;
+
+/* On Akaros, we either don't bother with this stuff or deal with it in
+ * devether.  (don't track the ethernet protocol, haven't hooked into vlan
+ * stuff, and multicast should be dealt with higher. */
+#if 0 // AKAROS_PORT
 			skb->protocol = eth_type_trans(skb, dev);
 
 			rtl8169_rx_vlan_tag(desc, skb);
 
 			if (skb->pkt_type == PACKET_MULTICAST)
 				dev->stats.multicast++;
-
-			napi_gro_receive(&tp->napi, skb);
+#endif
+			etheriq(dev, bp, TRUE);
 
 			u64_stats_update_begin(&tp->rx_stats.syncp);
 			tp->rx_stats.packets++;
@@ -7546,13 +7553,13 @@ release_descriptor:
 	tp->cur_rx = cur_rx;
 
 	return count;
-#endif
 }
 
+/* Interesting - there's no spinlocks in r8169.  The IRQ handler mostly checks
+ * status and schedules work.  Not sure if we're guaranteed only one IRQ per
+ * device at a time or if the ops here (like irq_disable) are SMP-safe. */
 static void rtl8169_interrupt(struct hw_trapframe *hw_tf, void *dev_instance)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
 	struct ether *dev = dev_instance;
 	struct rtl8169_private *tp = netdev_priv(dev);
 	int handled = 0;
@@ -7563,13 +7570,12 @@ static void rtl8169_interrupt(struct hw_trapframe *hw_tf, void *dev_instance)
 		status &= RTL_EVENT_NAPI | tp->event_slow;
 		if (status) {
 			handled = 1;
-
 			rtl_irq_disable(tp);
-			napi_schedule(&tp->napi);
+			/* It's not clear if there's only one IRQ at a time (SMP) or not.
+			 * Safest way is to use a ktask. */
+			rendez_wakeup(&tp->irq_task);
 		}
 	}
-	return IRQ_RETVAL(handled);
-#endif
 }
 
 /*
@@ -7587,6 +7593,8 @@ static void rtl_slow_event_work(struct rtl8169_private *tp)
 		switch (tp->mac_version) {
 		/* Work around for rx fifo overflow */
 		case RTL_GIGA_MAC_VER_11:
+			/* This might not work, given how our workqueue shims go */
+			panic("Not implemented");
 			netif_stop_queue(dev);
 			/* XXX - Hack alert. See rtl_task(). */
 			set_bit(RTL_FLAG_TASK_RESET_PENDING, tp->wk.flags);
@@ -7638,40 +7646,49 @@ out_unlock:
 	rtl_unlock_work(tp);
 }
 
-static int rtl8169_poll(struct napi_struct *napi, int budget)
+static int rtl_wake_cond(void *arg)
 {
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
-	struct rtl8169_private *tp = container_of(napi, struct rtl8169_private, napi);
-	struct ether *dev = tp->dev;
+	struct rtl8169_private *tp = arg;
+
+	return rtl_get_events(tp) & (RTL_EVENT_NAPI | tp->event_slow) ? 1 : 0;
+}
+
+/* Replaces rtl8169_poll (NAPI).  This is a ktask that runs and sleeps on a
+ * rendez, woken up by IRQs.  Compared to mlx4, we just pass rtl_rx a large
+ * budget.  If that's a problem, we can do smaller budgets and kthread_yield().
+ *
+ * The original ran in NAPI context and spawned a WQ task for slow stuff.
+ * We'll just run it all in the ktask/rproc.  One issue with the NAPI/WQ stuff
+ * was that it was assumed the WQ ran after the NAPI loop.  If that's not the
+ * case, one race was on enabling interrupts.  The WQ enables all; NAPI enables
+ * only Rx/Tx.  If the NAPI bit ran later, it'd clobber the WQ's settings. */
+static void rtl8169_irq_ktask(void *arg)
+{
+	struct ether *dev = arg;
+	struct rtl8169_private *tp = netdev_priv(dev);
 	uint16_t enable_mask = RTL_EVENT_NAPI | tp->event_slow;
-	int work_done= 0;
 	uint16_t status;
 
-	status = rtl_get_events(tp);
-	rtl_ack_events(tp, status & ~tp->event_slow);
+	while (1) {
+		status = rtl_get_events(tp);
+		rtl_ack_events(tp, status & ~tp->event_slow);
 
-	if (status & RTL_EVENT_NAPI_RX)
-		work_done = rtl_rx(dev, tp, (uint32_t) budget);
+		if (status & RTL_EVENT_NAPI_RX)
+			rtl_rx(dev, tp, UINT32_MAX);	/* careful of budget's type */
 
-	if (status & RTL_EVENT_NAPI_TX)
-		rtl_tx(dev, tp);
+		if (status & RTL_EVENT_NAPI_TX)
+			rtl_tx(dev, tp);
 
-	if (status & tp->event_slow) {
-		enable_mask &= ~tp->event_slow;
+		if (status & tp->event_slow) {
+			/* This calls rtl_irq_enable_all() */
+			rtl_slow_event_work(tp);
+		} else {
+			rtl_irq_enable(tp, enable_mask);
+			bus_wmb();
+		}
 
-		rtl_schedule_task(tp, RTL_FLAG_TASK_SLOW_PENDING);
+		rendez_sleep(&tp->irq_task, rtl_wake_cond, tp);
 	}
-
-	if (work_done < budget) {
-		napi_complete_done(napi, work_done);
-
-		rtl_irq_enable(tp, enable_mask);
-		bus_wmb();
-	}
-
-	return work_done;
-#endif
 }
 
 static void rtl8169_rx_missed(struct ether *dev, void __iomem *ioaddr)
@@ -7767,12 +7784,12 @@ static int rtl_open(struct ether *dev)
 	 * Rx and Tx descriptors needs 256 bytes alignment.
 	 * dma_alloc_coherent provides more.
 	 */
-	tp->TxDescArray = dma_alloc_coherent(&pdev->device, R8169_TX_RING_BYTES,
+	tp->TxDescArray = dma_zalloc_coherent(&pdev->device, R8169_TX_RING_BYTES,
 					     &tp->TxPhyAddr, MEM_WAIT);
 	if (!tp->TxDescArray)
 		goto err_pm_runtime_put;
 
-	tp->RxDescArray = dma_alloc_coherent(&pdev->device, R8169_RX_RING_BYTES,
+	tp->RxDescArray = dma_zalloc_coherent(&pdev->device, R8169_RX_RING_BYTES,
 					     &tp->RxPhyAddr, MEM_WAIT);
 	if (!tp->RxDescArray)
 		goto err_free_tx_0;
@@ -7787,11 +7804,8 @@ static int rtl_open(struct ether *dev)
 
 	rtl_request_firmware(tp);
 
-	panic("Not implemented");
-#if 0 // AKAROS_PORT_TODO
 	retval = register_irq(pdev->irqline, rtl8169_interrupt, dev,
-			      pci_to_tbdf(PCIDEV));
-#endif
+			      pci_to_tbdf(pdev));
 
 	if (retval < 0)
 		goto err_release_fw_2;
@@ -8185,10 +8199,13 @@ static unsigned rtl_try_msi(struct rtl8169_private *tp,
 
 	cfg2 = RTL_R8(Config2) & ~MSIEnable;
 	if (cfg->features & RTL_FEATURE_MSI) {
-#if 0 // AKAROS_PORT_TODO
+/* Akaros will attempt to support MSI if the device has it.  It'll do the MSI
+ * setup at run time.  It'll actually try for MSI-X, then MSI, then INT.  Here,
+ * we'll assume MSI(X) will work. */
+#if 0 // AKAROS_PORT
 		if (pci_enable_msi(tp->pci_dev)) {
 #else
-		if (-1) {
+		if (0) {
 #endif
 			netif_info(tp, hw, tp->dev, "no MSI. Back to INTx.\n");
 		} else {
@@ -8279,14 +8296,13 @@ static void rtl_hw_initialize(struct rtl8169_private *tp)
 	}
 }
 
-static int rtl_init_one(struct pci_device *pdev,
+static int rtl_init_one(struct ether *dev, struct pci_device *pdev,
 			const struct pci_device_id *ent)
 {
 	const struct rtl_cfg_info *cfg = rtl_cfg_infos + ent->driver_data;
 	const unsigned int region = cfg->region;
 	struct rtl8169_private *tp;
 	struct mii_if_info *mii;
-	struct ether *dev;
 	void __iomem *ioaddr;
 	int chipset, i;
 	int rc;
@@ -8294,16 +8310,6 @@ static int rtl_init_one(struct pci_device *pdev,
 	if (netif_msg_drv(&debug)) {
 		printk(KERN_INFO "%s Gigabit Ethernet driver %s loaded\n",
 		       MODULENAME, RTL8169_VERSION);
-	}
-
-#if 0 // AKAROS_PORT_TODO
-	dev = alloc_etherdev(sizeof (*tp));
-#else
-	dev = NULL;
-#endif
-	if (!dev) {
-		rc = -ENOMEM;
-		goto out;
 	}
 
 	SET_NETDEV_DEV(dev, &pdev->device);
@@ -8329,7 +8335,7 @@ static int rtl_init_one(struct pci_device *pdev,
 	rc = pci_enable_device(pdev);
 	if (rc < 0) {
 		netif_err(tp, probe, dev, "enable failure\n");
-		goto err_out_free_dev_1;
+		goto out;
 	}
 
 	if (pci_set_mwi(pdev) < 0)
@@ -8513,6 +8519,18 @@ static int rtl_init_one(struct pci_device *pdev,
 	 * properly for all devices */
 	dev->feat |= NETIF_F_RXCSUM |
 		NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX;
+	/* AKAROS: We don't have a way (currently) to turn on certain features at
+	 * runtime.  Linux's NIC didn't want SG, CSUM, and TSO by default, but we'll
+	 * turn it on until we find a NIC with a problem. */
+	dev->feat |= NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
+
+	/* AKAROS: Some versions don't pad to the mintu. */
+	switch (tp->mac_version) {
+	case RTL_GIGA_MAC_VER_34:
+		break;
+	default:
+		dev->feat |= NETF_PADMIN;
+	}
 
 	dev->hw_features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO |
 		NETIF_F_RXCSUM | NETIF_F_HW_VLAN_CTAG_TX |
@@ -8553,7 +8571,7 @@ static int rtl_init_one(struct pci_device *pdev,
 
 	tp->rtl_fw = RTL_FIRMWARE_UNKNOWN;
 
-	tp->counters = dma_alloc_coherent (&pdev->device, sizeof(*tp->counters),
+	tp->counters = dma_zalloc_coherent(&pdev->device, sizeof(*tp->counters),
 					   &tp->counters_phys_addr, MEM_WAIT);
 	if (!tp->counters) {
 		rc = -ENOMEM;
@@ -8566,7 +8584,7 @@ static int rtl_init_one(struct pci_device *pdev,
 
 	pci_set_drvdata(pdev, dev);
 
-	netif_info(tp, probe, dev, "%s at 0x%p, %pM, XID %08x IRQ %d\n",
+	netif_info(tp, probe, dev, "%s at 0x%lx, %E, XID %08x IRQ %d\n",
 		   rtl_chip_infos[chipset].name, ioaddr, dev->ea,
 		   (uint32_t)(RTL_R32(TxConfig) & 0x9cf0f8ff), pdev->irqline);
 	if (rtl_chip_infos[chipset].jumbo_max != JUMBO_1K) {
@@ -8610,8 +8628,6 @@ err_out_free_res_3:
 err_out_mwi_2:
 	pci_clear_mwi(pdev);
 	pci_disable_device(pdev);
-err_out_free_dev_1:
-	free_netdev(dev);
 	goto out;
 }
 
@@ -8627,3 +8643,218 @@ static struct pci_driver rtl8169_pci_driver = {
 
 module_pci_driver(rtl8169_pci_driver);
 #endif
+
+static spinlock_t rtl_9ns_lock = SPINLOCK_INITIALIZER;
+TAILQ_HEAD(rtl_tq, rtl8169_private);
+static struct rtl_tq rtl_tq = TAILQ_HEAD_INITIALIZER(rtl_tq);
+
+static void rtl8169_attach(struct ether *edev)
+{
+	struct rtl8169_private *tp = edev->ctlr;
+	char *task_name;
+
+	spin_lock(&rtl_9ns_lock);
+	if (tp->attached) {
+		spin_unlock(&rtl_9ns_lock);
+		return;
+	}
+	/* If we fail to actually attach, we can either undo this, or just not
+	 * attempt to attach again (which will most likely fail again). */
+	tp->attached = TRUE;
+	spin_unlock(&rtl_9ns_lock);
+
+	if (rtl_open(edev)) {
+		printk("Unable to attach rtl8169!");
+		return;
+	}
+	/* If we want an rproc, nows the time to ktask it */
+	task_name = kmalloc(KNAMELEN, MEM_WAIT);
+	snprintf(task_name, KNAMELEN, "#l%d_irq_ktask", edev->ctlrno);
+	ktask(task_name, rtl8169_irq_ktask, edev);
+}
+
+static void __rtl_xmit_poke(void *args)
+{
+	struct ether *edev = ((struct rtl_poke_args*)args)->edev;
+	struct rtl8169_private *tp = ((struct rtl_poke_args*)args)->tp;
+	struct block *bp;
+
+	while (TX_FRAGS_READY_FOR(tp, MAX_SKB_FRAGS)) {
+		bp = qget(edev->oq);
+		if (!bp)
+			break;
+		/* TODO: If this is a problem, we can peak at the first block and wait
+		 * til we have enough room.  Though we are still capped by the max TX
+		 * possible, and it might not be worth doing (leaving the NIC idle and
+		 * blasting packets.
+		 *
+		 * We probably need qclone to respect MAX_SKB_FRAGS or some other
+		 * system-wide constant. */
+		if (bp->nr_extra_bufs > MAX_SKB_FRAGS)
+			bp = linearizeblock(bp);
+		rtl8169_start_xmit(bp, edev);
+	}
+}
+
+static void rtl8169_transmit(struct ether *edev)
+{
+	struct rtl8169_private *tp = netdev_priv(edev);
+	struct rtl_poke_args args[1];
+
+	args->edev = edev;
+	args->tp = tp;
+	poke(&tp->poker, args);
+}
+
+static long rtl8169_ifstat(struct ether *edev, void *a, long n, uint32_t offset)
+{
+	rtl8169_get_stats64(edev, &edev->stats);
+	return linux_ifstat(&edev->stats, a, n, offset);
+}
+
+static long rtl8169_ctl(struct ether *edev, void *buf, long n)
+{
+	ERRSTACK(1);
+	int v;
+	char *p;
+	struct bnx2x *ctlr;
+	struct cmdbuf *cb;
+	struct cmdtab *ct;
+
+	ctlr = edev->ctlr;
+	if (!ctlr)
+		error(ENODEV, "edev has no controller!");
+	cb = parsecmd(buf, n);
+	if (waserror()) {
+		kfree(cb);
+		nexterror();
+	}
+	if (cb->nf < 1)
+		error(EFAIL, "short control request");
+
+	/* TODO: handle ctl command somehow.  igbe did the following: */
+	//ct = lookupcmd(cb, igbectlmsg, ARRAY_SIZE(igbectlmsg));
+
+	kfree(cb);
+	poperror();
+	return n;
+}
+
+static void rtl8169_shutdown(struct ether *ether)
+{
+	struct rtl8169_private *tp = netdev_priv(ether);
+
+	/* 9ns doesn't even call into devether shutdown - not sure what the hell is
+	 * going on there.  Completely untested, and I don't know if the order of
+	 * shutdown / remove_one is right, or if other things need to be done. */
+	warn("Untested NIC shutdown!");
+	rtl_shutdown(tp->pcidev);
+	rtl_remove_one(tp->pcidev);
+}
+
+static void rtl8169_promiscuous(void *arg, int on)
+{
+	struct ether *edev = arg;
+
+	if (on)
+		edev->rx_mode |= IFF_PROMISC;
+	else
+		edev->rx_mode &= ~IFF_PROMISC;
+	rtl_set_rx_mode(edev);
+}
+
+/* For every RTL device, we alloc a controller, but do little else until
+ * devether asks us to.  These aren't attached to ether devices yet. */
+static void rtl8169_pci(void)
+{
+	struct pci_device *pcidev;
+	const struct pci_device_id *pci_id;
+	struct rtl8169_private *ctlr;
+
+	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
+		/* This checks that pcidev is a Network Controller for Ethernet */
+		if (pcidev->class != 0x02 || pcidev->subclass != 0x00)
+			continue;
+		pci_id = srch_linux_pci_tbl(rtl8169_pci_tbl, pcidev);
+		if (!pci_id)
+			continue;
+		/* If we have a module init method, call it here via run_once() */
+		printk("rtl8169 driver found 0x%04x:%04x at %02x:%02x.%x\n",
+			   pcidev->ven_id, pcidev->dev_id,
+			   pcidev->bus, pcidev->dev, pcidev->func);
+
+		ctlr = kzmalloc(sizeof(struct rtl8169_private), MEM_WAIT);
+		rendez_init(&ctlr->irq_task);
+		poke_init(&ctlr->poker, __rtl_xmit_poke);
+		ctlr->pcidev = pcidev;
+		ctlr->pci_id = pci_id;
+
+		spin_lock(&rtl_9ns_lock);
+		TAILQ_INSERT_TAIL(&rtl_tq, ctlr, link9ns);
+		spin_unlock(&rtl_9ns_lock);
+	}
+}
+
+/* Called by devether's probe routines.  Return -1 if the edev does not match
+ * any of your ctlrs.
+ *
+ * Each controller must be used only once.  They were set up in rtl8169_pci.
+ * We're responsible for initializing edev, providing the connections from
+ * devether to this driver. */
+static int rtl8169_pnp(struct ether *edev)
+{
+	struct rtl8169_private *ctlr;
+	struct pci_device *pcidev;
+	int rc;
+
+	run_once(rtl8169_pci());
+
+	spin_lock(&rtl_9ns_lock);
+	TAILQ_FOREACH(ctlr, &rtl_tq, link9ns) {
+		/* just take the first inactive ctlr on the list */
+		if (ctlr->active)
+			continue;
+		ctlr->active = 1;
+		break;
+	}
+	spin_unlock(&rtl_9ns_lock);
+	if (ctlr == NULL)
+		return -1;
+
+	edev->ctlr = ctlr;
+	ctlr->edev = edev;
+	pcidev = ctlr->pcidev;
+	strlcpy(edev->drv_name, "r8169", KNAMELEN);
+
+	/* Unlike bnx2x, we need to do the device init early so we can extract info
+	 * like the MAC addr. */
+	rc = rtl_init_one(edev, pcidev, ctlr->pci_id);
+	if (rc) {
+		printk("Failed to init r8169 0x%04x:%04x at %02x:%02x.%x\n",
+			   pcidev->ven_id, pcidev->dev_id,
+			   pcidev->bus, pcidev->dev, pcidev->func);
+		/* We could clear 'active', but if it failed once, it'll fail again. */
+		return -1;
+	}
+
+	edev->irq = pcidev->irqline;
+	edev->tbdf = MKBUS(BusPCI, pcidev->bus, pcidev->dev, pcidev->func);
+	/* edev->mbps will get set during attach->rtl8169_set_speed. */
+
+	edev->attach = rtl8169_attach;
+	edev->transmit = rtl8169_transmit;
+	edev->ifstat = rtl8169_ifstat;
+	edev->ctl = rtl8169_ctl;
+	edev->shutdown = rtl8169_shutdown;
+
+	edev->arg = edev;
+	edev->promiscuous = rtl8169_promiscuous;
+	edev->multicast = NULL;	/* see note in rtl_set_rx_mode */
+
+	return 0;
+}
+
+linker_func_3(ether_rtl8169_link)
+{
+	addethercard("r8169", rtl8169_pnp);
+}
