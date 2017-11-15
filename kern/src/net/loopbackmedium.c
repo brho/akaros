@@ -63,7 +63,6 @@ loopbackbind(struct Ipifc *ifc, int unused_int, char **unused_char_pp_t)
 	/* TO DO: make queue size a function of kernel memory */
 	lb->q = qopen(128 * 1024, Qmsg, NULL, NULL);
 	ifc->arg = lb;
-	ifc->mbps = 1000;
 
 	ktask("loopbackread", loopbackread, ifc);
 

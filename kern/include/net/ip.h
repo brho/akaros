@@ -227,7 +227,6 @@ struct Ipifc {
 	int maxtu;					/* Maximum transfer unit */
 	int mintu;					/* Minumum tranfer unit */
 	unsigned int feat;				/* Offload features */
-	int mbps;					/* megabits per second */
 	void *arg;					/* medium specific */
 	int reassemble;				/* reassemble IP packets before forwarding */
 
