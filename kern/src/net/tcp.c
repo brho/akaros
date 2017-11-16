@@ -566,7 +566,6 @@ static void tcpshutdown(struct conv *c, int how)
 	switch (tcb->state) {
 	case Established:
 		tcb->flgcnt++;
-		tcb->snd.nxt++;
 		tcpsetstate(c, Finwait1);
 		tcpoutput(c);
 		break;
@@ -602,13 +601,11 @@ static void tcpclose(struct conv *c)
 			break;
 		case Established:
 			tcb->flgcnt++;
-			tcb->snd.nxt++;
 			tcpsetstate(c, Finwait1);
 			tcpoutput(c);
 			break;
 		case Close_wait:
 			tcb->flgcnt++;
-			tcb->snd.nxt++;
 			tcpsetstate(c, Last_ack);
 			tcpoutput(c);
 			break;
