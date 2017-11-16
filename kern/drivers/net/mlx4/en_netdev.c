@@ -1331,7 +1331,7 @@ static void mlx4_en_tx_timeout(struct ether *dev)
 }
 
 
-static struct netif_stats *mlx4_en_get_stats(struct ether *dev)
+struct netif_stats *mlx4_en_get_stats(struct ether *dev)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
 
@@ -1389,8 +1389,6 @@ static void mlx4_en_set_default_moderation(struct mlx4_en_priv *priv)
 
 static void mlx4_en_auto_moderation(struct mlx4_en_priv *priv)
 {
-	panic("Disabled");
-#if 0 // AKAROS_PORT
 	unsigned long period = (unsigned long) (jiffies - priv->last_moder_jiffies);
 	struct mlx4_en_cq *cq;
 	unsigned long packets;
@@ -1450,13 +1448,10 @@ static void mlx4_en_auto_moderation(struct mlx4_en_priv *priv)
 	}
 
 	priv->last_moder_jiffies = jiffies;
-#endif
 }
 
 static void mlx4_en_do_get_stats(struct work_struct *work)
 {
-	panic("Disabled");
-#if 0 // AKAROS_PORT
 	struct delayed_work *delay = to_delayed_work(work);
 	struct mlx4_en_priv *priv = container_of(delay, struct mlx4_en_priv,
 						 stats_task);
@@ -1475,12 +1470,13 @@ static void mlx4_en_do_get_stats(struct work_struct *work)
 
 		queue_delayed_work(mdev->workqueue, &priv->stats_task, STATS_DELAY);
 	}
+#if 0 // AKAROS_PORT
 	if (mdev->mac_removed[MLX4_MAX_PORTS + 1 - priv->port]) {
 		mlx4_en_do_set_mac(priv, priv->current_mac);
 		mdev->mac_removed[MLX4_MAX_PORTS + 1 - priv->port] = 0;
 	}
-	qunlock(&mdev->state_lock);
 #endif
+	qunlock(&mdev->state_lock);
 }
 
 /* mlx4_en_service_task - Run service task for tasks that needed to be done
@@ -1931,10 +1927,8 @@ static void mlx4_en_clear_stats(struct ether *dev)
 	struct mlx4_en_dev *mdev = priv->mdev;
 	int i;
 
-#if 0 // AKAROS_PORT
 	if (mlx4_en_DUMP_ETH_STATS(mdev, priv->port, 1))
 		en_dbg(HW, priv, "Failed dumping statistics\n");
-#endif
 
 	memset(&priv->stats, 0, sizeof(priv->stats));
 	memset(&priv->pstats, 0, sizeof(priv->pstats));
@@ -3066,9 +3060,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 		en_err(priv, "Failed Initializing port\n");
 		goto out;
 	}
-#if 0 // AKAROS_PORT
 	queue_delayed_work(mdev->workqueue, &priv->stats_task, STATS_DELAY);
-#endif
 
 	if (mdev->dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_TS)
 		queue_delayed_work(mdev->workqueue, &priv->service_task,

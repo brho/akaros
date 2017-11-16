@@ -150,8 +150,6 @@ static unsigned long en_stats_adder(__be64 *start, __be64 *next, int num)
 int mlx4_en_DUMP_ETH_STATS(struct mlx4_en_dev *mdev, uint8_t port,
 			   uint8_t reset)
 {
-	panic("Disabled");
-#if 0 // AKAROS_PORT
 	struct mlx4_en_stat_out_mbox *mlx4_en_stats;
 	struct mlx4_en_stat_out_flow_control_mbox *flowstats;
 	struct mlx4_en_priv *priv = netdev_priv(mdev->pndev[port]);
@@ -351,6 +349,5 @@ int mlx4_en_DUMP_ETH_STATS(struct mlx4_en_dev *mdev, uint8_t port,
 out:
 	mlx4_free_cmd_mailbox(mdev->dev, mailbox);
 	return err;
-#endif
 }
 

@@ -3886,8 +3886,10 @@ extern void mlx4_transmit(struct ether *edev);
 
 static long mlx4_ifstat(struct ether *edev, void *a, long n, uint32_t offset)
 {
-	printk("edev %p a %p n %d offset %u\n", edev, a, n, offset);
-	return 0;
+	/* From Linux's net_device_ops */
+	extern struct netif_stats *mlx4_en_get_stats(struct ether *dev);
+
+	return linux_ifstat(mlx4_en_get_stats(edev), a, n, offset);
 }
 
 static long mlx4_ctl(struct ether *edev, void *buf, long n)
