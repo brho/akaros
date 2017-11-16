@@ -141,6 +141,7 @@ void reader(int udp, char *addr, char *port, int buflen, int nbuf, int sink)
 	double elapsed;
 	int pd;
 	char peer[100];
+	double tput;
 
 	fprintf(stderr, "ttcp-r: buflen=%d, nbuf=%d, port=%s %s\n",
 		buflen, nbuf, port, udp ? "udp" : "tcp");
@@ -175,8 +176,9 @@ void reader(int udp, char *addr, char *port, int buflen, int nbuf, int sink)
 	}
 	elapsed = (nsec() - now) / 1E9;
 
+	tput = rate(nbytes, elapsed);	/* also sets 'unit' */
 	fprintf(stderr, "ttcp-r: %lld bytes in %.2f real seconds = %.2f %s/sec\n",
-	        nbytes, elapsed, rate(nbytes, elapsed), unit);
+	        nbytes, elapsed, tput, unit);
 }
 
 void writer(int udp, char *addr, char *port, int buflen, int nbuf, int src)
@@ -187,6 +189,7 @@ void writer(int udp, char *addr, char *port, int buflen, int nbuf, int src)
 	long now;
 	double elapsed;
 	char netaddr[128];
+	double tput;
 
 	fprintf(stderr, "ttcp-t: buflen=%d, nbuf=%d, port=%s %s -> %s\n",
 		    buflen, nbuf, port, udp ? "udp" : "tcp", addr);
@@ -212,8 +215,9 @@ void writer(int udp, char *addr, char *port, int buflen, int nbuf, int src)
 	}
 	elapsed = (nsec() - now) / 1E9;
 
+	tput = rate(nbytes, elapsed);	/* also sets 'unit' */
 	fprintf(stderr, "ttcp-t: %lld bytes in %.2f real seconds = %.2f %s/sec\n",
-	        nbytes, elapsed, rate(nbytes, elapsed), unit);
+	        nbytes, elapsed, tput, unit);
 }
 
 void usage(void)
