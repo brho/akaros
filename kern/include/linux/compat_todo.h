@@ -295,10 +295,7 @@ static inline unsigned long wait_for_completion_timeout(struct completion *x,
 	return timeout;
 }
 
-/* The timer functions (e.g. mod_timer) expect to set an actual time.  These
- * hacks do relative time.  Hopefully some users will use jiffies + rel_time
- * when using mod_timer (like r8169 does). */
-#define jiffies 0
+#define jiffies tsc2msec(read_tsc())
 
 struct timer_list {
 	spinlock_t lock;
@@ -346,10 +343,14 @@ static inline void add_timer(struct timer_list *timer)
 			    KMSG_ROUTINE);
 }
 
-static inline void mod_timer(struct timer_list *timer, unsigned long delay)
+static inline void mod_timer(struct timer_list *timer, unsigned long abs_msec)
 {
 	spin_lock_irqsave(&timer->lock);
-	timer->delay = delay;
+	/* Our callers often use jiffies + rel_time.  This jiffies may be slightly
+	 * more than the previous jiffies */
+	timer->delay = abs_msec - jiffies;
+	if ((long)timer->delay < 0)
+		timer->delay = 0;
 	if (timer->scheduled) {
 		spin_unlock_irqsave(&timer->lock);
 		return;

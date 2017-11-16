@@ -601,7 +601,7 @@ typedef enum netdev_tx netdev_tx_t;
 #define ASSERT_RTNL(...)
 
 #define synchronize_irq(x) warn_once("Asked to sync IRQ %d, unsupported", x)
-#define HZ 100
+#define HZ 1000
 
 /* Linux has a PCI device id struct.  Drivers make tables of their supported
  * devices, and this table is handled by higher level systems.  We don't have
