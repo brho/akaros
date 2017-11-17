@@ -310,6 +310,22 @@ static bool handle_halt(struct guest_thread *gth)
 	return TRUE;
 }
 
+/* The guest is told (via cpuid) that there is no monitor/mwait.  Callers of
+ * mwait are paravirtualized halts.
+ *
+ * We don't support monitor/mwait in software, so if they tried to mwait
+ * without break-on-interrupt and with interrupts disabled, they'll never
+ * wake up.  So we'll always break on interrupt. */
+static bool handle_mwait(struct guest_thread *gth)
+{
+	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
+	struct virtual_machine *vm = gth_to_vm(gth);
+
+	sleep_til_irq(gth);
+	vm_tf->tf_rip += 3;
+	return TRUE;
+}
+
 /* Is this a vmm specific thing?  or generic?
  *
  * what do we do when we want to kill the vm?  what are our other options? */
@@ -333,6 +349,8 @@ bool handle_vmexit(struct guest_thread *gth)
 		return handle_apic_access(gth);
 	case EXIT_REASON_HLT:
 		return handle_halt(gth);
+	case EXIT_REASON_MWAIT_INSTRUCTION:
+		return handle_mwait(gth);
 	case EXIT_REASON_EXTERNAL_INTERRUPT:
 	case EXIT_REASON_APIC_WRITE:
 		/* TODO: just ignore these? */

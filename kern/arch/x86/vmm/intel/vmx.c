@@ -542,7 +542,9 @@ static struct vmxec cbec = {
 	.try_set_0 = (CPU_BASED_MONITOR_EXITING),
 	.policy_changeable = (
 	         CPU_BASED_HLT_EXITING |
-	         CPU_BASED_PAUSE_EXITING),
+	         CPU_BASED_PAUSE_EXITING |
+	         CPU_BASED_MWAIT_EXITING |
+	         0),
 };
 
 static struct vmxec cb2ec = {
@@ -1308,6 +1310,9 @@ int intel_vmm_init(void) {
 		return ret;
 	}
 	printk("VMX setup succeeded\n");
+	/* If this isn't true (we have VMX but not mwait), then we'll have to look
+	 * closely at CPU_BASED_MWAIT_EXITING. */
+	assert(cpu_has_feat(CPU_FEAT_X86_MWAIT));
 	return 0;
 }
 
@@ -1440,6 +1445,8 @@ int vmx_ctl_get_exits(struct vmx_vmm *vmx)
 		ret |= VMM_CTL_EXIT_HALT;
 	if (vmx->cpu_exec_ctls & CPU_BASED_PAUSE_EXITING)
 		ret |= VMM_CTL_EXIT_PAUSE;
+	if (vmx->cpu_exec_ctls & CPU_BASED_MWAIT_EXITING)
+		ret |= VMM_CTL_EXIT_MWAIT;
 	return ret;
 }
 
@@ -1458,6 +1465,11 @@ int vmx_ctl_set_exits(struct vmx_vmm *vmx, int vmm_exits)
 	    if (!vmx_control_can_be_changed(&cbec, CPU_BASED_PAUSE_EXITING))
 			error(ENOSYS, "VMX can't toggle EXIT_PAUSE");
 		vmx_toggle_do |= CPU_BASED_PAUSE_EXITING;
+	}
+	if (toggle_want & VMM_CTL_EXIT_MWAIT) {
+	    if (!vmx_control_can_be_changed(&cbec, CPU_BASED_MWAIT_EXITING))
+			error(ENOSYS, "VMX can't toggle EXIT_MWAIT");
+		vmx_toggle_do |= CPU_BASED_MWAIT_EXITING;
 	}
 	/* This is being read concurrently by load_guest_pcore. */
 	WRITE_ONCE(vmx->cpu_exec_ctls, vmx->cpu_exec_ctls ^ vmx_toggle_do);

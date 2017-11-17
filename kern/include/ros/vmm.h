@@ -19,7 +19,8 @@
 
 #define VMM_CTL_EXIT_HALT		(1 << 0)
 #define VMM_CTL_EXIT_PAUSE		(1 << 1)
-#define VMM_CTL_ALL_EXITS		((1 << 2) - 1)
+#define VMM_CTL_EXIT_MWAIT		(1 << 2)
+#define VMM_CTL_ALL_EXITS		((1 << 3) - 1)
 
 #define VMM_CTL_FL_KERN_PRINTC		(1 << 0)
 #define VMM_CTL_ALL_FLAGS			(VMM_CTL_FL_KERN_PRINTC)

@@ -626,7 +626,8 @@ int vmm_init(struct virtual_machine *vm, struct vmm_gpcore_init *gpcis,
 		assert(greedy_rnbl_guests);
 		vcore_request_total(sched_nr_greedy_cores());
 		syscall(SYS_vmm_ctl, VMM_CTL_SET_EXITS,
-		        syscall(SYS_vmm_ctl, VMM_CTL_GET_EXITS) & ~VMM_CTL_EXIT_HALT);
+		        syscall(SYS_vmm_ctl, VMM_CTL_GET_EXITS) &
+				~(VMM_CTL_EXIT_HALT | VMM_CTL_EXIT_MWAIT));
 	}
 	return 0;
 }
