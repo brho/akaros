@@ -509,7 +509,4 @@ static inline void __cpu_relax(void)
 	asm volatile("pause" : : : "memory");
 }
 
-#ifndef UNUSED_ARG
-#define UNUSED_ARG(x) (void)x
-#endif /* This prevents compiler warnings for UNUSED_ARG */
 #endif /* !__ASSEMBLER__ */
