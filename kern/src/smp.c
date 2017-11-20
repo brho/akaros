@@ -66,18 +66,18 @@ static void __attribute__((noreturn)) __smp_idle(void *arg)
 	clear_rkmsg(pcpui);
 	pcpui->cur_kthread->flags = KTH_DEFAULT_FLAGS;
 	enable_irq();	/* one-shot change to get any IRQs before we halt later */
+	disable_irq();
 	while (1) {
-		disable_irq();
 		process_routine_kmsg();
 		try_run_proc();
 		cpu_bored();		/* call out to the ksched */
 		/* cpu_halt() atomically turns on interrupts and halts the core.
 		 * Important to do this, since we could have a RKM come in via an
 		 * interrupt right while PRKM is returning, and we wouldn't catch
-		 * it. */
+		 * it.  When it returns, IRQs are back off. */
 		__set_cpu_state(pcpui, CPU_STATE_IDLE);
 		cpu_halt();
-		/* interrupts are back on now (given our current semantics) */
+		__set_cpu_state(pcpui, CPU_STATE_KERNEL);
 	}
 	assert(0);
 }

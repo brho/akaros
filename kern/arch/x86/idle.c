@@ -6,7 +6,7 @@
 
 static unsigned int x86_cstate;
 
-/* This atomically enables interrupts and halts.
+/* This atomically enables interrupts and halts.  It returns with IRQs off.
  *
  * Note that sti does not take effect until after the *next* instruction */
 void cpu_halt(void)
@@ -19,6 +19,7 @@ void cpu_halt(void)
 	} else {
 		asm volatile("sti; hlt" : : : "memory");
 	}
+	disable_irq();
 }
 
 void set_pstate(unsigned int pstate)

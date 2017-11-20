@@ -1456,8 +1456,9 @@ static int sys_halt_core(struct proc *p, unsigned long usec)
 		enable_irq();
 		return 0;
 	}
-	/* CPU_STATE is reset to KERNEL by the IRQ handler that wakes us */
 	cpu_halt();
+	__set_cpu_state(pcpui, CPU_STATE_KERNEL);
+	enable_irq();
 	return 0;
 }
 

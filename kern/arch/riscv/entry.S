@@ -194,3 +194,4 @@ cpu_halt:
 1:b     1b   # handle_ipi can advance the PC to break out of this loop.
   ret
 after_cpu_halt:
+  clearpcr ASM_CR(PCR_SR), SR_ET
