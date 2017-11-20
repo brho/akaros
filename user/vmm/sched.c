@@ -297,12 +297,22 @@ static void __attribute__((noreturn)) vmm_sched_entry(void)
 {
 	struct vmm_thread *vth;
 
-	if (sched_is_greedy())
+	if (sched_is_greedy()) {
 		vth = sched_pick_thread_greedy();
-	else
+		if (!vth) {
+			/* sys_halt_core will return, but we need to restart the vcore.  We
+			 * might have woke due to an event, and we'll need to handle_events
+			 * and other things dealt with by uthreads. */
+			if (vcore_id() == 0)
+				sys_halt_core(0);
+			/* In greedy mode, yield will abort and we'll just restart */
+			vcore_yield_or_restart();
+		}
+	} else {
 		vth = sched_pick_thread_nice();
-	if (!vth)
-		vcore_yield_or_restart();
+		if (!vth)
+			vcore_yield_or_restart();
+	}
 	stats_run_vth(vth);
 	run_uthread((struct uthread*)vth);
 }
@@ -754,6 +764,8 @@ static void enqueue_vmm_thread(struct vmm_thread *vth)
 		spin_pdr_lock(&queue_lock);
 		TAILQ_INSERT_TAIL(&rnbl_tasks, vth, tq_next);
 		spin_pdr_unlock(&queue_lock);
+		if (sched_is_greedy())
+			vcore_wake(0, false);
 		break;
 	default:
 		panic("Bad vmm_thread type %p\n", vth->type);
