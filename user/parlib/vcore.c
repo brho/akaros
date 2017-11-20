@@ -521,3 +521,14 @@ void __attribute__((noreturn)) vcore_yield_or_restart(void)
 	set_stack_pointer((void*)vcpd->vcore_stack);
 	vcore_entry();
 }
+
+void vcore_wake(uint32_t vcoreid, bool force_ipi)
+{
+	struct preempt_data *vcpd = vcpd_of(vcoreid);
+
+	vcpd->notif_pending = true;
+	if (vcoreid == vcore_id())
+		return;
+	if (force_ipi || !arch_has_mwait())
+		sys_self_notify(vcoreid, EV_NONE, 0, true);
+}

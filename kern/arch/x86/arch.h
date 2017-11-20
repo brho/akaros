@@ -43,6 +43,8 @@ void tlbflush(void);
 void tlb_flush_global(void);
 /* idle.c */
 void cpu_halt(void);
+struct preempt_data;
+void cpu_halt_notif_pending(struct preempt_data *vcpd);
 
 static inline void breakpoint(void)
 {

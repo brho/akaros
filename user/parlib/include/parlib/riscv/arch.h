@@ -99,4 +99,9 @@ static inline void restore_fp_state(struct ancillary_state* silly)
 	write_fsr(fsr);
 }
 
+static inline bool arch_has_mwait(void)
+{
+	return false;
+}
+
 __END_DECLS

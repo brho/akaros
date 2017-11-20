@@ -161,6 +161,11 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 	}
 }
 
+static inline bool arch_has_mwait(void)
+{
+	return cpu_has_feat(CPU_FEAT_X86_MWAIT);
+}
+
 /* Cpuid helper function originally from Barret's fputest. */
 static inline void parlib_cpuid(uint32_t level1, uint32_t level2,
                                 uint32_t *eaxp, uint32_t *ebxp,

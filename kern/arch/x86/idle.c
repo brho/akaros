@@ -22,6 +22,24 @@ void cpu_halt(void)
 	disable_irq();
 }
 
+/* Atomically enables interrupts and halts.  It will wake if notif_pending was
+ * set (racy), and if we have mwait, it will wake if notif_pending gets set.
+ * It returns with IRQs off. */
+void cpu_halt_notif_pending(struct preempt_data *vcpd)
+{
+	if (cpu_has_feat(CPU_FEAT_X86_MWAIT))
+		asm volatile("monitor" : : "a"(&vcpd->notif_pending), "c"(0), "d"(0));
+	if (vcpd->notif_pending)
+		return;
+	/* Note we don't use the ecx=1 setting - we actually want to sti so that we
+	 * handle the IRQ and not just wake from it. */
+	if (cpu_has_feat(CPU_FEAT_X86_MWAIT))
+		asm volatile("sti; mwait" : : "c"(0x0), "a"(x86_cstate) : "memory");
+	else
+		asm volatile("sti; hlt" : : : "memory");
+	disable_irq();
+}
+
 void set_pstate(unsigned int pstate)
 {
 	uint64_t perf_ctl;

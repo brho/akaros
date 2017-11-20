@@ -1414,7 +1414,8 @@ static int sys_vc_entry(struct proc *p)
 
 /* This will halt the core, waking on an IRQ.  These could be kernel IRQs for
  * things like timers or devices, or they could be IPIs for RKMs (__notify for
- * an evq with IPIs for a syscall completion, etc).
+ * an evq with IPIs for a syscall completion, etc).  With arch support, this
+ * will also wake on a write to notif_pending.
  *
  * We don't need to finish the syscall early (worried about the syscall struct,
  * on the vcore's stack).  The syscall will finish before any __preempt RKM
@@ -1424,16 +1425,22 @@ static int sys_vc_entry(struct proc *p)
  *
  * In the future, RKM code might avoid sending IPIs if the core is already in
  * the kernel.  That code will need to check the CPU's state in some manner, and
- * send if the core is halted/idle.
+ * send if the core is halted/idle.  Or perhaps use mwait, if there's arch
+ * support.
  *
  * The core must wake up for RKMs, including RKMs that arrive while the kernel
- * is trying to halt.  The core need not abort the halt for notif_pending for
- * the vcore, only for a __notify or other RKM.  Anyone setting notif_pending
- * should then attempt to __notify (o/w it's probably a bug). */
+ * is trying to halt.
+ *
+ * If our hardware supports something like monitor/mwait, we'll abort if
+ * notif_pending was or gets set.  Note that whoever writes notif_pending may
+ * send an IPI regardless of whether or not we have mwait.  That's up to the
+ * ev_q settings (so basically userspace).  If userspace doesn't want an IPI, a
+ * notif will wake it up, but it won't break it out of a uthread loop. */
 static int sys_halt_core(struct proc *p, unsigned long usec)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	struct preempt_data *vcpd;
+
 	/* The user can only halt CG cores!  (ones it owns) */
 	if (management_core())
 		return -1;
@@ -1446,18 +1453,17 @@ static int sys_halt_core(struct proc *p, unsigned long usec)
 		enable_irq();
 		return 0;
 	}
-	/* This situation possible, though the check is not necessary.  We can't
-	 * assert notif_pending isn't set, since another core may be in the
-	 * proc_notify.  Thus we can't tell if this check here caught a bug, or just
-	 * aborted early. */
 	vcpd = &p->procdata->vcore_preempt_data[pcpui->owning_vcoreid];
-	if (vcpd->notif_pending) {
-		__set_cpu_state(pcpui, CPU_STATE_KERNEL);
-		enable_irq();
-		return 0;
-	}
-	cpu_halt();
+	/* We pretend to not be in vcore context so other cores will send us IPIs
+	 * (__notify).  If we do get a __notify, we'll have set notif_disabled back
+	 * on before we handle the message, since it's a routine KMSG.  Note that
+	 * other vcores will think we are not in vcore context.  This is no
+	 * different to when we pop contexts: 'briefly' leave VC ctx, check
+	 * notif_pending, and (possibly) abort and set notif_disabled. */
+	vcpd->notif_disabled = false;
+	cpu_halt_notif_pending(vcpd);
 	__set_cpu_state(pcpui, CPU_STATE_KERNEL);
+	vcpd->notif_disabled = true;
 	enable_irq();
 	return 0;
 }

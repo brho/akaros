@@ -158,6 +158,12 @@ static __inline void reboot(void)
 
 extern void cpu_halt(void);
 
+struct preempt_data;
+static inline void cpu_halt_notif_pending(struct preempt_data *vcpd)
+{
+	cpu_halt();
+}
+
 static inline void prefetch(void *addr)
 {
 }

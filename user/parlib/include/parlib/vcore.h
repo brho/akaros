@@ -57,6 +57,7 @@ void cpu_relax_vc(uint32_t vcoreid);
 uint32_t get_vcoreid(void);
 bool check_vcoreid(const char *str, uint32_t vcoreid);
 void __attribute__((noreturn)) vcore_yield_or_restart(void);
+void vcore_wake(uint32_t vcoreid, bool force_ipi);
 
 /* This works so long as we don't dlopen parlib (which we never do) */
 #define get_tlsvar_linaddr(_vcoreid, _var)                                     \
