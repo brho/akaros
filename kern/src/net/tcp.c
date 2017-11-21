@@ -2129,6 +2129,8 @@ static void track_rcv_sack(Tcpctl *tcb, uint32_t left, uint32_t right)
 
 	if (!tcb->sack_ok)
 		return;
+	if (left == right)
+		return;
 	assert(seq_lt(left, right));
 	sack->left = left;
 	sack->right = right;
