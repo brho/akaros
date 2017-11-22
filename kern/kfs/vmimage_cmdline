@@ -7,7 +7,6 @@ earlyprintk=vmcall,keep
  nohlt
  noht
  lapic=notscdeadline
- lapictimerfreq=1000
  clocksource=tsc
  pit=none
  root=/dev/vda1
