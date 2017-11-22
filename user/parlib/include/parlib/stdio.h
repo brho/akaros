@@ -107,11 +107,36 @@ static inline bool __safe_to_printf(void)
 	__parlib_safe_print_ret;                                                   \
 })
 
+#define debug_fprintf(f, ...) __vc_ctx_fprintf(f, __VA_ARGS__)
+#define debug_printf(...) __vc_ctx_fprintf(stdout, __VA_ARGS__)
+
+#define printx(...)                                                            \
+do {                                                                           \
+	if (__procdata.printx_on)                                                  \
+		debug_fprintf(stderr, __VA_ARGS__);                                    \
+} while (0);
+
+void trace_printf(const char *fmt, ...);
+
+#define trace_printx(...)                                                      \
+do {                                                                           \
+	if (__procdata.printx_on)                                                  \
+		trace_printf(__VA_ARGS__);                                             \
+} while (0);
+
 #define I_AM_HERE __vc_ctx_fprintf(stderr,                                     \
                                    "PID %d, vcore %d is in %s() at %s:%d\n",   \
                                    getpid(), vcore_id(), __FUNCTION__,         \
                                    __FILE__, __LINE__)
-#define debug_fprintf(f, ...) __vc_ctx_fprintf(f, __VA_ARGS__)
-#define debug_printf(...) __vc_ctx_fprintf(stdout, __VA_ARGS__)
+
+#define I_AM_HERE_x printx(stderr, "PID %d, vcore %d is in %s() at %s:%d\n",   \
+                                   getpid(), vcore_id(), __FUNCTION__,         \
+                                   __FILE__, __LINE__)
+
+#define I_AM_HERE_t trace_printf("Vcore %d is in %s() at %s:%d\n", vcore_id(), \
+                                 __FUNCTION__, __FILE__, __LINE__)
+
+#define I_AM_HERE_tx trace_printx("Vcore %d is in %s() at %s:%d\n", vcore_id(),\
+                                  __FUNCTION__, __FILE__, __LINE__)
 
 __END_DECLS

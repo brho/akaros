@@ -6,8 +6,6 @@
 
 __BEGIN_DECLS
 
-void trace_printf(const char *fmt, ...);
-
 /* For a poor-mans function tracer (can add these with spatch) */
 void __print_func_entry(const char *func, const char *file);
 void __print_func_exit(const char *func, const char *file);

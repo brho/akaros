@@ -1171,8 +1171,23 @@ int mon_db(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int mon_px(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	set_printx(2);
-	printk("Printxing is now %sabled\n", printx_on ? "en" : "dis");
+	pid_t pid = 0;
+	struct proc *p;
+
+	if (argc == 2)
+		pid = strtol(argv[1], 0, 0);
+	if (!pid) {
+		set_printx(2);
+		printk("Printxing is now %sabled\n", printx_on ? "en" : "dis");
+		return 0;
+	}
+	p = pid2proc(pid);
+	if (!p) {
+		printk("No proc with pid %d\n", pid);
+		return 1;
+	}
+	p->procdata->printx_on = !p->procdata->printx_on;
+	proc_decref(p);
 	return 0;
 }
 

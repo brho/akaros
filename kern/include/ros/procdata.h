@@ -19,7 +19,7 @@ typedef struct procdata {
 	syscall_sring_t			*syscallring;
 	sysevent_sring_t		syseventring;
 	char					pad2[SYSEVENTRINGSIZE - sizeof(sysevent_sring_t)];
-	bool					padb;
+	bool					printx_on;
 	uint8_t					pad8;
 	uint16_t				pad16;
 	uint32_t				pad32;
