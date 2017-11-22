@@ -19,11 +19,10 @@ typedef struct procdata {
 	syscall_sring_t			*syscallring;
 	sysevent_sring_t		syseventring;
 	char					pad2[SYSEVENTRINGSIZE - sizeof(sysevent_sring_t)];
-#if defined (__i386__) || defined (__x86_64) /* TODO: 64b */
-	segdesc_t				*ldt; // TODO: bug with this. (TLSV)
-#endif
-	/* glibc relies on stuff above this point.  if you change it, you need to
-	 * rebuild glibc. */
+	bool					padb;
+	uint8_t					pad8;
+	uint16_t				pad16;
+	uint32_t				pad32;
 	struct resource_req		res_req[MAX_NUM_RESOURCES];
 	struct event_queue		*kernel_evts[MAX_NR_EVENT];
 	/* Long range, would like these to be mapped in lazily, as the vcores are
