@@ -387,7 +387,6 @@ int main(int argc, char **argv)
 	uint64_t entry = 0;
 	int ret;
 	struct vm_trapframe *vm_tf;
-	uint64_t tsc_freq_khz;
 	char *cmdlinep;
 	int cmdlinesz, len, cmdline_fd;
 	char *disk_image_file = NULL;
@@ -646,9 +645,7 @@ int main(int argc, char **argv)
 
 	bp->hdr.cmd_line_ptr = (uintptr_t) cmdline;
 
-	tsc_freq_khz = get_tsc_freq()/1000;
-	len = snprintf(cmdline, 4096, "%s tscfreq=%lld %s", cmdline_default,
-	               tsc_freq_khz, cmdline_extra);
+	len = snprintf(cmdline, 4096, "%s %s", cmdline_default, cmdline_extra);
 
 	cmdlinesz = 4096 - len;
 	cmdlinep = cmdline + len;

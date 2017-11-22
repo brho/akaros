@@ -221,6 +221,16 @@ static bool handle_vmcall_smpboot(struct guest_thread *gth)
 	return TRUE;
 }
 
+static bool handle_vmcall_get_tscfreq(struct guest_thread *gth)
+{
+	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
+	struct vm_trapframe *vm_tf_ap;
+	struct virtual_machine *vm = gth_to_vm(gth);
+
+	vm_tf->tf_rax =	get_tsc_freq() / 1000;
+	return TRUE;
+}
+
 static bool handle_vmcall(struct guest_thread *gth)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
@@ -231,12 +241,15 @@ static bool handle_vmcall(struct guest_thread *gth)
 		return vm->vmcall(gth, vm_tf);
 
 	switch (vm_tf->tf_rax) {
-		case VMCALL_PRINTC:
-			retval = handle_vmcall_printc(gth);
-			break;
-		case VMCALL_SMPBOOT:
-			retval = handle_vmcall_smpboot(gth);
-			break;
+	case VMCALL_PRINTC:
+		retval = handle_vmcall_printc(gth);
+		break;
+	case VMCALL_SMPBOOT:
+		retval = handle_vmcall_smpboot(gth);
+		break;
+	case VMCALL_GET_TSCFREQ:
+		retval = handle_vmcall_get_tscfreq(gth);
+		break;
 	}
 
 	if (retval)
