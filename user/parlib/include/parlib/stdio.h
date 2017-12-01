@@ -116,7 +116,7 @@ do {                                                                           \
 		debug_fprintf(stderr, __VA_ARGS__);                                    \
 } while (0);
 
-void trace_printf(const char *fmt, ...);
+int trace_printf(const char *fmt, ...);
 
 #define trace_printx(...)                                                      \
 do {                                                                           \

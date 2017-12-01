@@ -96,7 +96,7 @@ static void trace_init(void *arg)
 		perror("Unable to open kptrace!\n");
 }
 
-void trace_printf(const char *fmt, ...)
+int trace_printf(const char *fmt, ...)
 {
 	va_list args;
 	char buf[128];
@@ -105,7 +105,7 @@ void trace_printf(const char *fmt, ...)
 
 	parlib_run_once(&once, trace_init, NULL);
 	if (kptrace < 0)
-		return;
+		return 0;
 	amt = snprintf(buf, sizeof(buf), "PID %d: ", getpid());
 	/* amt could be > sizeof, if we truncated. */
 	amt = MIN(amt, sizeof(buf));
@@ -113,5 +113,7 @@ void trace_printf(const char *fmt, ...)
 	/* amt == sizeof is OK here */
 	amt += vsnprintf(buf + amt, sizeof(buf) - amt, fmt, args);
 	va_end(args);
-	write(kptrace, buf, MIN(amt, sizeof(buf)));
+	amt = MIN(amt, sizeof(buf));
+	write(kptrace, buf, amt);
+	return amt;
 }
