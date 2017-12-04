@@ -247,12 +247,8 @@ static void poll_catas(unsigned long dev_ptr)
 		goto internal_err;
 	}
 
-#if 0 // AKAROS_PORT
 	mod_timer(&priv->catas_err.timer,
 		  round_jiffies(jiffies + MLX4_CATAS_POLL_INTERVAL));
-#else
-	mod_timer(&priv->catas_err.timer, MLX4_CATAS_POLL_INTERVAL);
-#endif
 	return;
 
 internal_err:
@@ -297,12 +293,8 @@ void mlx4_start_catas_poll(struct mlx4_dev *dev)
 
 	priv->catas_err.timer.data     = (unsigned long) dev;
 	priv->catas_err.timer.function = poll_catas;
-#if 0 // AKAROS_PORT
 	priv->catas_err.timer.expires  =
 		round_jiffies(jiffies + MLX4_CATAS_POLL_INTERVAL);
-#else
-	priv->catas_err.timer.delay    = MLX4_CATAS_POLL_INTERVAL;
-#endif
 	add_timer(&priv->catas_err.timer);
 }
 

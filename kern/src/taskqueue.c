@@ -47,11 +47,14 @@ static void __wq_wrapper(uint32_t srcid, long a0, long a1, long a2)
 	work->func(work);
 }
 
+/* Linux callers use jiffies as the unit of delay.  We pretend to be a 1000 HZ
+ * machine with 1 msec jiffies. */
 static void __wq_wrapper_delay(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct work_struct *work = (struct work_struct*)a0;
 	unsigned long delay = (unsigned long)a1;
-	kthread_usleep(delay * 10000);
+
+	kthread_usleep(delay * 1000);
 	work->func(work);
 }
 

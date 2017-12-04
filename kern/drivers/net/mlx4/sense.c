@@ -107,11 +107,7 @@ static void mlx4_sense_port(struct work_struct *work)
 sense_again:
 	qunlock(&priv->port_mutex);
 	queue_delayed_work(mlx4_wq , &sense->sense_poll,
-#if 0 // AKAROS_PORT
 			   round_jiffies_relative(MLX4_SENSE_RANGE));
-#else
-			   MLX4_SENSE_RANGE);
-#endif
 }
 
 void mlx4_start_sense(struct mlx4_dev *dev)
@@ -123,11 +119,7 @@ void mlx4_start_sense(struct mlx4_dev *dev)
 		return;
 
 	queue_delayed_work(mlx4_wq , &sense->sense_poll,
-#if 0 // AKAROS_PORT
 			   round_jiffies_relative(MLX4_SENSE_RANGE));
-#else
-			   MLX4_SENSE_RANGE);
-#endif
 }
 
 void mlx4_stop_sense(struct mlx4_dev *dev)

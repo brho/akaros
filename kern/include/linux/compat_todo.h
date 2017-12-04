@@ -297,10 +297,20 @@ static inline unsigned long wait_for_completion_timeout(struct completion *x,
 
 #define jiffies tsc2msec(read_tsc())
 
+static inline unsigned long round_jiffies(unsigned long j)
+{
+	return j / 1000 * 1000;
+}
+
+static inline unsigned long round_jiffies_relative(unsigned long j)
+{
+	return round_jiffies(j);
+}
+
 struct timer_list {
 	spinlock_t lock;
 	bool scheduled;
-	unsigned long delay;
+	unsigned long expires;
 	void (*function)(unsigned long);
 	unsigned long data;
 };
@@ -309,7 +319,7 @@ static inline void init_timer(struct timer_list *timer)
 {
 	spinlock_init_irqsave(&timer->lock);
 	timer->scheduled = false;
-	timer->delay = 0;
+	timer->expires = -1;
 	timer->function = 0;
 	timer->data = 0;
 }
@@ -325,14 +335,16 @@ static inline void setup_timer(struct timer_list *timer,
 static void __timer_wrapper(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct timer_list *timer = (struct timer_list *)a0;
-	unsigned long delay = 0;
+	unsigned long expires, now_j;
 
 	spin_lock_irqsave(&timer->lock);
-	delay = timer->delay;
+	expires = timer->expires;
 	timer->scheduled = false;
 	spin_unlock_irqsave(&timer->lock);
 
-	kthread_usleep(delay * 10000);
+	now_j = jiffies;
+	if (expires > now_j)
+		kthread_usleep((expires - now_j) * 1000);
 	timer->function(timer->data);
 }
 
@@ -343,14 +355,10 @@ static inline void add_timer(struct timer_list *timer)
 			    KMSG_ROUTINE);
 }
 
-static inline void mod_timer(struct timer_list *timer, unsigned long abs_msec)
+static inline void mod_timer(struct timer_list *timer, unsigned long expires)
 {
 	spin_lock_irqsave(&timer->lock);
-	/* Our callers often use jiffies + rel_time.  This jiffies may be slightly
-	 * more than the previous jiffies */
-	timer->delay = abs_msec - jiffies;
-	if ((long)timer->delay < 0)
-		timer->delay = 0;
+	timer->expires = expires;
 	if (timer->scheduled) {
 		spin_unlock_irqsave(&timer->lock);
 		return;
