@@ -37,14 +37,16 @@ int vmm_interrupt_guest(struct virtual_machine *vm, unsigned int gpcoreid,
 	uth_mutex_lock(gth->halt_mtx);
 	SET_BITMASK_BIT_ATOMIC(gpci->posted_irq_desc, vector);
 	/* Atomic op provides the mb() btw writing the vector and mucking with
-	 * OUTSTANDING_NOTIF.  If the notif was already set, then a previous thread
-	 * poked the guest and signaled the CV. */
+	 * OUTSTANDING_NOTIF.
+	 *
+	 * If we set notif, it's on us to inject the IRQ.  Either way, notif will be
+	 * set and we must kick the CV, unconditionally. */
 	if (!GET_BITMASK_BIT(gpci->posted_irq_desc, VMX_POSTED_OUTSTANDING_NOTIF)) {
 		SET_BITMASK_BIT_ATOMIC(gpci->posted_irq_desc,
 		                       VMX_POSTED_OUTSTANDING_NOTIF);
 		ros_syscall(SYS_vmm_poke_guest, gpcoreid, 0, 0, 0, 0, 0);
-		uth_cond_var_signal(gth->halt_cv);
 	}
+	uth_cond_var_signal(gth->halt_cv);
 	uth_mutex_unlock(gth->halt_mtx);
 	return 0;
 }

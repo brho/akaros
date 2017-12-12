@@ -283,8 +283,11 @@ static bool emsr_ok(struct emmsr *msr, struct vm_trapframe *vm_tf,
                     uint32_t opcode);
 static bool emsr_fake_apicbase(struct emmsr *msr, struct vm_trapframe *vm_tf,
                                uint32_t opcode);
+static bool emsr_lapic_icr(struct emmsr *msr, struct vm_trapframe *vm_tf,
+                           uint32_t opcode);
 
 struct emmsr emmsrs[] = {
+	{MSR_LAPIC_ICR, "MSR_LAPIC_ICR", emsr_lapic_icr},
 	{MSR_IA32_MISC_ENABLE, "MSR_IA32_MISC_ENABLE", emsr_miscenable},
 	{MSR_IA32_SYSENTER_CS, "MSR_IA32_SYSENTER_CS", emsr_ok},
 	{MSR_IA32_SYSENTER_EIP, "MSR_IA32_SYSENTER_EIP", emsr_ok},
@@ -332,6 +335,77 @@ struct emmsr emmsrs[] = {
 	// TBD
 	{MSR_IA32_TSC_DEADLINE, "MSR_IA32_TSC_DEADLINE", emsr_fakewrite},
 };
+
+/* Here are the rules for IPI injection:
+ * 1) The guest can't sleep if notif is set.
+ * 2) Userspace must wake the guest if notif is set, unconditionally
+ * 3) Whoever sets notif must make sure the interrupt gets injected.
+ *
+ * This allows the kernel to set notif and possibly lose a race with a
+ * concurrently halting / vmexiting guest.
+ *
+ * Guest sleeping happens in userspace in the halt/mwait vmexit handler.  If
+ * userspace (vmm_interrupt_guest() sees notif set, it must try to wake the
+ * guest - even if the user didn't set notif.  If the kernel sets notif, it
+ * might be able to know the guest is running.  But if that fails, we have to
+ * kick it back to userspace (return false here).  In that case, even though
+ * userspace didn't set notif, it must attempt to wake the guest.
+ *
+ * For 3, the kernel can often know if the guest is running.  Then it can send
+ * the posted IPI, then reconfirm the guest is running.  If that fails, or if it
+ * *might* have failed, the guest still needs to get the IRQ.  The next time the
+ * guest runs after notif was set, the interrupt will be injected.  If the
+ * kernel kicks it back to userspace, the guest will wake or will fail to halt
+ * (due to notif being set), and the next time it runs, the kernel will inject
+ * the IPI (when we pop the vmtf).
+ *
+ * There's another case: the kernel sets notif, reads the coreid, sends the IPI,
+ * and then sees the coreid is changed.  If the coreid is -1, the GPC isn't
+ * loaded/running, and we kick back to userspace (as above).  If the coreid is
+ * not -1, it is running somewhere else.  It might have missed the IPI, but
+ * since the guest was popped on a core after notif was set, the IRQ was
+ * posted/injected. */
+static bool emsr_lapic_icr_write(struct emmsr *msr, struct vm_trapframe *tf)
+{
+	uint32_t destination = tf->tf_rdx & 0xffffffff;
+	uint8_t vector = tf->tf_rax & 0xff;
+	uint8_t type = (tf->tf_rax >> 8) & 0x7;
+	struct guest_pcore *gpc;
+	int target_coreid;
+
+	if (type != 0 || destination == 0xffffffff)
+		return false;
+	gpc = lookup_guest_pcore(current, destination);
+	if (!gpc)
+		return false;
+	SET_BITMASK_BIT_ATOMIC((void*)gpc->posted_irq_desc, vector);
+	cmb();	/* atomic does the MB, order set write before test read */
+	/* We got lucky and squeezed our IRQ in with someone else's */
+	if (test_bit(VMX_POSTED_OUTSTANDING_NOTIF, (void*)gpc->posted_irq_desc))
+		return true;
+	SET_BITMASK_BIT_ATOMIC((void*)gpc->posted_irq_desc,
+	                       VMX_POSTED_OUTSTANDING_NOTIF);
+	cmb();	/* atomic does the MB, order set write before read of cpu */
+	target_coreid = ACCESS_ONCE(gpc->cpu);
+	if (target_coreid == -1)
+		return false;
+	/* If it's us, we'll send_ipi when we restart the VMTF.  Note this is rare:
+	 * the guest will usually use the self_ipi virtualization. */
+	if (target_coreid != core_id())
+		send_ipi(target_coreid, I_POKE_GUEST);
+	/* No MBs needed here: only that it happens after setting notif */
+	if (ACCESS_ONCE(gpc->cpu) == -1)
+		return false;
+	return true;
+}
+
+static bool emsr_lapic_icr(struct emmsr *msr, struct vm_trapframe *tf,
+                           uint32_t opcode)
+{
+	if (opcode == VMM_MSR_EMU_READ)
+		return false;
+	return emsr_lapic_icr_write(msr, tf);
+}
 
 /* this may be the only register that needs special handling.
  * If there others then we might want to extend the emmsr struct.

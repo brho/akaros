@@ -44,7 +44,8 @@ static void sleep_til_irq(struct guest_thread *gth)
 	/* The invariant is that if an IRQ is posted, but not delivered, we will not
 	 * sleep.  Anyone who posts an IRQ must signal after setting it.
 	 * vmm_interrupt_guest() does this.  If we use alternate sources of IRQ
-	 * posting, we'll need to revist this.
+	 * posting, we'll need to revist this.  For more details, see the notes in
+	 * the kernel IPI-IRC fast path.
 	 *
 	 * Although vmm_interrupt_guest() only writes OUTSTANDING_NOTIF, it's
 	 * possible that the hardware attempted to post the interrupt.  In SDM
