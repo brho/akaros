@@ -6,6 +6,7 @@
 #include <vmm/virtio_mmio.h>
 #include <vmm/virtio_ids.h>
 #include <vmm/virtio_config.h>
+#include <vmm/mmio.h>
 #include <vmm/vmm.h>
 #include <parlib/arch/trap.h>
 #include <parlib/bitmask.h>
@@ -16,11 +17,22 @@ static bool pir_notif_is_set(struct vmm_gpcore_init *gpci)
 	return GET_BITMASK_BIT(gpci->posted_irq_desc, VMX_POSTED_OUTSTANDING_NOTIF);
 }
 
-static bool rvi_is_set(struct guest_thread *gth)
+/* Returns true if the hardware will trigger an IRQ for the guest.  These
+ * virtual IRQs are only processed under certain situations, like vmentry, and
+ * posted IRQs.  See 'Evaluation of Pending Virtual Interrupts' in the SDM. */
+static bool virtual_irq_is_pending(struct guest_thread *gth)
 {
-	uint8_t rvi = gth_to_vmtf(gth)->tf_guest_intr_status & 0xff;
+	struct vmm_gpcore_init *gpci = gth_to_gpci(gth);
+	uint8_t rvi, vppr;
 
-	return rvi != 0;
+	/* Currently, the lower 4 bits are various ways to block IRQs, e.g. blocking
+	 * by STI.  The other bits are must be 0.  Presumably any new bits are types
+	 * of IRQ blocking. */
+	if (gth_to_vmtf(gth)->tf_intrinfo1)
+		return false;
+	vppr = read_mmreg32((uintptr_t)gth_to_gpci(gth)->vapic_addr + 0xa0);
+	rvi = gth_to_vmtf(gth)->tf_guest_intr_status & 0xff;
+	return (rvi & 0xf0) > (vppr & 0xf0);
 }
 
 /* Blocks a guest pcore / thread until it has an IRQ pending.  Syncs with
@@ -46,20 +58,15 @@ static void sleep_til_irq(struct guest_thread *gth)
 	 * actually delivered.  So checking OUTSTANDING_NOTIF and RVI should
 	 * suffice.
 	 *
-	 * Generally, we should also check GUEST_INTERRUPTIBILITY_INFO to see if
-	 * there's some reason to not deliver the interrupt and check things like
-	 * the VPPR (priority register).  But since we're emulating a halt, mwait,
-	 * or something else that needs to be woken by an IRQ, we can ignore that
-	 * and just wake them up.  Note that we won't actually deliver the IRQ,
-	 * we'll just restart the guest and the hardware will deliver the virtual
-	 * IRQ at the appropriate time.  So in the event that something weird
-	 * happens, the halt/mwait just returns spuriously.
+	 * Note that when we see a notif or pending virtual IRQ, we don't actually
+	 * deliver the IRQ, we'll just restart the guest and the hardware will
+	 * deliver the virtual IRQ at the appropriate time.
 	 *
 	 * The more traditional race here is if the halt starts concurrently with
 	 * the post; that's why we sync with the mutex to make sure there is an
 	 * ordering between the actual halt (this function) and the posting. */
 	uth_mutex_lock(gth->halt_mtx);
-	while (!(pir_notif_is_set(gpci) || rvi_is_set(gth)))
+	while (!(pir_notif_is_set(gpci) || virtual_irq_is_pending(gth)))
 		uth_cond_var_wait(gth->halt_cv, gth->halt_mtx);
 	uth_mutex_unlock(gth->halt_mtx);
 }
