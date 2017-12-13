@@ -111,6 +111,9 @@ void schedule_init(void)
 	spin_unlock(&sched_lock);
 
 #ifdef CONFIG_ARSC_SERVER
+	/* Most likely we'll have a syscall and a process that dedicates itself to
+	 * running this.  Or if it's a kthread, we don't need a core. */
+	#error "Find a way to get a core.  Probably a syscall to run a server."
 	int arsc_coreid = get_any_idle_core();
 	assert(arsc_coreid >= 0);
 	send_kernel_message(arsc_coreid, arsc_server, 0, 0, 0, KMSG_ROUTINE);
@@ -493,30 +496,6 @@ void cpu_bored(void)
 void avail_res_changed(int res_type, long change)
 {
 	printk("[kernel] ksched doesn't track any resources yet!\n");
-}
-
-int get_any_idle_core(void)
-{
-	spin_lock(&sched_lock);
-	int ret = __get_any_idle_core();
-	spin_unlock(&sched_lock);
-	return ret;
-}
-
-int get_specific_idle_core(int coreid)
-{
-	spin_lock(&sched_lock);
-	int ret = __get_specific_idle_core(coreid);
-	spin_unlock(&sched_lock);
-	return ret;
-}
-
-/* similar to __sched_put_idle_core, but without the prov tracking */
-void put_idle_core(int coreid)
-{
-	spin_lock(&sched_lock);
-	__put_idle_core(coreid);
-	spin_unlock(&sched_lock);
 }
 
 /* This deals with a request for more cores.  The amt of new cores needed is

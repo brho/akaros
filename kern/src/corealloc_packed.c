@@ -422,59 +422,6 @@ void __track_core_dealloc_bulk(struct proc *p, uint32_t *pc_arr,
 		__track_core_dealloc(p, pc_arr[i]);
 }
 
-/* Get an idle core from our pcore list and return its core_id. Don't
- * consider the chosen core in the future when handing out cores to a
- * process. This code assumes that the scheduler that uses it holds a lock
- * for the duration of the call. This will not give out provisioned cores. */
-int __get_any_idle_core(void)
-{
-	struct sched_pcore *spc;
-	int ret = -1;
-
-	for (int i = 0; i < num_cores; i++) {
-		struct sched_pcore *c = &all_pcores[i];
-
-		if (spc->alloc_proc == NULL) {
-			spc->alloc_proc = UNNAMED_PROC;
-			ret = spc->core_info->core_id;
-		}
-	}
-	return ret;
-}
-
-/* Detect if a pcore is idle or not. */
-static bool __spc_is_idle(struct sched_pcore *spc)
-{
-	return (spc->alloc_proc == NULL);
-}
-
-/* Same as __get_any_idle_core() except for a specific core id. */
-int __get_specific_idle_core(int coreid)
-{
-	struct sched_pcore *spc = pcoreid2spc(coreid);
-	int ret = -1;
-
-	assert((coreid >= 0) && (coreid < num_cores));
-	if (__spc_is_idle(pcoreid2spc(coreid)) && !spc->prov_proc) {
-		assert(!spc->alloc_proc);
-		spc->alloc_proc = UNNAMED_PROC;
-		ret = coreid;
-	}
-	return ret;
-}
-
-/* Reinsert a core obtained via __get_any_idle_core() or
- * __get_specific_idle_core() back into the idlecore map. This code assumes
- * that the scheduler that uses it holds a lock for the duration of the call.
- * This will not give out provisioned cores. */
-void __put_idle_core(int coreid)
-{
-	struct sched_pcore *spc = pcoreid2spc(coreid);
-
-	assert((coreid >= 0) && (coreid < num_cores));
-	spc->alloc_proc = NULL;
-}
-
 /* One off function to make 'pcoreid' the next core chosen by the core
  * allocation algorithm (so long as no provisioned cores are still idle).
  * This code assumes that the scheduler that uses it holds a lock for the

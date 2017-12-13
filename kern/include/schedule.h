@@ -66,16 +66,6 @@ void cpu_bored(void);
  * inappropriate, since we need to know which specific core is now free. */
 void avail_res_changed(int res_type, long change);
 
-/* Get and put idle CG cores.  Getting a core removes it from the idle list, and
- * the kernel can do whatever it wants with it.  All this means is that the
- * ksched won't hand out that core to a process.  This will not give out
- * provisioned cores.
- *
- * The gets return the coreid on success, -1 or -error on failure. */
-int get_any_idle_core(void);
-int get_specific_idle_core(int coreid);
-void put_idle_core(int coreid);
-
 /************** Provisioning / Allocating *************/
 /* This section is specific to a provisioning ksched.  Careful calling any of
  * this from generic kernel code, since it might not be present in all kernel
