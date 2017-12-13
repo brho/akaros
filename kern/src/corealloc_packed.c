@@ -11,7 +11,14 @@
 #include <kmalloc.h>
 
 enum pnode_type { CORE, CPU, SOCKET, NUMA, MACHINE, NUM_NODE_TYPES };
-static char pnode_label[5][8] = { "CORE", "CPU", "SOCKET", "NUMA", "MACHINE" };
+
+static const char * const pnode_label[] = {
+	[CORE] = "CORE",
+	[CPU] = "CPU",
+	[SOCKET] = "SOCKET",
+	[NUMA] = "NUMA",
+	[MACHINE] = "MACHINE"
+};
 
 /* Internal representation of a node in the hierarchy of elements in the cpu
  * topology of the machine (i.e. numa domain, socket, cpu, core, etc.). */
@@ -84,7 +91,12 @@ static void decref_nodes(struct sched_pnode *n)
 }
 
 /* Create a node and initialize it. This code assumes that child are created
- * before parent nodes. */
+ * before parent nodes.
+ *
+ * all_nodes is laid out such that all of the nodes are: CORES, then the CPUS,
+ * then the SOCKETS, then NUMA, then one for MACHINE.  The nodes at any given
+ * layer are later broken up into chunks of n and assigned to their parents
+ * (down below). */
 static void init_nodes(int type, int num, int nchildren)
 {
 	/* Initialize the lookup table for this node type. */
@@ -123,24 +135,26 @@ static void init_nodes(int type, int num, int nchildren)
 	}
 }
 
+/* Helper: Two cores have the same level id (and thus are at distance k, below)
+ * if their IDs divided by the number of cores per level are the same, due to
+ * how we number our cores. */
+static int get_level_id(int coreid, int level)
+{
+	return coreid / num_descendants[level][CORE];
+}
+
 /* Allocate a table of distances from one core to an other. Cores on the same
  * cpu have a distance of 1; same socket have a distance of 2; same numa -> 3;
  * same machine -> 4; */
 static void init_core_distances(void)
 {
-	core_distance = kzmalloc(num_cores * sizeof(int*), 0);
-	if (core_distance == NULL)
-		panic("Out of memory!\n");
-	for (int i = 0; i < num_cores; i++) {
-		core_distance[i] = kzmalloc(num_cores * sizeof(int), 0);
-		if (core_distance[i] == NULL)
-			panic("Out of memory!\n");
-	}
+	core_distance = kzmalloc(num_cores * sizeof(int*), MEM_WAIT);
+	for (int i = 0; i < num_cores; i++)
+		core_distance[i] = kzmalloc(num_cores * sizeof(int), MEM_WAIT);
 	for (int i = 0; i < num_cores; i++) {
 		for (int j = 0; j < num_cores; j++) {
 			for (int k = CPU; k <= MACHINE; k++) {
-				if (i/num_descendants[k][CORE] ==
-					j/num_descendants[k][CORE]) {
+				if (get_level_id(i, k) == get_level_id(j, k)) {
 					core_distance[i][j] = k;
 					break;
 				}
@@ -157,7 +171,8 @@ void corealloc_init(void)
 	/* Allocate a flat array of nodes. */
 	total_nodes = num_cores + num_cpus + num_sockets + num_numa + 1;
 	nodes_and_cores = kmalloc(total_nodes * sizeof(struct sched_pnode) +
-	                          num_cores * sizeof(struct sched_pcore), 0);
+	                          num_cores * sizeof(struct sched_pcore),
+	                          MEM_WAIT);
 	all_nodes = nodes_and_cores;
 	all_pcores = nodes_and_cores + total_nodes * sizeof(struct sched_pnode);
 
@@ -209,7 +224,10 @@ void corealloc_proc_init(struct proc *p)
 	TAILQ_INIT(&p->ksched_data.crd.prov_not_alloc_me);
 }
 
-/* Returns the sum of the distances from one core to all cores in a list. */
+/* Returns the sum of the distances from one core to all cores in a list.
+ *
+ * This assumes cl is the allocated list, or possibly the idlecores, since it
+ * uses alloc_next. */
 static int cumulative_core_distance(struct sched_pcore *c,
                                     struct sched_pcore_tailq cl)
 {
@@ -378,8 +396,8 @@ void __track_core_alloc(struct proc *p, uint32_t pcoreid)
 		TAILQ_INSERT_TAIL(&p->ksched_data.crd.prov_alloc_me, spc, prov_next);
 	}
 	/* Actually allocate the core, removing it from the idle core list. */
-	TAILQ_INSERT_TAIL(&p->ksched_data.crd.alloc_me, spc, alloc_next);
 	TAILQ_REMOVE(&idlecores, spc, alloc_next);
+	TAILQ_INSERT_TAIL(&p->ksched_data.crd.alloc_me, spc, alloc_next);
 	incref_nodes(spc->sched_pnode);
 }
 
