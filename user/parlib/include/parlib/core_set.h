@@ -5,13 +5,6 @@
 
 #pragma once
 
-#include <ros/arch/arch.h>
-#include <ros/common.h>
-#include <sys/types.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <limits.h>
-#include <parlib/parlib.h>
 #include <parlib/bitmask.h>
 
 __BEGIN_DECLS

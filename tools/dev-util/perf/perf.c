@@ -19,8 +19,8 @@
 #include <time.h>
 #include <parlib/parlib.h>
 #include <parlib/timing.h>
+#include <parlib/core_set.h>
 #include "xlib.h"
-#include "akaros.h"
 #include "perfconv.h"
 #include "perf_core.h"
 

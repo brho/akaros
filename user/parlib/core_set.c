@@ -6,13 +6,16 @@
 #include <ros/arch/arch.h>
 #include <ros/common.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <unistd.h>
 #include <parlib/parlib.h>
-#include "xlib.h"
-#include "akaros.h"
+#include <parlib/core_set.h>
 
 static const unsigned int llcores[] = {
 	0
@@ -40,7 +43,7 @@ static int get_vars_nr_cores(void)
 	int fd, ret;
 	char buf[10];
 
-	fd = xopen("#vars/num_cores!dw", O_READ, 0);
+	fd = open("#vars/num_cores!dw", O_READ);
 	if (fd < 0)
 		return -1;
 	if (read(fd, buf, sizeof(buf)) <= 0) {
@@ -71,10 +74,14 @@ size_t parlib_nr_total_cores(void)
 void parlib_parse_cores(const char *str, struct core_set *cores)
 {
 	unsigned int fcpu, ncpu;
-	char *dstr = xstrdup(str);
+	char *dstr = strdup(str);
 	char *sptr = NULL;
 	char *tok, *sptr2;
 
+	if (!dstr) {
+		perror("Duplicating a string");
+		exit(1);
+	}
 	ZERO_DATA(*cores);
 	for (tok = strtok_r(dstr, ",", &sptr); tok;
 		 tok = strtok_r(NULL, ",", &sptr)) {

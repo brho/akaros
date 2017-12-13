@@ -1,6 +1,6 @@
 include ../../Makefrag
 
-SOURCES = perf.c perfconv.c xlib.c perf_core.c akaros.c symbol-elf.c
+SOURCES = perf.c perfconv.c xlib.c perf_core.c symbol-elf.c
 
 XCC = $(CROSS_COMPILE)gcc
 

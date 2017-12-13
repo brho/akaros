@@ -20,11 +20,11 @@
 #include <errno.h>
 #include <regex.h>
 #include <parlib/parlib.h>
+#include <parlib/core_set.h>
 #include <perfmon/err.h>
 #include <perfmon/pfmlib.h>
 #include "xlib.h"
 #include "perfconv.h"
-#include "akaros.h"
 #include "perf_core.h"
 #include "elf.h"
 

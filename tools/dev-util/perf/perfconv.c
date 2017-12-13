@@ -25,6 +25,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <assert.h>
 #include "perf_format.h"
 #include "xlib.h"
 #include "perf_core.h"

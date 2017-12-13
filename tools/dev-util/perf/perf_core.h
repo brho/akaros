@@ -12,7 +12,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <limits.h>
-#include "akaros.h"
+#include <parlib/core_set.h>
 #include "perfconv.h"
 
 #define MAX_CPU_EVENTS 256
