@@ -1,10 +1,8 @@
 #pragma once
 
-#include <string.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <parlib/arch/atomic.h>
-#include <stdio.h>
 
 __BEGIN_DECLS
 
@@ -74,28 +72,16 @@ static bool BITMASK_IS_CLEAR(const uint8_t *name, size_t size)
 static inline bool BITMASK_IS_FULL(const uint8_t *map, size_t size)
 {
 	size_t nr_bytes = BYTES_FOR_BITMASK(size);
+	int i, j;
 
-	for (int i = 0; i < nr_bytes; i++) {
-		for (int j = 0; j < MIN(8, size); j++) {
+	for (i = 0; i < nr_bytes; i++) {
+		for (j = 0; j < MIN(8, size); j++) {
 			if (!((map[i] >> j) & 1))
 				return FALSE;
 			size--;
 		}
 	}
 	return TRUE;
-}
-
-static inline void PRINT_BITMASK(const uint8_t *name, size_t size)
-{
-	size_t nr_bytes = BYTES_FOR_BITMASK(size);
-
-	for (int i = 0; i < nr_bytes; i++) {
-		for (int j = 0; j < MIN(8, size); j++) {
-			printf("%x", (name[i] >> j) & 1);
-			size--;
-		}
-	}
-	printf("\n");
 }
 
 __END_DECLS
