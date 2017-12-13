@@ -186,7 +186,7 @@ static error_t parse_collect_opt(int key, char *arg, struct argp_state *state)
 		 * processes yet. */
 		break;
 	case 'C':
-		ros_parse_cores(arg, &p_opts->cores);
+		parlib_parse_cores(arg, &p_opts->cores);
 		p_opts->got_cores = TRUE;
 		break;
 	case 'e':
@@ -209,7 +209,7 @@ static error_t parse_collect_opt(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		/* By default, we set all cores (different than linux) */
 		if (!p_opts->got_cores)
-			ros_get_all_cores_set(&p_opts->cores);
+			parlib_get_all_core_set(&p_opts->cores);
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
@@ -534,7 +534,7 @@ static void run_process_and_wait(int argc, char *argv[],
 								 const struct core_set *cores)
 {
 	int pid, status;
-	size_t max_cores = ros_total_cores();
+	size_t max_cores = parlib_nr_total_cores();
 	struct core_set pvcores;
 
 	pid = create_child_with_stdfds(argv[0], argc, argv, environ);
@@ -544,11 +544,11 @@ static void run_process_and_wait(int argc, char *argv[],
 		exit(1);
 	}
 	if (cores) {
-		ros_get_low_latency_core_set(&pvcores);
-		ros_not_core_set(&pvcores);
-		ros_and_core_sets(&pvcores, cores);
+		parlib_get_ll_core_set(&pvcores);
+		parlib_not_core_set(&pvcores);
+		parlib_and_core_sets(&pvcores, cores);
 		for (size_t i = 0; i < max_cores; i++) {
-			if (ros_get_bit(&pvcores, i)) {
+			if (parlib_get_core(&pvcores, i)) {
 				if (sys_provision(pid, RES_CORES, i)) {
 					fprintf(stderr,
 							"Unable to provision CPU %lu to PID %d: cmd='%s'\n",

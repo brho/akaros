@@ -18,21 +18,21 @@ static const unsigned int llcores[] = {
 	0
 };
 
-void ros_get_low_latency_core_set(struct core_set *cores)
+void parlib_get_ll_core_set(struct core_set *cores)
 {
-	ros_get_no_cores_set(cores);
+	parlib_get_none_core_set(cores);
 	for (size_t i = 0; i < COUNT_OF(llcores); i++)
-		ros_set_bit(cores, llcores[i]);
+		parlib_set_core(cores, llcores[i]);
 }
 
-size_t ros_get_low_latency_core_count(void)
+size_t parlib_nr_ll_cores(void)
 {
 	return COUNT_OF(llcores);
 }
 
 static int guess_nr_cores(void)
 {
-	return max_vcores() + ros_get_low_latency_core_count();
+	return max_vcores() + parlib_nr_ll_cores();
 }
 
 static int get_vars_nr_cores(void)
@@ -60,7 +60,7 @@ static void set_nr_cores(void *arg)
 		nr_cores = guess_nr_cores();
 }
 
-size_t ros_total_cores(void)
+size_t parlib_nr_total_cores(void)
 {
 	static parlib_once_t once = PARLIB_ONCE_INIT;
 
@@ -68,7 +68,7 @@ size_t ros_total_cores(void)
 	return nr_cores;
 }
 
-void ros_parse_cores(const char *str, struct core_set *cores)
+void parlib_parse_cores(const char *str, struct core_set *cores)
 {
 	unsigned int fcpu, ncpu;
 	char *dstr = xstrdup(str);
@@ -84,11 +84,11 @@ void ros_parse_cores(const char *str, struct core_set *cores)
 				fprintf(stderr, "Invalid CPU range: %s\n", tok);
 				exit(1);
 			}
-			if (fcpu >= ros_total_cores()) {
+			if (fcpu >= parlib_nr_total_cores()) {
 				fprintf(stderr, "CPU number out of bound: %u\n", fcpu);
 				exit(1);
 			}
-			if (ncpu >= ros_total_cores()) {
+			if (ncpu >= parlib_nr_total_cores()) {
 				fprintf(stderr, "CPU number out of bound: %u\n", ncpu);
 				exit(1);
 			}
@@ -97,37 +97,37 @@ void ros_parse_cores(const char *str, struct core_set *cores)
 				exit(1);
 			}
 			for (; fcpu <= ncpu; fcpu++)
-				ros_set_bit(cores->core_set, fcpu);
+				parlib_set_core(cores, fcpu);
 		} else {
 			fcpu = atoi(tok);
-			if (fcpu >= ros_total_cores()) {
+			if (fcpu >= parlib_nr_total_cores()) {
 				fprintf(stderr, "CPU number out of bound: %u\n",
 						fcpu);
 				exit(1);
 			}
-			ros_set_bit(cores->core_set, fcpu);
+			parlib_set_core(cores, fcpu);
 		}
 	}
 	free(dstr);
 }
 
-void ros_get_all_cores_set(struct core_set *cores)
+void parlib_get_all_core_set(struct core_set *cores)
 {
-	size_t max_cores = ros_total_cores();
+	size_t max_cores = parlib_nr_total_cores();
 
 	memset(cores->core_set, 0xff, DIV_ROUND_UP(max_cores, CHAR_BIT));
 }
 
-void ros_get_no_cores_set(struct core_set *cores)
+void parlib_get_none_core_set(struct core_set *cores)
 {
-	size_t max_cores = ros_total_cores();
+	size_t max_cores = parlib_nr_total_cores();
 
 	memset(cores->core_set, 0, DIV_ROUND_UP(max_cores, CHAR_BIT));
 }
 
-void ros_not_core_set(struct core_set *dcs)
+void parlib_not_core_set(struct core_set *dcs)
 {
-	size_t max_cores = ros_total_cores();
+	size_t max_cores = parlib_nr_total_cores();
 
 	for (size_t i = 0; (max_cores > 0) && (i < sizeof(dcs->core_set)); i++) {
 		size_t nb = (max_cores >= CHAR_BIT) ? CHAR_BIT : max_cores;
@@ -137,13 +137,13 @@ void ros_not_core_set(struct core_set *dcs)
 	}
 }
 
-void ros_and_core_sets(struct core_set *dcs, const struct core_set *scs)
+void parlib_and_core_sets(struct core_set *dcs, const struct core_set *scs)
 {
 	for (size_t i = 0; i < sizeof(dcs->core_set); i++)
 		dcs->core_set[i] &= scs->core_set[i];
 }
 
-void ros_or_core_sets(struct core_set *dcs, const struct core_set *scs)
+void parlib_or_core_sets(struct core_set *dcs, const struct core_set *scs)
 {
 	for (size_t i = 0; i < sizeof(dcs->core_set); i++)
 		dcs->core_set[i] |= scs->core_set[i];

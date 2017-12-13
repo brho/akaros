@@ -14,37 +14,37 @@
 #include <parlib/parlib.h>
 #include <parlib/bitmask.h>
 
+__BEGIN_DECLS
+
 #define CORE_SET_SIZE BYTES_FOR_BITMASK(MAX_NUM_CORES)
 
-/* Not using sched.h CPU set because that file has definitions for a large
- * number of APIs Akaros does not support.
- * Making Akaros core_set.h visible in userslace might be a cleaner approach.
- */
 struct core_set {
 	DECL_BITMASK(core_set, MAX_NUM_CORES);
 };
 
-void ros_get_low_latency_core_set(struct core_set *cores);
-size_t ros_get_low_latency_core_count(void);
-size_t ros_total_cores(void);
-void ros_parse_cores(const char *str, struct core_set *cores);
-void ros_get_all_cores_set(struct core_set *cores);
-void ros_get_no_cores_set(struct core_set *cores);
-void ros_not_core_set(struct core_set *dcs);
-void ros_and_core_sets(struct core_set *dcs, const struct core_set *scs);
-void ros_or_core_sets(struct core_set *dcs, const struct core_set *scs);
+void parlib_get_ll_core_set(struct core_set *cores);
+size_t parlib_nr_ll_cores(void);
+size_t parlib_nr_total_cores(void);
+void parlib_parse_cores(const char *str, struct core_set *cores);
+void parlib_get_all_core_set(struct core_set *cores);
+void parlib_get_none_core_set(struct core_set *cores);
+void parlib_not_core_set(struct core_set *dcs);
+void parlib_and_core_sets(struct core_set *dcs, const struct core_set *scs);
+void parlib_or_core_sets(struct core_set *dcs, const struct core_set *scs);
 
-static inline void ros_set_bit(void *addr, size_t nbit)
+static inline void parlib_set_core(struct core_set *cores, size_t coreid)
 {
-	SET_BITMASK_BIT(addr, nbit);
+	SET_BITMASK_BIT(cores->core_set, coreid);
 }
 
-static inline void ros_clear_bit(void *addr, size_t nbit)
+static inline void parlib_clear_core(struct core_set *cores, size_t coreid)
 {
-	CLR_BITMASK_BIT(addr, nbit);
+	CLR_BITMASK_BIT(cores->core_set, coreid);
 }
 
-static inline bool ros_get_bit(const void *addr, size_t nbit)
+static inline bool parlib_get_core(const struct core_set *cores, size_t coreid)
 {
-	return GET_BITMASK_BIT(addr, nbit);
+	return GET_BITMASK_BIT(cores->core_set, coreid);
 }
+
+__END_DECLS
