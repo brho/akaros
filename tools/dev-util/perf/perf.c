@@ -534,8 +534,6 @@ static void run_process_and_wait(int argc, char *argv[],
 								 const struct core_set *cores)
 {
 	int pid, status;
-	size_t max_cores = parlib_nr_total_cores();
-	struct core_set pvcores;
 
 	pid = create_child_with_stdfds(argv[0], argc, argv, environ);
 	if (pid < 0) {
@@ -544,19 +542,12 @@ static void run_process_and_wait(int argc, char *argv[],
 		exit(1);
 	}
 	if (cores) {
-		parlib_get_ll_core_set(&pvcores);
-		parlib_not_core_set(&pvcores);
-		parlib_and_core_sets(&pvcores, cores);
-		for (size_t i = 0; i < max_cores; i++) {
-			if (parlib_get_core(&pvcores, i)) {
-				if (sys_provision(pid, RES_CORES, i)) {
-					fprintf(stderr,
-							"Unable to provision CPU %lu to PID %d: cmd='%s'\n",
-							i, pid, argv[0]);
-					sys_proc_destroy(pid, -1);
-					exit(1);
-				}
-			}
+		if (provision_core_set(pid, cores)) {
+			fprintf(stderr,
+					"Unable to provision all cores to PID %d: cmd='%s'\n",
+					pid, argv[0]);
+			sys_proc_destroy(pid, -1);
+			exit(1);
 		}
 	}
 	sys_proc_run(pid);

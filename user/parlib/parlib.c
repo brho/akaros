@@ -3,6 +3,7 @@
  * See LICENSE for details. */
 
 #include <parlib/parlib.h>
+#include <parlib/core_set.h>
 #include <parlib/ros_debug.h>
 #include <stdlib.h>
 
@@ -88,4 +89,22 @@ pid_t create_child_with_stdfds(const char *exe, int argc, char *const argv[],
 		return -1;
 	}
 	return kid;
+}
+
+/* Provisions the CG cores to PID.  Returns -1 if any of them fail. */
+int provision_core_set(pid_t pid, const struct core_set *cores)
+{
+	struct core_set pvcores;
+	size_t max_cores = parlib_nr_total_cores();
+
+	parlib_get_ll_core_set(&pvcores);
+	parlib_not_core_set(&pvcores);
+	parlib_and_core_sets(&pvcores, cores);
+	for (size_t i = 0; i < max_cores; i++) {
+		if (parlib_get_core(&pvcores, i)) {
+			if (sys_provision(pid, RES_CORES, i))
+				return -1;
+		}
+	}
+	return 0;
 }

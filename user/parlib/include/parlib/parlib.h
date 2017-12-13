@@ -10,6 +10,7 @@
 
 #include <parlib/common.h>
 #include <parlib/vcore.h>
+#include <parlib/core_set.h>
 #include <ros/memlayout.h>
 #include <ros/syscall.h>
 #include <ros/procinfo.h>
@@ -72,6 +73,7 @@ pid_t create_child(const char *exe, int argc, char *const argv[],
                    char *const envp[]);
 pid_t create_child_with_stdfds(const char *exe, int argc, char *const argv[],
                                char *const envp[]);
+int provision_core_set(pid_t pid, const struct core_set *cores);
 
 /* Once */
 typedef struct {
