@@ -117,14 +117,19 @@ static void set_num_cores(void)
 }
 
 /* Determine if srat has a unique numa domain compared to to all of the srat
- * records in list_head that are of type SRlapic. */
+ * records in list_head that are of type SRlapic.
+ *
+ * Note that this only finds a unique NUMA domain when we're on the last core in
+ * the list with that domain.  When we find that one, we'll need to scan the
+ * O(n) other cores from the other domains that are ahead of us in the list.
+ * It's a little inefficient, but OK for now. */
 static bool is_unique_numa(struct Srat *srat, struct Atable **tail,
                            size_t begin, size_t end)
 {
 	for (int i = begin; i < end; i++) {
 		struct Srat *st = tail[i]->tbl;
 
-		if (st->type == SRlapic)
+		if (st && st->type == SRlapic)
 			if (srat->lapic.dom == st->lapic.dom)
 				return FALSE;
 	}
@@ -144,7 +149,7 @@ static int get_num_numa(void)
 		struct Srat *temp = srat->children[i]->tbl;
 
 		if (temp != NULL && temp->type == SRlapic)
-			if (is_unique_numa(temp, srat->children, i, srat->nchildren))
+			if (is_unique_numa(temp, srat->children, i + 1, srat->nchildren))
 				numa++;
 	}
 
