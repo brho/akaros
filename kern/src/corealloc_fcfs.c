@@ -25,18 +25,16 @@ void corealloc_init(void)
 	/* init the idlecore list.  if they turned off hyperthreading, give them the
 	 * odds from 1..max-1.  otherwise, give them everything by 0 (default mgmt
 	 * core).  TODO: (CG/LL) better LL/CG mgmt */
-#ifndef CONFIG_DISABLE_SMT
-	for (int i = 0; i < num_cores; i++)
-		if (!is_ll_core(i))
-			TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
-#else
-	assert(!(num_cores % 2));
-	/* TODO: rethink starting at 1 here. If SMT is really disabled, the entire
-	 * core of an "ll" core shouldn't be available. */
-	for (int i = 1; i < num_cores; i += 2)
-		if (!is_ll_core(i))
-			TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
+	for (int i = 0; i < num_cores; i++) {
+		if (is_ll_core(i))
+			continue;
+#ifdef CONFIG_DISABLE_SMT
+		/* Remove all odd cores from consideration for allocation. */
+		if (i % 2 == 1)
+			continue;
 #endif /* CONFIG_DISABLE_SMT */
+		TAILQ_INSERT_TAIL(&idlecores, pcoreid2spc(i), alloc_next);
+	}
 }
 
 /* Initialize any data associated with allocating cores to a process. */

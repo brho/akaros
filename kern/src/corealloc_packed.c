@@ -190,8 +190,8 @@ void corealloc_init(void)
 			continue;
 		}
 #ifdef CONFIG_DISABLE_SMT
-		/* Remove all even cores from consideration for allocation. */
-		if (i % 2 == 0) {
+		/* Remove all odd cores from consideration for allocation. */
+		if (i % 2 == 1) {
 			incref_nodes(all_pcores[i].sched_pnode);
 			continue;
 		}
