@@ -1331,7 +1331,6 @@ int intel_vmm_pcpu_init(void)
 	if (ret)
 		goto failed;
 	currentcpu->vmx_enabled = 1;
-	printk("VMX enabled on CPU %d\n", core_id());
 	return 0;
 failed:
 	printk("Failed to enable VMX on core %d, err = %d\n", core_id(), ret);
