@@ -12,7 +12,6 @@
 
 enum pnode_type { CORE, CPU, SOCKET, NUMA, MACHINE, NUM_NODE_TYPES };
 static char pnode_label[5][8] = { "CORE", "CPU", "SOCKET", "NUMA", "MACHINE" };
-#define UNNAMED_PROC ((void*)-1)
 
 /* Internal representation of a node in the hierarchy of elements in the cpu
  * topology of the machine (i.e. numa domain, socket, cpu, core, etc.). */
@@ -184,26 +183,22 @@ void corealloc_init(void)
 	/* Initialize our table of core_distances */
 	init_core_distances();
 
-	/* Remove all ll_cores from consideration for allocation. */
-	for (int i = 0; i < num_cores; i++)
+	for (int i = 0; i < num_cores; i++) {
+		/* Remove all ll_cores from consideration for allocation. */
 		if (is_ll_core(i)) {
-			all_pcores[i].alloc_proc = UNNAMED_PROC;
 			incref_nodes(all_pcores[i].sched_pnode);
+			continue;
 		}
-
 #ifdef CONFIG_DISABLE_SMT
-	/* Remove all even cores from consideration for allocation. */
-	assert(!(num_cores % 2));
-	for (int i = 0; i < num_cores; i += 2) {
-		all_pcores[i].alloc_proc = UNNAMED_PROC;
-		incref_nodes(all_pcores[i].sched_pnode);
-	}
+		/* Remove all even cores from consideration for allocation. */
+		if (i % 2 == 0) {
+			incref_nodes(all_pcores[i].sched_pnode);
+			continue;
+		}
 #endif /* CONFIG_DISABLE_SMT */
-
-	/* Fill the idlecores array. */
-	for (int i = 0; i < num_cores; i++)
-		if (all_pcores[i].alloc_proc != UNNAMED_PROC)
-			TAILQ_INSERT_HEAD(&idlecores, &all_pcores[i], alloc_next);
+		/* Fill the idlecores array. */
+		TAILQ_INSERT_HEAD(&idlecores, &all_pcores[i], alloc_next);
+	}
 }
 
 /* Initialize any data associated with allocating cores to a process. */
