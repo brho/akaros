@@ -1,12 +1,11 @@
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <argp.h>
 
 #include <parlib/parlib.h>
 #include <parlib/vcore.h>
-
-const char *argp_program_version = "prov v0.1475263";
-const char *argp_program_bug_address = "<akaros+subscribe@googlegroups.com>";
 
 static char doc[] = "prov -- control for provisioning resources";
 static char args_doc[] = "-p PID\n-c PROGRAM [ARGS]\nPROGRAM [ARGS]\n"
@@ -31,9 +30,8 @@ static struct argp_option options[] = {
 	{0, 0, 0, 0, "Call with exactly one of these when changing a provision:"},
 	{"value",		'v', "VAL",	0, "Type-specific value, passed to the kernel"},
 	{"max",			'm', 0,		0, "Provision all resources of the given type"},
-	{0, 0, 0, OPTION_DOC, "Cores are provisioned to processes, so the value is "
-	                      "a specific pcore id.  To undo a core's "
-	                      "provisioning, pass in pid=0."},
+	{0, 0, 0, OPTION_DOC, "VAL for cores is a list, e.g. -v 1,3-5,9"},
+	{0, 0, 0, OPTION_DOC, "To undo a core's provisioning, pass in pid=0."},
 	{ 0 }
 };
 
@@ -42,13 +40,14 @@ static struct argp_option options[] = {
 #define PROV_MODE_SHOW			3
 
 struct prog_args {
-	char						*cmd;
-	char						**cmd_args;
+	char						**cmd_argv;
+	int							cmd_argc;
 	int							mode;		/* PROV_MODE_ETC */
 	pid_t						pid;
 	char						res_type;	/* cores (c), ram (m), etc */
-	long						res_val;	/* type-specific value */
-	int							max;
+	char						*res_val;	/* type-specific value, unparsed */
+	struct core_set				cores;
+	bool						max;
 	int							dummy_val_flag;
 };
 
@@ -83,11 +82,14 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
 				argp_usage(state);
 			}
 			pargs->mode = PROV_MODE_CMD;
-			pargs->cmd = arg;
-			/* Point to the next arg.  We can also check state->arg_num, which
-			 * is how many non-arpg arguments there are */
-			pargs->cmd_args = &state->argv[state->next];
-			/* Consume all args (it's done when next == argc) */
+
+			pargs->cmd_argc = state->argc - state->next + 1;
+			pargs->cmd_argv = malloc(sizeof(char*) * (pargs->cmd_argc + 1));
+			assert(pargs->cmd_argv);
+			pargs->cmd_argv[0] = arg;
+			memcpy(&pargs->cmd_argv[1], &state->argv[state->next],
+			       sizeof(char*) * (pargs->cmd_argc - 1));
+			pargs->cmd_argv[pargs->cmd_argc] = NULL;
 			state->next = state->argc;
 			break;
 		case 'v':
@@ -97,7 +99,7 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
 				argp_usage(state);
 			}
 			pargs->dummy_val_flag = 1;
-			pargs->res_val = atol(arg);
+			pargs->res_val = arg;
 			break;
 		case 'm':
 			if (pargs->dummy_val_flag) {
@@ -105,7 +107,7 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
 				argp_usage(state);
 			}
 			pargs->dummy_val_flag = 1;
-			pargs->max = 1;
+			pargs->max = true;
 			break;
 		case ARGP_KEY_END:
 			/* Make sure we selected a mode */
@@ -125,66 +127,18 @@ static struct argp argp = {options, parse_opt, args_doc, doc};
 /* Used by both -p and -c modes (-c will use it after creating pid) */
 static int prov_pid(pid_t pid, struct prog_args *pargs)
 {
-	unsigned int kernel_res_type;
-	int retval;
 	switch (pargs->res_type) {
 		case ('c'):
 			if (pargs->max) {
-				/* TODO: don't guess the LL/CG layout and num pcores */
-				#if 1
-				for (int i = 1; i < max_vcores() + 1; i++) {
-					if ((retval = sys_provision(pid, RES_CORES, i))) {
-						perror("Failed max provisioning");
-						return retval;
-					}
-				}
-				#else
-				/* To force a vcore shuffle / least optimal ordering, change
-				 * the if 1 to 0.  Normally, we provision out in a predictable,
-				 * VCn->PCn+1 ordering.  This splits the odd and even VCs
-				 * across sockets on a 32 PC machine (c89).  This is only for
-				 * perf debugging, when using the lockprov.sh script. */
-				retval = 0;
-				retval |= sys_provision(pid, RES_CORES,  1);
-				retval |= sys_provision(pid, RES_CORES, 16);
-				retval |= sys_provision(pid, RES_CORES,  2);
-				retval |= sys_provision(pid, RES_CORES, 17);
-				retval |= sys_provision(pid, RES_CORES,  3);
-				retval |= sys_provision(pid, RES_CORES, 18);
-				retval |= sys_provision(pid, RES_CORES,  4);
-				retval |= sys_provision(pid, RES_CORES, 19);
-				retval |= sys_provision(pid, RES_CORES,  5);
-				retval |= sys_provision(pid, RES_CORES, 20);
-				retval |= sys_provision(pid, RES_CORES,  6);
-				retval |= sys_provision(pid, RES_CORES, 21);
-				retval |= sys_provision(pid, RES_CORES,  7);
-				retval |= sys_provision(pid, RES_CORES, 22);
-				retval |= sys_provision(pid, RES_CORES,  8);
-				retval |= sys_provision(pid, RES_CORES, 23);
-				retval |= sys_provision(pid, RES_CORES,  9);
-				retval |= sys_provision(pid, RES_CORES, 24);
-				retval |= sys_provision(pid, RES_CORES, 10);
-				retval |= sys_provision(pid, RES_CORES, 25);
-				retval |= sys_provision(pid, RES_CORES, 11);
-				retval |= sys_provision(pid, RES_CORES, 26);
-				retval |= sys_provision(pid, RES_CORES, 12);
-				retval |= sys_provision(pid, RES_CORES, 27);
-				retval |= sys_provision(pid, RES_CORES, 13);
-				retval |= sys_provision(pid, RES_CORES, 28);
-				retval |= sys_provision(pid, RES_CORES, 14);
-				retval |= sys_provision(pid, RES_CORES, 29);
-				retval |= sys_provision(pid, RES_CORES, 15);
-				retval |= sys_provision(pid, RES_CORES, 31);
-				retval |= sys_provision(pid, RES_CORES, 30);
-				return retval;
-				#endif
+				parlib_get_all_core_set(&pargs->cores);
 			} else {
-				if ((retval = sys_provision(pid, RES_CORES, pargs->res_val))) {
-					perror("Failed single provision");
-					return retval;
+				if (!pargs->res_val) {
+					printf("Need a list of cores to provision\n");
+					return -1;
 				}
+				parlib_parse_cores(pargs->res_val, &pargs->cores);
 			}
-			kernel_res_type = RES_CORES;
+			provision_core_set(pid, &pargs->cores);
 			break;
 		case ('m'):
 			printf("Provisioning memory is not supported yet\n");
@@ -197,14 +151,13 @@ static int prov_pid(pid_t pid, struct prog_args *pargs)
 				printf("Unsupported resource type %c\n", pargs->res_type);
 			return -1;
 	}
-	sys_poke_ksched(pid, kernel_res_type);
 	return 0;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char **argv, char **envp)
 {
-
 	struct prog_args pargs = {0};
+	pid_t pid;
 
 	argp_parse(&argp, argc, argv, 0, 0, &pargs);
 
@@ -213,16 +166,23 @@ int main(int argc, char **argv)
 			return prov_pid(pargs.pid, &pargs);
 			break;
 		case (PROV_MODE_CMD):
-			printf("Launching programs not supported yet\n");
-			printf("Would have launched %s with args:", pargs.cmd);
-			if (pargs.cmd_args)
-				for (int i = 0; pargs.cmd_args[i]; i++)
-					printf(" %s", pargs.cmd_args[i]);
-			printf("\n");
+			pid = create_child_with_stdfds(pargs.cmd_argv[0], pargs.cmd_argc,
+			                               pargs.cmd_argv, envp);
+			if (pid < 0) {
+				perror("Unable to spawn child");
+				exit(-1);
+			}
+			if (prov_pid(pid, &pargs)) {
+				perror("Unable to provision to child");
+				sys_proc_destroy(pid, -1);
+				exit(-1);
+			}
+			sys_proc_run(pid);
+			waitpid(pid, NULL, 0);
 			return 0;
-			break;
 		case (PROV_MODE_SHOW):
 			printf("Show mode not supported yet, using ghetto interface\n\n");
+			printf("Check 'dmesg' if you aren't on the console\n\n");
 			sys_provision(-1, 0, 0);
 			return 0;
 			break;
