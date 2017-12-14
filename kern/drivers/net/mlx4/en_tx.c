@@ -1299,6 +1299,11 @@ void __mlx4_xmit_poke(void *args)
 		block = qget(edev->oq);
 		if (!block)
 			break;
+		/* This estimate might be off a little.  I think the driver is expecting
+		 * 16 (Linux's MAX_SKB_FRAGS).  I base that in part on the comment in
+		 * mlx4_en.h (grep "Typical TSO"). */
+		if (block->nr_extra_bufs > MAX_SKB_FRAGS)
+			block = linearizeblock(block);
 		mlx4_send_packet(block, priv, ring);
 	}
 }
