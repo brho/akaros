@@ -366,6 +366,19 @@ int _sock_lookup_listen_fd(int sock_fd, bool can_open)
 	return _rock_open_listen_fd(r);
 }
 
+/* Used by fcntl for F_SETFL. */
+void _sock_mirror_fcntl(int sock_fd, int cmd, long arg)
+{
+	Rock *r = _sock_findrock(sock_fd, 0);
+
+	if (!r || r->domain == PF_UNIX)
+		return;
+	if (r->ctl_fd >= 0)
+		syscall(SYS_fcntl, r->ctl_fd, cmd, arg);
+	if (r->has_listen_fd)
+		syscall(SYS_fcntl, r->listen_fd, cmd, arg);
+}
+
 /* Given an FD, opens the FD with the name 'sibling' in the same directory.
  * e.g., you have a data, you open a ctl.  Don't use this with cloned FDs (i.e.
  * open clone, get a ctl back) until we fix 9p and fd2path.

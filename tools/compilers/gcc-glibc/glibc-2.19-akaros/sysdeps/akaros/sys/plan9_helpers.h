@@ -76,6 +76,7 @@ extern void _sock_ingetaddr(Rock *, struct sockaddr_in *, socklen_t *,
 extern int _sock_strip_opts(int type);
 extern int _sock_get_opts(int type);
 extern int _sock_lookup_listen_fd(int sock_fd, bool can_open);
+extern void _sock_mirror_fcntl(int sock_fd, int cmd, long arg);
 
 int get_sibling_fd(int fd, const char *sibling);
 int write_hex_to_fd(int fd, uint64_t num);
