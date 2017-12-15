@@ -60,7 +60,7 @@ libc {
     register_close_cb;
     register_fork_cb;
 
-    _sock_lookup_listen_fd;
+    _sock_lookup_rock_fds;
     get_sibling_fd;
     write_hex_to_fd;
 

@@ -357,7 +357,7 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 	struct ceq_event *ceq_ev;
 	struct ep_fd_data *ep_fd;
 	struct fd_tap_req tap_req = {0};
-	int ret, filter, sock_listen_fd;
+	int ret, filter, sock_listen_fd, sock_ctl_fd;
 	struct epoll_event listen_event;
 
 	/* Only support ET.  Also, we just ignore EPOLLONESHOT.  That might work,
@@ -386,7 +386,7 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 	 * As far as tracking the FD goes for epoll_wait() reporting, if the app
 	 * wants to track the FD they think we are using, then they already passed
 	 * that in event->data. */
-	sock_listen_fd = _sock_lookup_listen_fd(fd, TRUE);
+	_sock_lookup_rock_fds(fd, TRUE, &sock_listen_fd, &sock_ctl_fd);
 	if (sock_listen_fd >= 0) {
 		listen_event.events = EPOLLET | EPOLLIN | EPOLLHUP;
 		listen_event.data = event->data;
@@ -431,7 +431,7 @@ static int __epoll_ctl_del(struct epoll_ctlr *ep, int fd,
 	struct ceq_event *ceq_ev;
 	struct ep_fd_data *ep_fd;
 	struct fd_tap_req tap_req = {0};
-	int ret, sock_listen_fd;
+	int ret, sock_listen_fd, sock_ctl_fd;
 
 	/* If we were dealing with a socket shim FD, we tapped both the listen and
 	 * the data file and need to untap both of them.
@@ -440,7 +440,7 @@ static int __epoll_ctl_del(struct epoll_ctlr *ep, int fd,
 	 * In that case, we don't want to try and open it.  If the listen FD isn't
 	 * open, then we know it isn't in an epoll set.  We also know the data FD
 	 * isn't epolled either, since we always epoll both FDs for rocks. */
-	sock_listen_fd = _sock_lookup_listen_fd(fd, FALSE);
+	_sock_lookup_rock_fds(fd, FALSE, &sock_listen_fd, &sock_ctl_fd);
 	if (sock_listen_fd >= 0) {
 		/* It's possible to fail here.  Even though we tapped it already, if the
 		 * deletion was triggered from close callbacks, it's possible for the

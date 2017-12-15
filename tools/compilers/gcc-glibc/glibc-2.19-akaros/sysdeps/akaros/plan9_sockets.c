@@ -351,19 +351,21 @@ static int _rock_open_listen_fd(Rock *r)
 	return ret;
 }
 
-/* Used by user/iplib (e.g. epoll).  Returns an FD for the listen file, opened
- * O_PATH, for this conversation.  Returns -1 on error. */
-int _sock_lookup_listen_fd(int sock_fd, bool can_open)
+/* Used by user/iplib (e.g. epoll).  Returns the FDs for the ctl_fd and for the
+ * listen file, opened O_PATH, for this conversation.  Returns -1 on no FDs. */
+void _sock_lookup_rock_fds(int sock_fd, bool can_open_listen_fd,
+                           int *listen_fd_r, int *ctl_fd_r)
 {
 	Rock *r = _sock_findrock(sock_fd, 0);
 
+	*listen_fd_r = -1;
+	*ctl_fd_r = -1;
 	if (!r || r->domain == PF_UNIX)
-		return -1;
-	if (r->has_listen_fd)
-		return r->listen_fd;
-	if (!can_open)
-		return -1;
-	return _rock_open_listen_fd(r);
+		return;
+	if (!r->has_listen_fd && can_open_listen_fd)
+		_rock_open_listen_fd(r);
+	*listen_fd_r = r->listen_fd;	/* might still be -1.  that's OK. */
+	*ctl_fd_r = r->ctl_fd;
 }
 
 /* Used by fcntl for F_SETFL. */
