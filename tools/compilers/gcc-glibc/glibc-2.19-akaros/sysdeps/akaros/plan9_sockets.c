@@ -26,14 +26,6 @@
 
 #include <sys/plan9_helpers.h>
 
-int _sock_open_ctlfd(Rock *r)
-{
-	int open_flags = O_RDWR;
-
-	open_flags |= (r->sopts & SOCK_CLOEXEC ? O_CLOEXEC : 0);
-	return open(r->ctl, open_flags);
-}
-
 void
 _sock_ingetaddr(Rock *r, struct sockaddr_in *ip, socklen_t *alen,
                 const char *a)
@@ -194,6 +186,7 @@ Rock *_sock_newrock(int fd)
 	r->reserved = 0;
 	memset(&r->raddr, 0, sizeof(r->raddr_stor));
 	r->ctl[0] = '\0';
+	r->ctl_fd = -1;
 	r->other = -1;
 	r->has_listen_fd = FALSE;
 	r->listen_fd = -1;
@@ -206,6 +199,8 @@ void _sock_fd_closed(int fd)
 
 	if (!r)
 		return;
+	if (r->ctl_fd >= 0)
+		close(r->ctl_fd);
 	if (r->has_listen_fd) {
 		close(r->listen_fd);
 		/* This shouldn't matter - the rock is being closed anyways. */
@@ -214,7 +209,7 @@ void _sock_fd_closed(int fd)
 }
 
 /* For a ctlfd and a few other settings, it opens and returns the corresponding
- * datafd.  This will close cfd for you. */
+ * datafd.  This will close cfd on error, or store it in the rock o/w. */
 int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
                Rock **rp)
 {
@@ -239,8 +234,8 @@ int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
 	open_flags |= (type & SOCK_NONBLOCK ? O_NONBLOCK : 0);
 	open_flags |= (type & SOCK_CLOEXEC ? O_CLOEXEC : 0);
 	fd = open(name, open_flags);
-	close(cfd);	/* close this no matter what */
 	if (fd < 0) {
+		close(cfd);
 		errno = ENOBUFS;
 		return -1;
 	}
@@ -249,8 +244,9 @@ int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
 	snprintf(name, sizeof(name), "/net/%s/%d/ctl", net, n);
 	r = _sock_newrock(fd);
 	if (r == 0) {
-		errno = ENOBUFS;
+		close(cfd);
 		close(fd);
+		errno = ENOBUFS;
 		return -1;
 	}
 	if (rp)
@@ -262,6 +258,7 @@ int _sock_data(int cfd, const char *net, int domain, int type, int protocol,
 	r->sopts = _sock_get_opts(type);
 	r->protocol = protocol;
 	strcpy(r->ctl, name);
+	r->ctl_fd = cfd;
 	return fd;
 }
 

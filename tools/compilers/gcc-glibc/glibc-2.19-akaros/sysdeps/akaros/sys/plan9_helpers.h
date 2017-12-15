@@ -57,7 +57,8 @@ struct Rock {
 		struct sockaddr raddr;	/* peer address */
 		struct sockaddr_storage raddr_stor;
 	};
-	char ctl[Ctlsize];			/* name of control file (if any) */
+	char ctl[Ctlsize];			/* Only used for relative path lookups now */
+	int ctl_fd;					/* fd of the ctl file */
 	int other;					/* fd of the remote end for Unix domain */
 	bool has_listen_fd;			/* has set up a listen file, O_PATH */
 	int listen_fd;				/* fd of the listen file, if any */
@@ -75,7 +76,6 @@ extern void _sock_ingetaddr(Rock *, struct sockaddr_in *, socklen_t *,
 extern int _sock_strip_opts(int type);
 extern int _sock_get_opts(int type);
 extern int _sock_lookup_listen_fd(int sock_fd, bool can_open);
-extern int _sock_open_ctlfd(Rock *r);
 
 int get_sibling_fd(int fd, const char *sibling);
 int write_hex_to_fd(int fd, uint64_t num);

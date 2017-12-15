@@ -17,7 +17,7 @@
  * success, -1 for errors. */
 int shutdown(int fd, int how)
 {
-	int ret, ctlfd;
+	int ret;
 	static const char rd_msg[] = "shutdown rd";
 	static const char wr_msg[] = "shutdown wr";
 	static const char rdwr_msg[] = "shutdown rdwr";
@@ -49,11 +49,7 @@ int shutdown(int fd, int how)
 		werrstr("Rock lookup failed");
 		return -1;
 	}
-	ctlfd = _sock_open_ctlfd(r);
-	if (!ctlfd)
-		return -1;
-	ret = write(ctlfd, msg, msg_sz);
-	close(ctlfd);
+	ret = write(r->ctl_fd, msg, msg_sz);
 	if (ret != msg_sz)
 		return -1;
 	return 0;

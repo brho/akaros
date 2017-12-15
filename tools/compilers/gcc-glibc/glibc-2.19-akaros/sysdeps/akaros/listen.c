@@ -31,7 +31,7 @@
 int __listen(int fd, int backlog)
 {
 	Rock *r;
-	int n, cfd;
+	int n;
 	char msg[128];
 	struct sockaddr_in *lip;
 	struct sockaddr_un *lunix;
@@ -44,28 +44,20 @@ int __listen(int fd, int backlog)
 
 	switch (r->domain) {
 		case PF_INET:
-			cfd = _sock_open_ctlfd(r);
-			if (cfd < 0) {
-				errno = EBADF;
-				return -1;
-			}
 			lip = (struct sockaddr_in *)&r->addr;
 			if (lip->sin_port >= 0) {
-				if (write(cfd, "bind 0", 6) < 0) {
+				if (write(r->ctl_fd, "bind 0", 6) < 0) {
 					errno = EINVAL;	//EGREG;
-					close(cfd);
 					return -1;
 				}
 				snprintf(msg, sizeof msg, "announce %d", ntohs(lip->sin_port));
 			} else
 				strcpy(msg, "announce *");
-			n = write(cfd, msg, strlen(msg));
+			n = write(r->ctl_fd, msg, strlen(msg));
 			if (n < 0) {
 				errno = EOPNOTSUPP;	/* Improve error reporting!!! */
-				close(cfd);
 				return -1;
 			}
-			close(cfd);
 			return 0;
 		case PF_UNIX:
 			if (r->other < 0) {

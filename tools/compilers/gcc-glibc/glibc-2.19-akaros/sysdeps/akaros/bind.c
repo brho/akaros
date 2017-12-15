@@ -28,7 +28,7 @@
 /* Give the socket FD the local address ADDR (which is LEN bytes long).  */
 int __bind(int fd, __CONST_SOCKADDR_ARG addr, socklen_t alen)
 {
-	int n, cfd;
+	int n;
 	socklen_t len;
 	Rock *r;
 	char msg[128];
@@ -50,20 +50,14 @@ int __bind(int fd, __CONST_SOCKADDR_ARG addr, socklen_t alen)
 	if (r->domain != PF_INET)
 		return 0;
 
-	cfd = _sock_open_ctlfd(r);
-	if (cfd < 0) {
-		errno = EBADF;
-		return -1;
-	}
 	lip = (struct sockaddr_in *)&r->addr;
 	if (lip->sin_port > 0)
 		snprintf(msg, sizeof msg, "bind %d", ntohs(lip->sin_port));
 	else
 		strcpy(msg, "bind *");
-	n = write(cfd, msg, strlen(msg));
+	n = write(r->ctl_fd, msg, strlen(msg));
 	if (n < 0) {
 		errno = EOPNOTSUPP;	/* Improve error reporting!!! */
-		close(cfd);
 		return -1;
 	}
 	if (lip->sin_port <= 0)
@@ -73,13 +67,12 @@ int __bind(int fd, __CONST_SOCKADDR_ARG addr, socklen_t alen)
 	 * open the listen file or anything like that. */
 	if ((r->domain == PF_INET) && (r->stype == SOCK_DGRAM)) {
 		n = snprintf(msg, sizeof(msg), "announce *!%d", ntohs(lip->sin_port));
-		n = write(cfd, msg, n);
+		n = write(r->ctl_fd, msg, n);
 		if (n < 0) {
 			perror("bind-announce failed");
 			return -1;
 		}
 	}
-	close(cfd);
 	return 0;
 }
 weak_alias(__bind, bind)

@@ -31,7 +31,7 @@
 int __connect(int fd, __CONST_SOCKADDR_ARG addr, socklen_t alen)
 {
 	Rock *r;
-	int n, cfd, nfd;
+	int n, nfd;
 	char msg[8 + 256 + 1], file[8 + 256 + 1];
 	struct sockaddr_in *lip, *rip;
 	struct sockaddr_un *runix;
@@ -57,11 +57,6 @@ int __connect(int fd, __CONST_SOCKADDR_ARG addr, socklen_t alen)
 			 * r->raddr, so we're already done here */
 			if (r->stype == SOCK_DGRAM)
 				return 0;
-			/* set up a tcp or udp connection */
-			cfd = _sock_open_ctlfd(r);
-			if (cfd < 0) {
-				return -1;
-			}
 			/* whatever .. */
 			rip = (struct sockaddr_in *)addr.__sockaddr_in__;
 			lip = (struct sockaddr_in *)&r->addr;
@@ -73,12 +68,9 @@ int __connect(int fd, __CONST_SOCKADDR_ARG addr, socklen_t alen)
 				snprintf(msg, sizeof msg, "connect %s!%d%s",
 						 inet_ntoa(rip->sin_addr), ntohs(rip->sin_port),
 						 r->reserved ? "!r" : "");
-			n = write(cfd, msg, strlen(msg));
-			if (n < 0) {
-				close(cfd);
+			n = write(r->ctl_fd, msg, strlen(msg));
+			if (n < 0)
 				return -1;
-			}
-			close(cfd);
 			return 0;
 		case PF_UNIX:
 			/* null terminate the address */

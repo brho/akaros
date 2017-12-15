@@ -70,10 +70,7 @@ int __libc_accept4(int fd, __SOCKADDR_ARG addr, socklen_t *alen, int a4_flags)
 				return -1;
 			/* at this point, we have a new conversation, and lcfd is its ctl
 			 * fd.  nfd will be the FD for that conv's data file.  sock_data
-			 * will trade our lcfd for the data file fd.  even if it fails,
-			 * sock_data will close our lcfd for us.  when it succeeds, it'll
-			 * open the data file before closing lcfd, which will keep the
-			 * converstation alive.
+			 * will store our lcfd in the rock and return the data file fd.
 			 *
 			 * Note, we pass the listen socket's stype, but not it's sopts.  The
 			 * sopts (e.g. SOCK_NONBLOCK) apply to the original socket, not to
