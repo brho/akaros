@@ -351,13 +351,50 @@ static void fire_existing_events(int fd, int ep_events,
 	}
 }
 
-static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
-                           struct epoll_event *event)
+static int __epoll_ctl_add_raw(struct epoll_ctlr *ep, int fd,
+                               struct epoll_event *event)
 {
 	struct ceq_event *ceq_ev;
 	struct ep_fd_data *ep_fd;
 	struct fd_tap_req tap_req = {0};
-	int ret, filter, sock_listen_fd, sock_ctl_fd;
+	int ret, filter;
+
+	ceq_ev = ep_get_ceq_ev(ep, fd);
+	if (!ceq_ev) {
+		errno = ENOMEM;
+		werrstr("Epoll set cannot grow yet!");
+		return -1;
+	}
+	ep_fd = (struct ep_fd_data*)ceq_ev->user_data;
+	if (ep_fd) {
+		errno = EEXIST;
+		return -1;
+	}
+	tap_req.fd = fd;
+	tap_req.cmd = FDTAP_CMD_ADD;
+	/* EPOLLHUP is implicitly set for all epolls. */
+	filter = ep_events_to_taps(event->events | EPOLLHUP);
+	tap_req.filter = filter;
+	tap_req.ev_q = ep->ceq_evq;
+	tap_req.ev_id = fd;	/* using FD as the CEQ ID */
+	ret = sys_tap_fds(&tap_req, 1);
+	if (ret != 1)
+		return -1;
+	ep_fd = malloc(sizeof(struct ep_fd_data));
+	ep_fd->fd = fd;
+	ep_fd->filter = filter;
+	ep_fd->ep_event = *event;
+	ep_fd->ep_event.events |= EPOLLHUP;
+	ceq_ev->user_data = (uint64_t)ep_fd;
+	fire_existing_events(fd, ep_fd->ep_event.events, ep->ceq_evq);
+	return 0;
+}
+
+static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
+                           struct epoll_event *event)
+{
+	struct fd_tap_req tap_req = {0};
+	int ret, sock_listen_fd, sock_ctl_fd;
 	struct epoll_event listen_event;
 
 	/* Only support ET.  Also, we just ignore EPOLLONESHOT.  That might work,
@@ -390,65 +427,20 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 	if (sock_listen_fd >= 0) {
 		listen_event.events = EPOLLET | EPOLLIN | EPOLLHUP;
 		listen_event.data = event->data;
-		ret = __epoll_ctl_add(ep, sock_listen_fd, &listen_event);
+		ret = __epoll_ctl_add_raw(ep, sock_listen_fd, &listen_event);
 		if (ret < 0)
 			return ret;
 	}
-	ceq_ev = ep_get_ceq_ev(ep, fd);
-	if (!ceq_ev) {
-		errno = ENOMEM;
-		werrstr("Epoll set cannot grow yet!");
-		return -1;
-	}
-	ep_fd = (struct ep_fd_data*)ceq_ev->user_data;
-	if (ep_fd) {
-		errno = EEXIST;
-		return -1;
-	}
-	tap_req.fd = fd;
-	tap_req.cmd = FDTAP_CMD_ADD;
-	/* EPOLLHUP is implicitly set for all epolls. */
-	filter = ep_events_to_taps(event->events | EPOLLHUP);
-	tap_req.filter = filter;
-	tap_req.ev_q = ep->ceq_evq;
-	tap_req.ev_id = fd;	/* using FD as the CEQ ID */
-	ret = sys_tap_fds(&tap_req, 1);
-	if (ret != 1)
-		return -1;
-	ep_fd = malloc(sizeof(struct ep_fd_data));
-	ep_fd->fd = fd;
-	ep_fd->filter = filter;
-	ep_fd->ep_event = *event;
-	ep_fd->ep_event.events |= EPOLLHUP;
-	ceq_ev->user_data = (uint64_t)ep_fd;
-	fire_existing_events(fd, ep_fd->ep_event.events, ep->ceq_evq);
-	return 0;
+	return __epoll_ctl_add_raw(ep, fd, event);
 }
 
-static int __epoll_ctl_del(struct epoll_ctlr *ep, int fd,
-                           struct epoll_event *event)
+static int __epoll_ctl_del_raw(struct epoll_ctlr *ep, int fd,
+                               struct epoll_event *event)
 {
 	struct ceq_event *ceq_ev;
 	struct ep_fd_data *ep_fd;
 	struct fd_tap_req tap_req = {0};
-	int ret, sock_listen_fd, sock_ctl_fd;
 
-	/* If we were dealing with a socket shim FD, we tapped both the listen and
-	 * the data file and need to untap both of them.
-	 *
-	 * We could be called from a close_cb, and we already closed the listen FD.
-	 * In that case, we don't want to try and open it.  If the listen FD isn't
-	 * open, then we know it isn't in an epoll set.  We also know the data FD
-	 * isn't epolled either, since we always epoll both FDs for rocks. */
-	_sock_lookup_rock_fds(fd, FALSE, &sock_listen_fd, &sock_ctl_fd);
-	if (sock_listen_fd >= 0) {
-		/* It's possible to fail here.  Even though we tapped it already, if the
-		 * deletion was triggered from close callbacks, it's possible for the
-		 * sock_listen_fd to be closed first, which would have triggered an
-		 * epoll_ctl_del.  When we get around to closing the Rock FD, the listen
-		 * FD was already closed. */
-		__epoll_ctl_del(ep, sock_listen_fd, event);
-	}
 	ceq_ev = ep_get_ceq_ev(ep, fd);
 	if (!ceq_ev) {
 		errno = ENOENT;
@@ -468,6 +460,30 @@ static int __epoll_ctl_del(struct epoll_ctlr *ep, int fd,
 	ceq_ev->user_data = 0;
 	free(ep_fd);
 	return 0;
+}
+
+static int __epoll_ctl_del(struct epoll_ctlr *ep, int fd,
+                           struct epoll_event *event)
+{
+	int sock_listen_fd, sock_ctl_fd;
+
+	/* If we were dealing with a socket shim FD, we tapped both the listen and
+	 * the data file and need to untap both of them.
+	 *
+	 * We could be called from a close_cb, and we already closed the listen FD.
+	 * In that case, we don't want to try and open it.  If the listen FD isn't
+	 * open, then we know it isn't in an epoll set.  We also know the data FD
+	 * isn't epolled either, since we always epoll both FDs for rocks. */
+	_sock_lookup_rock_fds(fd, FALSE, &sock_listen_fd, &sock_ctl_fd);
+	if (sock_listen_fd >= 0) {
+		/* It's possible to fail here.  Even though we tapped it already, if the
+		 * deletion was triggered from close callbacks, it's possible for the
+		 * sock_listen_fd to be closed first, which would have triggered an
+		 * epoll_ctl_del.  When we get around to closing the Rock FD, the listen
+		 * FD was already closed. */
+		__epoll_ctl_del_raw(ep, sock_listen_fd, event);
+	}
+	return __epoll_ctl_del_raw(ep, fd, event);
 }
 
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
