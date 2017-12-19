@@ -4,8 +4,10 @@
  *
  * select()
  *
- * Our select() is super spurious and will only work with apps that use
- * non-blocking I/O.
+ * Our select() is a bit rough and only works with FDs where fstat can return
+ * S_READABLE or S_WRITABLE.  For the most part, this applies to qio queues,
+ * which are the basis for a lot of the network stack and pipes.  FDs where
+ * fstat doesn't tell us the readiness will have races.
  *
  * Under the hood, our select() is implemented with epoll (and under that, FD
  * taps).  Those can only detect edges (e.g. a socket becomes readable).
@@ -13,25 +15,23 @@
  * The problem is that we want to detect a level status (e.g. socket is
  * readable) with an edge event (e.g. socket *becomes* readable).  To do this,
  * when someone initially selects, the FD gets tracked with epoll and we
- * immediately return saying the FD is ready for whatever they asked for.  This
- * is usually not true, and the application will need to poll all of its FDs
- * once after the initial select() call.  Subsequent selects() will still be
- * tracking the FD in the epoll set.  If any edge events that come after the
- * poll (which eventually returns EAGAIN) will be caught by epoll, and a
- * subsequent select will wake up (or never block in the first place) due to the
- * reception of that edge event.
+ * manually poll the FDs with fstat.  Subsequent selects() will still be tracked
+ * in the epoll set, but since apps can select() even on FDs they didn't drain
+ * to the point of blocking, we still need to poll every FD on every select()
+ * call.
  *
  * We maintain one FD set per program.  It tracks *any* FD being tracked by
- * *any* select call.  Regardless of whether the user asked for
- * read/write/except, the FD gets watched for anything until it closes.  This
- * will result in spurious wakeups.
+ * *any* select call.  This is because you can only have one tap per FD.
+ * Regardless of whether the user asked for read/write/except, the FD gets
+ * watched for anything until it closes.
  *
  * One issue with the global FD set is that one thread may consume the epoll
  * events intended for another thread (or even for itself at another call
  * site!).  To get around this, only one thread is the actual epoller, and the
- * others block on a mutex.  An alternative is to use a per-thread FD set, using
- * TLS, but not every 2LS uses TLS, and performance is not a concern for code
- * using select().
+ * others block on a mutex.  TLS isn't an option for two reasons: not all 2LSs
+ * use TLS (minor concern, maybe they should) and there are some threads who
+ * make multiple select calls - we actually want per-call-site-and-thread fd
+ * sets.
  *
  * Notes:
  * - pselect might be racy
@@ -64,9 +64,10 @@
 
 static int epoll_fd;
 static fd_set all_fds;
-static uth_mutex_t *fdset_mtx;
-static uintptr_t unique_caller;
-static uth_mutex_t *sleep_mtx;
+static fd_set working_read_fds;
+static fd_set working_write_fds;
+static fd_set working_except_fds;
+static uth_mutex_t *epoll_mtx;
 
 static bool fd_is_set(unsigned int fd, fd_set *set)
 {
@@ -85,16 +86,16 @@ static void select_fd_closed(int fd)
 		return;
 	/* We just need to stop tracking FD.  We do not need to remove it from the
 	 * epoll set, since that will happen automatically on close(). */
-	uth_mutex_lock(fdset_mtx);
+	uth_mutex_lock(epoll_mtx);
 	FD_CLR(fd, &all_fds);
-	uth_mutex_unlock(fdset_mtx);
+	uth_mutex_unlock(epoll_mtx);
 }
 
 static void select_forked(void)
 {
 	struct epoll_event ep_ev;
 
-	uth_mutex_lock(fdset_mtx);
+	uth_mutex_lock(epoll_mtx);
 	for (int i = 0; i < FD_SETSIZE; i++) {
 		if (fd_is_set(i, &all_fds)) {
 			ep_ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR;
@@ -106,7 +107,7 @@ static void select_forked(void)
 			FD_CLR(i, &all_fds);
 		}
 	}
-	uth_mutex_unlock(fdset_mtx);
+	uth_mutex_unlock(epoll_mtx);
 }
 
 static void select_init(void *arg)
@@ -120,8 +121,7 @@ static void select_init(void *arg)
 		perror("select failed epoll_create");
 		exit(-1);
 	}
-	fdset_mtx = uth_mutex_alloc();
-	sleep_mtx = uth_mutex_alloc();
+	epoll_mtx = uth_mutex_alloc();
 	register_fork_cb(&select_fork_cb);
 }
 
@@ -132,14 +132,18 @@ static int select_tv_to_ep_timeout(struct timeval *tv)
 	return tv->tv_sec * 1000 + DIV_ROUND_UP(tv->tv_usec, 1000);
 }
 
-/* Check with the kernel if FD is readable/writable or not.  Some apps will call
- * select() on something even if it is already actionable, and not wait until
- * they get the EAGAIN.
+/* Helper: check with the kernel if FD is readable/writable or not.  Some apps
+ * will call select() on something even if it is already actionable, and not
+ * wait until they get the EAGAIN.
+ *
+ * This modifies the global working_ fd sets by setting bits of actionable FDs
+ * and will return the number of bits turned on.  So basically, 1 for readable
+ * xor writable, 2 for both.
  *
  * TODO: this *won't* work for disk based files.  It only works on qids that are
  * backed with qio queues or something similar, where the device has support for
  * setting DMREADABLE/DMWRITABLE. */
-static bool fd_is_actionable(int fd, fd_set *readfds, fd_set *writefds)
+static unsigned int fd_set_actionable(int fd, fd_set *readfds, fd_set *writefds)
 {
 	struct stat stat_buf;
 	int ret;
@@ -147,23 +151,52 @@ static bool fd_is_actionable(int fd, fd_set *readfds, fd_set *writefds)
 	/* Avoid the stat call on FDs we're not tracking (which should trigger an
 	 * error, or give us the stat for FD 0). */
 	if (!(fd_is_set(fd, readfds) || fd_is_set(fd, writefds)))
-		return FALSE;
+		return 0;
 	ret = fstat(fd, &stat_buf);
 	assert(!ret);
-	return (fd_is_set(fd, readfds) && S_READABLE(stat_buf.st_mode)) ||
-	       (fd_is_set(fd, writefds) && S_WRITABLE(stat_buf.st_mode));
+	ret = 0;
+	if (fd_is_set(fd, readfds)) {
+		if (S_READABLE(stat_buf.st_mode)) {
+			ret++;
+			FD_SET(fd, &working_read_fds);
+		}
+	}
+	if (fd_is_set(fd, writefds)) {
+		if (S_WRITABLE(stat_buf.st_mode)) {
+			ret++;
+			FD_SET(fd, &working_write_fds);
+		}
+	}
+	return ret;
+}
+
+/* Helper: extracts events from ep_result for types ep_event_types, and sets
+ * their bits in ret_fds if the FD was watched.  Returns the number of bits set.
+ */
+static int extract_bits_for_events(struct epoll_event *ep_result,
+                                   uint32_t ep_event_types,
+                                   fd_set *watched_fds, fd_set *ret_fds)
+{
+	int ret = 0;
+	int fd = ep_result->data.fd;
+
+	if (ep_result->events & ep_event_types) {
+		if (fd_is_set(fd, watched_fds) && !FD_ISSET(fd, ret_fds)) {
+			FD_SET(fd, ret_fds);
+			ret++;
+		}
+	}
+	return ret;
 }
 
 int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
            struct timeval *timeout)
 {
-	bool changed_set = FALSE;
 	struct epoll_event ep_ev;
 	struct epoll_event *ep_results;
-	uintptr_t my_call_id;
-	int ret;
-	int ep_timeout = select_tv_to_ep_timeout(timeout);
+	int ret, ep_ret, ep_timeout;
 	static parlib_once_t once = PARLIB_ONCE_INIT;
+	struct timeval start_tv[1], end_tv[1];
 
 	parlib_run_once(&once, select_init, NULL);
 	/* good thing nfds is a signed int... */
@@ -171,19 +204,16 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
 		errno = EINVAL;
 		return -1;
 	}
-	/* It is legal to select on read even if you didn't consume all of the data
-	 * in an FD; similarly for writers on non-full FDs. */
-	for (int i = 0; i < nfds; i++) {
-		if (fd_is_actionable(i, readfds, writefds))
-			return nfds;
-	}
-	uth_mutex_lock(fdset_mtx);
+loop:
+	if (timeout)
+		gettimeofday(start_tv, NULL);
+	ep_timeout = select_tv_to_ep_timeout(timeout);
+	uth_mutex_lock(epoll_mtx);
 	for (int i = 0; i < nfds; i++) {
 		if ((fd_is_set(i, readfds) || fd_is_set(i, writefds) ||
 		     fd_is_set(i, exceptfds)) &&
 		    !fd_is_set(i, &all_fds)) {
 
-			changed_set = TRUE;
 			FD_SET(i, &all_fds);
 			/* FDs that we track for *any* reason with select will be
 			 * tracked for *all* reasons with epoll. */
@@ -201,57 +231,94 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
 				}
 				/* Careful to unlock before calling perror.  perror calls
 				 * close, which calls our CB, which grabs the lock. */
-				uth_mutex_unlock(fdset_mtx);
+				uth_mutex_unlock(epoll_mtx);
 				perror("select epoll_ctl failed");
 				return -1;
 			}
 		}
 	}
-	uth_mutex_unlock(fdset_mtx);
-	/* Since we just added some FD to our tracking set, we don't know if its
-	 * readable or not.  We'll only catch edge-triggered changes in the future.
-	 * We can spuriously tell the user all FDs are ready, and next time they
-	 * can block until there is edge activity. */
-	if (changed_set)
-		return nfds;
-	/* Since there is a global epoll set, we could have multiple threads
-	 * epolling at a time and one thread could consume the events that should
-	 * wake another thread.  We don't know when the 'other' thread last polled,
-	 * so we'll need to assume its event was consumed and just return.
+	/* Since we just added some FDs to our tracking set, we don't know if they
+	 * are readable or not.  We'll only catch edge-triggered changes in the
+	 * future.
 	 *
-	 * To make matters more confusing, we could also have a single thread that
-	 * selects multiple times on separate FD sets.  So we also need to
-	 * distinguish between calls and threads.
+	 * Similarly, it is legal to select on a readable FD even if you didn't
+	 * consume all of the data yet; similarly for writers on non-full FDs.
 	 *
-	 * If the same {thread, callsite} selects again and no one else has since
-	 * selected, then we know no one consumed the events.  We'll use the stack
-	 * pointer to uniquely identify the {thread, callsite} combo that recently
-	 * selected.  We use a mutex so that the extra threads sleep. */
-	uth_mutex_lock(sleep_mtx);
-	my_call_id = get_stack_pointer();
-	if (my_call_id != unique_caller) {
-		/* Could thrash, if we fight with another uth for unique_caller */
-		unique_caller = my_call_id;
-		uth_mutex_unlock(sleep_mtx);
-		return nfds;
+	 * Additionally, since there is a global epoll set, we could have multiple
+	 * threads epolling concurrently and one thread could consume the events
+	 * that should wake another thread.  Also, keep in mind we could also have a
+	 * single thread that selects multiple times on separate FD sets.
+	 *
+	 * Due to any of these cases, we need to check every FD this select call
+	 * cares about (i.e. in an fd_set) to see if it is actionable.  We do it
+	 * while holding the mutex to prevent other threads from consuming our epoll
+	 * events. */
+	ret = 0;
+	FD_ZERO(&working_read_fds);
+	FD_ZERO(&working_write_fds);
+	FD_ZERO(&working_except_fds);
+	/* Note the helper sets bits in the working_ fd sets */
+	for (int i = 0; i < nfds; i++)
+		ret += fd_set_actionable(i, readfds, writefds);
+	if (ret) {
+		if (readfds)
+			*readfds = working_read_fds;
+		if (writefds)
+			*writefds = working_write_fds;
+		uth_mutex_unlock(epoll_mtx);
+		return ret;
 	}
 	/* Need to check for up to FD_SETSIZE - nfds isn't the size of all FDs
 	 * tracked; it's the size of only our current select call */
 	ep_results = malloc(sizeof(struct epoll_event) * FD_SETSIZE);
 	if (!ep_results) {
-		uth_mutex_unlock(sleep_mtx);
+		uth_mutex_unlock(epoll_mtx);
 		errno = ENOMEM;
 		return -1;
 	}
-	/* Don't care which ones were set; we'll just tell the user they all were
-	 * set.  If they can't handle that, this whole plan won't work. */
-	ret = epoll_wait(epoll_fd, ep_results, FD_SETSIZE, ep_timeout);
-	uth_mutex_unlock(sleep_mtx);
+	ep_ret = epoll_wait(epoll_fd, ep_results, FD_SETSIZE, ep_timeout);
+	/* We need to hold the mtx during all of this processing since we're using
+	 * the global working_ fds sets.  We can't modify the
+	 * readfds/writefds/exceptfds until we're sure we are done. */
+	ret = 0;
+	/* Note that ret can be > ep_ret.  An FD that is both readable and writable
+	 * counts as one event for epoll, but as two bits for select. */
+	for (int i = 0; i < ep_ret; i++) {
+		ret += extract_bits_for_events(&ep_results[i], EPOLLIN | EPOLLHUP,
+		                               readfds, &working_read_fds);
+		ret += extract_bits_for_events(&ep_results[i], EPOLLOUT | EPOLLHUP,
+		                               writefds, &working_write_fds);
+		ret += extract_bits_for_events(&ep_results[i], EPOLLERR,
+		                               exceptfds, &working_except_fds);
+	}
 	free(ep_results);
-	/* TODO: consider updating timeval.  It's not mandatory (POSIX). */
-	if (ret == 0)	/* timeout */
-		return 0;
-	return nfds;
+	if (ret) {
+		if (readfds)
+			*readfds = working_read_fds;
+		if (writefds)
+			*writefds = working_write_fds;
+		if (exceptfds)
+			*exceptfds = working_except_fds;
+	}
+	uth_mutex_unlock(epoll_mtx);
+	/* TODO: Consider updating timeval for non-timeouts.  It's not mandatory
+	 * (POSIX). */
+	if (ret)
+		return ret;
+	/* If we have no rets at this point, there are a few options: we could have
+	 * timed out (if requested), or we could have consumed someone else's event.
+	 * No one could have consumed our event, since we were the only epoller
+	 * (while holding the mtx).  In the latter case, we'll need to try again,
+	 * but with an updated timeout. */
+	if (timeout) {
+		gettimeofday(end_tv, NULL);
+		timersub(end_tv, start_tv, end_tv);	/* diff in end_tv */
+		if (timercmp(timeout, end_tv, >))
+			timersub(timeout, end_tv, timeout);
+		else
+			return 0;	/* select timed out */
+	}
+	goto loop;
 }
 
 int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
