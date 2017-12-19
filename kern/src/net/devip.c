@@ -103,6 +103,7 @@ static long ndbwrite(struct Fs *, char *unused_char_p_t, uint32_t, int);
 static void closeconv(struct conv *);
 static void setup_proto_qio_bypass(struct conv *cv);
 static void undo_proto_qio_bypass(struct conv *cv);
+static int connected(void *a);
 
 static struct conv *chan2conv(struct chan *chan)
 {
@@ -126,6 +127,36 @@ static int topdirgen(struct chan *c, struct dir *dp)
 	return founddevdir(c, q, get_cur_genbuf(), 0, network, 0555, dp);
 }
 
+/* Computes the perm field for a stat for Qdata.  Since select() polls the
+ * 'actionability' of a socket via the qdata FD, we'll also report listenable
+ * and connected conversations.  It's a minor hack.  =( */
+static int qdata_stat_perm(struct conv *cv)
+{
+	int perm;
+
+	perm = cv->perm;
+	/* If there is ever a listener, then it's readable.  Ideally, we'd only
+	 * report this on the Qlisten file (which we also do).  The socket crap
+	 * should never use a listening socket for data, so there shouldn't be any
+	 * confusion when a Qdata shows up as readable. */
+	perm |= cv->incall ? DMREADABLE : 0;
+	/* For connectable convs, they need to be both connected and qio
+	 * readable/writable.  The way to think about this is that the convs are not
+	 * truly writable/readable until they are connected.  Conveniently, this
+	 * means that when select polls Qdata for non-blocking connect(), a
+	 * connected conversation pops up as writable (the qio is writable too).
+	 *
+	 * Note that a conversation can be 'Connected' even if it failed to connect.
+	 * At least that's what the 9ns TCP code does.  It's more like "the protocol
+	 * did what it needed and the connectctlmsg call (or its non-blocking
+	 * equivalent) is done".  For instance, TCP has a few reasons to call
+	 * Fsconnected, such as when we send the SYN and get a RST. */
+	if (!cv->p->connect || connected(cv)) {
+		perm |= qreadable(cv->rq) ? DMREADABLE : 0;
+		perm |= qwritable(cv->wq) ? DMWRITABLE : 0;
+	}
+	return perm;
+}
 
 static int ip3gen(struct chan *c, int i, struct dir *dp)
 {
@@ -146,9 +177,7 @@ static int ip3gen(struct chan *c, int i, struct dir *dp)
 			return founddevdir(c, q, "ctl", 0,
 					           cv->owner, cv->perm, dp);
 		case Qdata:
-			perm = cv->perm;
-			perm |= qreadable(cv->rq) ? DMREADABLE : 0;
-			perm |= qwritable(cv->wq) ? DMWRITABLE : 0;
+			perm = qdata_stat_perm(cv);
 			return founddevdir(c, q, "data", qlen(cv->rq),
 							   cv->owner, perm, dp);
 		case Qerr:
