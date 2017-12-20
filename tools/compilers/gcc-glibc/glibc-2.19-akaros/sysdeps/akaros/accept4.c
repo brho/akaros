@@ -30,7 +30,6 @@ int __libc_accept4(int fd, __SOCKADDR_ARG addr, socklen_t *alen, int a4_flags)
 	struct sockaddr_in *ip;
 	char name[Ctlsize];
 	char file[8 + Ctlsize + 1];
-	char *p;
 	const char *net = 0;
 	char listen[Ctlsize];
 	int open_flags;
@@ -52,13 +51,8 @@ int __libc_accept4(int fd, __SOCKADDR_ARG addr, socklen_t *alen, int a4_flags)
 					break;
 			}
 			/* at this point, our FD is for the data file.  we need to open the
-			 * listen file.  The line is stored in r->ctl (e.g.
-			 * /net/tcp/666/ctl) */
-			strcpy(listen, r->ctl);
-			p = strrchr(listen, '/');
-			if (p == 0)
-				return -1;
-			strcpy(p + 1, "listen");
+			 * listen file. */
+			_sock_get_conv_filename(r, "listen", listen);
 			open_flags = O_RDWR;
 			/* This is for the listen - maybe don't block on open */
 			open_flags |= (r->sopts & SOCK_NONBLOCK ? O_NONBLOCK : 0);

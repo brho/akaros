@@ -26,6 +26,20 @@
 
 #include <sys/plan9_helpers.h>
 
+/* Puts the path of the conversation file for 'name' for the Rock in retval,
+ * which must be a char [Ctlsize]. */
+void _sock_get_conv_filename(Rock *r, const char *name, char *retloc)
+{
+	char *p;
+
+	strlcpy(retloc, r->ctl, Ctlsize);
+	p = strrchr(retloc, '/');
+	assert(p);
+	p++;
+	*p = 0;
+	strlcat(retloc, name, Ctlsize);
+}
+
 void
 _sock_ingetaddr(Rock *r, struct sockaddr_in *ip, socklen_t *alen,
                 const char *a)
@@ -36,9 +50,7 @@ _sock_ingetaddr(Rock *r, struct sockaddr_in *ip, socklen_t *alen,
 	int open_flags;
 
 	/* get remote address */
-	strcpy(name, r->ctl);
-	p = strrchr(name, '/');
-	strcpy(p + 1, a);
+	_sock_get_conv_filename(r, a, name);
 	open_flags = O_RDONLY;
 	open_flags |= (r->sopts & SOCK_CLOEXEC ? O_CLOEXEC : 0);
 	fd = open(name, open_flags);
@@ -317,28 +329,11 @@ int _sock_get_opts(int type)
  * success, -1 on error.  This is racy, like a lot of other Rock stuff. */
 static int _rock_open_listen_fd(Rock *r)
 {
-	char listen_file[Ctlsize + 3];
-	char *p;
+	char listen_file[Ctlsize];
 	int ret;
 	int open_flags;
 
-	if (r->ctl == NULL || r->ctl[0] != '/') {
-		fprintf(stderr, "r->ctl corrupt: '%s' (domain = %d)\n",
-		        (r->ctl == NULL ? "NULL" : r->ctl), r->domain);
-	        assert(r->ctl != NULL && r->ctl[0] == '/');
-	}
-	strlcpy(listen_file, r->ctl, sizeof(listen_file));
-	/* We want the conversation directory. We look for '/ctl' at
-	 * the end of the string. */
-	p = strrchr(listen_file, '/');
-	if (p == NULL)
-		p = listen_file;
-	++p;
-	if (strcmp(p, "ctl") != 0) {
-		fprintf(stderr, "ctl file does not end in '/ctl': is '%s'\n", p);
-		assert(strcmp(p, "ctl") == 0);
-	}
-	strlcpy(p, "listen", sizeof(listen_file) - (p - listen_file));
+	_sock_get_conv_filename(r, "listen", listen_file);
 	open_flags = O_PATH;
 	open_flags |= (r->sopts & SOCK_CLOEXEC ? O_CLOEXEC : 0);
 	ret = open(listen_file, open_flags);

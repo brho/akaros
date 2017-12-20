@@ -71,6 +71,7 @@ extern void _sock_srvname(char *, char *);
 extern int _sock_srv(char *, int);
 extern int _sock_data(int, const char *, int, int, int, Rock **);
 extern int _sock_ipattr(const char *);
+extern void _sock_get_conv_filename(Rock *r, const char *name, char *retloc);
 extern void _sock_ingetaddr(Rock *, struct sockaddr_in *, socklen_t *,
 							const char *);
 extern int _sock_strip_opts(int type);
