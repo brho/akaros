@@ -1099,7 +1099,8 @@ static int connected(void *a)
 	return ((struct conv *)a)->state == Connected;
 }
 
-static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
+static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb,
+                          struct chan *chan)
 {
 	ERRSTACK(1);
 	char *p;
@@ -1110,8 +1111,22 @@ static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 	c->cerr[0] = '\0';
 	if (x->connect == NULL)
 		error(EFAIL, "connect not supported");
+	/* It's up to the proto connect method to not block the kthread.  This is
+	 * currently the case for e.g. TCP. */
 	x->connect(c, cb->f, cb->nf);
-
+	/* This is notionally right before the rendez_sleep: either we block or we
+	 * kick back to userspace.  We do this before the unlock to avoid races with
+	 * c->state (rendez's internal lock deals with its race with the waker) and
+	 * to avoid the excessive unlock and relock.
+	 *
+	 * Also, it's important that we don't do anything important for the
+	 * functionality of the conv after the rendez sleep.  The non-blocking style
+	 * won't call back into the kernel - it just wants the event.  I considered
+	 * allowing multiple connect calls, where we just return if it was already
+	 * connected, but that would break UDP, which allows multiple different
+	 * connect calls. */
+	if ((chan->flag & O_NONBLOCK) && !connected(c))
+		error(EINPROGRESS, "connection not ready yet");
 	qunlock(&c->qlock);
 	if (waserror()) {
 		qlock(&c->qlock);
@@ -1436,7 +1451,7 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 			if (cb->nf < 1)
 				error(EFAIL, "short control request");
 			if (strcmp(cb->f[0], "connect") == 0)
-				connectctlmsg(x, c, cb);
+				connectctlmsg(x, c, cb, ch);
 			else if (strcmp(cb->f[0], "announce") == 0)
 				announcectlmsg(x, c, cb);
 			else if (strcmp(cb->f[0], "bind") == 0)
@@ -1505,19 +1520,10 @@ static long ipbwrite(struct chan *ch, struct block *bp, uint32_t offset)
 	}
 }
 
-static void ip_wake_cb(struct queue *q, void *data, int filter)
+static void fire_data_taps(struct conv *conv, int filter)
 {
-	struct conv *conv = (struct conv*)data;
 	struct fd_tap *tap_i;
-	/* For these two, we want to ignore events on the opposite end of the
-	 * queues.  For instance, we want to know when the WQ is writable.  Our
-	 * writes will actually make it readable - we don't want to trigger a tap
-	 * for that.  However, qio doesn't know how/why we are using a queue, or
-	 * even who the ends are (hence the callbacks) */
-	if ((filter & FDTAP_FILT_READABLE) && (q == conv->wq))
-		return;
-	if ((filter & FDTAP_FILT_WRITABLE) && (q == conv->rq))
-		return;
+
 	/* At this point, we have an event we want to send to our taps (if any).
 	 * The lock protects list integrity and the existence of the tap.
 	 *
@@ -1539,6 +1545,22 @@ static void ip_wake_cb(struct queue *q, void *data, int filter)
 	SLIST_FOREACH(tap_i, &conv->data_taps, link)
 		fire_tap(tap_i, filter);
 	spin_unlock(&conv->tap_lock);
+}
+
+static void ip_wake_cb(struct queue *q, void *data, int filter)
+{
+	struct conv *conv = (struct conv*)data;
+
+	/* For these two, we want to ignore events on the opposite end of the
+	 * queues.  For instance, we want to know when the WQ is writable.  Our
+	 * writes will actually make it readable - we don't want to trigger a tap
+	 * for that.  However, qio doesn't know how/why we are using a queue, or
+	 * even who the ends are (hence the callbacks) */
+	if ((filter & FDTAP_FILT_READABLE) && (q == conv->wq))
+		return;
+	if ((filter & FDTAP_FILT_WRITABLE) && (q == conv->rq))
+		return;
+	fire_data_taps(conv, filter);
 }
 
 int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
@@ -1776,6 +1798,8 @@ int Fsconnected(struct conv *c, char *msg)
 	}
 
 	rendez_wakeup(&c->cr);
+	/* The user can poll or tap the connection status via Qdata */
+	fire_data_taps(c, FDTAP_FILT_WRITABLE);
 	return 0;
 }
 
