@@ -75,7 +75,7 @@ void backtrace_guest_thread(FILE *f, struct guest_thread *vm_thread)
 		        guest_pc);
 		if (!guest_fp)
 			break;
-		if (gvatogpa(vm_thread, guest_fp, &host_fp))
+		if (gva2gpa(vm_thread, guest_fp, &host_fp))
 			break;
 		memcpy(frame, (void*)host_fp, 2 * sizeof(uintptr_t));
 		guest_pc = frame[1];

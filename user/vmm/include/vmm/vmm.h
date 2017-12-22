@@ -93,7 +93,7 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
            uint64_t **regp, int *store, int *size, int *advance);
 int io(struct guest_thread *vm_thread);
 void showstatus(FILE *f, struct guest_thread *vm_thread);
-int gvatogpa(struct guest_thread *vm_thread, uint64_t va, uint64_t *pa);
+int gva2gpa(struct guest_thread *vm_thread, uint64_t va, uint64_t *pa);
 int rippa(struct guest_thread *vm_thread, uint64_t *pa);
 int msrio(struct guest_thread *vm_thread, struct vmm_gpcore_init *gpci,
           uint32_t opcode);

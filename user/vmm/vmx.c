@@ -43,12 +43,8 @@ void showstatus(FILE *f, struct guest_thread *vm_thread)
 	backtrace_guest_thread(f, vm_thread);
 }
 
-/* Convert a kernel guest virtual address to physical address.
- * Assumes that the guest VA is in the high negative address space.
- * TODO: Takes the vm_thread argument so that we can walk the page tables
- * instead of just coercing the pointer. Therefore, this is not in vmm.h
- * since it may get complex. */
-int gvatogpa(struct guest_thread *vm_thread, uint64_t va, uint64_t *pa)
+/* Convert a guest virtual address to physical address. */
+int gva2gpa(struct guest_thread *vm_thread, uint64_t va, uint64_t *pa)
 {
 	assert(vm_thread != NULL);
 	struct vm_trapframe *vm_tf = gth_to_vmtf(vm_thread);
@@ -78,5 +74,5 @@ int gvatogpa(struct guest_thread *vm_thread, uint64_t va, uint64_t *pa)
 int rippa(struct guest_thread *vm_thread, uint64_t *pa)
 {
 	assert(vm_thread != NULL);
-	return gvatogpa(vm_thread, gth_to_vmtf(vm_thread)->tf_rip, pa);
+	return gva2gpa(vm_thread, gth_to_vmtf(vm_thread)->tf_rip, pa);
 }
