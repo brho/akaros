@@ -1,13 +1,8 @@
 earlyprintk=vmcall,keep
  console=hvc0
- acpi.debug_layer=0x2
- acpi.debug_level=0xffffffff
- apic=debug
- noexec=off
- nohlt
- noht
  lapic=notscdeadline
  clocksource=tsc
  pit=none
+ nortc
+ nozswap
  root=/dev/vda1
- noht
