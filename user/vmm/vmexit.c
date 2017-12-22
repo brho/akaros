@@ -258,6 +258,39 @@ static bool handle_vmcall(struct guest_thread *gth)
 	case VMCALL_GET_TSCFREQ:
 		retval = handle_vmcall_get_tscfreq(gth);
 		break;
+	case VMCALL_TRACE_TF:
+		trace_printf("  rax  0x%016lx\n",      vm_tf->tf_r11);
+		trace_printf("  rbx  0x%016lx\n",      vm_tf->tf_rbx);
+		trace_printf("  rcx  0x%016lx\n",      vm_tf->tf_rcx);
+		trace_printf("  rdx  0x%016lx\n",      vm_tf->tf_rdx);
+		trace_printf("  rbp  0x%016lx\n",      vm_tf->tf_rbp);
+		trace_printf("  rsi  0x%016lx\n",      vm_tf->tf_rsi);
+		trace_printf("  rdi  0x%016lx\n",      vm_tf->tf_rdi);
+		trace_printf("  r8   0x%016lx\n",      vm_tf->tf_r8);
+		trace_printf("  r9   0x%016lx\n",      vm_tf->tf_r9);
+		trace_printf("  r10  0x%016lx\n",      vm_tf->tf_r10);
+		trace_printf("  r11  0x%016lx\n",      0xdeadbeef);
+		trace_printf("  r12  0x%016lx\n",      vm_tf->tf_r12);
+		trace_printf("  r13  0x%016lx\n",      vm_tf->tf_r13);
+		trace_printf("  r14  0x%016lx\n",      vm_tf->tf_r14);
+		trace_printf("  r15  0x%016lx\n",      vm_tf->tf_r15);
+		trace_printf("  rip  0x%016lx\n",      vm_tf->tf_rip);
+		trace_printf("  rflg 0x%016lx\n",      vm_tf->tf_rflags);
+		trace_printf("  rsp  0x%016lx\n",      vm_tf->tf_rsp);
+		trace_printf("  cr2  0x%016lx\n",      vm_tf->tf_cr2);
+		trace_printf("  cr3  0x%016lx\n",      vm_tf->tf_cr3);
+		trace_printf("Gpcore 0x%08x\n",        vm_tf->tf_guest_pcoreid);
+		trace_printf("Flags  0x%08x\n",        vm_tf->tf_flags);
+		trace_printf("Inject 0x%08x\n",        vm_tf->tf_trap_inject);
+		trace_printf("ExitRs 0x%08x\n",        vm_tf->tf_exit_reason);
+		trace_printf("ExitQl 0x%08x\n",        vm_tf->tf_exit_qual);
+		trace_printf("Intr1  0x%016lx\n",      vm_tf->tf_intrinfo1);
+		trace_printf("Intr2  0x%016lx\n",      vm_tf->tf_intrinfo2);
+		trace_printf("GIntr  0x----%04x\n",    vm_tf->tf_guest_intr_status);
+		trace_printf("GVA    0x%016lx\n",      vm_tf->tf_guest_va);
+		trace_printf("GPA    0x%016lx\n",      vm_tf->tf_guest_pa);
+		retval = true;
+		break;
 	}
 
 	if (retval)
