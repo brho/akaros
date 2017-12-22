@@ -57,6 +57,8 @@ int gvatogpa(struct guest_thread *vm_thread, uint64_t va, uint64_t *pa)
 
 	for (int shift = PML4_SHIFT; shift >= PML1_SHIFT; shift -= BITS_PER_PML) {
 		entry = ptptr[PMLx(va, shift)];
+		/* bit 63 can be NX.  Bits 62:52 are ignored (for PML4) */
+		entry &= 0x000fffffffffffff;
 
 		if (!PAGE_PRESENT(entry))
 			return -1;
