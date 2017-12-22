@@ -311,5 +311,16 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
 		*regp = &vm_tf->tf_r15;
 		break;
 	}
+	/* Handle movz{b,w}X.  Zero the destination. */
+	if ((rip_gpa[0] == 0x0f) && (rip_gpa[1] == 0xb6)) {
+		/* movzb.
+		 * TODO: figure out if the destination size is 16 or 32 bits.  Linux
+		 * doesn't call this yet, so it's not urgent. */
+		return -1;
+	}
+	if ((rip_gpa[0] == 0x0f) && (rip_gpa[1] == 0xb7)) {
+		/* movzwl.  Destination is 32 bits, unless we had the rex prefix */
+		**regp &= ~((1ULL << 32) - 1);
+	}
 	return 0;
 }
