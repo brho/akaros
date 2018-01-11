@@ -1832,7 +1832,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 	} else {
 		/* VFS failed, checking 9ns */
 		unset_errno();	/* Go can't handle extra errnos */
-		retval = sysstatakaros(t_path, (struct stat *)kbuf);
+		retval = sysstatakaros(t_path, (struct kstat *)kbuf);
 		printd("sysstat returns %d\n", retval);
 		/* both VFS and 9ns failed, bail out */
 		if (retval < 0)

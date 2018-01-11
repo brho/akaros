@@ -1399,10 +1399,10 @@ ssize_t generic_dir_read(struct file *file, char *u_buf, size_t count,
 		/* Slight info exposure: could be extra crap after the name in the
 		 * dirent (like the name of a deleted file) */
 		if (!is_ktask(per_cpu_info[core_id()].cur_kthread))
-			memcpy_to_user(current, u_buf, dirent, sizeof(struct dirent));
+			memcpy_to_user(current, u_buf, dirent, sizeof(struct kdirent));
 		else
-			memcpy(u_buf, dirent, sizeof(struct dirent));
-		amt_copied += sizeof(struct dirent);
+			memcpy(u_buf, dirent, sizeof(struct kdirent));
+		amt_copied += sizeof(struct kdirent);
 		/* 0 signals end of directory */
 		if (retval == 0)
 			break;
@@ -2812,7 +2812,7 @@ char *do_getcwd(struct fs_struct *fs_env, char **kfree_this, size_t cwd_l)
 static void print_dir(struct dentry *dentry, char *buf, int depth)
 {
 	struct dentry *child_d;
-	struct dirent next = {0};
+	struct kdirent next = {0};
 	struct file *dir;
 	int retval;
 

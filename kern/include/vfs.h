@@ -303,7 +303,7 @@ struct file_operations {
 	int (*llseek) (struct file *, off64_t, off64_t *, int);
 	ssize_t (*read) (struct file *, char *, size_t, off64_t *);
 	ssize_t (*write) (struct file *, const char *, size_t, off64_t *);
-	int (*readdir) (struct file *, struct dirent *);
+	int (*readdir) (struct file *, struct kdirent *);
 	int (*mmap) (struct file *, struct vm_region *);
 	int (*open) (struct inode *, struct file *);
 	int (*flush) (struct file *);

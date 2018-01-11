@@ -285,7 +285,7 @@ int mon_nanwan(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 int mon_bin_ls(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
-	struct dirent dir = {0};
+	struct kdirent dir = {0};
 	struct file *bin_dir;
 	int retval = 0;
 

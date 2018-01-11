@@ -1329,7 +1329,7 @@ int ext2_llseek(struct file *file, off64_t offset, off64_t *ret, int whence)
 /* Fills in the next directory entry (dirent), starting with d_off.  Like with
  * read and write, there will be issues with userspace and the *dirent buf.
  * TODO: (UMEM) */
-int ext2_readdir(struct file *dir, struct dirent *dirent)
+int ext2_readdir(struct file *dir, struct kdirent *dirent)
 {
 	void *blk_buf;
 	/* Not enough data at the end of the directory */

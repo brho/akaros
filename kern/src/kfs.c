@@ -575,7 +575,7 @@ int kfs_llseek(struct file *file, off64_t offset, off64_t *ret, int whence)
  * buf.  TODO: we don't really do anything with userspace concerns here, in part
  * because memcpy_to doesn't work well.  When we fix how we want to handle the
  * userbuffers, we can write this accordingly. (UMEM)  */
-int kfs_readdir(struct file *dir, struct dirent *dirent)
+int kfs_readdir(struct file *dir, struct kdirent *dirent)
 {
 	int count = 2;	/* total num dirents, gets incremented in check_entry() */
 	int desired_file = dirent->d_off;
