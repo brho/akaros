@@ -773,6 +773,27 @@ uint64_t pmc_cycles(void)
 	return ((uint64_t)a) | (((uint64_t)d) << 32);
 }
 
+/* run with $ perf stat m kfunc wrmsr_test 0xMSR 100000 */
+void wrmsr_test(unsigned int msr, int loops)
+{
+	uint64_t start_cycles, diff_cycles;
+	uint64_t start_time, diff_time;
+	uint64_t msrval = read_msr(msr);
+
+	loops = MAX(loops, 1);
+	start_cycles = pmc_cycles();
+	start_time = start_timing();
+
+	for (int i = 0; i < loops; i++)
+		write_msr(msr, msrval);
+
+	diff_cycles = pmc_cycles() - start_cycles;
+	diff_time = stop_timing(start_time);
+
+	printk("msr 0x%x, cycles per: %llu, nsec per: %llu\n", msr,
+	       diff_cycles / loops, tsc2nsec(diff_time) / loops);
+}
+
 /* Does a basic test for interference.  You should kfunc this, often after
  * starting the monitor on another core.  You can spam it with ipi_spam().
  * You'll also need the PMCs to run.  Easiest way is with:
