@@ -272,19 +272,20 @@ typedef struct x86_pgdir {
 /* Some things to be careful of:  Global and PAT only apply to the last PTE in
  * a chain: so either a PTE in PML1, or a Jumbo PTE in PML2 or 3.  When PAT
  * applies, which bit we use depends on whether we are jumbo or not.  For PML1,
- * PAT is bit 8.  For jumbo PTEs (and only when they are for a jumbo page), we
+ * PAT is bit 7.  For jumbo PTEs (and only when they are for a jumbo page), we
  * use bit 12. */
-#define PTE_P			0x001	/* Present */
-#define PTE_W			0x002	/* Writeable */
-#define PTE_U			0x004	/* User */
-#define __PTE_PWT		0x008	/* Write-Through */
-#define __PTE_PCD		0x010	/* Cache-Disable */
-#define PTE_A			0x020	/* Accessed */
-#define PTE_D			0x040	/* Dirty */
-#define PTE_PS			0x080	/* Page Size */
-#define __PTE_PAT		0x080	/* Page attribute table */
-#define PTE_G			0x100	/* Global Page */
-#define __PTE_JPAT		0x800	/* Jumbo PAT */
+#define PTE_P			(1 << 0)	/* Present */
+#define PTE_W			(1 << 1)	/* Writeable */
+#define PTE_U			(1 << 2)	/* User */
+#define __PTE_PWT		(1 << 3)	/* Write-Through */
+#define __PTE_PCD		(1 << 4)	/* Cache-Disable */
+#define PTE_A			(1 << 5)	/* Accessed */
+#define PTE_D			(1 << 6)	/* Dirty */
+#define PTE_PS			(1 << 7)	/* Page Size */
+#define __PTE_PAT		(1 << 7)	/* Page attribute table */
+#define PTE_G			(1 << 8)	/* Global Page */
+#define __PTE_JPAT		(1 << 12)	/* Jumbo PAT */
+#define PTE_XD			(1 << 63)	/* Execute disabled */
 #define PTE_NOCACHE		(__PTE_PWT | __PTE_PCD)
 #define PTE_WRITECOMB	(__PTE_PCD)
 
