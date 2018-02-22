@@ -114,6 +114,27 @@ int memcpy_to_user_errno(struct proc *p, void *dst, const void *src, int len)
 	return error;
 }
 
+/* Helpers for FSs that don't care if they copy to the user or the kernel.
+ *
+ * TODO: (KFOP) Probably shouldn't do this.  Either memcpy directly, or split
+ * out the is_user_r(w)addr from copy_{to,from}_user().  Or throw from the fault
+ * handler.  Right now, we ignore the ret/errors completely. */
+void memcpy_to_safe(void *dst, const void *src, size_t amt)
+{
+	if (!is_ktask(per_cpu_info[core_id()].cur_kthread))
+		memcpy_to_user(current, dst, src, amt);
+	else
+		memcpy(dst, src, amt);
+}
+
+void memcpy_from_safe(void *dst, const void *src, size_t amt)
+{
+	if (!is_ktask(per_cpu_info[core_id()].cur_kthread))
+		memcpy_from_user(current, dst, src, amt);
+	else
+		memcpy(dst, src, amt);
+}
+
 /* Creates a buffer (kmalloc) and safely copies into it from va.  Can return an
  * error code.  Check its response with IS_ERR().  Must be paired with
  * user_memdup_free() if this succeeded. */
