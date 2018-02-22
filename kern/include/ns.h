@@ -457,7 +457,7 @@ struct dev {
 	struct walkqid *(*walk) (struct chan *, struct chan *, char **name, int);
 	int (*stat) (struct chan *, uint8_t *, int);
 	struct chan *(*open) (struct chan *, int);
-	void (*create) (struct chan *, char *, int, uint32_t);
+	void (*create)(struct chan *, char *, int, uint32_t, char *);
 	void (*close) (struct chan *);
 	long (*read) (struct chan *, void *, long, int64_t);
 	struct block *(*bread) (struct chan *, long, uint32_t);
@@ -707,7 +707,7 @@ struct chan *devattach(const char *name, char *spec);
 struct block *devbread(struct chan *, long, uint32_t);
 long devbwrite(struct chan *, struct block *, uint32_t);
 struct chan *devclone(struct chan *);
-void devcreate(struct chan *, char *name, int mode, uint32_t perm);
+void devcreate(struct chan *, char *name, int mode, uint32_t perm, char *ext);
 void devdir(struct chan *, struct qid, char *, int64_t, char *, long,
 			struct dir *);
 long devdirread(struct chan *, char *, long, struct dirtab *, int, Devgen *);

@@ -588,8 +588,12 @@ static struct chan *mntopen(struct chan *c, int omode)
 	return mntopencreate(Topen, c, NULL, omode, 0);
 }
 
-static void mntcreate(struct chan *c, char *name, int omode, uint32_t perm)
+static void mntcreate(struct chan *c, char *name, int omode, uint32_t perm,
+                      char *ext)
 {
+	/* TODO: support extensions for e.g. symlinks */
+	if (perm & DMSYMLINK)
+		error(EINVAL, "#%s doesn't support symlinks", devname());
 	mntopencreate(Tcreate, c, name, omode, perm);
 }
 

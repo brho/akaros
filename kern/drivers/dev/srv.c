@@ -221,9 +221,13 @@ static struct chan *srvopen(struct chan *c, int omode)
 	return c;
 }
 
-static void srvcreate(struct chan *c, char *name, int omode, uint32_t perm)
+static void srvcreate(struct chan *c, char *name, int omode, uint32_t perm,
+                      char *ext)
 {
 	struct srvfile *srv;
+
+	if (perm & DMSYMLINK)
+		error(EINVAL, "#%s doesn't support symlinks", devname());
 	srv = kzmalloc(sizeof(struct srvfile), MEM_WAIT);
 	kstrdup(&srv->name, name);
 	kstrdup(&srv->user, current ? current->user.name : "eve");

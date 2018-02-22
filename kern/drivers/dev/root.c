@@ -340,10 +340,14 @@ static struct chan *rootopen(struct chan *c, int omode)
 	return devopen(c, omode, NULL, 0, rootgen);
 }
 
-static void rootcreate(struct chan *c, char *name, int omode, uint32_t perm)
+static void rootcreate(struct chan *c, char *name, int omode, uint32_t perm,
+                       char *ext)
 {
 	struct dirtab *r = &roottab[c->qid.path], *newr;
 	struct rootdata *rd = &rootdata[c->qid.path];
+
+	if (perm & DMSYMLINK)
+		error(EINVAL, "#%s doesn't support symlinks", devname());
 	/* need to filter openmode so that it gets only the access-type bits */
 	omode = openmode(omode);
 	c->mode = openmode(omode);

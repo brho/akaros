@@ -166,13 +166,16 @@ static struct dirtab *find_free_var(void)
 }
 
 /* We ignore the perm - they are all hard-coded in the dirtab */
-static void vars_create(struct chan *c, char *name, int omode, uint32_t perm)
+static void vars_create(struct chan *c, char *name, int omode, uint32_t perm,
+                        char *ext)
 {
 	struct dirtab *new_slot;
 	uintptr_t addr;
 	char *bang;
 	size_t size;
 
+	if (perm & DMSYMLINK)
+		error(EINVAL, "#%s doesn't support symlinks", devname());
 	/* TODO: check that the user is privileged */
 	bang = strchr(name, '!');
 	if (!bang)

@@ -430,8 +430,8 @@ Return:
 	return c;
 }
 
-void
-devcreate(struct chan *c, char *unused_char_p_t, int unused_int, uint32_t u)
+void devcreate(struct chan *c, char *unused_char_p_t, int unused_int,
+               uint32_t u, char *ext)
 {
 	error(EPERM, ERROR_FIXME);
 }
