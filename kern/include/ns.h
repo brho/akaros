@@ -787,9 +787,10 @@ void mousetrack(int unused_int, int, int, int);
 uint64_t ms2fastticks(uint32_t);
 void mul64fract(uint64_t *, uint64_t, uint64_t);
 void muxclose(struct mnt *);
-struct chan *namec(char *unused_char_p_t, int unused_int, int, uint32_t);
+struct chan *namec(char *unused_char_p_t, int unused_int, int, uint32_t,
+                   void *ext);
 struct chan *namec_from(struct chan *c, char *name, int amode, int omode,
-                        uint32_t perm);
+                        uint32_t perm, void *ext);
 struct chan *newchan(void);
 struct egrp *newegrp(void);
 struct mount *newmount(struct mhead *, struct chan *, int unused_int,

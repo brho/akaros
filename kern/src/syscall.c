@@ -2489,7 +2489,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 
 	/* discard namec error */
 	if (!waserror()) {
-		oldchan = namec(from_path, Aaccess, 0, 0);
+		oldchan = namec(from_path, Aaccess, 0, 0, NULL);
 	}
 	poperror();
 	if (!oldchan) {
@@ -2518,7 +2518,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 	}
 
 	/* the omode and perm are of no importance. */
-	newchan = namec(to_path, Acreatechan, 0, 0);
+	newchan = namec(to_path, Acreatechan, 0, 0, NULL);
 	if (newchan == NULL) {
 		printd("sys_rename %s to %s found no chan\n", from_path, to_path);
 		set_errno(EPERM);

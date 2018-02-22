@@ -993,7 +993,8 @@ void *memrchr(void *va, int c, long n)
  * The classic namec() is broken into a front end to get the starting point and
  * a __namec_from, which does the guts of the lookup.  */
 static struct chan *__namec_from(struct chan *c, char *aname, int amode,
-                                 int omode, uint32_t perm, bool can_mount)
+                                 int omode, uint32_t perm, bool can_mount,
+                                 void *ext)
 {
 	ERRSTACK(2);
 	int len, npath;
@@ -1253,7 +1254,7 @@ Open:
 				cnew->flag |= omode & CEXTERNAL_FLAGS;
 				devtab[cnew->type].create(cnew, e.elems[e.ARRAY_SIZEs - 1],
 										  omode & ~(O_EXCL | O_CLOEXEC),
-										  perm, NULL);
+										  perm, ext);
 				poperror();
 
 				if (m)
@@ -1303,7 +1304,7 @@ Open:
 	return c;
 }
 
-struct chan *namec(char *name, int amode, int omode, uint32_t perm)
+struct chan *namec(char *name, int amode, int omode, uint32_t perm, void *ext)
 {
 	bool can_mount = TRUE;
 	struct chan *c;
@@ -1379,11 +1380,11 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm)
 			chan_incref(c);
 			break;
 	}
-	return __namec_from(c, name, amode, omode, perm, can_mount);
+	return __namec_from(c, name, amode, omode, perm, can_mount, ext);
 }
 
 struct chan *namec_from(struct chan *c, char *name, int amode, int omode,
-                        uint32_t perm)
+                        uint32_t perm, void *ext)
 {
 	if (name[0] == '\0') {
 		/* Our responsibility to cclose 'c' on our error */
@@ -1391,7 +1392,7 @@ struct chan *namec_from(struct chan *c, char *name, int amode, int omode,
 		error(EFAIL, "empty file name");
 	}
 	validname(name, 1);
-	return __namec_from(c, name, amode, omode, perm, TRUE);
+	return __namec_from(c, name, amode, omode, perm, TRUE, ext);
 }
 
 /*

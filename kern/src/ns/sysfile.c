@@ -154,7 +154,7 @@ int syschdir(char *path)
 		return -1;
 	}
 
-	c = namec(path, Atodir, 0, 0);
+	c = namec(path, Atodir, 0, 0, NULL);
 	pg = current->pgrp;
 	cclose(pg->dot);
 	pg->dot = c;
@@ -194,7 +194,7 @@ int syscreate(char *path, int mode, uint32_t perm)
 	}
 
 	openmode(mode & ~O_EXCL);	/* error check only; OEXCL okay here */
-	c = namec(path, Acreate, mode, perm);
+	c = namec(path, Acreate, mode, perm, NULL);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -387,7 +387,7 @@ long bindmount(struct chan *c, char *old, int flag, char *spec)
 	if (flag > MMASK || (flag & MORDER) == (MBEFORE | MAFTER))
 		error(EINVAL, ERROR_FIXME);
 
-	c1 = namec(old, Amount, 0, 0);
+	c1 = namec(old, Amount, 0, 0, NULL);
 	if (waserror()) {
 		cclose(c1);
 		nexterror();
@@ -410,7 +410,7 @@ int sysbind(char *new, char *old, int flags)
 		return -1;
 	}
 
-	c0 = namec(new, Abind, 0, 0);
+	c0 = namec(new, Abind, 0, 0, NULL);
 	if (waserror()) {
 		cclose(c0);
 		nexterror();
@@ -485,7 +485,7 @@ int sysunmount(char *src_path, char *onto_path)
 		return -1;
 	}
 
-	cmount.c = namec(onto_path, Amount, 0, 0);
+	cmount.c = namec(onto_path, Amount, 0, 0, NULL);
 	if (src_path != NULL && src_path[0] != '\0') {
 		/*
 		 * This has to be namec(..., Aopen, ...) because
@@ -493,7 +493,7 @@ int sysunmount(char *src_path, char *onto_path)
 		 * opening it is the only way to get at the real
 		 * Chan underneath.
 		 */
-		cmounted.c = namec(src_path, Aopen, O_READ, 0);
+		cmounted.c = namec(src_path, Aopen, O_READ, 0, NULL);
 	}
 
 	cunmount(cmount.c, cmounted.c);
@@ -516,7 +516,7 @@ int sysopenat(int fromfd, char *path, int vfs_flags)
 	}
 	openmode(vfs_flags);	/* error check only */
 	if ((path[0] == '/') || (fromfd == AT_FDCWD)) {
-		c = namec(path, Aopen, vfs_flags, 0);
+		c = namec(path, Aopen, vfs_flags, 0, NULL);
 	} else {
 		/* We don't cclose from.  namec_from will convert it to the new chan
 		 * during the walk process (c).  It'll probably close from internally,
@@ -525,7 +525,7 @@ int sysopenat(int fromfd, char *path, int vfs_flags)
 		from = fdtochan(&current->open_files, fromfd, -1, FALSE, TRUE);
 		if (!(from->flag & O_PATH))
 			error(EINVAL, "Cannot openat from a non-O_PATH FD");
-		c = namec_from(from, path, Aopen, vfs_flags, 0);
+		c = namec_from(from, path, Aopen, vfs_flags, 0, NULL);
 	}
 	fd = newfd(c, 0, vfs_flags, FALSE);
 	if (fd < 0)
@@ -762,7 +762,7 @@ int sysremove(char *path)
 		return -1;
 	}
 
-	c = namec(path, Aremove, 0, 0);
+	c = namec(path, Aremove, 0, 0, NULL);
 	if (waserror()) {
 		c->type = -1;	/* see below */
 		cclose(c);
@@ -926,7 +926,7 @@ int sysstat(char *path, uint8_t *buf, int n)
 		return -1;
 	}
 
-	c = namec(path, Aaccess, 0, 0);
+	c = namec(path, Aaccess, 0, 0, NULL);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -1044,7 +1044,7 @@ int syswstat(char *path, uint8_t * buf, int n)
 	}
 
 	validstat(buf, n, 0);
-	c = namec(path, Aaccess, 0, 0);
+	c = namec(path, Aaccess, 0, 0, NULL);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -1102,7 +1102,7 @@ struct dir *sysdirstat(char *name)
 		return NULL;
 	}
 
-	c = namec(name, Aaccess, 0, 0);
+	c = namec(name, Aaccess, 0, 0, NULL);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -1297,7 +1297,7 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 		/* We are probably spawned by the kernel directly, and have no parent to
 		 * inherit from. */
 		new_proc->pgrp = newpgrp();
-		new_proc->slash = namec("#root", Atodir, 0, 0);
+		new_proc->slash = namec("#root", Atodir, 0, 0, NULL);
 		if (!new_proc->slash)
 			panic("no root device");
 		/* Want the name to be "/" instead of "#root" */
