@@ -391,27 +391,13 @@ devdirread(struct chan *c, char *d, long n,
 }
 
 /*
- * error(EPERM, ERROR_FIXME) if open permission not granted for
- * current->user.name
+ * Throws an error if open permission not granted for current->user.name
  */
 void devpermcheck(char *fileuid, uint32_t perm, int omode)
 {
-	int rwx;
-
-	/* select user, group, or other from the traditional rwxrwxrwx, shifting
-	 * into the upper-most position */
-	if (strcmp(current->user.name, fileuid) == 0)
-		perm <<= 0;
-	else if (iseve())
-		perm <<= 3;
-	else
-		perm <<= 6;
-	/* translate omode into things like S_IRUSR (just one set of rwx------).
-	 * Plan 9 originally only returned 0400 0200 0600 and 0100 here; it didn't
-	 * seem to handle O_EXEC being mixed readable or writable. */
-	rwx = omode_to_rwx(omode);
-	if ((rwx & perm) != rwx)
-		error(EPERM, "devpermcheck(%s, 0%o, 0%o) failed", fileuid, perm, omode);
+	if (!caller_has_perms(fileuid, perm, omode))
+		error(EPERM, "permcheck(user: %s, rwx: 0%o, omode 0%o) failed",
+		      fileuid, perm, omode);
 }
 
 struct chan *devopen(struct chan *c, int omode, struct dirtab *tab, int ntab,

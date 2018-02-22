@@ -1003,6 +1003,12 @@ void printqid(void (*putch) (int, void **), void **putdat, struct qid *q);
 void printcname(void (*putch) (int, void **), void **putdat, struct cname *c);
 void printchan(void (*putch) (int, void **), void **putdat, struct chan *c);
 
+/* kern/src/ns/util.c */
+bool caller_is_username(char *uid);
+bool caller_has_perms(char *fileuid, uint32_t perm, int omode);
+bool caller_has_dir_perms(struct dir *dir, int omode);
+void dir_perm_check(struct dir *dir, int omode);
+
 static inline int abs(int a)
 {
 	if (a < 0)

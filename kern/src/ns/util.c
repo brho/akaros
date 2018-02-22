@@ -4,6 +4,7 @@
 #include <string.h>
 #include <err.h>
 #include <syscall.h>
+#include <smp.h>
 
 /* Copies n bytes from mem + offset into buf, similar to a read() call. */
 int readmem(unsigned long offset, char *buf, unsigned long n,
@@ -96,4 +97,44 @@ int omode_to_9p_accmode(int open_flags)
 	                          [0] = 0 /* we can't express no permissions */
 	                          };
 	return acc_opts[open_flags & O_ACCMODE];
+}
+
+/* TODO: This assumes UID isn't concurrently changed */
+bool caller_is_username(char *uid)
+{
+	struct username *current_user = current ? &current->user : &eve;
+
+	return strcmp(current_user->name, uid) == 0;
+}
+
+/* Checks if current->user has permissions for omode access on something with
+ * {owner_fileuid, perm} */
+bool caller_has_perms(char *fileuid, uint32_t perm, int omode)
+{
+	int rwx;
+
+	perm &= S_PMASK;	/* technically unnecessary; good for clarity */
+	/* select user, group, or other from the traditional rwxrwxrwx, shifting
+	 * into the upper-most position */
+	if (caller_is_username(fileuid))
+		perm <<= 0;
+	else if (iseve())
+		perm <<= 3;
+	else
+		perm <<= 6;
+	/* translate omode into things like S_IRUSR (just one set of rwx------).
+	 * Plan 9 originally only returned 0400 0200 0600 and 0100 here; it didn't
+	 * seem to handle O_EXEC being mixed readable or writable. */
+	rwx = omode_to_rwx(omode);
+	return (rwx & perm) == rwx;
+}
+
+bool caller_has_dir_perms(struct dir *dir, int omode)
+{
+	return caller_has_perms(dir->uid, READ_ONCE(dir->mode), omode);
+}
+
+void dir_perm_check(struct dir *dir, int omode)
+{
+	devpermcheck(dir->uid, READ_ONCE(dir->mode) & S_PMASK, omode);
 }
