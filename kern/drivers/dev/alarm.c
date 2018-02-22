@@ -344,22 +344,6 @@ static struct chan *alarmopen(struct chan *c, int omode)
 	return c;
 }
 
-static void alarmcreate(struct chan *c, char *name, int omode, uint32_t perm)
-{
-	error(EPERM, ERROR_FIXME);
-}
-
-static void alarmremove(struct chan *c)
-{
-	error(EPERM, ERROR_FIXME);
-}
-
-static int alarmwstat(struct chan *c, uint8_t * dp, int n)
-{
-	error(EFAIL, "No alarmwstat");
-	return 0;
-}
-
 static void alarmclose(struct chan *c)
 {
 	/* There are more closes than opens.  For instance, sysstat doesn't open,
@@ -576,14 +560,14 @@ struct dev alarmdevtab __devtab = {
 	.walk = alarmwalk,
 	.stat = alarmstat,
 	.open = alarmopen,
-	.create = alarmcreate,
+	.create = devcreate,
 	.close = alarmclose,
 	.read = alarmread,
 	.bread = devbread,
 	.write = alarmwrite,
 	.bwrite = devbwrite,
-	.remove = alarmremove,
-	.wstat = alarmwstat,
+	.remove = devremove,
+	.wstat = devwstat,
 	.power = devpower,
 	.chaninfo = alarm_chaninfo,
 	.tapfd = alarm_tapfd,
