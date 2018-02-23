@@ -6,7 +6,7 @@
  *
  * Modified for the Akaros operating system:
  * Copyright (c) 2013-2014 The Regents of the University of California
- * Copyright (c) 2013-2015 Google Inc.
+ * Copyright (c) 2013-2018 Google Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -42,27 +42,31 @@
 
 unsigned int sizeD2M(struct dir *d)
 {
-	char *sv[4];
+	char *sv[STAT_NR_STRINGS_AK];
 	int i, ns;
 
 	sv[0] = d->name;
 	sv[1] = d->uid;
 	sv[2] = d->gid;
 	sv[3] = d->muid;
+	sv[4] = d->ext;
 
 	ns = 0;
-	for (i = 0; i < 4; i++)
+	for (i = 0; i < STAT_NR_STRINGS_AK; i++)
 		if (sv[i])
 			ns += strlen(sv[i]);
 
-	return STATFIXLEN + ns;
+	return STAT_FIX_LEN_AK + ns;
 }
 
+/* This converts dirs into the Akaros format (P92000.u + timespecs).  So far, we
+ * haven't needed to convert to a smaller format, such as you'd get if nbuf was
+ * too small. */
 unsigned int convD2M(struct dir *d, uint8_t * buf, unsigned int nbuf)
 {
 	uint8_t *p, *ebuf;
-	char *sv[4];
-	int i, ns, nsv[4], ss;
+	char *sv[STAT_NR_STRINGS_AK];
+	int i, ns, nsv[STAT_NR_STRINGS_AK], ss;
 
 	if (nbuf < BIT16SZ)
 		return 0;
@@ -74,9 +78,10 @@ unsigned int convD2M(struct dir *d, uint8_t * buf, unsigned int nbuf)
 	sv[1] = d->uid;
 	sv[2] = d->gid;
 	sv[3] = d->muid;
+	sv[4] = d->ext;
 
 	ns = 0;
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < STAT_NR_STRINGS_AK; i++) {
 		if (sv[i])
 			nsv[i] = strlen(sv[i]);
 		else
@@ -84,45 +89,46 @@ unsigned int convD2M(struct dir *d, uint8_t * buf, unsigned int nbuf)
 		ns += nsv[i];
 	}
 
-	ss = STATFIXLEN + ns;
+	ss = STAT_FIX_LEN_AK + ns;
 
 	/* set size befor erroring, so user can know how much is needed */
-	/* note that length excludes count field itself */
+	/* note that length excludes the count field itself */
 	PBIT16(p, ss - BIT16SZ);
 	p += BIT16SZ;
 
 	if (ss > nbuf)
 		return BIT16SZ;
 
-	PBIT16(p, d->type);
-	p += BIT16SZ;
-	PBIT32(p, d->dev);
-	p += BIT32SZ;
-	PBIT8(p, d->qid.type);
-	p += BIT8SZ;
-	PBIT32(p, d->qid.vers);
-	p += BIT32SZ;
-	PBIT64(p, d->qid.path);
-	p += BIT64SZ;
-	PBIT32(p, d->mode);
-	p += BIT32SZ;
-	PBIT32(p, d->atime);
-	p += BIT32SZ;
-	PBIT32(p, d->mtime);
-	p += BIT32SZ;
-	PBIT64(p, d->length);
-	p += BIT64SZ;
+	PBIT16(p, d->type);             p += BIT16SZ;
+	PBIT32(p, d->dev);              p += BIT32SZ;
+	PBIT8(p, d->qid.type);          p += BIT8SZ;
+	PBIT32(p, d->qid.vers);         p += BIT32SZ;
+	PBIT64(p, d->qid.path);         p += BIT64SZ;
+	PBIT32(p, d->mode);             p += BIT32SZ;
+	PBIT32(p, d->atime.tv_sec);     p += BIT32SZ;
+	PBIT32(p, d->mtime.tv_sec);     p += BIT32SZ;
+	PBIT64(p, d->length);           p += BIT64SZ;
 
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < STAT_NR_STRINGS_AK; i++) {
 		ns = nsv[i];
 		if (p + ns + BIT16SZ > ebuf)
 			return 0;
-		PBIT16(p, ns);
-		p += BIT16SZ;
+		PBIT16(p, ns); p += BIT16SZ;
 		if (ns)
 			memmove(p, sv[i], ns);
 		p += ns;
 	}
+	PBIT32(p, d->n_uid);            p += BIT32SZ;
+	PBIT32(p, d->n_gid);            p += BIT32SZ;
+	PBIT32(p, d->n_muid);           p += BIT32SZ;
+	PBIT64(p, d->atime.tv_sec);     p += BIT64SZ;
+	PBIT64(p, d->atime.tv_nsec);    p += BIT64SZ;
+	PBIT64(p, d->btime.tv_sec);     p += BIT64SZ;
+	PBIT64(p, d->btime.tv_nsec);    p += BIT64SZ;
+	PBIT64(p, d->ctime.tv_sec);     p += BIT64SZ;
+	PBIT64(p, d->ctime.tv_nsec);    p += BIT64SZ;
+	PBIT64(p, d->mtime.tv_sec);     p += BIT64SZ;
+	PBIT64(p, d->mtime.tv_nsec);    p += BIT64SZ;
 
 	if (ss != p - buf)
 		return 0;

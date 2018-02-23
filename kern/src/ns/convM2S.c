@@ -73,6 +73,8 @@ uint8_t *gqid(uint8_t * p, uint8_t * ep, struct qid *q)
 	return p;
 }
 
+/* This initializes a dir to "don't touch" values.  These fields are ignored on
+ * a wstat. */
 void init_empty_dir(struct dir *d)
 {
 	d->type = ~0;
@@ -81,13 +83,25 @@ void init_empty_dir(struct dir *d)
 	d->qid.vers = ~0;
 	d->qid.type = ~0;
 	d->mode = ~0;
-	d->atime = ~0;
-	d->mtime = ~0;
 	d->length = ~0;
 	d->name = "";
 	d->uid = "";
 	d->gid = "";
 	d->muid = "";
+	d->ext = "";
+	d->n_uid = ~0;
+	d->n_gid = ~0;
+	d->n_muid = ~0;
+	d->atime.tv_sec = ~0;
+	d->btime.tv_sec = ~0;
+	d->ctime.tv_sec = ~0;
+	d->mtime.tv_sec = ~0;
+	/* We don't look at tv_nsec to determine whether or not the field is "don't
+	 * touch".  This way, all nsecs are normal. */
+	d->atime.tv_nsec = 0;
+	d->btime.tv_nsec = 0;
+	d->ctime.tv_nsec = 0;
+	d->mtime.tv_nsec = 0;
 }
 
 /*

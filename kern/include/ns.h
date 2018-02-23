@@ -136,17 +136,25 @@ struct qid {
 struct dir {
 	/* system-modified data */
 	uint16_t type;				/* server type */
-	unsigned int dev;			/* server subtype */
+	uint32_t dev;			/* server subtype */
 	/* file data */
 	struct qid qid;				/* unique id from server */
-	int mode;					/* permissions */
-	uint32_t atime;				/* last read time */
-	uint32_t mtime;				/* last write time */
-	int64_t length;				/* file length: see <u.h> */
+	uint32_t mode;				/* permissions */
+	/* 9p stat has u32 atime (seconds) here */
+	/* 9p stat has u32 mtime (seconds) here */
+	uint64_t length;			/* file length: see <u.h> */
 	char *name;					/* last element of path */
 	char *uid;					/* owner name */
 	char *gid;					/* group name */
 	char *muid;					/* last modifier name */
+	char *ext;					/* extensions for special files (symlinks) */
+	uint32_t n_uid;				/* numeric owner uid */
+	uint32_t n_gid;				/* numeric group id */
+	uint32_t n_muid;			/* numeric last modifier id */
+	struct timespec atime;		/* last access time */
+	struct timespec btime;		/* file creation time */
+	struct timespec ctime;		/* last attribute change time */
+	struct timespec mtime;		/* last data modification time */
 };
 
 struct waitmsg {
@@ -231,9 +239,49 @@ typedef
 #define	BIT64SZ		8
 #define	QIDSZ	(BIT8SZ+BIT32SZ+BIT64SZ)
 
-/* STATFIXLEN includes leading 16-bit count */
-/* The count, however, excludes itself; total size is BIT16SZ+count */
-#define STATFIXLEN	(BIT16SZ+QIDSZ+5*BIT16SZ+4*BIT32SZ+1*BIT64SZ)	/* amount of fixed length data in a stat buffer */
+/* The 9p STATFIXLENs include the leading 16-bit count.  The count, however,
+ * excludes itself; total size is BIT16SZ + count.  This is the amount of fixed
+ * length data in a stat buffer.  This does not include the strings, but it
+ * includes the string counts (u16s)
+ *
+ * STAT_FIX_LEN_9P is the original 9p stat message: type to length, including
+ * u32 atime and u32 mtime.  This is the bare minimum for a stat that we
+ * receive.  We check in e.g. convM2D for any extra fields.
+ *
+ * STAT_FIX_LEN_AK is the stat message used by Akaros, which includes Eric VH's
+ * extensions and full timespecs.  It is analogous to struct dir, including the
+ * u32s for the legacy atime/mtime.  We always send stats of this size, e.g. in
+ * convD2M.
+ *
+ * Note that the extended stat message has fixed data after the strings, but to
+ * get to this data, you have to jump through the string and their counts
+ * (u16s).  The counts are part of the fixed length, but not the strings.  Also
+ * note that the _AK version has an extra string. */
+#define STAT_NR_STRINGS_9P 4
+#define STAT_NR_STRINGS_AK 5
+#define STAT_FIX_LEN_9P (BIT16SZ +                      /* size */             \
+                         BIT16SZ +                      /* type */             \
+                         BIT32SZ +                      /* dev */              \
+                         QIDSZ +                        /* qid */              \
+                         BIT32SZ +                      /* mode */             \
+                         BIT32SZ +                      /* atime u32 */        \
+                         BIT32SZ +                      /* mtime u32 */        \
+                         BIT64SZ +                      /* length */           \
+                         STAT_NR_STRINGS_9P * BIT16SZ + /* string counts */    \
+						 0)
+#define __STAT_FIX_LEN_AK_NONSTRING (                                          \
+                         BIT32SZ +                      /* n_uid */            \
+                         BIT32SZ +                      /* n_gid */            \
+                         BIT32SZ +                      /* n_muid */           \
+                         2 * BIT64SZ +                  /* atime */            \
+                         2 * BIT64SZ +                  /* btime */            \
+                         2 * BIT64SZ +                  /* ctime */            \
+                         2 * BIT64SZ +                  /* mtime */            \
+						 0)
+#define STAT_FIX_LEN_AK (STAT_FIX_LEN_9P +                                     \
+                         (STAT_NR_STRINGS_AK - STAT_NR_STRINGS_9P) * BIT16SZ + \
+                         __STAT_FIX_LEN_AK_NONSTRING +                         \
+						 0)
 
 #define	NOTAG		(uint16_t)~0U	/* Dummy tag */
 #define	NOFID		(uint32_t)~0U	/* Dummy fid */

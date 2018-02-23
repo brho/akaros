@@ -2409,15 +2409,10 @@ static int vfs_wstat(struct file *file, uint8_t *stat_m, size_t stat_sz,
 		if (retval < 0)
 			goto out;
 	}
-	if (flags & WSTAT_ATIME) {
-		/* wstat only gives us seconds */
-		file->f_dentry->d_inode->i_atime.tv_sec = dir->atime;
-		file->f_dentry->d_inode->i_atime.tv_nsec = 0;
-	}
-	if (flags & WSTAT_MTIME) {
-		file->f_dentry->d_inode->i_mtime.tv_sec = dir->mtime;
-		file->f_dentry->d_inode->i_mtime.tv_nsec = 0;
-	}
+	if (flags & WSTAT_ATIME)
+		file->f_dentry->d_inode->i_atime = dir->atime;
+	if (flags & WSTAT_MTIME)
+		file->f_dentry->d_inode->i_mtime = dir->mtime;
 
 out:
 	kfree(dir);
@@ -2536,7 +2531,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 
 	struct dir dir;
 	size_t mlen;
-	uint8_t mbuf[STATFIXLEN + MAX_PATH_LEN + 1];
+	uint8_t mbuf[STAT_FIX_LEN_AK + MAX_PATH_LEN + 1];
 
 	init_empty_dir(&dir);
 	dir.name = to_path;

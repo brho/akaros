@@ -40,8 +40,10 @@
 #include <smp.h>
 #include <net/ip.h>
 
+/* TODO: these sizes are hokey.  DIRSIZE is used in chandirstat, and it looks
+ * like it's the size of a common-case stat. */
 enum {
-	DIRSIZE = STATFIXLEN + 32 * 4,
+	DIRSIZE = STAT_FIX_LEN_AK + 32 * STAT_NR_STRINGS_AK,
 	DIRREADLIM = 2048,	/* should handle the largest reasonable directory entry */
 	DIRREADSIZE=8192,	/* Just read a lot. Memory is cheap, lots of bandwidth,
 				 * and RPCs are very expensive. At the same time,
@@ -858,7 +860,7 @@ void validstat(uint8_t * s, int n, int slashok)
 	if (statcheck(s, n) < 0)
 		error(EINVAL, ERROR_FIXME);
 	/* verify that name entry is acceptable */
-	s += STATFIXLEN - 4 * BIT16SZ;	/* location of first string */
+	s += STAT_FIX_LEN_9P - STAT_NR_STRINGS_9P * BIT16SZ;
 	/*
 	 * s now points at count for first string.
 	 * if it's too long, let the server decide; this is
@@ -1205,6 +1207,7 @@ static long dirpackage(uint8_t * buf, long ts, struct kdirent **d)
 	nn = 0;
 	for (i = 0; i < ts; i += m) {
 		m = BIT16SZ + GBIT16((uint8_t *) & buf[i]);
+		/* Note 's' is ignored by convM2kdirent */
 		if (nn >= n || /*convM2D */ convM2kdirent(&buf[i], m, *d + nn, s) != m) {
 			kfree(*d);
 			*d = NULL;

@@ -68,6 +68,8 @@ void
 devdir(struct chan *c, struct qid qid, char *n,
 	   int64_t length, char *user, long perm, struct dir *db)
 {
+	struct timespec now = nsec2timespec(epoch_nsec());
+
 	db->name = n;
 	if (c->flag & CMSG)
 		qid.type |= QTMOUNT;
@@ -76,12 +78,22 @@ devdir(struct chan *c, struct qid qid, char *n,
 	db->dev = c->dev;
 	db->mode = perm;
 	db->mode |= qid.type << 24;
-	db->atime = seconds();
-	db->mtime = kerndate;
 	db->length = length;
 	db->uid = user;
 	db->gid = eve.name;
 	db->muid = user;
+	db->ext = NULL;
+	/* TODO: once we figure out what to do for uid/gid, then we can try to tie
+	 * that to the n_uid.  Or just ignore it, and only use that as a
+	 * pass-through for 9p2000.u. */
+	db->n_uid = 0;
+	db->n_gid = 0;
+	db->n_muid = 0;
+	/* TODO: what does devdir really want? */
+	db->atime = now;
+	db->btime = now;
+	db->ctime = now;
+	db->mtime = now;
 }
 
 /*

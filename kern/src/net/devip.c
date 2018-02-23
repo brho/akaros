@@ -262,7 +262,7 @@ static int ip1gen(struct chan *c, int i, struct dir *dp)
 	}
 	devdir(c, q, p, len, network, prot, dp);
 	if (i == Qndb && f->ndbmtime > kerndate)
-		dp->mtime = f->ndbmtime;
+		dp->mtime.tv_sec = f->ndbmtime;
 	return 1;
 }
 

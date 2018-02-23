@@ -1,3 +1,8 @@
+/* Copyright (c) 2013-2018 Google Inc
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ * Ron Minnich <rminnich@google.com>
+ *
+ * See LICENSE for details.  */
 
 #include <vfs.h>
 #include <kfs.h>
@@ -14,86 +19,28 @@
 #include <net/ip.h>
 
 /* Special akaros edition. */
-/* akaros does not (yet) pass as much info as plan 9 does,
- * and it still has stuff I'm not happy about like an inode number.
- */
-#if 0
-struct kdirent {
-	__ino64_t d_ino;			/* inod
-								   e number */
-	__off64_t d_off;			/* offs
-								   et to the next dirent */
-	unsigned short d_reclen;	/* length of th
-								   is record */
-	unsigned char d_type;
-	char d_name[MAX_FILENAME_SZ + 1];	/* filename */
-} __attribute__ ((aligned(8)));
-
-#endif
-
 unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd,
 						   char *strs)
 {
-	uint8_t *p, *ebuf;
-	char *sv[4];
-	int i, ns;
-	uint32_t junk;
-	printd("%s >>>>>>>>>nbuf %d STATFIXLEN %d\n", __func__, nbuf, STATFIXLEN);
-	if (nbuf < STATFIXLEN)
+	struct dir *dir;
+	size_t conv_sz, name_sz;
+
+	if (nbuf < STAT_FIX_LEN_9P)
 		return 0;
+	dir = kmalloc(sizeof(struct dir) + nbuf, MEM_WAIT);
+	conv_sz = convM2D(buf, nbuf, dir, (char*)&dir[1]);
 
-	p = buf;
-	ebuf = buf + nbuf;
+	kd->d_ino = dir->qid.path;
+	kd->d_off = 0;		/* ignored for 9ns readdir */
+	kd->d_type = 0;		/* TODO: might need this; never used this in the VFS */
+	name_sz = dir->name ? strlen(dir->name) : 0;
+	kd->d_reclen = name_sz;
+	/* Our caller should have made sure kd was big enough... */
+	memcpy(kd->d_name, dir->name, name_sz);
+	kd->d_name[name_sz] = 0;
 
-	p += BIT16SZ;	/* ignore size */
-	kd->d_type = GBIT16(p);
-	p += BIT16SZ;
-	junk = GBIT32(p);
-	p += BIT32SZ;
-	junk = GBIT8(p);
-	p += BIT8SZ;
-	junk = GBIT32(p);
-	p += BIT32SZ;
-	kd->d_ino = GBIT64(p);
-	p += BIT64SZ;
-	junk /* mode */  = GBIT32(p);
-	p += BIT32SZ;
-	junk /*d->atime */  = GBIT32(p);
-	p += BIT32SZ;
-	junk /*d->mtime */  = GBIT32(p);
-	p += BIT32SZ;
-	junk /*d->length */  = GBIT64(p);
-	p += BIT64SZ;
-
-	/* for now, uids in akaros are ints. Does not
-	 * matter; kdirents are limited in what they tell you.
-	 * get the name, ignore the rest. Maybe we can
-	 * fix this later.
-	 */
-	for (i = 0; i < 4; i++) {
-		if (p + BIT16SZ > ebuf)
-			return 0;
-		ns = GBIT16(p);
-		p += BIT16SZ;
-		if (p + ns > ebuf)
-			return 0;
-		if (strs) {
-			sv[i] = strs;
-			memmove(strs, p, ns);
-			strs += ns;
-			*strs++ = '\0';
-		}
-		if (i == 0) {
-			kd->d_reclen = ns;
-			printd("memmove %p %p %d\n", kd->d_name, p, ns);
-			memmove(kd->d_name, p, ns);
-			kd->d_name[ns] = 0;
-		}
-		p += ns;
-	}
-
-	printd("%s returns %d %s\n", __func__, p - buf, kd->d_name);
-	return p - buf;
+	kfree(dir);
+	return conv_sz;
 }
 
 static int mode_9ns_to_posix(int mode_9ns)
@@ -116,41 +63,28 @@ static int mode_9ns_to_posix(int mode_9ns)
 
 unsigned int convM2kstat(uint8_t * buf, unsigned int nbuf, struct kstat *ks)
 {
-	uint8_t *p, *ebuf;
-	char *sv[4];
-	int i, ns;
-	uint32_t junk;
+	struct dir *dir;
+	size_t conv_sz, name_sz;
 
-	if (nbuf < STATFIXLEN)
+	if (nbuf < STAT_FIX_LEN_9P)
 		return 0;
+	dir = kmalloc(sizeof(struct dir) + nbuf, MEM_WAIT);
+	conv_sz = convM2D(buf, nbuf, dir, (char*)&dir[1]);
 
-	p = buf;
-	ebuf = buf + nbuf;
+	ks->st_dev = dir->type;
+	ks->st_ino = dir->qid.path;
+	ks->st_mode = mode_9ns_to_posix(dir->mode);
+	ks->st_nlink = dir->mode & DMDIR ? 2 : 1;
+	ks->st_uid = dir->n_uid;
+	ks->st_gid = dir->n_gid;
+	ks->st_rdev = dir->dev;
+	ks->st_size = dir->length;
+	ks->st_blksize = 1;
+	ks->st_blocks = dir->length;
+	ks->st_atim = dir->atime;
+	ks->st_mtim = dir->mtime;
+	ks->st_ctim = dir->ctime;
 
-	p += BIT16SZ;	/* ignore size */
-	junk /*kd->d_type */  = GBIT16(p);
-	p += BIT16SZ;
-	ks->st_rdev = ks->st_dev = GBIT32(p);
-	p += BIT32SZ;
-	junk /*qid.type */  = GBIT8(p);
-	p += BIT8SZ;
-	junk /*qid.vers */  = GBIT32(p);
-	p += BIT32SZ;
-	ks->st_ino = GBIT64(p);
-	p += BIT64SZ;
-	ks->st_mode = mode_9ns_to_posix(GBIT32(p));
-	p += BIT32SZ;
-	ks->st_atim.tv_sec = GBIT32(p);
-	p += BIT32SZ;
-	ks->st_mtim.tv_sec = GBIT32(p);
-	p += BIT32SZ;
-	ks->st_size = GBIT64(p);
-	p += BIT64SZ;
-	ks->st_blksize = 512;
-	ks->st_blocks = ROUNDUP(ks->st_size, ks->st_blksize) / ks->st_blksize;
-
-	ks->st_nlink = 2;	// links make no sense any more.
-	ks->st_uid = ks->st_gid = 0;
-
-	return p - buf;
+	kfree(dir);
+	return conv_sz;
 }
