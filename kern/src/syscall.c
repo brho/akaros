@@ -348,7 +348,9 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 				break;
 			copy_tracedata_from_user(trace, trace->arg0, trace->arg1);
 			snprintf_to_trace(trace, " -> ");
-			copy_tracedata_from_user(trace, trace->arg2, trace->arg3);
+			copy_tracedata_from_user(trace, trace->arg2,
+			                         (int)trace->retval < 0 ? 0
+									                        : trace->retval);
 			break;
 		}
 	}
@@ -1845,7 +1847,8 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 	} else {
 		/* VFS failed, checking 9ns */
 		unset_errno();	/* Go can't handle extra errnos */
-		retval = sysstatakaros(t_path, (struct kstat *)kbuf);
+		retval = sysstatakaros(t_path, (struct kstat *)kbuf,
+		                       flags & LOOKUP_FOLLOW ? 0 : O_NOFOLLOW);
 		printd("sysstat returns %d\n", retval);
 		/* both VFS and 9ns failed, bail out */
 		if (retval < 0)
@@ -2059,6 +2062,10 @@ intreg_t sys_symlink(struct proc *p, char *old_path, size_t old_l,
 		return -1;
 	}
 	ret = do_symlink(t_newpath, t_oldpath, S_IRWXU | S_IRWXG | S_IRWXO);
+	if (ret && (get_errno() == ENOENT)) {
+		unset_errno();
+		ret = syssymlink(t_newpath, t_oldpath);
+	}
 	free_path(p, t_oldpath);
 	free_path(p, t_newpath);
 	return ret;
@@ -2068,28 +2075,24 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
                       char *u_buf, size_t buf_l)
 {
 	char *symname = NULL;
-	uint8_t *buf = NULL;
 	ssize_t copy_amt;
 	int ret = -1;
 	struct dentry *path_d;
 	char *t_path = copy_in_path(p, path, path_l);
+	struct dir *dir = NULL;
+
 	if (t_path == NULL)
 		return -1;
-	/* TODO: 9ns support */
 	path_d = lookup_dentry(t_path, 0);
-	if (!path_d){
-		int n = 2048;
-		buf = kmalloc(n*2, MEM_WAIT);
-		struct dir *d = (void *)&buf[n];
- 		/* try 9ns. */
-		if (sysstat(t_path, buf, n) > 0) {
-			printk("sysstat t_path %s\n", t_path);
-			convM2D(buf, n, d, (char *)&d[1]);
-			/* will be NULL if things did not work out */
-			symname = d->muid;
-		}
-	} else
+	if (!path_d) {
+		dir = sysdirlstat(t_path);
+		if (!(dir->mode & DMSYMLINK))
+			set_error(EINVAL, "not a symlink: %s", t_path);
+		else
+			symname = dir->ext;
+	} else {
 		symname = path_d->d_inode->i_op->readlink(path_d);
+	}
 
 	free_path(p, t_path);
 
@@ -2100,9 +2103,7 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	}
 	if (path_d)
 		kref_put(&path_d->d_kref);
-	if (buf)
-		kfree(buf);
-	printd("READLINK returning %s\n", u_buf);
+	kfree(dir);
 	return ret;
 }
 

@@ -113,6 +113,7 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 #define QTEXCL		0x20	/* type bit for exclusive use files */
 #define QTMOUNT		0x10	/* type bit for mounted channel */
 #define QTAUTH		0x08	/* type bit for authentication file */
+#define QTSYMLINK	0x02	/* type bit for symlinks */
 #define QTFILE		0x01	/* plain file */
 
 /* bits in Dir.mode */
@@ -1015,6 +1016,7 @@ int sysfversion(int fd, unsigned int msize, char *vers, unsigned int arglen);
 int sysfwstat(int fd, uint8_t * buf, int n);
 long bindmount(struct chan *c, char *old, int flag, char *spec);
 int sysbind(char *new, char *old, int flags);
+int syssymlink(char *new_path, char *old_path);
 int sysmount(int fd, int afd, char *old, int flags, char *spec);
 int sysunmount(char *old, char *new);
 int sysopenat(int dirfd, char *path, int vfs_flags);
@@ -1027,12 +1029,14 @@ int sysremove(char *path);
 int64_t sysseek(int fd, int64_t off, int whence);
 void validstat(uint8_t * s, int n, int slashok);
 int sysstat(char *path, uint8_t*, int n);
-int sysstatakaros(char *path, struct kstat *);
+int syslstat(char *path, uint8_t*, int n);
+int sysstatakaros(char *path, struct kstat *, int flags);
 long syswrite(int fd, void *va, long n);
 long syspwrite(int fd, void *va, long n, int64_t off);
 int syswstat(char *path, uint8_t * buf, int n);
 struct dir *chandirstat(struct chan *c);
 struct dir *sysdirstat(char *name);
+struct dir *sysdirlstat(char *name);
 struct dir *sysdirfstat(int fd);
 int sysdirwstat(char *name, struct dir *dir);
 int sysdirfwstat(int fd, struct dir *dir);

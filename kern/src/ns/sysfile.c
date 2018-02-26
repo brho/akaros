@@ -425,6 +425,23 @@ int sysbind(char *new, char *old, int flags)
 	return r;
 }
 
+int syssymlink(char *new_path, char *old_path)
+{
+	ERRSTACK(1);
+	struct chan *c;
+
+	if (waserror()) {
+		poperror();
+		return -1;
+	}
+	validname(old_path, true);
+	c = namec(new_path, Acreate, O_EXCL,
+	          DMSYMLINK | S_IRWXU | S_IRWXG | S_IRWXO, old_path);
+	cclose(c);
+	poperror();
+	return 0;
+}
+
 int sysmount(int fd, int afd, char *old, int flags, char *spec)
 {
 	ERRSTACK(1);
@@ -918,7 +935,7 @@ int sysfstatakaros(int fd, struct kstat *ks)
 	return n;
 }
 
-int sysstat(char *path, uint8_t *buf, int n)
+static int __stat(char *path, uint8_t *buf, int n, int flags)
 {
 	ERRSTACK(2);
 	struct chan *c;
@@ -928,7 +945,7 @@ int sysstat(char *path, uint8_t *buf, int n)
 		return -1;
 	}
 
-	c = namec(path, Aaccess, 0, 0, NULL);
+	c = namec(path, Aaccess, flags, 0, NULL);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -942,13 +959,23 @@ int sysstat(char *path, uint8_t *buf, int n)
 	return n;
 }
 
-int sysstatakaros(char *path, struct kstat *ks)
+int sysstat(char *path, uint8_t *buf, int n)
+{
+	return __stat(path, buf, n, 0);
+}
+
+int syslstat(char *path, uint8_t *buf, int n)
+{
+	return __stat(path, buf, n, O_NOFOLLOW);
+}
+
+int sysstatakaros(char *path, struct kstat *ks, int flags)
 {
 
 	int n = 4096;
 	uint8_t *buf;
 	buf = kmalloc(n, MEM_WAIT);
-	n = sysstat(path, buf, n);
+	n = __stat(path, buf, n, flags);
 	if (n > 0) {
 		convM2kstat(buf, n, ks);
 		n = 0;
@@ -1093,7 +1120,7 @@ struct dir *chandirstat(struct chan *c)
 
 }
 
-struct dir *sysdirstat(char *name)
+static struct dir *__dir_stat(char *name, int flags)
 {
 	ERRSTACK(2);
 	struct chan *c;
@@ -1104,7 +1131,7 @@ struct dir *sysdirstat(char *name)
 		return NULL;
 	}
 
-	c = namec(name, Aaccess, 0, 0, NULL);
+	c = namec(name, Aaccess, flags, 0, NULL);
 	if (waserror()) {
 		cclose(c);
 		nexterror();
@@ -1115,6 +1142,16 @@ struct dir *sysdirstat(char *name)
 
 	poperror();
 	return d;
+}
+
+struct dir *sysdirstat(char *name)
+{
+	return __dir_stat(name, 0);
+}
+
+struct dir *sysdirlstat(char *name)
+{
+	return __dir_stat(name, O_NOFOLLOW);
 }
 
 struct dir *sysdirfstat(int fd)
