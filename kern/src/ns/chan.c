@@ -72,6 +72,10 @@ struct Elemlist {
 	int mustbedir;
 };
 
+struct walk_helper {
+	bool can_mount;
+};
+
 #define SEP(c) ((c) == 0 || (c) == '/')
 void cleancname(struct cname *);
 
@@ -688,7 +692,8 @@ struct chan *undomount(struct chan *c, struct cname *name)
  * Either walks all the way or not at all.  No partial results in *cp.
  * *nerror is the number of names to display in an error message.
  */
-int walk(struct chan **cp, char **names, int nnames, bool can_mount, int *nerror)
+int walk(struct chan **cp, char **names, int nnames, struct walk_helper *wh,
+         int *nerror)
 {
 	int dev, dotdot, i, n, nhave, ntry, type;
 	struct chan *c, *nc, *lastmountpoint = NULL;
@@ -739,7 +744,7 @@ int walk(struct chan **cp, char **names, int nnames, bool can_mount, int *nerror
 			}
 		}
 
-		if (!dotdot && can_mount)
+		if (!dotdot && wh->can_mount)
 			domount(&c, &mh);
 
 		type = c->type;
@@ -747,7 +752,7 @@ int walk(struct chan **cp, char **names, int nnames, bool can_mount, int *nerror
 
 		if ((wq = devtab[type].walk(c, NULL, names + nhave, ntry)) == NULL) {
 			/* try a union mount, if any */
-			if (mh && can_mount) {
+			if (mh && wh->can_mount) {
 				/*
 				 * mh->mount == c, so start at mh->mount->next
 				 */
@@ -784,7 +789,7 @@ int walk(struct chan **cp, char **names, int nnames, bool can_mount, int *nerror
 			n = 1;
 		} else {
 			nc = NULL;
-			if (can_mount)
+			if (wh->can_mount)
 				for (i = 0; i < wq->nqid && i < ntry - 1; i++)
 					if (findmount(&nc, &nmh, type, dev, wq->qid[i]))
 						break;
@@ -993,8 +998,8 @@ void *memrchr(void *va, int c, long n)
  * The classic namec() is broken into a front end to get the starting point and
  * a __namec_from, which does the guts of the lookup.  */
 static struct chan *__namec_from(struct chan *c, char *aname, int amode,
-                                 int omode, uint32_t perm, bool can_mount,
-                                 void *ext)
+                                 int omode, uint32_t perm,
+                                 struct walk_helper *wh, void *ext)
 {
 	ERRSTACK(2);
 	int len, npath;
@@ -1043,7 +1048,7 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 		e.ARRAY_SIZEs--;
 	}
 
-	if (walk(&c, e.elems, e.ARRAY_SIZEs, can_mount, &npath) < 0) {
+	if (walk(&c, e.elems, e.ARRAY_SIZEs, wh, &npath) < 0) {
 		if (npath < 0 || npath > e.ARRAY_SIZEs) {
 			printd("namec %s walk error npath=%d\n", aname, npath);
 			error(EFAIL, "walk failed");
@@ -1085,13 +1090,13 @@ NameError:
 
 	switch (amode) {
 		case Aaccess:
-			if (can_mount)
+			if (wh->can_mount)
 				domount(&c, NULL);
 			break;
 
 		case Abind:
 			m = NULL;
-			if (can_mount)
+			if (wh->can_mount)
 				domount(&c, &m);
 			if (c->umh != NULL)
 				putmhead(c->umh);
@@ -1105,7 +1110,7 @@ Open:
 			cname = c->name;
 			kref_get(&cname->ref, 1);
 			m = NULL;
-			if (can_mount)
+			if (wh->can_mount)
 				domount(&c, &m);
 
 			/* our own copy to open or remove */
@@ -1182,7 +1187,7 @@ Open:
 			 * If omode&OEXCL is set, just give up.
 			 */
 			e.ARRAY_SIZEs++;
-			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, can_mount, NULL) == 0) {
+			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, wh, NULL) == 0) {
 				if (omode & O_EXCL)
 					error(EEXIST, ERROR_FIXME);
 				omode |= O_TRUNC;
@@ -1233,7 +1238,8 @@ Open:
 			cnew = NULL;	/* is this assignment necessary? */
 			/* discard error */
 			if (!waserror()) {	/* try create */
-				if (can_mount && findmount(&cnew, &m, c->type, c->dev, c->qid))
+				if (wh->can_mount && findmount(&cnew, &m, c->type, c->dev,
+				                               c->qid))
 					cnew = createdir(cnew, m);
 				else {
 					cnew = c;
@@ -1277,7 +1283,7 @@ Open:
 			strlcpy(tmperrbuf, current_errstr(), sizeof(tmperrbuf));
 			saved_errno = get_errno();
 			/* note: we depend that walk does not error */
-			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, can_mount, NULL) < 0) {
+			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, wh, NULL) < 0) {
 				set_errno(saved_errno);
 				/* Report the error we had originally */
 				error(EFAIL, tmperrbuf);
@@ -1306,7 +1312,7 @@ Open:
 
 struct chan *namec(char *name, int amode, int omode, uint32_t perm, void *ext)
 {
-	bool can_mount = TRUE;
+	struct walk_helper wh = {.can_mount = true};
 	struct chan *c;
 	char *devname, *devspec;
 	int n, devtype;
@@ -1328,7 +1334,7 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm, void *ext)
 			break;
 
 		case '#':
-			can_mount = FALSE;
+			wh.can_mount = false;
 			devname = get_cur_genbuf();
 			devname[0] = '\0';
 			n = 0;
@@ -1380,19 +1386,21 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm, void *ext)
 			chan_incref(c);
 			break;
 	}
-	return __namec_from(c, name, amode, omode, perm, can_mount, ext);
+	return __namec_from(c, name, amode, omode, perm, &wh, ext);
 }
 
 struct chan *namec_from(struct chan *c, char *name, int amode, int omode,
                         uint32_t perm, void *ext)
 {
+	struct walk_helper wh = {.can_mount = true};
+
 	if (name[0] == '\0') {
 		/* Our responsibility to cclose 'c' on our error */
 		cclose(c);
 		error(EFAIL, "empty file name");
 	}
 	validname(name, 1);
-	return __namec_from(c, name, amode, omode, perm, TRUE, ext);
+	return __namec_from(c, name, amode, omode, perm, &wh, ext);
 }
 
 /*
