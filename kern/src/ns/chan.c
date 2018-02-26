@@ -74,7 +74,13 @@ struct Elemlist {
 
 struct walk_helper {
 	bool can_mount;
+	bool no_follow;
+	unsigned int nr_loops;
 };
+#define WALK_MAX_NR_LOOPS 8
+
+static struct chan *walk_symlink(struct chan *symlink, struct walk_helper *wh,
+                                 unsigned int nr_names_left);
 
 #define SEP(c) ((c) == 0 || (c) == '/')
 void cleancname(struct cname *);
@@ -719,7 +725,8 @@ int walk(struct chan **cp, char **names, int nnames, struct walk_helper *wh,
 	 * side of the mount point, and c's name is cname.
 	 */
 	for (nhave = 0; nhave < nnames; nhave += n) {
-		if ((c->qid.type & QTDIR) == 0) {
+		/* We only allow symlink when they are first and it's .. (see below) */
+		if ((c->qid.type & (QTDIR | QTSYMLINK)) == 0) {
 			if (nerror)
 				*nerror = nhave;
 			cnameclose(cname);
@@ -746,6 +753,10 @@ int walk(struct chan **cp, char **names, int nnames, struct walk_helper *wh,
 
 		if (!dotdot && wh->can_mount)
 			domount(&c, &mh);
+		/* Bug - the only time we walk from a symlink should be during
+		 * walk_symlink, which should have given us a dotdot. */
+		if ((c->qid.type & QTSYMLINK) && !dotdot)
+			panic("Got a walk from a symlink that wasn't ..!");
 
 		type = c->type;
 		dev = c->dev;
@@ -812,7 +823,24 @@ int walk(struct chan **cp, char **names, int nnames, struct walk_helper *wh,
 					return -1;
 				}
 				n = wq->nqid;
-				nc = wq->clone;
+				if (wq->clone->qid.type & QTSYMLINK) {
+					nc = walk_symlink(wq->clone, wh, nnames - nhave - n);
+					if (!nc) {
+						/* walk_symlink() set error.  This seems to be the
+						 * standard walk() error-cleanup. */
+						if (nerror)
+							*nerror = nhave + wq->nqid;
+						cclose(c);
+						cclose(wq->clone);
+						cnameclose(cname);
+						kfree(wq);
+						if (mh != NULL)
+							putmhead(mh);
+						return -1;
+					}
+				} else {
+					nc = wq->clone;
+				}
 			} else {	/* stopped early, at a mount point */
 				if (wq->clone != NULL) {
 					cclose(wq->clone);
@@ -1031,6 +1059,8 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 	 */
 	parsename(aname, &e);
 
+	if (e.mustbedir)
+		omode &= ~O_NOFOLLOW;
 	/*
 	 * On create, ....
 	 */
@@ -1046,7 +1076,12 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 		if (e.ARRAY_SIZEs == 0)
 			error(EEXIST, ERROR_FIXME);
 		e.ARRAY_SIZEs--;
+		/* We're dropping the last element, which O_NOFOLLOW applied to.  Not
+		 * sure if there are any legit reasons to have O_NOFOLLOW with create.*/
+		omode &= ~O_NOFOLLOW;
 	}
+	if (omode & O_NOFOLLOW)
+		wh->no_follow = true;
 
 	if (walk(&c, e.elems, e.ARRAY_SIZEs, wh, &npath) < 0) {
 		if (npath < 0 || npath > e.ARRAY_SIZEs) {
@@ -1327,9 +1362,9 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm, void *ext)
 	 */
 	switch (name[0]) {
 		case '/':
+			/* TODO: kernel walkers will crash here */
+			assert(current && current->slash);
 			c = current->slash;
-			if (!c)
-				panic("no slash!");
 			chan_incref(c);
 			break;
 
@@ -1493,4 +1528,88 @@ void putmhead(struct mhead *m)
 {
 	if (m)
 		kref_put(&m->ref);
+}
+
+/* Given s, make a copy of a string with padding bytes in front.  Returns a
+ * pointer to the start of the string and the memory to free in str_store.
+ *
+ * Free str_store with kfree. */
+static char *pad_and_strdup(char *s, int padding, char **str_store)
+{
+	char *store = kzmalloc(strlen(s) + 1 + padding, MEM_WAIT);
+
+	strlcpy(store + padding, s, strlen(s) + 1);
+	*str_store = store;
+	return store + padding;
+}
+
+/* Walks a symlink c.  Returns the target chan, which could be the symlink
+ * itself, if we're NO_FOLLOW.  On success, we'll decref the symlink and give
+ * you a ref counted result.
+ *
+ * Returns NULL on error, and does not close the symlink.  Like regular walk, it
+ * is all or nothing. */
+static struct chan *walk_symlink(struct chan *symlink, struct walk_helper *wh,
+                                 unsigned int nr_names_left)
+{
+	struct dir *dir;
+	char *link_name, *link_store;
+	struct chan *from;
+	Elemlist e = {0};
+
+	if (!nr_names_left && wh->no_follow)
+		return symlink;
+	if (wh->nr_loops >= WALK_MAX_NR_LOOPS) {
+		set_error(ELOOP, "too many nested symlinks in walk");
+		return NULL;
+	}
+	dir = chandirstat(symlink);
+	if (!dir) {
+		/* Should propagate the error from dev.stat() */
+		return NULL;
+	}
+	if (!(dir->mode & DMSYMLINK)) {
+		set_error(ELOOP, "symlink isn't a symlink!");
+		kfree(dir);
+		return NULL;
+	}
+	link_name = pad_and_strdup(dir->ext, 3, &link_store);
+	kfree(dir);
+
+	if (link_name[0] == '/') {
+		/* TODO: kernel walkers will crash here, just like namec() */
+		assert(current && current->slash);
+		from = current->slash;
+	} else {
+		from = symlink;
+		link_name -= 3;
+		strncpy(link_name, "../", 3);
+		if (!from->name)
+			from->name = newcname("");
+	}
+	/* we close this ref on failure or it gets walked to the result. */
+	chan_incref(from);
+
+	parsename(link_name, &e);
+	kfree(link_store);
+
+	wh->nr_loops++;
+	if (walk(&from, e.elems, e.ARRAY_SIZEs, wh, NULL) < 0) {
+		cclose(from);
+		from = NULL;
+	} else {
+		cclose(symlink);
+		if (from->qid.type & QTSYMLINK) {
+			symlink = from;
+			from = walk_symlink(symlink, wh, nr_names_left);
+			if (!from)
+				cclose(symlink);
+		}
+	}
+	wh->nr_loops--;
+
+	kfree(e.name);
+	kfree(e.elems);
+	kfree(e.off);
+	return from;
 }

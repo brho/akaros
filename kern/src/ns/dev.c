@@ -273,7 +273,10 @@ Notfound:
 					if (j == 0)
 						error(ENOENT, "could not find name %s, dev %s", n,
 						      c->type == -1 ? "no dev" : devtab[c->type].name);
-					/* TODO: I think we don't need to just set_error here */
+					/* TODO: I think we don't need to just set_error here.  I
+					 * got this once when hacking on namec/walk and didn't
+					 * set_error() in an error case.  This was for symlinks on
+					 * #kfs bound on #root. */
 					set_error(ENOENT, "tell brho you saw this in an error");
 					goto Done;
 				case 0:
