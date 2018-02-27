@@ -415,7 +415,10 @@ int cmount(struct chan *new, struct chan *old, int flag, char *spec)
 	struct mhead *m, **l, *mh;
 	struct mount *nm, *f, *um, **h;
 
-	if (QTDIR & (old->qid.type ^ new->qid.type))
+	/* Can bind anything onto a symlink's name.  Otherwise, both the old and the
+	 * new must agree on whether or not it is a directory. */
+	if (!(old->qid.type & QTSYMLINK) &&
+	    (QTDIR & (old->qid.type ^ new->qid.type)))
 		error(EINVAL, ERROR_FIXME);
 
 	if (old->umh)
@@ -605,6 +608,34 @@ struct chan *cclone(struct chan *c)
 	if (c->name)
 		kref_get(&c->name->ref, 1);
 	return nc;
+}
+
+/* Helper: is something mounted on the chan? */
+static bool is_mount_point(struct chan *c)
+{
+	struct pgrp *pg;
+	struct mhead *m;
+	int type = c->type;
+	int dev = c->dev;
+	struct qid qid = c->qid;
+
+	pg = current->pgrp;
+	rlock(&pg->ns);
+	for (m = MOUNTH(pg, qid); m; m = m->hash) {
+		rlock(&m->lock);
+		if (!m->from) {
+			runlock(&m->lock);
+			continue;
+		}
+		if (eqchantdqid(m->from, type, dev, qid, 1)) {
+			runlock(&m->lock);
+			runlock(&pg->ns);
+			return true;
+		}
+		runlock(&m->lock);
+	}
+	runlock(&pg->ns);
+	return false;
 }
 
 int
@@ -1564,6 +1595,9 @@ static struct chan *walk_symlink(struct chan *symlink, struct walk_helper *wh,
 	struct chan *from;
 	Elemlist e = {0};
 
+	/* mildly expensive: need to rlock the namespace */
+	if (is_mount_point(symlink))
+		return symlink;
 	if (!nr_names_left && wh->no_follow)
 		return symlink;
 	if (wh->nr_loops >= WALK_MAX_NR_LOOPS) {
