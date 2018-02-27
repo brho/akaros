@@ -1068,8 +1068,7 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 		/* perm must have DMDIR if last element is / or /. */
 		if (e.mustbedir && !(perm & DMDIR)) {
 			npath = e.ARRAY_SIZEs;
-			strlcpy(tmperrbuf, "create without DMDIR", sizeof(tmperrbuf));
-			goto NameError;
+			error(EINVAL, "create without DMDIR");
 		}
 
 		/* don't try to walk the last path element just yet. */
@@ -1088,6 +1087,7 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 			printd("namec %s walk error npath=%d\n", aname, npath);
 			error(EFAIL, "walk failed");
 		}
+		/* Old plan 9 errors would jump here for the magic error parsing. */
 NameError:
 		if (current_errstr()[0]) {
 			/* errstr is set, we'll just stick with it and error out */
@@ -1114,8 +1114,7 @@ NameError:
 
 	if (e.mustbedir && !(c->qid.type & QTDIR)) {
 		npath = e.ARRAY_SIZEs;
-		strlcpy(tmperrbuf, "not a directory", sizeof(tmperrbuf));
-		goto NameError;
+		error(ENOTDIR, "not a dir, but mustbedir.  trailing slash?");
 	}
 
 	if ((amode == Aopen) && (omode & O_EXEC) && (c->qid.type & QTDIR)) {
