@@ -1079,6 +1079,14 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 		 * sure if there are any legit reasons to have O_NOFOLLOW with create.*/
 		omode &= ~O_NOFOLLOW;
 	}
+	switch (amode) {
+	/* the difference for stat and lstat (Aaccess) are handled in sysfile.c */
+	case Abind:
+	case Amount:
+	case Aremove:
+		omode |= O_NOFOLLOW;
+		break;
+	}
 	if (omode & O_NOFOLLOW)
 		wh->no_follow = true;
 

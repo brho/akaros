@@ -546,6 +546,9 @@ int sysopenat(int fromfd, char *path, int vfs_flags)
 			error(EINVAL, "Cannot openat from a non-O_PATH FD");
 		c = namec_from(from, path, Aopen, vfs_flags, 0, NULL);
 	}
+	/* Devices should catch this, but just in case, we'll catch it. */
+	if ((c->qid.type & QTSYMLINK) && (vfs_flags & O_NOFOLLOW))
+		error(ELOOP, "no-follow open of a symlink");
 	fd = newfd(c, 0, vfs_flags, FALSE);
 	if (fd < 0)
 		error(-fd, ERROR_FIXME);
