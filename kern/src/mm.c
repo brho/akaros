@@ -442,6 +442,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset)
 {
 	struct file *file = NULL;
+	void *result;
 
 	offset <<= PGSHIFT;
 	printd("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n", addr,
@@ -462,13 +463,15 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		file = get_file_from_fd(&p->open_files, fd);
 		if (!file) {
 			set_errno(EBADF);
-			return MAP_FAILED;
+			result = MAP_FAILED;
+			goto out_ref;
 		}
 	}
 	/* Check for overflow.  This helps do_mmap and populate_va, among others. */
 	if (offset + len < offset) {
 		set_errno(EINVAL);
-		return MAP_FAILED;
+		result = MAP_FAILED;
+		goto out_ref;
 	}
 	/* If they don't care where to put it, we'll start looking after the break.
 	 * We could just have userspace handle this (in glibc's mmap), so we don't
@@ -482,13 +485,16 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	/* Need to check addr + len, after we do our addr adjustments */
 	if (!__is_user_addr((void*)addr, len, UMAPTOP)) {
 		set_errno(EINVAL);
-		return MAP_FAILED;
+		result = MAP_FAILED;
+		goto out_ref;
 	}
 	if (PGOFF(addr)) {
 		set_errno(EINVAL);
-		return MAP_FAILED;
+		result = MAP_FAILED;
+		goto out_ref;
 	}
-	void *result = do_mmap(p, addr, len, prot, flags, file, offset);
+	result = do_mmap(p, addr, len, prot, flags, file, offset);
+out_ref:
 	if (file)
 		kref_put(&file->f_kref);
 	return result;
