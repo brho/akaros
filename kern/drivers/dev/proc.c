@@ -412,9 +412,9 @@ static void build_maps_cb(struct vm_region *vmr, void *arg)
 	char *path;
 	unsigned long inode_nr;
 
-	if (vmr->vm_file) {
-		path = file_abs_path(vmr->vm_file, path_buf, sizeof(path_buf));
-		inode_nr = vmr->vm_file->f_dentry->d_inode->i_ino;
+	if (vmr_has_file(vmr)) {
+		path = foc_abs_path(vmr->__vm_foc, path_buf, sizeof(path_buf));
+		inode_nr = 0; /* TODO: do we care about this? */
 	} else {
 		strlcpy(path_buf, "[heap]", sizeof(path_buf));
 		path = path_buf;
@@ -429,8 +429,8 @@ static void build_maps_cb(struct vm_region *vmr, void *arg)
 	                       vmr->vm_prot & PROT_WRITE   ? 'w' : '-',
 	                       vmr->vm_prot & PROT_EXEC    ? 'x' : '-',
 	                       vmr->vm_flags & MAP_PRIVATE ? 'p' : 's',
-	                       vmr->vm_file ? vmr->vm_foff : 0,
-	                       vmr->vm_file ? 1 : 0,	/* VFS == 1 for major */
+	                       vmr_has_file(vmr) ? vmr->vm_foff : 0,
+	                       vmr_has_file(vmr) ? 1 : 0,	/* VFS == 1 for major */
 	                       0,
 	                       inode_nr);
 	/* Align the filename to the 74th char, like Linux (73 chars so far) */

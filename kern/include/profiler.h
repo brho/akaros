@@ -10,7 +10,7 @@
 
 struct hw_trapframe;
 struct proc;
-struct file;
+struct file_or_chan;
 struct cmdbuf;
 
 int profiler_configure(struct cmdbuf *cb);
@@ -28,5 +28,5 @@ void profiler_trace_data_flush(void);
 int profiler_size(void);
 int profiler_read(void *va, int n);
 void profiler_notify_mmap(struct proc *p, uintptr_t addr, size_t size, int prot,
-						  int flags, struct file *f, size_t offset);
+						  int flags, struct file_or_chan *foc, size_t offset);
 void profiler_notify_new_process(struct proc *p);

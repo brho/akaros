@@ -869,14 +869,14 @@ static inline int request_firmware(const struct firmware **fwp,
 								   struct device *ignored)
 {
 	struct firmware *ret_fw;
-	struct file *fw_file;
+	struct file_or_chan *fw_file;
 	void *fw_data;
 	char dirname[] = "/lib/firmware/";
 	/* could dynamically allocate the min of this and some MAX */
 	char fullpath[sizeof(dirname) + strlen(file_name) + 1];
 
 	snprintf(fullpath, sizeof(fullpath), "%s%s", dirname, file_name);
-	fw_file = do_file_open(fullpath, O_READ, 0);
+	fw_file = foc_open(fullpath, O_READ, 0);
 	if (!fw_file) {
 		printk("Unable to find firmware file %s!\n", fullpath);
 		return -1;
@@ -884,14 +884,14 @@ static inline int request_firmware(const struct firmware **fwp,
 	fw_data = kread_whole_file(fw_file);
 	if (!fw_data) {
 		printk("Unable to load firmware file %s!\n", fullpath);
-		kref_put(&fw_file->f_kref);
+		foc_decref(fw_file);
 		return -1;
 	}
 	ret_fw = kmalloc(sizeof(struct firmware), MEM_WAIT);
 	ret_fw->data = fw_data;
-	ret_fw->size = fw_file->f_dentry->d_inode->i_size;
+	ret_fw->size = foc_get_len(fw_file);
 	*fwp = ret_fw;
-	kref_put(&fw_file->f_kref);
+	foc_decref(fw_file);
 	return 0;
 }
 

@@ -37,10 +37,159 @@ static int populate_pm_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
                           int pte_prot, struct page_map *pm, size_t offset,
                           int flags, bool exec);
 
-/* minor helper, will ease the file->chan transition */
-static struct page_map *file2pm(struct file *file)
+static struct page_map *foc_to_pm(struct file_or_chan *foc)
 {
-	return file->f_mapping;
+	switch (foc->type) {
+	case F_OR_C_FILE:
+		return foc->file->f_mapping;
+	case F_OR_C_CHAN:
+		return NULL; /* TODO: (chan) hook to fs_file mapping */
+	}
+	panic("unknown F_OR_C type");
+}
+
+static struct page_map *vmr_to_pm(struct vm_region *vmr)
+{
+	return foc_to_pm(vmr->__vm_foc);
+}
+
+char *foc_to_name(struct file_or_chan *foc)
+{
+	switch (foc->type) {
+	case F_OR_C_FILE:
+		return foc->file->f_dentry->d_name.name;
+	case F_OR_C_CHAN:
+		return NULL;	/* TODO: (chan) */
+	}
+	panic("unknown F_OR_C type");
+}
+
+char *foc_abs_path(struct file_or_chan *foc, char *path, size_t max_size)
+{
+	switch (foc->type) {
+	case F_OR_C_FILE:
+		return file_abs_path(foc->file, path, max_size);
+	case F_OR_C_CHAN:
+		return NULL;	/* TODO: (chan) */
+	}
+	panic("unknown F_OR_C type");
+}
+
+ssize_t foc_read(struct file_or_chan *foc, void *buf, size_t amt, off64_t off)
+{
+	off64_t fake_off = off;
+
+	switch (foc->type) {
+	case F_OR_C_FILE:
+		return foc->file->f_op->read(foc->file, buf, amt, &fake_off);
+	case F_OR_C_CHAN:
+		return -1;	/* TODO: (chan) */
+	}
+	panic("unknown F_OR_C type");
+}
+
+static void foc_release(struct kref *kref)
+{
+	struct file_or_chan *foc = container_of(kref, struct file_or_chan, kref);
+
+	switch (foc->type) {
+	case F_OR_C_FILE:
+		kref_put(&foc->file->f_kref);
+		break;
+	case F_OR_C_CHAN:
+		/* TODO: (chan) */
+		break;
+	default:
+		panic("unknown F_OR_C type, %d", foc->type);
+	}
+	kfree(foc);
+}
+
+static struct file_or_chan *foc_alloc(void)
+{
+	struct file_or_chan *foc;
+
+	foc = kzmalloc(sizeof(struct file_or_chan), MEM_ATOMIC);
+	if (!foc)
+		return NULL;
+	kref_init(&foc->kref, foc_release, 1);
+	return foc;
+}
+
+struct file_or_chan *foc_open(char *path, int omode, int perm)
+{
+	struct file_or_chan *foc = foc_alloc();
+
+	if (!foc)
+		return NULL;
+	foc->type = F_OR_C_FILE;
+	foc->file = do_file_open(path, omode, perm);
+	if (!foc->file) {
+		kfree(foc);
+		foc = NULL;
+	}
+	return foc;
+}
+
+struct file_or_chan *fd_to_foc(struct fd_table *fdt, int fd)
+{
+	struct file_or_chan *foc = foc_alloc();
+
+	if (!foc)
+		return NULL;
+	foc->type = F_OR_C_FILE;
+	foc->file = get_file_from_fd(fdt, fd);
+	if (!foc->file) {
+		kfree(foc);
+		foc = NULL;
+	}
+	return foc;
+}
+
+void foc_incref(struct file_or_chan *foc)
+{
+	kref_get(&foc->kref, 1);
+}
+
+void foc_decref(struct file_or_chan *foc)
+{
+	kref_put(&foc->kref);
+}
+
+void *foc_pointer(struct file_or_chan *foc)
+{
+	if (!foc)
+		return NULL;
+	switch (foc->type) {
+	case F_OR_C_FILE:
+		return foc->file;
+	case F_OR_C_CHAN:
+		return foc->chan;
+	default:
+		panic("unknown F_OR_C type, %d", foc->type);
+	}
+}
+
+size_t foc_get_len(struct file_or_chan *foc)
+{
+	switch (foc->type) {
+	case F_OR_C_FILE:
+		return foc->file->f_dentry->d_inode->i_size;
+	case F_OR_C_CHAN:
+		return 0;	/* TODO: (chan) */
+	}
+	panic("unknown F_OR_C type, %d", foc->type);
+}
+
+int foc_dev_mmap(struct file_or_chan *foc, struct vm_region *vmr)
+{
+	switch (foc->type) {
+	case F_OR_C_FILE:
+		return foc->file->f_op->mmap(foc->file, vmr);
+	case F_OR_C_CHAN:
+		return -1;	/* TODO: (chan) */
+	}
+	panic("unknown F_OR_C type, %d", foc->type);
 }
 
 void vmr_init(void)
@@ -129,14 +278,14 @@ struct vm_region *split_vmr(struct vm_region *old_vmr, uintptr_t va)
 	old_vmr->vm_end = va;
 	new_vmr->vm_prot = old_vmr->vm_prot;
 	new_vmr->vm_flags = old_vmr->vm_flags;
-	if (old_vmr->vm_file) {
-		kref_get(&old_vmr->vm_file->f_kref, 1);
-		new_vmr->vm_file = old_vmr->vm_file;
+	if (vmr_has_file(old_vmr)) {
+		foc_incref(old_vmr->__vm_foc);
+		new_vmr->__vm_foc = old_vmr->__vm_foc;
 		new_vmr->vm_foff = old_vmr->vm_foff +
 		                      old_vmr->vm_end - old_vmr->vm_base;
-		pm_add_vmr(file2pm(old_vmr->vm_file), new_vmr);
+		pm_add_vmr(vmr_to_pm(old_vmr), new_vmr);
 	} else {
-		new_vmr->vm_file = 0;
+		new_vmr->__vm_foc = NULL;
 		new_vmr->vm_foff = 0;
 	}
 	return new_vmr;
@@ -150,10 +299,10 @@ int merge_vmr(struct vm_region *first, struct vm_region *second)
 	if ((first->vm_end != second->vm_base) ||
 	    (first->vm_prot != second->vm_prot) ||
 	    (first->vm_flags != second->vm_flags) ||
-	    (first->vm_file != second->vm_file))
+	    (first->__vm_foc != second->__vm_foc))
 		return -1;
-	if ((first->vm_file) && (second->vm_foff != first->vm_foff +
-	                         first->vm_end - first->vm_base))
+	if (vmr_has_file(first) && (second->vm_foff != first->vm_foff +
+	                            first->vm_end - first->vm_base))
 		return -1;
 	first->vm_end = second->vm_end;
 	destroy_vmr(second);
@@ -207,9 +356,9 @@ int shrink_vmr(struct vm_region *vmr, uintptr_t va)
  * out the page table entries. */
 void destroy_vmr(struct vm_region *vmr)
 {
-	if (vmr->vm_file) {
-		pm_remove_vmr(file2pm(vmr->vm_file), vmr);
-		kref_put(&vmr->vm_file->f_kref);
+	if (vmr_has_file(vmr)) {
+		pm_remove_vmr(vmr_to_pm(vmr), vmr);
+		foc_decref(vmr->__vm_foc);
 	}
 	TAILQ_REMOVE(&vmr->vm_proc->vm_regions, vmr, vm_link);
 	kmem_cache_free(vmr_kcache, vmr);
@@ -326,7 +475,7 @@ static int fill_vmr(struct proc *p, struct proc *new_p, struct vm_region *vmr)
 {
 	int ret = 0;
 
-	if ((!vmr->vm_file) || (vmr->vm_flags & MAP_PRIVATE)) {
+	if (!vmr_has_file(vmr) || (vmr->vm_flags & MAP_PRIVATE)) {
 		/* We don't support ANON + SHARED yet */
 		assert(!(vmr->vm_flags & MAP_SHARED));
 		ret = copy_pages(p, new_p, vmr->vm_base, vmr->vm_end);
@@ -335,15 +484,15 @@ static int fill_vmr(struct proc *p, struct proc *new_p, struct vm_region *vmr)
 		 * (but we might be able to ignore MAP_POPULATE). */
 		if (vmr->vm_flags & MAP_LOCKED) {
 			/* need to keep the file alive in case we unlock/block */
-			kref_get(&vmr->vm_file->f_kref, 1);
+			foc_incref(vmr->__vm_foc);
 			/* math is a bit nasty if vm_base isn't page aligned */
 			assert(!PGOFF(vmr->vm_base));
 			ret = populate_pm_va(new_p, vmr->vm_base,
 			                     (vmr->vm_end - vmr->vm_base) >> PGSHIFT,
-			                     vmr->vm_prot, vmr->vm_file->f_mapping,
+			                     vmr->vm_prot, vmr_to_pm(vmr),
 			                     vmr->vm_foff, vmr->vm_flags,
 			                     vmr->vm_prot & PROT_EXEC);
-			kref_put(&vmr->vm_file->f_kref);
+			foc_decref(vmr->__vm_foc);
 		}
 	}
 	return ret;
@@ -373,17 +522,17 @@ int duplicate_vmrs(struct proc *p, struct proc *new_p)
 		vmr->vm_end = vm_i->vm_end;
 		vmr->vm_prot = vm_i->vm_prot;
 		vmr->vm_flags = vm_i->vm_flags;
-		vmr->vm_file = vm_i->vm_file;
+		vmr->__vm_foc = vm_i->__vm_foc;
 		vmr->vm_foff = vm_i->vm_foff;
-		if (vm_i->vm_file) {
-			kref_get(&vm_i->vm_file->f_kref, 1);
-			pm_add_vmr(file2pm(vm_i->vm_file), vmr);
+		if (vmr_has_file(vm_i)) {
+			foc_incref(vm_i->__vm_foc);
+			pm_add_vmr(vmr_to_pm(vm_i), vmr);
 		}
 		ret = fill_vmr(p, new_p, vmr);
 		if (ret) {
-			if (vm_i->vm_file) {
-				pm_remove_vmr(file2pm(vm_i->vm_file), vmr);
-				kref_put(&vm_i->vm_file->f_kref);
+			if (vmr_has_file(vm_i)) {
+				pm_remove_vmr(vmr_to_pm(vm_i), vmr);
+				foc_decref(vm_i->__vm_foc);
 			}
 			kmem_cache_free(vmr_kcache, vm_i);
 			return ret;
@@ -407,7 +556,7 @@ void print_vmrs(struct proc *p)
 	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link)
 		printk("%02d: (%p - %p): 0x%08x, 0x%08x, %p, %p\n", count++,
 		       vmr->vm_base, vmr->vm_end, vmr->vm_prot, vmr->vm_flags,
-		       vmr->vm_file, vmr->vm_foff);
+		       foc_pointer(vmr->__vm_foc), vmr->vm_foff);
 }
 
 void enumerate_vmrs(struct proc *p,
@@ -441,7 +590,7 @@ static bool mmap_flags_priv_ok(int flags)
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset)
 {
-	struct file *file = NULL;
+	struct file_or_chan *file = NULL;
 	void *result;
 
 	offset <<= PGSHIFT;
@@ -456,7 +605,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		return MAP_FAILED;
 	}
 	if (!(flags & MAP_ANON) && (fd >= 0)) {
-		file = get_file_from_fd(&p->open_files, fd);
+		file = fd_to_foc(&p->open_files, fd);
 		if (!file) {
 			set_errno(EBADF);
 			result = MAP_FAILED;
@@ -492,7 +641,7 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	result = do_mmap(p, addr, len, prot, flags, file, offset);
 out_ref:
 	if (file)
-		kref_put(&file->f_kref);
+		foc_decref(file);
 	return result;
 }
 
@@ -517,6 +666,24 @@ out_error:	/* for debugging */
 	printk("[kernel] mmap perm check failed for %s for prot %o\n",
 	       file_name(file), prot);
 	return false;
+}
+
+static bool check_chan_perms(struct vm_region *vmr, struct chan *chan, int prot)
+{
+	/* TODO: (chan) */
+	return true;
+}
+
+static bool check_foc_perms(struct vm_region *vmr, struct file_or_chan *foc,
+                            int prot)
+{
+	switch (foc->type) {
+	case F_OR_C_FILE:
+		return check_file_perms(vmr, foc->file, prot);
+	case F_OR_C_CHAN:
+		return check_chan_perms(vmr, foc->chan, prot);
+	}
+	panic("unknown F_OR_C type");
 }
 
 /* Helper, maps in page at addr, but only if nothing is mapped there.  Returns
@@ -645,7 +812,7 @@ static int populate_pm_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
 }
 
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
-              struct file *file, size_t offset)
+              struct file_or_chan *file, size_t offset)
 {
 	len = ROUNDUP(len, PGSIZE);
 	struct vm_region *vmr, *vmr_temp;
@@ -686,8 +853,8 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	vmr->vm_flags = flags & MAP_PERSIST_FLAGS;
 	vmr->vm_foff = offset;
 	if (file) {
-		if (!check_file_perms(vmr, file, prot)) {
-			assert(!vmr->vm_file);
+		if (!check_foc_perms(vmr, file, prot)) {
+			assert(!vmr->__vm_foc);
 			destroy_vmr(vmr);
 			set_errno(EACCES);
 			spin_unlock(&p->vmr_lock);
@@ -695,7 +862,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		}
 		/* TODO: consider locking the file while checking (not as manadatory as
 		 * in handle_page_fault() */
-		if (nr_pages(offset + len) > nr_pages(file->f_dentry->d_inode->i_size)) {
+		if (nr_pages(offset + len) > nr_pages(foc_get_len(file))) {
 			/* We're allowing them to set up the VMR, though if they attempt to
 			 * fault in any pages beyond the file's limit, they'll fail.  Since
 			 * they might not access the region, we need to make sure POPULATE
@@ -707,17 +874,17 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		/* Prep the FS to make sure it can mmap the file.  Slightly weird
 		 * semantics: if we fail and had munmapped the space, they will have a
 		 * hole in their VM now. */
-		if (file->f_op->mmap(file, vmr)) {
-			assert(!vmr->vm_file);
+		if (foc_dev_mmap(file, vmr)) {
+			assert(!vmr->__vm_foc);
 			destroy_vmr(vmr);
 			set_errno(EACCES);	/* not quite */
 			spin_unlock(&p->vmr_lock);
 			return MAP_FAILED;
 		}
-		kref_get(&file->f_kref, 1);
-		pm_add_vmr(file2pm(file), vmr);
+		foc_incref(file);
+		pm_add_vmr(foc_to_pm(file), vmr);
 	}
-	vmr->vm_file = file;
+	vmr->__vm_foc = file;
 	vmr = merge_me(vmr);		/* attempts to merge with neighbors */
 
 	if (flags & MAP_POPULATE && prot != PROT_NONE) {
@@ -730,7 +897,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		} else {
 			/* Note: this will unlock if it blocks.  our refcnt on the file
 			 * keeps the pm alive when we unlock */
-			ret = populate_pm_va(p, addr, nr_pgs, pte_prot, file->f_mapping,
+			ret = populate_pm_va(p, addr, nr_pgs, pte_prot, foc_to_pm(file),
 			                     offset, flags, prot & PROT_EXEC);
 		}
 		if (ret == -ENOMEM) {
@@ -791,7 +958,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	while (vmr && vmr->vm_base < addr + len) {
 		if (vmr->vm_prot == prot)
 			goto next_vmr;
-		if (vmr->vm_file && !check_file_perms(vmr, vmr->vm_file, prot)) {
+		if (vmr_has_file(vmr) && !check_foc_perms(vmr, vmr->__vm_foc, prot)) {
 			file_access_failure = TRUE;
 			goto next_vmr;
 		}
@@ -1001,6 +1168,7 @@ static int __hpf_load_page(struct proc *p, struct page_map *pm,
 static int __hpf(struct proc *p, uintptr_t va, int prot, bool file_ok)
 {
 	struct vm_region *vmr;
+	struct file_or_chan *file;
 	struct page *a_page;
 	unsigned int f_idx;	/* index of the missing page in the file */
 	int ret = 0;
@@ -1021,7 +1189,7 @@ refault:
 		ret = -EPERM;
 		goto out;
 	}
-	if (!vmr->vm_file) {
+	if (!vmr_has_file(vmr)) {
 		/* No file - just want anonymous memory */
 		if (upage_alloc(p, &a_page, TRUE)) {
 			ret = -ENOMEM;
@@ -1032,12 +1200,13 @@ refault:
 			ret = -EACCES;
 			goto out;
 		}
+		file = vmr->__vm_foc;
 		/* If this fails, either something got screwed up with the VMR, or the
 		 * permissions changed after mmap/mprotect.  Either way, I want to know
 		 * (though it's not critical). */
-		if (!check_file_perms(vmr, vmr->vm_file, prot))
+		if (!check_foc_perms(vmr, file, prot))
 			printk("[kernel] possible issue with VMR prots on file %s!\n",
-			       file_name(vmr->vm_file));
+			       foc_to_name(file));
 		/* Load the file's page in the page cache.
 		 * TODO: (BLK) Note, we are holding the mem lock!  We need to rewrite
 		 * this stuff so we aren't hold the lock as excessively as we are, and
@@ -1047,23 +1216,23 @@ refault:
 		/* TODO: need some sort of lock on the file to deal with someone
 		 * concurrently shrinking it.  Adding 1 to f_idx, since it is
 		 * zero-indexed */
-		if (f_idx + 1 > nr_pages(vmr->vm_file->f_dentry->d_inode->i_size)) {
+		if (f_idx + 1 > nr_pages(foc_get_len(file))) {
 			/* We're asking for pages that don't exist in the file */
 			/* TODO: unlock the file */
 			ret = -ESPIPE; /* linux sends a SIGBUS at access time */
 			goto out;
 		}
-		ret = pm_load_page_nowait(vmr->vm_file->f_mapping, f_idx, &a_page);
+		ret = pm_load_page_nowait(foc_to_pm(file), f_idx, &a_page);
 		if (ret) {
 			if (ret != -EAGAIN)
 				goto out;
 			/* keep the file alive after we unlock */
-			kref_get(&vmr->vm_file->f_kref, 1);
+			foc_incref(file);
 			spin_unlock(&p->vmr_lock);
-			ret = __hpf_load_page(p, vmr->vm_file->f_mapping, f_idx, &a_page,
+			ret = __hpf_load_page(p, foc_to_pm(file), f_idx, &a_page,
 			                      first);
 			first = FALSE;
-			kref_put(&vmr->vm_file->f_kref);
+			foc_decref(file);
 			if (ret)
 				return ret;
 			goto refault;
@@ -1115,6 +1284,7 @@ int handle_page_fault_nofile(struct proc *p, uintptr_t va, int prot)
 unsigned long populate_va(struct proc *p, uintptr_t va, unsigned long nr_pgs)
 {
 	struct vm_region *vmr, vmr_copy;
+	struct file_or_chan *file;
 	unsigned long nr_pgs_this_vmr;
 	unsigned long nr_filled = 0;
 	struct page *page;
@@ -1134,22 +1304,23 @@ unsigned long populate_va(struct proc *p, uintptr_t va, unsigned long nr_pgs)
 		pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
 		           (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
 		nr_pgs_this_vmr = MIN(nr_pgs, (vmr->vm_end - va) >> PGSHIFT);
-		if (!vmr->vm_file) {
+		if (!vmr_has_file(vmr)) {
 			if (populate_anon_va(p, va, nr_pgs_this_vmr, pte_prot)) {
 				/* on any error, we can just bail.  we might be underestimating
 				 * nr_filled. */
 				break;
 			}
 		} else {
+			file = vmr->__vm_foc;
 			/* need to keep the file alive in case we unlock/block */
-			kref_get(&vmr->vm_file->f_kref, 1);
+			foc_incref(file);
 			/* Regarding foff + (va - base): va - base < len, and foff + len
 			 * does not over flow */
 			ret = populate_pm_va(p, va, nr_pgs_this_vmr, pte_prot,
-			                     vmr->vm_file->f_mapping,
+			                     foc_to_pm(file),
 			                     vmr->vm_foff + (va - vmr->vm_base),
 			                     vmr->vm_flags, vmr->vm_prot & PROT_EXEC);
-			kref_put(&vmr->vm_file->f_kref);
+			foc_decref(file);
 			if (ret) {
 				/* we might have failed if the underlying file doesn't cover the
 				 * mmap window, depending on how we'll deal with truncation. */

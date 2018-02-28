@@ -261,7 +261,7 @@ static void profiler_emit_current_system_status(void)
 		struct proc *p = (struct proc *) opaque;
 
 		profiler_notify_mmap(p, vmr->vm_base, vmr->vm_end - vmr->vm_base,
-		                     vmr->vm_prot, vmr->vm_flags, vmr->vm_file,
+		                     vmr->vm_prot, vmr->vm_flags, vmr->__vm_foc,
 		                     vmr->vm_foff);
 	}
 
@@ -532,12 +532,12 @@ int profiler_read(void *va, int n)
 }
 
 void profiler_notify_mmap(struct proc *p, uintptr_t addr, size_t size, int prot,
-                          int flags, struct file *f, size_t offset)
+                          int flags, struct file_or_chan *foc, size_t offset)
 {
 	if (kref_get_not_zero(&profiler_kref, 1)) {
-		if (f && (prot & PROT_EXEC) && profiler_percpu_ctx) {
+		if (foc && (prot & PROT_EXEC) && profiler_percpu_ctx) {
 			char path_buf[PROFILER_MAX_PRG_PATH];
-			char *path = file_abs_path(f, path_buf, sizeof(path_buf));
+			char *path = foc_abs_path(foc, path_buf, sizeof(path_buf));
 
 			if (likely(path))
 				profiler_push_pid_mmap(p, addr, size, offset, path);

@@ -16,15 +16,13 @@
 
 /* Check if the file is valid elf file (i.e. by checking for ELF_MAGIC in the
  * header) */
-bool is_valid_elf(struct file *f)
+bool is_valid_elf(struct file_or_chan *foc)
 {
 	elf64_t h;
-	off64_t o = 0;
 	uintptr_t c = switch_to_ktask();
 
-	if (f->f_op->read(f, (char*)&h, sizeof(elf64_t), &o) != sizeof(elf64_t)) {
+	if (foc_read(foc, (char*)&h, sizeof(elf64_t), 0) != sizeof(elf64_t))
 		goto fail;
-	}
 	if (h.e_magic != ELF_MAGIC) {
 		goto fail;
 	}
@@ -134,8 +132,8 @@ static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
 /* We need the writable flag for ld.  Even though the elf header says it wants
  * RX (and not W) for its main program header, it will page fault (eip 56f0,
  * 46f0 after being relocated to 0x1000, va 0x20f4). */
-static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
-                        elf_info_t *ei, bool writable)
+static int load_one_elf(struct proc *p, struct file_or_chan *foc,
+                        uintptr_t pg_num, elf_info_t *ei, bool writable)
 {
 	int ret = -1;
 	ei->phdr = -1;
@@ -153,7 +151,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 	elf64_t elfhdr_storage;
 	elf32_t* elfhdr32 = (elf32_t*)&elfhdr_storage;
 	elf64_t* elfhdr64 = &elfhdr_storage;
-	if (f->f_op->read(f, (char*)elfhdr64, sizeof(elf64_t), &f_off)
+	if (foc_read(foc, (char*)elfhdr64, sizeof(elf64_t), f_off)
 	        != sizeof(elf64_t)) {
 		/* if you ever debug this, be sure to 0 out elfhrd_storage in advance */
 		printk("[kernel] load_one_elf: failed to read file\n");
@@ -195,7 +193,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 	}
 	phdrs = kmalloc(e_phnum * phsz, 0);
 	f_off = e_phoff;
-	if (!phdrs || f->f_op->read(f, phdrs, e_phnum * phsz, &f_off) !=
+	if (!phdrs || foc_read(foc, phdrs, e_phnum * phsz, f_off) !=
 	              e_phnum * phsz) {
 		printk("[kernel] load_one_elf: could not get program headers\n");
 		goto fail;
@@ -223,7 +221,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 		else if (p_type == ELF_PROG_INTERP) {
 			f_off = p_offset;
 			ssize_t maxlen = sizeof(ei->interp);
-			ssize_t bytes = f->f_op->read(f, ei->interp, maxlen, &f_off);
+			ssize_t bytes = foc_read(foc, ei->interp, maxlen, f_off);
 			/* trying to catch errors.  don't know how big it could be, but it
 			 * should be at least 0. */
 			if (bytes <= 0) {
@@ -276,7 +274,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 				if (filesz - partial) {
 					/* Map the complete pages. */
 					if (do_mmap(p, memstart, filesz - partial, mm_perms,
-					            mm_flags, f, filestart) == MAP_FAILED) {
+					            mm_flags, foc, filestart) == MAP_FAILED) {
 						printk("[kernel] load_one_elf: complete mmap failed\n");
 						goto fail;
 					}
@@ -294,7 +292,8 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 					/* Map the final partial page. */
 					uintptr_t last_page = memstart + filesz - partial;
 					if (do_mmap(p, last_page, PGSIZE, mm_perms, mm_flags,
-					            f, filestart + filesz - partial) == MAP_FAILED) {
+					            foc, filestart + filesz - partial)
+						== MAP_FAILED) {
 						printk("[kernel] load_one_elf: partial mmap failed\n");
 						goto fail;
 					}
@@ -336,7 +335,7 @@ static int load_one_elf(struct proc *p, struct file *f, uintptr_t pg_num,
 		uintptr_t filestart = ROUNDDOWN(e_phoff, PGSIZE);
 		uintptr_t filesz = e_phoff + (e_phnum * phsz) - filestart;
 		void *phdr_addr = do_mmap(p, 0, filesz, PROT_READ | PROT_WRITE,
-		                          MAP_PRIVATE, f, filestart);
+		                          MAP_PRIVATE, foc, filestart);
 		if (phdr_addr == MAP_FAILED) {
 			printk("[kernel] load_one_elf: prog header mmap failed\n");
 			goto fail;
@@ -355,15 +354,15 @@ fail:
 	return ret;
 }
 
-int load_elf(struct proc* p, struct file* f,
+int load_elf(struct proc *p, struct file_or_chan *foc,
              int argc, char *argv[], int envc, char *envp[])
 {
 	elf_info_t ei, interp_ei;
-	if (load_one_elf(p, f, 0, &ei, FALSE))
+	if (load_one_elf(p, foc, 0, &ei, FALSE))
 		return -1;
 
 	if (ei.dynamic) {
-		struct file *interp = do_file_open(ei.interp, O_READ, 0);
+		struct file_or_chan *interp = foc_open(ei.interp, O_READ, 0);
 		if (!interp)
 			return -1;
 		/* Load dynamic linker at 1M. Obvious MIB joke avoided.
@@ -374,7 +373,7 @@ int load_elf(struct proc* p, struct file* f,
 		 * explicit. */
 		int error = load_one_elf(p, interp, MMAP_LD_FIXED_VA >> PGSHIFT,
 		                         &interp_ei, TRUE);
-		kref_put(&interp->f_kref);
+		foc_decref(interp);
 		if (error)
 			return -1;
 	}

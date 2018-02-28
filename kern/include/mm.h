@@ -12,9 +12,33 @@
 #include <atomic.h>
 #include <sys/queue.h>
 #include <slab.h>
+#include <kref.h>
 
 struct file;
+struct chan;
+struct fd_table;
 struct proc;								/* preprocessor games */
+
+#define F_OR_C_NONE 0
+#define F_OR_C_FILE 1
+#define F_OR_C_CHAN 2
+
+struct file_or_chan {
+	int type;
+	struct file *file;
+	struct chan *chan;
+	struct kref kref;
+};
+
+char *foc_to_name(struct file_or_chan *foc);
+char *foc_abs_path(struct file_or_chan *foc, char *path, size_t max_size);
+ssize_t foc_read(struct file_or_chan *foc, void *buf, size_t amt, off64_t off);
+struct file_or_chan *foc_open(char *path, int omode, int perm);
+struct file_or_chan *fd_to_foc(struct fd_table *fdt, int fd);
+void foc_incref(struct file_or_chan *foc);
+void foc_decref(struct file_or_chan *foc);
+void *foc_pointer(struct file_or_chan *foc);
+size_t foc_get_len(struct file_or_chan *foc);
 
 /* Basic structure defining a region of a process's virtual memory.  Note we
  * don't refcnt these.  Either they are in the TAILQ/tree, or they should be
@@ -29,10 +53,21 @@ struct vm_region {
 	uintptr_t					vm_end;
 	int							vm_prot;
 	int							vm_flags;
-	struct file					*vm_file;
+	struct file_or_chan			*__vm_foc;
 	size_t						vm_foff;
 };
 TAILQ_HEAD(vmr_tailq, vm_region);			/* Declares 'struct vmr_tailq' */
+
+static inline bool vmr_has_file(struct vm_region *vmr)
+{
+	return vmr->__vm_foc ? true : false;
+}
+
+static inline char *vmr_to_filename(struct vm_region *vmr)
+{
+	assert(vmr_has_file(vmr));
+	return foc_to_name(vmr->__vm_foc);
+}
 
 /* VM Region Management Functions.  For now, these just maintain themselves -
  * anything related to mapping needs to be done by the caller. */
@@ -62,7 +97,7 @@ void enumerate_vmrs(struct proc *p,
 void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
            int fd, size_t offset);
 void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
-              struct file *f, size_t offset);
+              struct file_or_chan *foc, size_t offset);
 int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot);
 int munmap(struct proc *p, uintptr_t addr, size_t len);
 int handle_page_fault(struct proc *p, uintptr_t va, int prot);

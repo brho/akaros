@@ -179,12 +179,12 @@ void debug_addr_proc(struct proc *p, unsigned long addr)
 		printk("Addr %p has no VMR\n", addr);
 		return;
 	}
-	if (!vmr->vm_file) {
+	if (!vmr_has_file(vmr)) {
 		spin_unlock(&p->vmr_lock);
 		printk("Addr %p's VMR has no file\n", addr);
 		return;
 	}
-	printk("Addr %p is in %s at offset %p\n", addr, file_name(vmr->vm_file),
+	printk("Addr %p is in %s at offset %p\n", addr, vmr_to_filename(vmr),
 	       addr - vmr->vm_base + vmr->vm_foff);
 	spin_unlock(&p->vmr_lock);
 }

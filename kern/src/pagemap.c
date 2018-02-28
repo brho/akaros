@@ -618,7 +618,8 @@ void print_page_map_info(struct page_map *pm)
 	TAILQ_FOREACH(vmr_i, &pm->pm_vmrs, vm_pm_link) {
 		printk("\tVMR proc %d: (%p - %p): 0x%08x, 0x%08x, %p, %p\n",
 		       vmr_i->vm_proc->pid, vmr_i->vm_base, vmr_i->vm_end,
-		       vmr_i->vm_prot, vmr_i->vm_flags, vmr_i->vm_file, vmr_i->vm_foff);
+		       vmr_i->vm_prot, vmr_i->vm_flags, foc_pointer(vmr_i->__vm_foc),
+			   vmr_i->vm_foff);
 	}
 	spin_unlock(&pm->pm_lock);
 }

@@ -146,9 +146,9 @@ typedef long elf_aux_t[2];
 // Hardware capabilities (for use with ELF_AUX_HWCAP)
 #define ELF_HWCAP_SPARC_FLUSH	1
 
-struct file;
-bool is_valid_elf(struct file *f);
-int load_elf(struct proc* p, struct file* f,
+struct file_or_chan;
+bool is_valid_elf(struct file_or_chan *f);
+int load_elf(struct proc *p, struct file_or_chan *f,
              int argc, char *argv[], int envc, char *envp[]);
 ssize_t get_startup_argc(struct proc *p);
 char *get_startup_argv(struct proc *p, size_t idx, char *argp,

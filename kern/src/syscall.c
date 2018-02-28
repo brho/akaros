@@ -708,7 +708,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 {
 	int pid = 0;
 	char *t_path;
-	struct file *program;
+	struct file_or_chan *program;
 	struct proc *new_p;
 	int argc, envc;
 	char **argv, **envp;
@@ -717,8 +717,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
-	/* TODO: 9ns support */
-	program = do_file_open(t_path, O_READ, 0);
+	program = foc_open(t_path, O_READ, 0);
 	if (!program)
 		goto error_with_path;
 	if (!is_valid_elf(program)) {
@@ -762,7 +761,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	/* progname is argv0, which accounts for symlinks */
 	proc_set_progname(new_p, argc ? argv[0] : NULL);
 	proc_replace_binary_path(new_p, t_path);
-	kref_put(&program->f_kref);
+	foc_decref(program);
 	user_memdup_free(p, kargenv);
 	__proc_ready(new_p);
 	pid = new_p->pid;
@@ -778,7 +777,7 @@ error_with_proc:
 error_with_kargenv:
 	user_memdup_free(p, kargenv);
 error_with_file:
-	kref_put(&program->f_kref);
+	foc_decref(program);
 error_with_path:
 	free_path(p, t_path);
 	return -1;
@@ -982,7 +981,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 {
 	int ret = -1;
 	char *t_path = NULL;
-	struct file *program;
+	struct file_or_chan *program;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	int argc, envc;
 	char **argv, **envp;
@@ -1033,8 +1032,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		return -1;
 	}
 	/* This could block: */
-	/* TODO: 9ns support */
-	program = do_file_open(t_path, O_READ, 0);
+	program = foc_open(t_path, O_READ, 0);
 	/* Clear the current_ctx.  We won't be returning the 'normal' way.  Even if
 	 * we want to return with an error, we need to go back differently in case
 	 * we succeed.  This needs to be done before we could possibly block, but
@@ -1062,7 +1060,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	close_fdt(&p->open_files, TRUE);
 	env_user_mem_free(p, 0, UMAPTOP);
 	if (load_elf(p, program, argc, argv, envc, envp)) {
-		kref_put(&program->f_kref);
+		foc_decref(program);
 		user_memdup_free(p, kargenv);
 		systrace_finish_trace(pcpui->cur_kthread, -1);
 		/* Note this is an inedible reference, but proc_destroy now returns */
@@ -1071,8 +1069,8 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		 * return to the user (hence the all_out) */
 		goto all_out;
 	}
-	printd("[PID %d] exec %s\n", p->pid, file_name(program));
-	kref_put(&program->f_kref);
+	printd("[PID %d] exec %s\n", p->pid, foc_to_name(program));
+	foc_decref(program);
 	systrace_finish_trace(pcpui->cur_kthread, 0);
 	goto success;
 	/* These error and out paths are so we can handle the async interface, both
@@ -1081,7 +1079,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 mid_error:
 	/* These two error paths are for when we want to restart the process with an
 	 * error value (errno is already set). */
-	kref_put(&program->f_kref);
+	foc_decref(program);
 early_error:
 	/* Note the t_path is passed to proc_replace_binary_path for success */
 	free_path(p, t_path);

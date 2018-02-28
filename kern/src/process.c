@@ -474,7 +474,7 @@ void __proc_ready(struct proc *p)
 }
 
 /* Creates a process from the specified file, argvs, and envps. */
-struct proc *proc_create(struct file *prog, char **argv, char **envp)
+struct proc *proc_create(struct file_or_chan *prog, char **argv, char **envp)
 {
 	struct proc *p;
 	error_t r;

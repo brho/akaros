@@ -924,8 +924,9 @@ bool test_ucq(void)
 	set_awaiter_rel(waiter, 1000000);	/* 1s should be long enough */
 	set_alarm(tchain, waiter);
 	/* Just spawn the program */
-	struct file *program;
-	program = do_file_open("/bin/ucq", O_READ, 0);
+	struct file_or_chan *program;
+
+	program = foc_open("/bin/ucq", O_READ, 0);
 
 	KT_ASSERT_M("We should be able to find /bin/ucq",
 	            program);
@@ -935,7 +936,7 @@ bool test_ucq(void)
 	/* instead of getting rid of the reference created in proc_create, we'll put
 	 * it in the awaiter */
 	waiter->data = p;
-	kref_put(&program->f_kref);
+	foc_decref(program);
 	/* Should never return from schedule (env_pop in there) also note you may
 	 * not get the process you created, in the event there are others floating
 	 * around that are runnable */
@@ -1071,7 +1072,9 @@ bool test_vm_regions(void)
 	for (int i = 0; i < 3; i++) {
 		vmrs[i]->vm_prot = PROT_READ;
 		vmrs[i]->vm_flags = 0;
-		vmrs[i]->vm_file = 0; /* would like to test this, it's a pain for now */
+		/* would like to test this, it's a pain for now */
+		if (vmr_has_file(vmrs[i]))
+			vmrs[i]->__vm_foc->type = 0;
 	}
 	vmrs[0] = merge_me(vmrs[1]);
 	results[0].base = 0x2000;

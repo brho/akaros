@@ -309,7 +309,7 @@ int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("Usage: bin_run FILENAME\n");
 		return 1;
 	}
-	struct file *program;
+	struct file_or_chan *program;
 	int retval = 0;
 	char buf[5 + MAX_FILENAME_SZ + 1] = "/bin/";	/* /bin/ + max + \0 */
 
@@ -318,7 +318,7 @@ int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("Filename '%s' too long!\n", argv[1]);
 		return 1;
 	}
-	program = do_file_open(buf, O_READ, 0);
+	program = foc_open(buf, O_READ, 0);
 	if (!program) {
 		printk("No such program!\n");
 		return 1;
@@ -336,7 +336,7 @@ int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 	kfree(p_argv);
 	proc_wakeup(p);
 	proc_decref(p); /* let go of the reference created in proc_create() */
-	kref_put(&program->f_kref);
+	foc_decref(program);
 	/* Make a scheduling decision.  You might not get the process you created,
 	 * in the event there are others floating around that are runnable */
 	run_scheduler();

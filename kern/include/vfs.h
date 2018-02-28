@@ -500,8 +500,8 @@ int do_rename(char *old_path, char *new_path);
 int do_truncate(struct inode *inode, off64_t len);
 struct file *dentry_open(struct dentry *dentry, int flags);
 void file_release(struct kref *kref);
-ssize_t kread_file(struct file *file, void *buf, size_t sz);
-void *kread_whole_file(struct file *file);
+ssize_t kread_file(struct file_or_chan *file, void *buf, size_t sz);
+void *kread_whole_file(struct file_or_chan *file);
 
 /* Process-related File management functions */
 void *lookup_fd(struct fd_table *fdt, int fd, bool incref, bool vfs);
