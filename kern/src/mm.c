@@ -181,8 +181,52 @@ size_t foc_get_len(struct file_or_chan *foc)
 	panic("unknown F_OR_C type, %d", foc->type);
 }
 
-int foc_dev_mmap(struct file_or_chan *foc, struct vm_region *vmr)
+/* Helper: returns TRUE if the VMR is allowed to access the file with prot.
+ *
+ * http://pubs.opengroup.org/onlinepubs/9699919799/functions/mmap.html
+ * - FD must be opened PROT_READ for any mmap
+ * - you can have a PROT_WRITE, MAP_PRIVATE mmap with an FD that isn't
+ *   PROT_WRITE */
+static bool check_file_perms(struct vm_region *vmr, struct file *file, int prot)
 {
+	assert(file);
+	/* VFS stores it as rwx for some reason */
+	if (!(file->f_mode & S_IRUSR))
+		goto out_error;
+	if ((prot & PROT_WRITE) & !(vmr->vm_flags & MAP_PRIVATE)) {
+		if (!(file->f_mode & S_IWUSR))
+			goto out_error;
+	}
+	return true;
+out_error:	/* for debugging */
+	printk("[kernel] mmap perm check failed for %s for prot %o\n",
+	       file_name(file), prot);
+	return false;
+}
+
+static bool check_chan_perms(struct vm_region *vmr, struct chan *chan, int prot)
+{
+	/* TODO: (chan) */
+	return true;
+}
+
+static bool check_foc_perms(struct vm_region *vmr, struct file_or_chan *foc,
+                            int prot)
+{
+	switch (foc->type) {
+	case F_OR_C_FILE:
+		return check_file_perms(vmr, foc->file, prot);
+	case F_OR_C_CHAN:
+		return check_chan_perms(vmr, foc->chan, prot);
+	}
+	panic("unknown F_OR_C type");
+}
+
+static int foc_dev_mmap(struct file_or_chan *foc, struct vm_region *vmr,
+                        int prot)
+{
+	if (!check_foc_perms(vmr, foc, prot))
+		return -1;
 	switch (foc->type) {
 	case F_OR_C_FILE:
 		return foc->file->f_op->mmap(foc->file, vmr);
@@ -645,47 +689,6 @@ out_ref:
 	return result;
 }
 
-/* Helper: returns TRUE if the VMR is allowed to access the file with prot.
- *
- * http://pubs.opengroup.org/onlinepubs/9699919799/functions/mmap.html
- * - FD must be opened PROT_READ for any mmap
- * - you can have a PROT_WRITE, MAP_PRIVATE mmap with an FD that isn't
- *   PROT_WRITE */
-static bool check_file_perms(struct vm_region *vmr, struct file *file, int prot)
-{
-	assert(file);
-	/* VFS stores it as rwx for some reason */
-	if (!(file->f_mode & S_IRUSR))
-		goto out_error;
-	if ((prot & PROT_WRITE) & !(vmr->vm_flags & MAP_PRIVATE)) {
-		if (!(file->f_mode & S_IWUSR))
-			goto out_error;
-	}
-	return true;
-out_error:	/* for debugging */
-	printk("[kernel] mmap perm check failed for %s for prot %o\n",
-	       file_name(file), prot);
-	return false;
-}
-
-static bool check_chan_perms(struct vm_region *vmr, struct chan *chan, int prot)
-{
-	/* TODO: (chan) */
-	return true;
-}
-
-static bool check_foc_perms(struct vm_region *vmr, struct file_or_chan *foc,
-                            int prot)
-{
-	switch (foc->type) {
-	case F_OR_C_FILE:
-		return check_file_perms(vmr, foc->file, prot);
-	case F_OR_C_CHAN:
-		return check_chan_perms(vmr, foc->chan, prot);
-	}
-	panic("unknown F_OR_C type");
-}
-
 /* Helper, maps in page at addr, but only if nothing is mapped there.  Returns
  * 0 on success.  Will take ownership of non-pagemap pages, including on error
  * cases.  This just means we free it on error, and notionally store it in the
@@ -852,14 +855,24 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	vmr->vm_prot = prot;
 	vmr->vm_flags = flags & MAP_PERSIST_FLAGS;
 	vmr->vm_foff = offset;
+	vmr->__vm_foc = NULL;
 	if (file) {
-		if (!check_foc_perms(vmr, file, prot)) {
+		/* Prep the FS and make sure it can mmap the file.  The device/FS checks
+		 * perms, and does whatever else it needs to make the mmap work.
+		 *
+		 * Slightly weird semantics: if we fail and had munmapped the space,
+		 * they will have a hole in their VM now. */
+		if (foc_dev_mmap(file, vmr, prot)) {
 			assert(!vmr->__vm_foc);
 			destroy_vmr(vmr);
-			set_errno(EACCES);
+			set_errno(EACCES);	/* not quite */
 			spin_unlock(&p->vmr_lock);
 			return MAP_FAILED;
 		}
+		/* TODO: push the PM stuff into the chan/fs_file. */
+		pm_add_vmr(foc_to_pm(file), vmr);
+		foc_incref(file);
+		vmr->__vm_foc = file;
 		/* TODO: consider locking the file while checking (not as manadatory as
 		 * in handle_page_fault() */
 		if (nr_pages(offset + len) > nr_pages(foc_get_len(file))) {
@@ -871,20 +884,8 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 			 * immediately mprotect it to PROT_NONE. */
 			flags &= ~MAP_POPULATE;
 		}
-		/* Prep the FS to make sure it can mmap the file.  Slightly weird
-		 * semantics: if we fail and had munmapped the space, they will have a
-		 * hole in their VM now. */
-		if (foc_dev_mmap(file, vmr)) {
-			assert(!vmr->__vm_foc);
-			destroy_vmr(vmr);
-			set_errno(EACCES);	/* not quite */
-			spin_unlock(&p->vmr_lock);
-			return MAP_FAILED;
-		}
-		foc_incref(file);
-		pm_add_vmr(foc_to_pm(file), vmr);
 	}
-	vmr->__vm_foc = file;
+
 	vmr = merge_me(vmr);		/* attempts to merge with neighbors */
 
 	if (flags & MAP_POPULATE && prot != PROT_NONE) {
