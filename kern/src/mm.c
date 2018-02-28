@@ -501,51 +501,26 @@ out_ref:
 }
 
 /* Helper: returns TRUE if the VMR is allowed to access the file with prot.
- * This is a bit ghetto still: messes with the file mode and assumes it can walk
- * the dentry/inode paths without locking.  It also ignores the CoW stuff we'll
- * need to do eventually. */
+ *
+ * http://pubs.opengroup.org/onlinepubs/9699919799/functions/mmap.html
+ * - FD must be opened PROT_READ for any mmap
+ * - you can have a PROT_WRITE, MAP_PRIVATE mmap with an FD that isn't
+ *   PROT_WRITE */
 static bool check_file_perms(struct vm_region *vmr, struct file *file, int prot)
 {
 	assert(file);
-	if (prot & PROT_READ) {
-		if (check_perms(file->f_dentry->d_inode, S_IRUSR))
+	/* VFS stores it as rwx for some reason */
+	if (!(file->f_mode & S_IRUSR))
+		goto out_error;
+	if ((prot & PROT_WRITE) & !(vmr->vm_flags & MAP_PRIVATE)) {
+		if (!(file->f_mode & S_IWUSR))
 			goto out_error;
 	}
-	if (prot & PROT_WRITE) {
-		/* if vmr maps a file as MAP_SHARED, then we need to make sure the
-		 * protection change is in compliance with the open mode of the
-		 * file. */
-		if (vmr->vm_flags & MAP_SHARED) {
-			if (!(file->f_mode & S_IWUSR)) {
-				/* at this point, we have a file opened in the wrong mode,
-				 * but we may be allowed to access it still. */
-				if (check_perms(file->f_dentry->d_inode, S_IWUSR)) {
-					goto out_error;
-				} else {
-					/* it is okay, though we need to change the file mode. (note
-					 * the lack of a lock/protection (TODO) */
-					file->f_mode |= S_IWUSR;
-				}
-			}
-		} else {	/* PRIVATE mapping */
-			/* TODO: we want a CoW mapping (like we want in handle_page_fault()),
-			 * since there is a concern of a process having the page already
-			 * mapped in to a file it does not have permissions to, and then
-			 * mprotecting it so it can access it.  So we can't just change
-			 * the prot, and we don't know yet if a page is mapped in.  To
-			 * handle this, we ought to sort out the CoW bit, and then this
-			 * will be easy.  Til then, just do a permissions check.  If we
-			 * start having weird issues with libc overwriting itself (since
-			 * procs mprotect that W), then change this. */
-			if (check_perms(file->f_dentry->d_inode, S_IWUSR))
-				goto out_error;
-		}
-	}
-	return TRUE;
+	return true;
 out_error:	/* for debugging */
-	printk("[kernel] mmap perm check failed for %s for access %d\n",
+	printk("[kernel] mmap perm check failed for %s for prot %o\n",
 	       file_name(file), prot);
-	return FALSE;
+	return false;
 }
 
 /* Helper, maps in page at addr, but only if nothing is mapped there.  Returns
