@@ -451,15 +451,11 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		set_errno(EINVAL);
 		return MAP_FAILED;
 	}
-	if (fd >= 0 && (flags & MAP_ANON)) {
-		set_errno(EBADF);
-		return MAP_FAILED;
-	}
 	if (!len) {
 		set_errno(EINVAL);
 		return MAP_FAILED;
 	}
-	if (fd != -1) {
+	if (!(flags & MAP_ANON) && (fd >= 0)) {
 		file = get_file_from_fd(&p->open_files, fd);
 		if (!file) {
 			set_errno(EBADF);
