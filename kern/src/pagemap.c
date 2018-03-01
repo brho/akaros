@@ -612,6 +612,11 @@ handle_dirty:
 	return nr_removed;
 }
 
+void pm_destroy(struct page_map *pm)
+{
+	/* TODO: implement me! */
+}
+
 void print_page_map_info(struct page_map *pm)
 {
 	struct vm_region *vmr_i;
