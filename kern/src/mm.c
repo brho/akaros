@@ -25,6 +25,8 @@
 #include <smp.h>
 #include <profiler.h>
 #include <umem.h>
+#include <ns.h>
+#include <tree_file.h>
 
 /* These are the only mmap flags that are saved in the VMR.  If we implement
  * more of the mmap interface, we may need to grow this. */
@@ -43,7 +45,8 @@ static struct page_map *foc_to_pm(struct file_or_chan *foc)
 	case F_OR_C_FILE:
 		return foc->file->f_mapping;
 	case F_OR_C_CHAN:
-		return NULL; /* TODO: (chan) hook to fs_file mapping */
+		assert(foc->fsf);
+		return foc->fsf->pm;
 	}
 	panic("unknown F_OR_C type");
 }
@@ -59,7 +62,10 @@ char *foc_to_name(struct file_or_chan *foc)
 	case F_OR_C_FILE:
 		return foc->file->f_dentry->d_name.name;
 	case F_OR_C_CHAN:
-		return NULL;	/* TODO: (chan) */
+		if (foc->fsf)
+			return foc->fsf->dir.name;
+		else
+			return foc->chan->name->s;
 	}
 	panic("unknown F_OR_C type");
 }
@@ -70,20 +76,27 @@ char *foc_abs_path(struct file_or_chan *foc, char *path, size_t max_size)
 	case F_OR_C_FILE:
 		return file_abs_path(foc->file, path, max_size);
 	case F_OR_C_CHAN:
-		return NULL;	/* TODO: (chan) */
+		return foc->chan->name->s;
 	}
 	panic("unknown F_OR_C type");
 }
 
 ssize_t foc_read(struct file_or_chan *foc, void *buf, size_t amt, off64_t off)
 {
+	ERRSTACK(1);
 	off64_t fake_off = off;
+	ssize_t ret = -1;
 
 	switch (foc->type) {
 	case F_OR_C_FILE:
 		return foc->file->f_op->read(foc->file, buf, amt, &fake_off);
 	case F_OR_C_CHAN:
-		return -1;	/* TODO: (chan) */
+		if (!(foc->chan->qid.type & QTFILE))
+			return -1;
+		if (!waserror())
+			ret = devtab[foc->chan->type].read(foc->chan, buf, amt, off);
+		poperror();
+		return ret;
 	}
 	panic("unknown F_OR_C type");
 }
@@ -97,7 +110,7 @@ static void foc_release(struct kref *kref)
 		kref_put(&foc->file->f_kref);
 		break;
 	case F_OR_C_CHAN:
-		/* TODO: (chan) */
+		cclose(foc->chan);
 		break;
 	default:
 		panic("unknown F_OR_C type, %d", foc->type);
@@ -118,31 +131,48 @@ static struct file_or_chan *foc_alloc(void)
 
 struct file_or_chan *foc_open(char *path, int omode, int perm)
 {
+	ERRSTACK(1);
 	struct file_or_chan *foc = foc_alloc();
 
 	if (!foc)
 		return NULL;
-	foc->type = F_OR_C_FILE;
 	foc->file = do_file_open(path, omode, perm);
-	if (!foc->file) {
-		kfree(foc);
-		foc = NULL;
+	if (foc->file) {
+		foc->type = F_OR_C_FILE;
+		return foc;
 	}
+	if (waserror()) {
+		kfree(foc);
+		poperror();
+		return NULL;
+	}
+	foc->chan = namec(path, Aopen, omode, perm, NULL);
+	foc->type = F_OR_C_CHAN;
+	poperror();
 	return foc;
 }
 
 struct file_or_chan *fd_to_foc(struct fd_table *fdt, int fd)
 {
+	ERRSTACK(1);
 	struct file_or_chan *foc = foc_alloc();
 
 	if (!foc)
 		return NULL;
-	foc->type = F_OR_C_FILE;
 	foc->file = get_file_from_fd(fdt, fd);
-	if (!foc->file) {
-		kfree(foc);
-		foc = NULL;
+	if (foc->file) {
+		foc->type = F_OR_C_FILE;
+		return foc;
 	}
+	if (waserror()) {
+		kfree(foc);
+		poperror();
+		return NULL;
+	}
+	/* We're not checking mode here (-1).  mm code checks later. */
+	foc->chan = fdtochan(fdt, fd, -1, true, true);
+	foc->type = F_OR_C_CHAN;
+	poperror();
 	return foc;
 }
 
@@ -176,7 +206,8 @@ size_t foc_get_len(struct file_or_chan *foc)
 	case F_OR_C_FILE:
 		return foc->file->f_dentry->d_inode->i_size;
 	case F_OR_C_CHAN:
-		return 0;	/* TODO: (chan) */
+		assert(foc->fsf);
+		return foc->fsf->dir.length;
 	}
 	panic("unknown F_OR_C type, %d", foc->type);
 }
@@ -206,8 +237,13 @@ out_error:	/* for debugging */
 
 static bool check_chan_perms(struct vm_region *vmr, struct chan *chan, int prot)
 {
-	/* TODO: (chan) */
-	return true;
+	/* glibc isn't opening its files O_EXEC */
+	prot &= ~PROT_EXEC;
+	if (!(chan->mode & O_READ))
+		return false;
+	if (vmr->vm_flags & MAP_PRIVATE)
+		prot &= ~PROT_WRITE;
+	return (chan->mode & prot) == prot;
 }
 
 static bool check_foc_perms(struct vm_region *vmr, struct file_or_chan *foc,
@@ -223,7 +259,7 @@ static bool check_foc_perms(struct vm_region *vmr, struct file_or_chan *foc,
 }
 
 static int foc_dev_mmap(struct file_or_chan *foc, struct vm_region *vmr,
-                        int prot)
+                        int prot, int flags)
 {
 	if (!check_foc_perms(vmr, foc, prot))
 		return -1;
@@ -231,7 +267,12 @@ static int foc_dev_mmap(struct file_or_chan *foc, struct vm_region *vmr,
 	case F_OR_C_FILE:
 		return foc->file->f_op->mmap(foc->file, vmr);
 	case F_OR_C_CHAN:
-		return -1;	/* TODO: (chan) */
+		if (!devtab[foc->chan->type].mmap) {
+			set_error(ENODEV, "device does not support mmap");
+			return -1;
+		}
+		foc->fsf = devtab[foc->chan->type].mmap(foc->chan, vmr, prot, flags);
+		return foc->fsf ? 0 : -1;
 	}
 	panic("unknown F_OR_C type, %d", foc->type);
 }
@@ -854,7 +895,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	if (file) {
 		/* Prep the FS and make sure it can mmap the file.  The device/FS checks
 		 * perms, and does whatever else it needs to make the mmap work. */
-		if (foc_dev_mmap(file, vmr, prot)) {
+		if (foc_dev_mmap(file, vmr, prot, flags & MAP_PERSIST_FLAGS)) {
 			vmr_free(vmr);
 			set_errno(EACCES);	/* not quite */
 			return MAP_FAILED;

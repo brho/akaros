@@ -496,6 +496,8 @@ struct cname {
 	char *s;
 };
 
+struct fs_file;
+
 struct dev {
 	char *name;
 
@@ -520,6 +522,7 @@ struct dev {
 	char *(*chaninfo)(struct chan *, char *, size_t);
 	int (*tapfd)(struct chan *, struct fd_tap *, int);
 	int (*chan_ctl)(struct chan *, int);
+	struct fs_file *(*mmap)(struct chan *, struct vm_region *, int, int);
 	/* we need to be aligned to 64 bytes for the linker tables. */
 } __attribute__ ((aligned(64)));
 

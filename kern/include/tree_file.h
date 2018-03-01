@@ -262,6 +262,8 @@ size_t tree_chan_read(struct chan *c, void *ubuf, size_t n, off64_t offset);
 size_t tree_chan_write(struct chan *c, void *ubuf, size_t n, off64_t offset);
 size_t tree_chan_stat(struct chan *c, uint8_t *m_buf, size_t m_buf_sz);
 size_t tree_chan_wstat(struct chan *c, uint8_t *m_buf, size_t m_buf_sz);
+struct fs_file *tree_chan_mmap(struct chan *c, struct vm_region *vmr, int prot,
+                               int flags);
 
 struct chan *tree_file_alloc_chan(struct tree_file *tf, struct dev *dev,
                                   char *name);

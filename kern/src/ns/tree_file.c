@@ -981,6 +981,22 @@ size_t tree_chan_wstat(struct chan *c, uint8_t *m_buf, size_t m_buf_sz)
 	return fs_file_wstat(&tf->file, m_buf, m_buf_sz);
 }
 
+struct fs_file *tree_chan_mmap(struct chan *c, struct vm_region *vmr, int prot,
+                               int flags)
+{
+	struct fs_file *f = &chan_to_tree_file(c)->file;
+
+	/* TODO: In the future, we'll check the prot, establish hooks with the VMR,
+	 * and other things, mostly in something like fs_file_mmap, which will be
+	 * able to handle mmaping something that doesn't use the page cache.  For
+	 * now, I'm aggressively qlocking to catch bugs. */
+	qlock(&f->qlock);
+	if ((prot & PROT_WRITE) && (flags & MAP_SHARED))
+		f->flags |= FSF_DIRTY;
+	qunlock(&f->qlock);
+	return f;
+}
+
 /* Given a tree file, construct a chan that points to the TF for the given
  * device.  Careful with this - it's for bootstrapping. */
 struct chan *tree_file_alloc_chan(struct tree_file *tf, struct dev *dev,

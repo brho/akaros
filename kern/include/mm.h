@@ -27,6 +27,7 @@ struct file_or_chan {
 	int type;
 	struct file *file;
 	struct chan *chan;
+	struct fs_file *fsf;	/* weak ref, set during mmap. */
 	struct kref kref;
 };
 
