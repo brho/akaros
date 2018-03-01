@@ -2477,121 +2477,20 @@ intreg_t sys_fwstat(struct proc *p, int fd, uint8_t *stat_m, size_t stat_sz,
 intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
                     char *new_path, size_t new_path_l)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	ERRSTACK(1);
-	int mountpointlen = 0;
 	char *from_path = copy_in_path(p, old_path, old_path_l);
 	char *to_path = copy_in_path(p, new_path, new_path_l);
-	struct chan *oldchan = 0, *newchan = NULL;
 	int retval = -1;
 
 	if ((!from_path) || (!to_path))
 		return -1;
-	printd("sys_rename :%s: to :%s: : ", from_path, to_path);
+	printk("sys_rename :%s: to :%s: : ", from_path, to_path);
 
-	/* we need a fid for the wstat. */
-	/* TODO: maybe wrap the 9ns stuff better.  sysrename maybe? */
-
-	/* discard namec error */
-	if (!waserror()) {
-		oldchan = namec(from_path, Aaccess, 0, 0, NULL);
-	}
-	poperror();
-	if (!oldchan) {
-		retval = do_rename(from_path, to_path);
-		free_path(p, from_path);
-		free_path(p, to_path);
-		return retval;
-	}
-
-	printd("Oldchan: %C\n", oldchan);
-	printd("Oldchan: mchan %C\n", oldchan->mchan);
-
-	/* If walked through a mountpoint, we need to take that
-	 * into account for the Twstat.
-	 */
-	if (oldchan->mountpoint) {
-		printd("mountpoint: %C\n", oldchan->mountpoint);
-		if (oldchan->mountpoint->name)
-			mountpointlen = oldchan->mountpoint->name->len;
-	}
-
-	/* This test makes sense even when mountpointlen is 0 */
-	if (strlen(to_path) < mountpointlen) {
-		set_errno(EINVAL);
-		goto done;
-	}
-
-	/* the omode and perm are of no importance. */
-	newchan = namec(to_path, Acreatechan, 0, 0, NULL);
-	if (newchan == NULL) {
-		printd("sys_rename %s to %s found no chan\n", from_path, to_path);
-		set_errno(EPERM);
-		goto done;
-	}
-	printd("Newchan: %C\n", newchan);
-	printd("Newchan: mchan %C\n", newchan->mchan);
-
-	if ((newchan->dev != oldchan->dev) ||
-		(newchan->type != oldchan->type)) {
-		printd("Old chan and new chan do not match\n");
-		set_errno(ENODEV);
-		goto done;
-	}
-
-	struct dir dir;
-	size_t mlen;
-	uint8_t mbuf[STAT_FIX_LEN_AK + MAX_PATH_LEN + 1];
-
-	init_empty_dir(&dir);
-	dir.name = to_path;
-	/* absolute paths need the mountpoint name stripped from them.
-	 * Once stripped, it still has to be an absolute path.
-	 */
-	if (dir.name[0] == '/') {
-		dir.name = to_path + mountpointlen;
-		if (dir.name[0] != '/') {
-			set_errno(EINVAL);
-			goto done;
-		}
-	}
-
-	mlen = convD2M(&dir, mbuf, sizeof(mbuf));
-	if (!mlen) {
-		printk("convD2M failed\n");
-		set_errno(EINVAL);
-		goto done;
-	}
-
-	if (waserror()) {
-		printk("validstat failed: %s\n", current_errstr());
-		goto done;
-	}
-
-	validstat(mbuf, mlen, 1);
-	poperror();
-
-	if (waserror()) {
-		//cclose(oldchan);
-		nexterror();
-	}
-
-	retval = devtab[oldchan->type].wstat(oldchan, mbuf, mlen);
-
-	poperror();
-	if (retval == mlen) {
-		retval = mlen;
-	} else {
-		printk("syswstat did not go well\n");
-		set_errno(EXDEV);
-	};
-	printk("syswstat returns %d\n", retval);
-
-done:
+	retval = do_rename(from_path, to_path);
+	/* This isn't quite true, but will work til we get rid of the VFS */
+	if (retval < 0)
+		set_error(EXDEV, "no 9ns rename yet");
 	free_path(p, from_path);
 	free_path(p, to_path);
-	cclose(oldchan);
-	cclose(newchan);
 	return retval;
 }
 

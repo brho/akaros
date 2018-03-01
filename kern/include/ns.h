@@ -378,7 +378,6 @@ enum {
 	Amount,						/* to be mounted or mounted upon */
 	Acreate,					/* is to be created */
 	Aremove,					/* will be removed by caller */
-	Acreatechan,					/* return a chan for a create request. for sysrename. */
 
 	/* internal chan flags, used by the kernel only */
 	COPEN = 		0x0001,	/* for i/o */

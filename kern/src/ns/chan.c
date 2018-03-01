@@ -1051,9 +1051,6 @@ void *memrchr(void *va, int c, long n)
  * Since the functions that open Aaccess (sysstat, syswstat, sys_stat)
  * do not use the struct cname*, this avoids an unnecessary clone.
  *
- * Acreatechan will never open. It will do all the tests and return a chan
- * for the directory where an open will succeed.
- *
  * The classic namec() is broken into a front end to get the starting point and
  * a __namec_from, which does the guts of the lookup.  */
 static struct chan *__namec_from(struct chan *c, char *aname, int amode,
@@ -1095,7 +1092,7 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 	/*
 	 * On create, ....
 	 */
-	if ((amode == Acreate) || (amode == Acreatechan)) {
+	if (amode == Acreate) {
 		/* perm must have DMDIR if last element is / or /. */
 		if (e.mustbedir && !(perm & DMDIR)) {
 			npath = e.ARRAY_SIZEs;
@@ -1243,13 +1240,6 @@ Open:
 			 * When mounting on an already mounted upon directory,
 			 * one wants subsequent mounts to be attached to the
 			 * original directory, not the replacement.  Don't domount.
-			 */
-			break;
-
-		case Acreatechan:
-			/*
-			 * We've walked to the place where it *could* be created.
-			 * Return that chan.
 			 */
 			break;
 
