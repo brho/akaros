@@ -86,6 +86,12 @@ struct kstat {
 /* TODO: have userpsace use our stuff from bits/stats.h */
 #ifdef ROS_KERNEL
 
+/* Access mode bits (unistd.h) */
+#define R_OK 4
+#define W_OK 2
+#define X_OK 1
+#define F_OK 0
+
 /* File creation modes (access controls) */
 #define S_IRWXU 00700	/* user (file owner) has read, write and execute perms */
 #define S_IRUSR 00400	/* user has read permission */

@@ -1964,17 +1964,25 @@ static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
                            int mode)
 {
 	int retval;
+	struct dir *dir;
 	char *t_path = copy_in_path(p, path, path_l);
+
 	if (!t_path)
 		return -1;
-	/* TODO: 9ns support */
 	retval = do_access(t_path, mode);
-	free_path(p, t_path);
 	printd("Access for path: %s retval: %d\n", path, retval);
 	if (retval < 0) {
-		set_errno(-retval);
-		return -1;
+		unset_errno();
+		dir = sysdirstat(t_path);
+		if (!dir)
+			goto out;
+		if ((mode == F_OK) || caller_has_dir_perms(dir,
+		                             access_bits_to_omode(mode)))
+			retval = 0;
+		kfree(dir);
 	}
+out:
+	free_path(p, t_path);
 	return retval;
 }
 

@@ -99,6 +99,19 @@ int omode_to_9p_accmode(int open_flags)
 	return acc_opts[open_flags & O_ACCMODE];
 }
 
+int access_bits_to_omode(int access_bits)
+{
+	int omode = 0;
+
+	if (R_OK)
+		omode |= O_READ;
+	if (W_OK)
+		omode |= O_WRITE;
+	if (X_OK)
+		omode |= O_EXEC;
+	return omode;
+}
+
 /* TODO: This assumes UID isn't concurrently changed */
 bool caller_is_username(char *uid)
 {

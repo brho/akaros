@@ -860,6 +860,7 @@ uint64_t ns2fastticks(uint64_t);
 int okaddr(uint32_t, uint32_t, int);
 int omode_to_rwx(int);
 int omode_to_9p_accmode(int open_flags);
+int access_bits_to_omode(int access_bits);
 struct block *packblock(struct block *);
 struct block *padblock(struct block *, int);
 
