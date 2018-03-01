@@ -15,10 +15,12 @@
 extern void set_error(int error, const char *fmt, ...);
 extern struct errbuf *get_cur_errbuf(void);
 
+#define error_jmp() longjmp(&get_cur_errbuf()->jmpbuf, 1)
+
 #define error(e, x, ...)												\
 	do {																\
 		set_error(e, x, ##__VA_ARGS__);									\
-		longjmp(&get_cur_errbuf()->jmpbuf, 1);							\
+		error_jmp();													\
 	} while(0)
 #define nexterror() longjmp(&(errpop(errstack, ARRAY_SIZE(errstack), &curindex, \
 									 prev_errbuf)->jmpbuf), 1)

@@ -270,14 +270,10 @@ Accept:
 					printd("DEVWALK -1, i was %d, want path %p\n", i,
 						   c->qid.path);
 Notfound:
-					if (j == 0)
-						error(ENOENT, "could not find name %s, dev %s", n,
+					set_error(ENOENT, "could not find name %s, dev %s", n,
 						      c->type == -1 ? "no dev" : devtab[c->type].name);
-					/* TODO: I think we don't need to just set_error here.  I
-					 * got this once when hacking on namec/walk and didn't
-					 * set_error() in an error case.  This was for symlinks on
-					 * #kfs bound on #root. */
-					set_error(ENOENT, "tell brho you saw this in an error");
+					if (j == 0)
+						error_jmp();
 					goto Done;
 				case 0:
 					printd("DEVWALK continue, i was %d\n", i);
@@ -308,6 +304,9 @@ Done:
 	} else if (wq->clone) {
 		/* attach cloned channel to same device */
 		wq->clone->type = c->type;
+	} else {
+		/* Not sure this is possible, would like to know. */
+		warn_once("had enough names, but still no wq->clone");
 	}
 	return wq;
 }

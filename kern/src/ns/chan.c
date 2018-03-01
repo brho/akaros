@@ -1130,7 +1130,7 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 NameError:
 		if (current_errstr()[0]) {
 			/* errstr is set, we'll just stick with it and error out */
-			longjmp(&get_cur_errbuf()->jmpbuf, 1);
+			error_jmp();
 		} else {
 			error(EFAIL, "Name to chan lookup failed");
 		}
