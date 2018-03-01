@@ -362,7 +362,8 @@ int load_elf(struct proc *p, struct file_or_chan *foc,
 		return -1;
 
 	if (ei.dynamic) {
-		struct file_or_chan *interp = foc_open(ei.interp, O_READ, 0);
+		struct file_or_chan *interp = foc_open(ei.interp, O_EXEC | O_READ, 0);
+
 		if (!interp)
 			return -1;
 		/* Load dynamic linker at 1M. Obvious MIB joke avoided.

@@ -717,7 +717,7 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
-	program = foc_open(t_path, O_READ, 0);
+	program = foc_open(t_path, O_EXEC | O_READ, 0);
 	if (!program)
 		goto error_with_path;
 	if (!is_valid_elf(program)) {
@@ -1032,7 +1032,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		return -1;
 	}
 	/* This could block: */
-	program = foc_open(t_path, O_READ, 0);
+	program = foc_open(t_path, O_EXEC | O_READ, 0);
 	/* Clear the current_ctx.  We won't be returning the 'normal' way.  Even if
 	 * we want to return with an error, we need to go back differently in case
 	 * we succeed.  This needs to be done before we could possibly block, but
