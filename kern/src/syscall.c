@@ -2200,8 +2200,11 @@ intreg_t sys_rmdir(struct proc *p, const char *path, size_t path_l)
 	char *t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
-	/* TODO: 9ns support */
 	retval = do_rmdir(t_path);
+	if (retval < 0) {
+		unset_errno();
+		retval = sysremove(t_path);
+	}
 	free_path(p, t_path);
 	return retval;
 }
