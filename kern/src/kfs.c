@@ -73,7 +73,7 @@ struct super_block *kfs_get_sb(struct fs_type *fs, int flags,
 
 	/* Build and init the SB.  No need to read off disc. */
 	struct super_block *sb = get_sb();
-	sb->s_dev = 0;
+	sb->s_dev = 1337;
 	sb->s_blocksize = 1;
 	sb->s_maxbytes = KFS_MAX_FILE_SIZE;
 	sb->s_type = &kfs_fs_type;
