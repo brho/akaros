@@ -64,7 +64,7 @@ int iseve(void)
 	return strcmp(eve.name, current->user.name) == 0;
 }
 
-struct username eve = {.name = "", .name_lock = SPINLOCK_INITIALIZER};
+struct username eve = {.name = "eve", .name_lock = SPINLOCK_INITIALIZER};
 char hostdomain[256] = "akaros.org";
 
 static struct {

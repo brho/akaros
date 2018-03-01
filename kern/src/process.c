@@ -392,11 +392,8 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 		cv_unlock(&parent->child_wait);
 	} else {
 		p->ppid = 0;
-		memset(p->user.name, 0, sizeof(p->user.name));
-		if (strcmp(p->user.name, eve.name) != 0) {
-			printk("Parentless process assigned username \"\"\n");
-			printk("User \"\" does not have hostowner privileges\n");
-		}
+		strlcpy(p->user.name, eve.name, sizeof(p->user.name));
+		printk("Parentless process assigned username '%s'\n", p->user.name);
 	}
 	TAILQ_INIT(&p->children);
 	cv_init(&p->child_wait);
