@@ -1,0 +1,10 @@
+--- a/libbb/copy_file.c	2018-03-01 12:07:42.710585231 -0500
++++ b/libbb/copy_file.c	2018-03-01 12:07:20.634470427 -0500
+@@ -335,6 +335,7 @@
+ 	/* We are lazy here, a bit lax with races... */
+ 	if (dest_exists) {
+ 		errno = EEXIST;
++		errstr()[0] = 0;
+ 		ovr = ask_and_unlink(dest, flags);
+ 		if (ovr <= 0)
+ 			return ovr;
