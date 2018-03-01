@@ -310,7 +310,7 @@ static int rootgen(struct chan *c, char *name, struct dirtab *tab_unused,
 }
 
 static struct walkqid *rootwalk(struct chan *c, struct chan *nc, char **name,
-								int nname)
+								unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, NULL, 0, rootgen);
 }
@@ -318,10 +318,10 @@ static struct walkqid *rootwalk(struct chan *c, struct chan *nc, char **name,
 /* Instead of using devstat, we use our own.  This allows us to have stats on
  * directories.  devstat() just fakes it.  Note that gen cannot return a direct
  * gen for a directory, since that would break devdirread(). */
-static int rootstat(struct chan *c, uint8_t * dp, int n)
+static size_t rootstat(struct chan *c, uint8_t *dp, size_t n)
 {
 	struct dir dir[1];
-	ssize_t ret;
+	size_t ret;
 	struct dirtab *entry = &roottab[c->qid.path];
 
 	/* TODO: this assumes eve is the user, which is what synthetic devices do.
@@ -373,7 +373,7 @@ static void rootclose(struct chan *c)
 {
 }
 
-static long rootread(struct chan *c, void *buf, long n, int64_t offset)
+static size_t rootread(struct chan *c, void *buf, size_t n, off64_t offset)
 {
 	uint32_t p, len;
 	uint8_t *data;
@@ -401,7 +401,7 @@ static long rootread(struct chan *c, void *buf, long n, int64_t offset)
  * kpagemalloc ... barret?
  * 		we have kpage_alloc (gives a page) and kpage_alloc_addr (void*)
  */
-static long rootwrite(struct chan *c, void *a, long n, int64_t off)
+static size_t rootwrite(struct chan *c, void *a, size_t n, off64_t off)
 {
 	struct rootdata *rd = &rootdata[c->qid.path];
 	struct dirtab *r = &roottab[c->qid.path];
@@ -425,7 +425,7 @@ static long rootwrite(struct chan *c, void *a, long n, int64_t off)
 	return n;
 }
 
-static int rootwstat(struct chan *c, uint8_t *m_buf, int m_buf_sz)
+static size_t rootwstat(struct chan *c, uint8_t *m_buf, size_t m_buf_sz)
 {
 	struct dirtab *file = &roottab[c->qid.path];
 	struct dir *dir;

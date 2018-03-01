@@ -324,9 +324,8 @@ size_t dev_make_stat(struct chan *c, struct dir *dir, uint8_t *dp, size_t n)
 	return n;
 }
 
-int
-devstat(struct chan *c, uint8_t * db, int n,
-		struct dirtab *tab, int ntab, Devgen * gen)
+size_t devstat(struct chan *c, uint8_t *db, size_t n, struct dirtab *tab,
+               int ntab, Devgen *gen)
 {
 	int i;
 	struct dir dir;
@@ -451,7 +450,7 @@ void devcreate(struct chan *c, char *unused_char_p_t, int unused_int,
 	error(EPERM, ERROR_FIXME);
 }
 
-struct block *devbread(struct chan *c, long n, uint32_t offset)
+struct block *devbread(struct chan *c, size_t n, off64_t offset)
 {
 	ERRSTACK(1);
 	struct block *bp;
@@ -468,7 +467,7 @@ struct block *devbread(struct chan *c, long n, uint32_t offset)
 	return bp;
 }
 
-long devbwrite(struct chan *c, struct block *bp, uint32_t offset)
+size_t devbwrite(struct chan *c, struct block *bp, off64_t offset)
 {
 	ERRSTACK(1);
 	long n;
@@ -489,7 +488,7 @@ void devremove(struct chan *c)
 	error(EPERM, ERROR_FIXME);
 }
 
-int devwstat(struct chan *c, uint8_t * unused_uint8_p_t, int i)
+size_t devwstat(struct chan *c, uint8_t *unused_uint8_p_t, size_t i)
 {
 	error(EPERM, ERROR_FIXME);
 	return 0;

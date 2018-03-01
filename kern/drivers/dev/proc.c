@@ -360,12 +360,12 @@ static struct chan *procattach(char *spec)
 }
 
 static struct walkqid *procwalk(struct chan *c, struct chan *nc, char **name,
-								int nname)
+								unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, 0, 0, procgen);
 }
 
-static int procstat(struct chan *c, uint8_t * db, int n)
+static size_t procstat(struct chan *c, uint8_t *db, size_t n)
 {
 	return devstat(c, db, n, 0, 0, procgen);
 }
@@ -651,7 +651,7 @@ static struct chan *procopen(struct chan *c, int omode)
 	return tc;
 }
 
-static int procwstat(struct chan *c, uint8_t * db, int n)
+static size_t procwstat(struct chan *c, uint8_t *db, size_t n)
 {
 	ERRSTACK(2);
 	error(ENOSYS, ERROR_FIXME);
@@ -903,7 +903,7 @@ static int eventsavailable(void *)
 }
 #endif
 
-static long procread(struct chan *c, void *va, long n, int64_t off)
+static size_t procread(struct chan *c, void *va, size_t n, off64_t off)
 {
 	ERRSTACK(1);
 	struct proc *p;
@@ -1085,7 +1085,7 @@ static void mntscan(struct mntwalk *mw, struct proc *p)
 	runlock(&pg->ns);
 }
 
-static long procwrite(struct chan *c, void *va, long n, int64_t off)
+static size_t procwrite(struct chan *c, void *va, size_t n, off64_t off)
 {
 	ERRSTACK(2);
 

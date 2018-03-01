@@ -73,7 +73,7 @@ static struct chan *capattach(char *spec)
 }
 
 static struct walkqid *capwalk(struct chan *c, struct chan *nc, char **name,
-                               int nname)
+                               unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, capdir, ncapdir, devgen);
 }
@@ -86,7 +86,7 @@ static void capremove(struct chan *c)
 		error(EPERM, "Permission denied");
 }
 
-static int32_t capstat(struct chan *c, uint8_t *db, int32_t n)
+static size_t capstat(struct chan *c, uint8_t *db, size_t n)
 {
 	return devstat(c, db, n, capdir, ncapdir, devgen);
 }
@@ -185,7 +185,7 @@ static void capclose(struct chan *c)
 {
 }
 
-static long capread(struct chan *c, void *va, long n, int64_t m)
+static size_t capread(struct chan *c, void *va, size_t n, off64_t m)
 {
 	switch ((uint32_t)c->qid.path) {
 	case Qdir:
@@ -198,7 +198,7 @@ static long capread(struct chan *c, void *va, long n, int64_t m)
 	return n;
 }
 
-static long capwrite(struct chan *c, void *va, long n, int64_t m)
+static size_t capwrite(struct chan *c, void *va, size_t n, off64_t m)
 {
 	struct Caphash *p;
 	char *cp;

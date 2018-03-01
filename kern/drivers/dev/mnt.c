@@ -116,7 +116,7 @@ void mntgate(struct mnt *);
 void mntpntfree(struct mnt *);
 void mntqrm(struct mnt *, struct mntrpc *);
 struct mntrpc *mntralloc(struct chan *, uint32_t);
-long mntrdwr(int unused_int, struct chan *, void *, long, int64_t);
+size_t mntrdwr(int unused_int, struct chan *, void *, size_t, off64_t);
 int mntrpcread(struct mnt *, struct mntrpc *);
 void mountio(struct mnt *, struct mntrpc *);
 void mountmux(struct mnt *, struct mntrpc *);
@@ -425,7 +425,7 @@ struct chan *mntchan(void)
 }
 
 static struct walkqid *mntwalk(struct chan *c, struct chan *nc, char **name,
-							   int nname)
+							   unsigned int nname)
 {
 	ERRSTACK(2);
 	volatile int alloc;
@@ -508,7 +508,7 @@ Return:
 	return wq;
 }
 
-static int mntstat(struct chan *c, uint8_t * dp, int n)
+static size_t mntstat(struct chan *c, uint8_t *dp, size_t n)
 {
 	ERRSTACK(1);
 	struct mnt *m;
@@ -663,7 +663,7 @@ static void mntremove(struct chan *c)
 	mntclunk(c, Tremove);
 }
 
-static int mntwstat(struct chan *c, uint8_t * dp, int n)
+static size_t mntwstat(struct chan *c, uint8_t *dp, size_t n)
 {
 	ERRSTACK(1);
 	struct mnt *m;
@@ -691,7 +691,7 @@ static int mntwstat(struct chan *c, uint8_t * dp, int n)
  * If the return a partial result, but more than one result,
  * we'll return a shorter read and the next offset will be aligned
  */
-static long mntread(struct chan *c, void *buf, long n, int64_t off)
+static size_t mntread(struct chan *c, void *buf, size_t n, off64_t off)
 {
 	uint8_t *p, *e;
 	int nc, cache, isdir, dirlen;
@@ -742,12 +742,12 @@ static long mntread(struct chan *c, void *buf, long n, int64_t off)
 	return n;
 }
 
-static long mntwrite(struct chan *c, void *buf, long n, int64_t off)
+static size_t mntwrite(struct chan *c, void *buf, size_t n, off64_t off)
 {
 	return mntrdwr(Twrite, c, buf, n, off);
 }
 
-long mntrdwr(int type, struct chan *c, void *buf, long n, int64_t off)
+size_t mntrdwr(int type, struct chan *c, void *buf, size_t n, off64_t off)
 {
 	ERRSTACK(1);
 	struct mnt *m;

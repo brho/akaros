@@ -94,12 +94,12 @@ static void ver_shutdown(void)
 }
 
 static struct walkqid *ver_walk(struct chan *c, struct chan *nc, char **name,
-								 int nname)
+								unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, vertab, ARRAY_SIZE(vertab), devgen);
 }
 
-static int ver_stat(struct chan *c, uint8_t *db, int n)
+static size_t ver_stat(struct chan *c, uint8_t *db, size_t n)
 {
 	return devstat(c, db, n, vertab, ARRAY_SIZE(vertab), devgen);
 }
@@ -143,7 +143,7 @@ static ssize_t read_buildid(void *va, long n, off64_t off)
 	return readmem(off, va, n, build_id, sizeof(build_id));
 }
 
-static long ver_read(struct chan *c, void *va, long n, int64_t off)
+static size_t ver_read(struct chan *c, void *va, size_t n, off64_t off)
 {
 	switch ((int) c->qid.path) {
 	case Kverdirqid:
@@ -175,7 +175,7 @@ static long ver_read(struct chan *c, void *va, long n, int64_t off)
 	return 0;
 }
 
-static long ver_write(struct chan *c, void *a, long n, int64_t unused)
+static size_t ver_write(struct chan *c, void *a, size_t n, off64_t unused)
 {
 	error(ENOTSUP, ERROR_FIXME);
 	return -1;

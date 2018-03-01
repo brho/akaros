@@ -120,12 +120,13 @@ static struct chan *pciattach(char *spec)
 	return devattach(devname(), spec);
 }
 
-struct walkqid *pciwalk(struct chan *c, struct chan *nc, char **name, int nname)
+struct walkqid *pciwalk(struct chan *c, struct chan *nc, char **name,
+                        unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, (struct dirtab *)0, 0, pcigen);
 }
 
-static int pcistat(struct chan *c, uint8_t *dp, int n)
+static size_t pcistat(struct chan *c, uint8_t *dp, size_t n)
 {
 	return devstat(c, dp, n, (struct dirtab *)0, 0L, pcigen);
 }
@@ -144,7 +145,7 @@ static void pciclose(struct chan *_)
 {
 }
 
-static long pciread(struct chan *c, void *va, long n, int64_t offset)
+static size_t pciread(struct chan *c, void *va, size_t n, off64_t offset)
 {
 	char buf[PCI_CONFIG_SZ], *ebuf, *w, *a;
 	int i, tbdf, r;
@@ -207,7 +208,7 @@ static long pciread(struct chan *c, void *va, long n, int64_t offset)
 	return n;
 }
 
-static long pciwrite(struct chan *c, void *va, long n, int64_t offset)
+static size_t pciwrite(struct chan *c, void *va, size_t n, off64_t offset)
 {
 	uint8_t *a;
 	int i, r, tbdf;

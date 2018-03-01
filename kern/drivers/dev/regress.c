@@ -73,14 +73,14 @@ regressinit(void)
 {
 }
 
-static struct walkqid*
-regresswalk(struct chan *c, struct chan *nc, char **name, int nname)
+static struct walkqid *regresswalk(struct chan *c, struct chan *nc, char **name,
+                                   unsigned int nname)
 {
-	return devwalk(c, nc, name, nname, regresstab, ARRAY_SIZE(regresstab), devgen);
+	return devwalk(c, nc, name, nname, regresstab, ARRAY_SIZE(regresstab),
+	               devgen);
 }
 
-static int
-regressstat(struct chan *c, uint8_t *db, int n)
+static size_t regressstat(struct chan *c, uint8_t *db, size_t n)
 {
 	if (regress.monitor)
 		regresstab[Monitordataqid].length = qlen(regress.monitor);
@@ -108,8 +108,7 @@ regressclose(struct chan*unused)
 {
 }
 
-static long
-regressread(struct chan *c, void *va, long n, int64_t off)
+static size_t regressread(struct chan *c, void *va, size_t n, off64_t off)
 {
 	uint64_t w, *bp;
 	char *a, *ea;
@@ -143,8 +142,7 @@ regressread(struct chan *c, void *va, long n, int64_t off)
 	return n;
 }
 
-static long
-regresswrite(struct chan *c, void *a, long n, int64_t unused)
+static size_t regresswrite(struct chan *c, void *a, size_t n, off64_t unused)
 {
 	ERRSTACK(1);
 	uintptr_t pc;

@@ -190,7 +190,7 @@ pipegen(struct chan *c, char *unused,
 }
 
 static struct walkqid *pipewalk(struct chan *c, struct chan *nc, char **name,
-								int nname)
+								unsigned int nname)
 {
 	struct walkqid *wq;
 	Pipe *p;
@@ -215,7 +215,7 @@ static struct walkqid *pipewalk(struct chan *c, struct chan *nc, char **name,
 	return wq;
 }
 
-static int pipestat(struct chan *c, uint8_t * db, int n)
+static size_t pipestat(struct chan *c, uint8_t *db, size_t n)
 {
 	Pipe *p;
 	struct dir dir;
@@ -343,7 +343,7 @@ static void pipeclose(struct chan *c)
 	kref_put(&p->ref);
 }
 
-static long piperead(struct chan *c, void *va, long n, int64_t offset)
+static size_t piperead(struct chan *c, void *va, size_t n, off64_t offset)
 {
 	Pipe *p;
 
@@ -371,7 +371,7 @@ static long piperead(struct chan *c, void *va, long n, int64_t offset)
 	return -1;	/* not reached */
 }
 
-static struct block *pipebread(struct chan *c, long n, uint32_t offset)
+static struct block *pipebread(struct chan *c, size_t n, off64_t offset)
 {
 	Pipe *p;
 
@@ -396,7 +396,7 @@ static struct block *pipebread(struct chan *c, long n, uint32_t offset)
 /*
  *  A write to a closed pipe causes an EPIPE error to be thrown.
  */
-static long pipewrite(struct chan *c, void *va, long n, int64_t ignored)
+static size_t pipewrite(struct chan *c, void *va, size_t n, off64_t ignored)
 {
 	ERRSTACK(1);
 	Pipe *p;
@@ -446,7 +446,7 @@ static long pipewrite(struct chan *c, void *va, long n, int64_t ignored)
 	return n;
 }
 
-static long pipebwrite(struct chan *c, struct block *bp, uint32_t offset)
+static size_t pipebwrite(struct chan *c, struct block *bp, off64_t offset)
 {
 	long n;
 	Pipe *p;
@@ -478,7 +478,7 @@ static long pipebwrite(struct chan *c, struct block *bp, uint32_t offset)
 	return n;
 }
 
-static int pipewstat(struct chan *c, uint8_t *dp, int n)
+static size_t pipewstat(struct chan *c, uint8_t *dp, size_t n)
 {
 	ERRSTACK(2);
 	struct dir *d;

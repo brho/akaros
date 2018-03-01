@@ -43,12 +43,12 @@ static struct chan *mem_attach(char *spec)
 }
 
 static struct walkqid *mem_walk(struct chan *c, struct chan *nc, char **name,
-								int nname)
+								unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, mem_dir, ARRAY_SIZE(mem_dir), devgen);
 }
 
-static int mem_stat(struct chan *c, uint8_t *db, int n)
+static size_t mem_stat(struct chan *c, uint8_t *db, size_t n)
 {
 	return devstat(c, db, n, mem_dir, ARRAY_SIZE(mem_dir), devgen);
 }
@@ -411,7 +411,7 @@ static void mem_close(struct chan *c)
 	}
 }
 
-static long mem_read(struct chan *c, void *ubuf, long n, int64_t offset)
+static size_t mem_read(struct chan *c, void *ubuf, size_t n, off64_t offset)
 {
 	struct sized_alloc *sza;
 
@@ -431,7 +431,7 @@ static long mem_read(struct chan *c, void *ubuf, long n, int64_t offset)
 	return -1;
 }
 
-static long mem_write(struct chan *c, void *ubuf, long n, int64_t offset)
+static size_t mem_write(struct chan *c, void *ubuf, size_t n, off64_t offset)
 {
 	switch (c->qid.path) {
 	default:

@@ -268,12 +268,12 @@ static struct chan *alarmattach(char *spec)
 }
 
 static struct walkqid *alarmwalk(struct chan *c, struct chan *nc, char **name,
-								 int nname)
+								 unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, 0, 0, alarmgen);
 }
 
-static int alarmstat(struct chan *c, uint8_t * db, int n)
+static size_t alarmstat(struct chan *c, uint8_t *db, size_t n)
 {
 	return devstat(c, db, n, 0, 0, alarmgen);
 }
@@ -396,7 +396,7 @@ static long read_qcount(struct chan *c, void *ubuf, size_t n)
 	return sizeof(old_count);
 }
 
-static long alarmread(struct chan *c, void *ubuf, long n, int64_t offset)
+static size_t alarmread(struct chan *c, void *ubuf, size_t n, off64_t offset)
 {
 	struct proc_alarm *p_alarm;
 
@@ -454,7 +454,7 @@ static void set_proc_alarm(struct proc_alarm *a, uint64_t hexval)
  * active kref on the p_alarm.  Also note that we make no assumptions about
  * current here - we find the proc (and the tchain) via the ref stored in the
  * proc_alarm. */
-static long alarmwrite(struct chan *c, void *ubuf, long n, int64_t unused)
+static size_t alarmwrite(struct chan *c, void *ubuf, size_t n, off64_t unused)
 {
 	struct proc_alarm *p_alarm;
 

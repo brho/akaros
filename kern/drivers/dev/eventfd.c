@@ -90,7 +90,7 @@ static struct chan *efd_attach(char *spec)
 }
 
 static struct walkqid *efd_walk(struct chan *c, struct chan *nc, char **name,
-								int nname)
+								unsigned int nname)
 {
 	struct walkqid *wq;
 	struct eventfd *efd = c->aux;
@@ -117,7 +117,7 @@ static struct walkqid *efd_walk(struct chan *c, struct chan *nc, char **name,
 }
 
 /* In the future, we could use stat / wstat to get and set O_NONBLOCK */
-static int efd_stat(struct chan *c, uint8_t * db, int n)
+static size_t efd_stat(struct chan *c, uint8_t *db, size_t n)
 {
 	return devstat(c, db, n, efd_dir, ARRAY_SIZE(efd_dir), devgen);
 }
@@ -182,7 +182,7 @@ success:
 	return ret;
 }
 
-static long efd_read(struct chan *c, void *ubuf, long n, int64_t offset)
+static size_t efd_read(struct chan *c, void *ubuf, size_t n, off64_t offset)
 {
 	struct eventfd *efd = c->aux;
 
@@ -230,7 +230,7 @@ success:
 	efd_fire_taps(efd, FDTAP_FILT_READABLE);
 }
 
-static long efd_write(struct chan *c, void *ubuf, long n, int64_t offset)
+static size_t efd_write(struct chan *c, void *ubuf, size_t n, off64_t offset)
 {
 	struct eventfd *efd = c->aux;
 	unsigned long write_val;

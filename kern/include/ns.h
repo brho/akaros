@@ -499,25 +499,26 @@ struct cname {
 struct dev {
 	char *name;
 
-	void (*reset) (void);
-	void (*init) (void);
-	void (*shutdown) (void);
-	struct chan *(*attach) (char *muxattach);
-	struct walkqid *(*walk) (struct chan *, struct chan *, char **name, int);
-	int (*stat) (struct chan *, uint8_t *, int);
-	struct chan *(*open) (struct chan *, int);
+	void (*reset)(void);
+	void (*init)(void);
+	void (*shutdown)(void);
+	struct chan *(*attach)(char *muxattach);
+	struct walkqid *(*walk)(struct chan *, struct chan *, char **name,
+	                        unsigned int);
+	size_t (*stat)(struct chan *, uint8_t *, size_t);
+	struct chan *(*open)(struct chan *, int);
 	void (*create)(struct chan *, char *, int, uint32_t, char *);
-	void (*close) (struct chan *);
-	long (*read) (struct chan *, void *, long, int64_t);
-	struct block *(*bread) (struct chan *, long, uint32_t);
-	long (*write) (struct chan *, void *, long, int64_t);
-	long (*bwrite) (struct chan *, struct block *, uint32_t);
-	void (*remove) (struct chan *);
-	int (*wstat) (struct chan *, uint8_t * unused_uint8_p_t, int);
-	void (*power) (int);		/* power mgt: power(1) → on, power (0) → off */
+	void (*close)(struct chan *);
+	size_t (*read)(struct chan *, void *, size_t, off64_t);
+	struct block *(*bread)(struct chan *, size_t, off64_t);
+	size_t (*write)(struct chan *, void *, size_t, off64_t);
+	size_t (*bwrite)(struct chan *, struct block *, off64_t);
+	void (*remove)(struct chan *);
+	size_t (*wstat)(struct chan *, uint8_t *, size_t);
+	void (*power)(int);		/* power mgt: power(1) → on, power (0) → off */
 //  int (*config)( int unused_int, char *unused_char_p_t, DevConf*);
-	char *(*chaninfo) (struct chan *, char *, size_t);
-	int (*tapfd) (struct chan *, struct fd_tap *, int);
+	char *(*chaninfo)(struct chan *, char *, size_t);
+	int (*tapfd)(struct chan *, struct fd_tap *, int);
 	int (*chan_ctl)(struct chan *, int);
 	/* we need to be aligned to 64 bytes for the linker tables. */
 } __attribute__ ((aligned(64)));
@@ -753,8 +754,8 @@ int cursoron(int);
 void cursoroff(int);
 void cwrite(struct chan *, uint8_t * unused_uint8_p_t, int unused_int, int64_t);
 struct chan *devattach(const char *name, char *spec);
-struct block *devbread(struct chan *, long, uint32_t);
-long devbwrite(struct chan *, struct block *, uint32_t);
+struct block *devbread(struct chan *, size_t, off64_t);
+size_t devbwrite(struct chan *, struct block *, off64_t);
 struct chan *devclone(struct chan *);
 void devcreate(struct chan *, char *name, int mode, uint32_t perm, char *ext);
 void devdir(struct chan *, struct qid, char *, int64_t, char *, long,
@@ -772,12 +773,12 @@ void devremove(struct chan *);
 void devreset(void);
 void devshutdown(void);
 size_t dev_make_stat(struct chan *c, struct dir *dir, uint8_t *dp, size_t n);
-int devstat(struct chan *, uint8_t * unused_uint8_p_t, int unused_int,
-			struct dirtab *, int unused_int2, Devgen *);
+size_t devstat(struct chan *, uint8_t *db, size_t n, struct dirtab *,
+               int ntab, Devgen *);
 struct walkqid *devwalk(struct chan *,
 						struct chan *, char **unused_char_pp_t, int unused_int,
 						struct dirtab *, int unused_intw, Devgen *);
-int devwstat(struct chan *, uint8_t * unused_uint8_p_t, int);
+size_t devwstat(struct chan *, uint8_t *, size_t);
 char *devchaninfo(struct chan *chan, char *ret, size_t ret_l);
 void disinit(void *);
 void disfault(void *, char *unused_char_p_t);

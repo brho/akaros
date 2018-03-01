@@ -119,7 +119,7 @@ static void ethershutdown(void)
 }
 
 static struct walkqid *etherwalk(struct chan *chan, struct chan *nchan,
-								 char **name, int nname)
+								 char **name, unsigned int nname)
 {
 	ERRSTACK(1);
 	struct walkqid *wq;
@@ -139,10 +139,10 @@ static struct walkqid *etherwalk(struct chan *chan, struct chan *nchan,
 	return wq;
 }
 
-static int etherstat(struct chan *chan, uint8_t * dp, int n)
+static size_t etherstat(struct chan *chan, uint8_t *dp, size_t n)
 {
 	ERRSTACK(1);
-	int s;
+	size_t s;
 	struct ether *ether;
 
 	ether = chan->aux;
@@ -191,7 +191,7 @@ static void etherclose(struct chan *chan)
 	runlock(&ether->rwlock);
 }
 
-static long etherread(struct chan *chan, void *buf, long n, int64_t off)
+static size_t etherread(struct chan *chan, void *buf, size_t n, off64_t off)
 {
 	ERRSTACK(1);
 	struct ether *ether;
@@ -223,7 +223,7 @@ out:
 	return r;
 }
 
-static struct block *etherbread(struct chan *chan, long n, uint32_t offset)
+static struct block *etherbread(struct chan *chan, size_t n, off64_t offset)
 {
 	ERRSTACK(1);
 	struct block *b;
@@ -241,7 +241,7 @@ static struct block *etherbread(struct chan *chan, long n, uint32_t offset)
 	return b;
 }
 
-static int etherwstat(struct chan *chan, uint8_t * dp, int n)
+static size_t etherwstat(struct chan *chan, uint8_t *dp, size_t n)
 {
 	ERRSTACK(1);
 	struct ether *ether;
@@ -450,7 +450,7 @@ static int etheroq(struct ether *ether, struct block *bp)
 	return len;
 }
 
-static long etherwrite(struct chan *chan, void *buf, long n, int64_t unused)
+static size_t etherwrite(struct chan *chan, void *buf, size_t n, off64_t unused)
 {
 	ERRSTACK(2);
 	struct ether *ether;
@@ -511,7 +511,7 @@ out:
 	return l;
 }
 
-static long etherbwrite(struct chan *chan, struct block *bp, uint32_t unused)
+static size_t etherbwrite(struct chan *chan, struct block *bp, off64_t unused)
 {
 	ERRSTACK(1);
 	struct ether *ether;

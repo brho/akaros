@@ -674,12 +674,12 @@ static struct chan *sdattach(char *spec)
 }
 
 static struct walkqid *sdwalk(struct chan *c, struct chan *nc, char **name,
-                              int nname)
+                              unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, NULL, 0, sdgen);
 }
 
-static int32_t sdstat(struct chan *c, uint8_t *db, int32_t n)
+static size_t sdstat(struct chan *c, uint8_t *db, size_t n)
 {
 	return devstat(c, db, n, NULL, 0, sdgen);
 }
@@ -758,8 +758,8 @@ static void sdclose(struct chan *c)
 	}
 }
 
-static int32_t sdbio(struct chan *c, int write, char *a, int32_t len,
-                     int64_t off)
+static size_t sdbio(struct chan *c, int write, char *a, size_t len,
+                    off64_t off)
 {
 	ERRSTACK(2);
 	int nchange;
@@ -768,7 +768,7 @@ static int32_t sdbio(struct chan *c, int write, char *a, int32_t len,
 	struct sdunit *unit;
 	struct sdev *sdev;
 	int64_t bno;
-	int32_t l, max, nb, offset;
+	size_t l, max, nb, offset;
 
 	sdev = sdgetdev(DEV(c->qid));
 	if (sdev == NULL) {
@@ -892,7 +892,7 @@ static int32_t sdbio(struct chan *c, int write, char *a, int32_t len,
 	return len;
 }
 
-static int32_t sdrio(struct sdreq *r, void *a, int32_t n)
+static size_t sdrio(struct sdreq *r, void *a, size_t n)
 {
 	ERRSTACK(1);
 	void *data;
@@ -1118,14 +1118,14 @@ int sdfakescsi(struct sdreq *r, void *info, int ilen)
 	}
 }
 
-static long sdread(struct chan *c, void *a, long n, int64_t off)
+static size_t sdread(struct chan *c, void *a, size_t n, off64_t off)
 {
 	ERRSTACK(1);
 	char *p, *e, *buf;
 	struct sdpart *pp;
 	struct sdunit *unit;
 	struct sdev *sdev;
-	int32_t offset;
+	off64_t offset;
 	int i, l, mm, status;
 
 	offset = off;
@@ -1206,19 +1206,19 @@ static long sdread(struct chan *c, void *a, long n, int64_t off)
 		}
 		if (unit->state == Rawdata) {
 			unit->state = Rawstatus;
-			i = sdrio(unit->req, a, n);
+			n = sdrio(unit->req, a, n);
 		} else if (unit->state == Rawstatus) {
 			status = unit->req->status;
 			unit->state = Rawcmd;
 			kfree(unit->req);
 			unit->req = NULL;
-			i = readnum(0, a, n, status, NUMSIZE);
+			n = readnum(0, a, n, status, NUMSIZE);
 		} else
-			i = 0;
+			n = 0;
 		qunlock(&unit->raw);
 		kref_put(&sdev->r);
 		poperror();
-		return i;
+		return n;
 
 	case Qpart:
 		return sdbio(c, 0, a, n, off);
@@ -1227,7 +1227,7 @@ static long sdread(struct chan *c, void *a, long n, int64_t off)
 
 static void legacytopctl(struct cmdbuf *);
 
-static long sdwrite(struct chan *c, void *a, long n, int64_t off)
+static size_t sdwrite(struct chan *c, void *a, size_t n, off64_t off)
 {
 	ERRSTACK(2);
 	char *f0;
@@ -1399,7 +1399,7 @@ static long sdwrite(struct chan *c, void *a, long n, int64_t off)
 	return n;
 }
 
-static int32_t sdwstat(struct chan *c, uint8_t *dp, int32_t n)
+static size_t sdwstat(struct chan *c, uint8_t *dp, size_t n)
 {
 	ERRSTACK(2);
 	struct dir *d;

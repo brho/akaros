@@ -105,7 +105,7 @@ static struct chan *vars_attach(char *spec)
 }
 
 static struct walkqid *vars_walk(struct chan *c, struct chan *nc, char **name,
-								 int nname)
+								 unsigned int nname)
 {
 	ERRSTACK(1);
 	struct walkqid *ret;
@@ -121,10 +121,10 @@ static struct walkqid *vars_walk(struct chan *c, struct chan *nc, char **name,
 	return ret;
 }
 
-static int vars_stat(struct chan *c, uint8_t *db, int n)
+static size_t vars_stat(struct chan *c, uint8_t *db, size_t n)
 {
 	ERRSTACK(1);
-	int ret;
+	size_t ret;
 
 	qlock(&vars_lock);
 	if (waserror()) {
@@ -291,7 +291,7 @@ static const char *get_integer_fmt(char data_fmt, char data_size)
 	return 0;
 }
 
-static long vars_read(struct chan *c, void *ubuf, long n, int64_t offset)
+static size_t vars_read(struct chan *c, void *ubuf, size_t n, off64_t offset)
 {
 	ERRSTACK(1);
 	char tmp[128];	/* big enough for any number and most strings */
@@ -299,7 +299,7 @@ static long vars_read(struct chan *c, void *ubuf, long n, int64_t offset)
 	char data_size, data_fmt, *fmt;
 	const char *fmt_int;
 	bool is_signed = FALSE;
-	long ret;
+	size_t ret;
 
 	qlock(&vars_lock);
 	if (waserror()) {
@@ -386,7 +386,7 @@ static long vars_read(struct chan *c, void *ubuf, long n, int64_t offset)
 	return ret;
 }
 
-static long vars_write(struct chan *c, void *ubuf, long n, int64_t offset)
+static size_t vars_write(struct chan *c, void *ubuf, size_t n, off64_t offset)
 {
 	error(EFAIL, "Can't write to a #%s file", devname());
 }

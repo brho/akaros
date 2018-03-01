@@ -1949,7 +1949,7 @@ static struct chan *acpiattach(char *spec)
 }
 
 static struct walkqid *acpiwalk(struct chan *c, struct chan *nc, char **name,
-								int nname)
+								unsigned int nname)
 {
 	/*
 	 * Note that devwalk hard-codes a test against the location of 'devgen',
@@ -1958,7 +1958,7 @@ static struct walkqid *acpiwalk(struct chan *c, struct chan *nc, char **name,
 	return devwalk(c, nc, name, nname, NULL, 0, acpigen);
 }
 
-static int acpistat(struct chan *c, uint8_t *dp, int n)
+static size_t acpistat(struct chan *c, uint8_t *dp, size_t n)
 {
 	struct Atable *a = genatable(c);
 
@@ -1984,7 +1984,7 @@ static int tlen;
 
 // Get the table from the qid.
 // Read that one table using the pointers.
-static long acpiread(struct chan *c, void *a, long n, int64_t off)
+static size_t acpiread(struct chan *c, void *a, size_t n, off64_t off)
 {
 	long q;
 	struct Atable *t;
@@ -2039,7 +2039,7 @@ static long acpiread(struct chan *c, void *a, long n, int64_t off)
 	return -1;
 }
 
-static long acpiwrite(struct chan *c, void *a, long n, int64_t off)
+static size_t acpiwrite(struct chan *c, void *a, size_t n, off64_t off)
 {
 	error(EFAIL, "acpiwrite: not until we can figure out what it's for");
 #if 0

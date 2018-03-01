@@ -185,7 +185,7 @@ static void kprof_shutdown(void)
 }
 
 static struct walkqid *kprof_walk(struct chan *c, struct chan *nc, char **name,
-                                  int nname)
+                                  unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, kproftab, ARRAY_SIZE(kproftab), devgen);
 }
@@ -200,7 +200,7 @@ static long kprof_profdata_read(void *dest, long size, int64_t off)
 	return profiler_read(dest, size);
 }
 
-static int kprof_stat(struct chan *c, uint8_t *db, int n)
+static size_t kprof_stat(struct chan *c, uint8_t *db, size_t n)
 {
 	kproftab[Kprofdataqid].length = kprof_profdata_size();
 	kproftab[Kptraceqid].length = kprof_tracedata_size();
@@ -320,7 +320,7 @@ static long mpstatraw_read(void *va, long n, int64_t off)
 	return n;
 }
 
-static long kprof_read(struct chan *c, void *va, long n, int64_t off)
+static size_t kprof_read(struct chan *c, void *va, size_t n, off64_t off)
 {
 	uint64_t w, *bp;
 	char *a, *ea;
@@ -352,7 +352,7 @@ static long kprof_read(struct chan *c, void *va, long n, int64_t off)
 	return n;
 }
 
-static long kprof_write(struct chan *c, void *a, long n, int64_t unused)
+static size_t kprof_write(struct chan *c, void *a, size_t n, off64_t unused)
 {
 	ERRSTACK(1);
 	struct cmdbuf *cb = parsecmd(a, n);

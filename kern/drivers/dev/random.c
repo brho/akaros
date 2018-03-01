@@ -128,13 +128,13 @@ static struct chan *randomattach(char *spec)
 }
 
 static struct walkqid *randomwalk(struct chan *c, struct chan *nc, char **name,
-								int nname)
+                                  unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, randomdir,
 		       ARRAY_SIZE(randomdir), devgen);
 }
 
-static int randomstat(struct chan *c, uint8_t *dp, int n)
+static size_t randomstat(struct chan *c, uint8_t *dp, size_t n)
 {
 	struct dir dir;
 	struct dirtab *tab;
@@ -168,7 +168,7 @@ static void randomclose(struct chan *c)
 {
 }
 
-static long randomread(struct chan *c, void *va, long n, int64_t ignored)
+static size_t randomread(struct chan *c, void *va, size_t n, off64_t ignored)
 {
 	switch (c->qid.path) {
 		case Qdir:
@@ -187,7 +187,7 @@ static long randomread(struct chan *c, void *va, long n, int64_t ignored)
 /*
  *  A write to a closed random causes an ERANDOM error to be thrown.
  */
-static long randomwrite(struct chan *c, void *va, long n, int64_t ignored)
+static size_t randomwrite(struct chan *c, void *va, size_t n, off64_t ignored)
 {
 	error(EPERM, "No use for writing random just yet");
 	return -1;
@@ -196,12 +196,6 @@ static long randomwrite(struct chan *c, void *va, long n, int64_t ignored)
 static long randombwrite(struct chan *c, struct block *bp, uint32_t junk)
 {
 	error(EPERM, "No use for writing random just yet");
-	return -1;
-}
-
-static int randomwstat(struct chan *c, uint8_t *dp, int n)
-{
-	error(EPERM, "No use for wstat random just yet");
 	return -1;
 }
 
@@ -242,7 +236,7 @@ struct dev randomdevtab __devtab = {
 	.read = randomread,
 	.write = randomwrite,
 	.remove = devremove,
-	.wstat = randomwstat,
+	.wstat = devwstat,
 	.power = devpower,
 	.chaninfo = devchaninfo,
 	.tapfd = random_tapfd,

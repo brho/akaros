@@ -413,7 +413,7 @@ static struct chan *ipattach(char *spec)
 }
 
 static struct walkqid *ipwalk(struct chan *c, struct chan *nc, char **name,
-							  int nname)
+							  unsigned int nname)
 {
 	struct IPaux *a = c->aux;
 	struct walkqid *w;
@@ -424,7 +424,7 @@ static struct walkqid *ipwalk(struct chan *c, struct chan *nc, char **name,
 	return w;
 }
 
-static int ipstat(struct chan *c, uint8_t * db, int n)
+static size_t ipstat(struct chan *c, uint8_t *db, size_t n)
 {
 	return devstat(c, db, n, NULL, 0, ipgen);
 }
@@ -615,7 +615,7 @@ static struct chan *ipopen(struct chan *c, int omode)
 	return c;
 }
 
-static int ipwstat(struct chan *c, uint8_t * dp, int n)
+static size_t ipwstat(struct chan *c, uint8_t *dp, size_t n)
 {
 	ERRSTACK(2);
 	struct dir *d;
@@ -786,7 +786,7 @@ enum {
 	Statelen = 32 * 1024,
 };
 
-static long ipread(struct chan *ch, void *a, long n, int64_t off)
+static size_t ipread(struct chan *ch, void *a, size_t n, off64_t off)
 {
 	struct conv *c;
 	struct Proto *x;
@@ -884,7 +884,7 @@ static long ipread(struct chan *ch, void *a, long n, int64_t off)
 	}
 }
 
-static struct block *ipbread(struct chan *ch, long n, uint32_t offset)
+static struct block *ipbread(struct chan *ch, size_t n, off64_t offset)
 {
 	struct conv *c;
 
@@ -1399,7 +1399,7 @@ static void autobind(struct conv *cv)
 	kfree(cb);
 }
 
-static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
+static size_t ipwrite(struct chan *ch, void *v, size_t n, off64_t off)
 {
 	ERRSTACK(1);
 	struct conv *c;
@@ -1499,10 +1499,10 @@ static long ipwrite(struct chan *ch, void *v, long n, int64_t off)
 	return n;
 }
 
-static long ipbwrite(struct chan *ch, struct block *bp, uint32_t offset)
+static size_t ipbwrite(struct chan *ch, struct block *bp, off64_t offset)
 {
 	struct conv *c;
-	int n;
+	size_t n;
 
 	switch (TYPE(ch->qid)) {
 		case Qdata:

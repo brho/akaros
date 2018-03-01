@@ -312,12 +312,12 @@ static struct chan *archattach(char *spec)
 }
 
 struct walkqid *archwalk(struct chan *c, struct chan *nc, char **name,
-						 int nname)
+						 unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, archdir, Qmax, devgen);
 }
 
-static int archstat(struct chan *c, uint8_t * dp, int n)
+static size_t archstat(struct chan *c, uint8_t *dp, size_t n)
 {
 	archdir[Qrealmem].length = REAL_MEM_SIZE;
 
@@ -496,7 +496,7 @@ static void archclose(struct chan *c)
 	}
 }
 
-static long archread(struct chan *c, void *a, long n, int64_t offset)
+static size_t archread(struct chan *c, void *a, size_t n, off64_t offset)
 {
 	char *buf, *p;
 	int err, port;
@@ -655,7 +655,7 @@ static ssize_t pstate_write(void *ubuf, size_t len, off64_t off)
 	return len;
 }
 
-static long archwrite(struct chan *c, void *a, long n, int64_t offset)
+static size_t archwrite(struct chan *c, void *a, size_t n, off64_t offset)
 {
 	char *p;
 	int port, err;

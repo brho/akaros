@@ -153,12 +153,12 @@ static struct chan *srvattach(char *spec)
 }
 
 static struct walkqid *srvwalk(struct chan *c, struct chan *nc, char **name,
-							   int nname)
+							   unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, 0, 0, srvgen);
 }
 
-static int srvstat(struct chan *c, uint8_t * db, int n)
+static size_t srvstat(struct chan *c, uint8_t *db, size_t n)
 {
 	return devstat(c, db, n, 0, 0, srvgen);
 }
@@ -244,12 +244,6 @@ static void srvcreate(struct chan *c, char *name, int omode, uint32_t perm,
 	atomic_inc(&nr_srvs);
 }
 
-static int srvwstat(struct chan *c, uint8_t * dp, int n)
-{
-	error(ENOSYS, ERROR_FIXME);
-	return -1;
-}
-
 static void srvremove(struct chan *c)
 {
 	struct srvfile *srv_i, *temp;
@@ -281,12 +275,12 @@ static void srvclose(struct chan *c)
 /* N.B. srvopen gives the chan back. The only 'reading' we do
  * in srv is of the top level directory.
  */
-static long srvread(struct chan *c, void *va, long count, int64_t offset)
+static size_t srvread(struct chan *c, void *va, size_t count, off64_t offset)
 {
 	return devdirread(c, va, count, 0, 0, srvgen);
 }
 
-static long srvwrite(struct chan *c, void *va, long count, int64_t offset)
+static size_t srvwrite(struct chan *c, void *va, size_t count, off64_t offset)
 {
 	ERRSTACK(2);
 	struct srvfile *srv;
@@ -344,7 +338,7 @@ struct dev srvdevtab __devtab = {
 	.write = srvwrite,
 	.bwrite = devbwrite,
 	.remove = srvremove,
-	.wstat = srvwstat,
+	.wstat = devwstat,
 	.power = devpower,
 	.chaninfo = devchaninfo,
 };

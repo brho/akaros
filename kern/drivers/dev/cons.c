@@ -711,12 +711,12 @@ static struct chan *consattach(char *spec)
 }
 
 static struct walkqid *conswalk(struct chan *c, struct chan *nc, char **name,
-								int nname)
+								unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, consdir, ARRAY_SIZE(consdir), devgen);
 }
 
-static int consstat(struct chan *c, uint8_t *dp, int n)
+static size_t consstat(struct chan *c, uint8_t *dp, size_t n)
 {
 	struct dir dir;
 	struct dirtab *tab;
@@ -789,7 +789,7 @@ static void consclose(struct chan *c)
 	}
 }
 
-static long consread(struct chan *c, void *buf, long n, int64_t off)
+static size_t consread(struct chan *c, void *buf, size_t n, off64_t off)
 {
 	ERRSTACK(1);
 	uint32_t l;
@@ -1050,7 +1050,7 @@ static long consread(struct chan *c, void *buf, long n, int64_t off)
 	return -1;	/* never reached */
 }
 
-static long conswrite(struct chan *c, void *va, long n, int64_t off)
+static size_t conswrite(struct chan *c, void *va, size_t n, off64_t off)
 {
 	ERRSTACK(1);
 	char buf[256], ch;
