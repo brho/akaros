@@ -52,7 +52,8 @@ struct cpio_bin_hdr
 	void			*c_filestart;
 };
 
-void parse_cpio_entries(struct super_block *sb, void *cpio_b);
+void parse_cpio_entries(void *cpio_b, size_t cpio_sz,
+                        int (*cb)(struct cpio_bin_hdr*, void *), void *cb_arg);
 
 /* Helper function: converts src non-null-term string's n bytes from base 16 to
  * a long, using buf as space.  Make sure buf is n + 1. */

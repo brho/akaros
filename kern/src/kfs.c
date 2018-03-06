@@ -30,6 +30,8 @@ struct file_operations kfs_f_op_file;
 struct file_operations kfs_f_op_dir;
 struct file_operations kfs_f_op_sym;
 
+static int add_kfs_entry(struct cpio_bin_hdr *c_bhdr, void *cb_arg);
+
 /* TODO: something more better.  Prob something like the vmem cache, for this,
  * pids, etc.  Good enough for now.  This also means we can only have one
  * KFS instance, and we also aren't synchronizing access. */
@@ -93,7 +95,9 @@ struct super_block *kfs_get_sb(struct fs_type *fs, int flags,
 	/* 1 is the KFS root ino (inode number) */
 	init_sb(sb, vmnt, &kfs_d_op, 1, 0);
 	/* Parses the CPIO entries and builds the in-memory KFS tree. */
-	parse_cpio_entries(sb, sb->s_fs_info);
+	parse_cpio_entries(sb->s_fs_info,
+	                   (size_t)_binary_obj_kern_initramfs_cpio_size,
+	                   add_kfs_entry, sb);
 	printk("KFS superblock loaded\n");
 	return sb;
 }
@@ -910,62 +914,13 @@ static int __add_kfs_entry(struct dentry *parent, char *path,
  * If a directory does not exist for a file, this will return an error.  Don't
  * use the -depth flag to find when building the CPIO archive, and this won't be
  * a problem.  (Maybe) */
-static int add_kfs_entry(struct super_block *sb, struct cpio_bin_hdr *c_bhdr)
+static int add_kfs_entry(struct cpio_bin_hdr *c_bhdr, void *cb_arg)
 {
+	struct super_block *sb = cb_arg;
 	char *path = c_bhdr->c_filename;
+
 	/* Root of the FS, already part of KFS */
 	if (!strcmp(path, "."))
 		return 0;
 	return __add_kfs_entry(sb->s_mount->mnt_root, path, c_bhdr);
-}
-
-void parse_cpio_entries(struct super_block *sb, void *cpio_b)
-{
-	struct cpio_newc_header *c_hdr = (struct cpio_newc_header*)cpio_b;
-
-	char buf[9] = {0};	/* temp space for strol conversions */
-	size_t namesize = 0;
-	int offset = 0;		/* offset in the cpio archive */
-	struct cpio_bin_hdr *c_bhdr = kmalloc(sizeof(*c_bhdr), 0);
-	memset(c_bhdr, 0, sizeof(*c_bhdr));
-
-	/* read all files and paths */
-	for (; ; c_hdr = (struct cpio_newc_header*)(cpio_b + offset)) {
-		offset += sizeof(*c_hdr);
-		if (strncmp(c_hdr->c_magic, "070701", 6)) {
-			printk("Invalid magic number in CPIO header, aborting.\n");
-			return;
-		}
-		c_bhdr->c_filename = (char*)c_hdr + sizeof(*c_hdr);
-		namesize = cpio_strntol(buf, c_hdr->c_namesize, 8);
-		printd("Namesize: %d\n", namesize);
-		if (!strcmp(c_bhdr->c_filename, "TRAILER!!!"))
-			break;
-		c_bhdr->c_ino = cpio_strntol(buf, c_hdr->c_ino, 8);
-		c_bhdr->c_mode = (int)cpio_strntol(buf, c_hdr->c_mode, 8);
-		c_bhdr->c_uid = cpio_strntol(buf, c_hdr->c_uid, 8);
-		c_bhdr->c_gid = cpio_strntol(buf, c_hdr->c_gid, 8);
-		c_bhdr->c_nlink = (unsigned int)cpio_strntol(buf, c_hdr->c_nlink, 8);
-		c_bhdr->c_mtime = cpio_strntol(buf, c_hdr->c_mtime, 8);
-		c_bhdr->c_filesize = cpio_strntol(buf, c_hdr->c_filesize, 8);
-		c_bhdr->c_dev_maj = cpio_strntol(buf, c_hdr->c_dev_maj, 8);
-		c_bhdr->c_dev_min = cpio_strntol(buf, c_hdr->c_dev_min, 8);
-		c_bhdr->c_rdev_maj = cpio_strntol(buf, c_hdr->c_rdev_maj, 8);
-		c_bhdr->c_rdev_min = cpio_strntol(buf, c_hdr->c_rdev_min, 8);
-		printd("File: %s: %d Bytes\n", c_bhdr->c_filename, c_bhdr->c_filesize);
-		offset += namesize;
-		/* header + name will be padded out to 4-byte alignment */
-		offset = ROUNDUP(offset, 4);
-		c_bhdr->c_filestart = cpio_b + offset;
-		/* make this a function pointer or something */
-		if (add_kfs_entry(sb, c_bhdr)) {
-			printk("Failed to add an entry to KFS!\n");
-			break;
-		}
-		offset += c_bhdr->c_filesize;
-		offset = ROUNDUP(offset, 4);
-		//printk("offset is %d bytes\n", offset);
-		c_hdr = (struct cpio_newc_header*)(cpio_b + offset);
-	}
-	kfree(c_bhdr);
 }
