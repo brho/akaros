@@ -100,6 +100,11 @@ static inline long atomic_swap(atomic_t *addr, long val)
 	return (long)__sync_lock_test_and_set(addr, val); // yes, really
 }
 
+static inline void *atomic_swap_ptr(void **addr, void *val)
+{
+	return (void*)__sync_lock_test_and_set(addr, val);
+}
+
 static inline uint32_t atomic_swap_u32(uint32_t *addr, uint32_t val)
 {
 	return __sync_lock_test_and_set(addr, val); // yes, really

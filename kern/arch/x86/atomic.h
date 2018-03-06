@@ -68,6 +68,11 @@ static inline long atomic_swap(atomic_t *addr, long val)
 	return (long)__sync_lock_test_and_set(addr, val);
 }
 
+static inline void *atomic_swap_ptr(void **addr, void *val)
+{
+	return (void*)__sync_lock_test_and_set(addr, val);
+}
+
 static inline bool atomic_cas(atomic_t *addr, long exp_val, long new_val)
 {
 	return __sync_bool_compare_and_swap(addr, exp_val, new_val);
