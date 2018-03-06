@@ -65,8 +65,6 @@ void closepgrp(struct pgrp *p)
 		}
 	}
 	wunlock(&p->ns);
-	cclose(p->dot);
-	cclose(p->slash);
 	kfree(p);
 }
 
@@ -161,8 +159,6 @@ void pgrpcpy(struct pgrp *to, struct pgrp *from)
 	}
 
 	to->progmode = from->progmode;
-	to->slash = cclone(from->slash);
-	to->dot = cclone(from->dot);
 	to->nodevs = from->nodevs;
 
 	poperror();

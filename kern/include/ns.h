@@ -611,8 +611,6 @@ struct pgrp {
 	qlock_t nsh;
 	struct mhead *mnthash[MNTHASH];
 	int progmode;
-	struct chan *dot;
-	struct chan *slash;
 	int nodevs;
 	int pin;
 };
@@ -1005,6 +1003,7 @@ long kchanio(void *vc, void *buf, int n, int mode);
 int openmode(uint32_t o);
 void fdclose(struct fd_table *fdt, int fd);
 int syschdir(char *path);
+int sysfchdir(int fd);
 int grpclose(struct fd_table *fdt, int fd);
 int sysclose(int fd);
 int syscreate(char *path, int mode, uint32_t perm);

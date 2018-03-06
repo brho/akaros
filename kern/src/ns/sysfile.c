@@ -39,6 +39,7 @@
 #include <pmap.h>
 #include <smp.h>
 #include <net/ip.h>
+#include <rcu.h>
 
 /* TODO: these sizes are hokey.  DIRSIZE is used in chandirstat, and it looks
  * like it's the size of a common-case stat. */
@@ -145,22 +146,40 @@ void fdclose(struct fd_table *fdt, int fd)
 	close_fd(fdt, fd);
 }
 
+static void set_dot(struct chan *c)
+{
+	c = atomic_swap_ptr((void**)&current->dot, c);
+	synchronize_rcu();
+	cclose(c);
+}
+
 int syschdir(char *path)
 {
 	ERRSTACK(1);
 	struct chan *c;
-	struct pgrp *pg;
 
 	if (waserror()) {
 		poperror();
 		return -1;
 	}
-
 	c = namec(path, Atodir, 0, 0, NULL);
-	pg = current->pgrp;
-	cclose(pg->dot);
-	pg->dot = c;
 	poperror();
+	set_dot(c);
+	return 0;
+}
+
+int sysfchdir(int fd)
+{
+	ERRSTACK(1);
+	struct chan *c;
+
+	if (waserror()) {
+		poperror();
+		return -1;
+	}
+	c = fdtochan(&current->open_files, fd, -1, 0, 1);
+	poperror();
+	set_dot(c);
 	return 0;
 }
 
@@ -1329,7 +1348,8 @@ void print_chaninfo(struct chan *c)
 int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 {
 
-	struct kref *new_dot_ref;
+	struct chan *new_dot;
+
 	ERRSTACK(1);
 	if (waserror()) {
 		printk("plan9setup failed, %s\n", current_errstr());
@@ -1357,14 +1377,13 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 	/* / should never disappear while we hold a ref to parent */
 	chan_incref(parent->slash);
 	new_proc->slash = parent->slash;
-	/* dot could change concurrently, and we could fail to gain a ref if whoever
-	 * decref'd dot triggered the release.  if that did happen, new_proc->dot
-	 * should update and we can try again. */
-	while (!(new_dot_ref = kref_get_not_zero(&parent->dot->ref, 1)))
-		cpu_relax();
-	/* And now, we can't trust parent->dot, and need to determine our dot from
-	 * the ref we obtained. */
-	new_proc->dot = container_of(new_dot_ref, struct chan, ref);
+
+	rcu_read_lock();
+	new_dot = rcu_dereference(parent->dot);
+	kref_get(&new_dot->ref, 1);
+	rcu_read_unlock();
+	new_proc->dot = new_dot;
+
 	poperror();
 	return 0;
 }

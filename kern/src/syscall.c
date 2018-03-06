@@ -2126,8 +2126,11 @@ static intreg_t sys_chdir(struct proc *p, pid_t pid, const char *path,
 		proc_decref(target);
 		return -1;
 	}
-	/* TODO: 9ns support */
 	retval = do_chdir(&target->fs_env, t_path);
+	if (retval < 0) {
+		unset_errno();
+		retval = syschdir(t_path);
+	}
 	free_path(p, t_path);
 	proc_decref(target);
 	return retval;
@@ -2142,10 +2145,10 @@ static intreg_t sys_fchdir(struct proc *p, pid_t pid, int fd)
 		return -1;
 	file = get_file_from_fd(&p->open_files, fd);
 	if (!file) {
-		/* TODO: 9ns */
-		set_errno(EBADF);
+		unset_errno();
+		retval = sysfchdir(fd);
 		proc_decref(target);
-		return -1;
+		return retval;
 	}
 	retval = do_fchdir(&target->fs_env, file);
 	kref_put(&file->f_kref);
