@@ -307,6 +307,21 @@ char *sysfd2path(int fd)
 	return s;
 }
 
+char *sysgetcwd(void)
+{
+	char *s = NULL;
+	struct chan *dot;
+
+	rcu_read_lock();
+	dot = rcu_dereference(current->dot);
+	kref_get(&dot->ref, 1);
+	rcu_read_unlock();
+	if (dot->name)
+		kstrdup(&s, dot->name->s);
+	cclose(dot);
+	return s;
+}
+
 int sysfauth(int fd, char *aname)
 {
 	ERRSTACK(2);
