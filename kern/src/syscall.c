@@ -1669,52 +1669,14 @@ static unsigned long sys_populate_va(struct proc *p, uintptr_t va,
 
 static intreg_t sys_read(struct proc *p, int fd, void *buf, size_t len)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	ssize_t ret;
-	struct file *file = get_file_from_fd(&p->open_files, fd);
 	sysc_save_str("read on fd %d", fd);
-	/* VFS */
-	if (file) {
-		if (!file->f_op->read) {
-			kref_put(&file->f_kref);
-			set_errno(EINVAL);
-			return -1;
-		}
-		/* TODO: (UMEM) currently, read() handles user memcpy
-		 * issues, but we probably should user_mem_check and
-		 * pin the region here, so read doesn't worry about
-		 * it */
-		ret = file->f_op->read(file, buf, len, &file->f_pos);
-		kref_put(&file->f_kref);
-	} else {
-		/* plan9, should also handle errors (EBADF) */
-		ret = sysread(fd, buf, len);
-	}
-	return ret;
+	return sysread(fd, buf, len);
 }
 
 static intreg_t sys_write(struct proc *p, int fd, const void *buf, size_t len)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	ssize_t ret;
-	struct file *file = get_file_from_fd(&p->open_files, fd);
-
 	sysc_save_str("write on fd %d", fd);
-	/* VFS */
-	if (file) {
-		if (!file->f_op->write) {
-			kref_put(&file->f_kref);
-			set_errno(EINVAL);
-			return -1;
-		}
-		/* TODO: (UMEM) */
-		ret = file->f_op->write(file, buf, len, &file->f_pos);
-		kref_put(&file->f_kref);
-	} else {
-		/* plan9, should also handle errors */
-		ret = syswrite(fd, (void*)buf, len);
-	}
-	return ret;
+	return syswrite(fd, (void*)buf, len);
 }
 
 /* Checks args/reads in the path, opens the file (relative to fromfd if the path
@@ -1722,8 +1684,7 @@ static intreg_t sys_write(struct proc *p, int fd, const void *buf, size_t len)
 static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
                            size_t path_l, int oflag, int mode)
 {
-	int fd = -1;
-	struct file *file = 0;
+	int fd;
 	char *t_path;
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
@@ -1736,36 +1697,19 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 		return -1;
 	sysc_save_str("open %s at fd %d", t_path, fromfd);
 	mode &= ~p->fs_env.umask;
-	/* Only check the VFS for legacy opens.  It doesn't support openat.  Actual
-	 * openats won't check here, and file == 0. */
-	if ((t_path[0] == '/') || (fromfd == AT_FDCWD))
-		file = do_file_open(t_path, oflag, mode);
-	else
-		set_errno(ENOENT);	/* was not in the VFS. */
-	if (file) {
-		/* VFS lookup succeeded */
-		/* stores the ref to file */
-		fd = insert_file(&p->open_files, file, 0, FALSE, oflag & O_CLOEXEC);
-		kref_put(&file->f_kref);	/* drop our ref */
-		if (fd < 0)
-			warn("File insertion failed");
-	} else if (get_errno() == ENOENT) {
-		/* VFS failed due to ENOENT.  Other errors don't fall back to 9ns */
-		unset_errno();	/* Go can't handle extra errnos */
-		fd = sysopenat(fromfd, t_path, oflag);
-		/* successful lookup with CREATE and EXCL is an error */
-		if (fd != -1) {
-			if ((oflag & O_CREATE) && (oflag & O_EXCL)) {
-				set_errno(EEXIST);
-				sysclose(fd);
-				free_path(p, t_path);
-				return -1;
-			}
-		} else {
-			if (oflag & O_CREATE) {
-				mode &= S_PMASK;
-				fd = syscreate(t_path, oflag, mode);
-			}
+	fd = sysopenat(fromfd, t_path, oflag);
+	/* successful lookup with CREATE and EXCL is an error */
+	if (fd != -1) {
+		if ((oflag & O_CREATE) && (oflag & O_EXCL)) {
+			set_errno(EEXIST);
+			sysclose(fd);
+			free_path(p, t_path);
+			return -1;
+		}
+	} else {
+		if (oflag & O_CREATE) {
+			mode &= S_PMASK;
+			fd = syscreate(t_path, oflag, mode);
 		}
 	}
 	free_path(p, t_path);
@@ -1775,40 +1719,21 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 
 static intreg_t sys_close(struct proc *p, int fd)
 {
-	struct file *file = get_file_from_fd(&p->open_files, fd);
-	int retval = 0;
-	printd("sys_close %d\n", fd);
-	/* VFS */
-	if (file) {
-		put_file_from_fd(&p->open_files, fd);
-		kref_put(&file->f_kref);	/* Drop the ref from get_file */
-		return 0;
-	}
-	/* 9ns, should also handle errors (bad FD, etc) */
-	retval = sysclose(fd);
-	return retval;
+	return sysclose(fd);
 }
 
 static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 {
 	struct kstat *kbuf;
-	struct file *file;
+
 	kbuf = kmalloc(sizeof(struct kstat), 0);
 	if (!kbuf) {
 		set_errno(ENOMEM);
 		return -1;
 	}
-	file = get_file_from_fd(&p->open_files, fd);
-	/* VFS */
-	if (file) {
-		stat_inode(file->f_dentry->d_inode, kbuf);
-		kref_put(&file->f_kref);
-	} else {
-		unset_errno();	/* Go can't handle extra errnos */
-	    if (sysfstatakaros(fd, (struct kstat *)kbuf) < 0) {
-			kfree(kbuf);
-			return -1;
-		}
+	if (sysfstatakaros(fd, (struct kstat *)kbuf) < 0) {
+		kfree(kbuf);
+		return -1;
 	}
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
@@ -1826,9 +1751,9 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
                             struct kstat *u_stat, int flags)
 {
 	struct kstat *kbuf;
-	struct dentry *path_d;
 	char *t_path = copy_in_path(p, path, path_l);
 	int retval = 0;
+
 	if (!t_path)
 		return -1;
 	kbuf = kmalloc(sizeof(struct kstat), 0);
@@ -1837,21 +1762,10 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 		retval = -1;
 		goto out_with_path;
 	}
-	/* Check VFS for path */
-	path_d = lookup_dentry(t_path, flags);
-	if (path_d) {
-		stat_inode(path_d->d_inode, kbuf);
-		kref_put(&path_d->d_kref);
-	} else {
-		/* VFS failed, checking 9ns */
-		unset_errno();	/* Go can't handle extra errnos */
-		retval = sysstatakaros(t_path, (struct kstat *)kbuf,
-		                       flags & LOOKUP_FOLLOW ? 0 : O_NOFOLLOW);
-		printd("sysstat returns %d\n", retval);
-		/* both VFS and 9ns failed, bail out */
-		if (retval < 0)
-			goto out_with_kbuf;
-	}
+	retval = sysstatakaros(t_path, (struct kstat *)kbuf,
+	                       flags & LOOKUP_FOLLOW ? 0 : O_NOFOLLOW);
+	if (retval < 0)
+		goto out_with_kbuf;
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat)))
 		retval = -1;
@@ -1882,82 +1796,29 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
 {
 	int retval = 0;
 	int newfd;
-	struct file *file = get_file_from_fd(&p->open_files, fd);
 
-	if (!file) {
-		/* 9ns hack */
-		switch (cmd) {
-			case (F_DUPFD):
-				newfd = arg1;
-				if (newfd < 0) {
-					set_errno(EBADF);
-					return -1;
-				}
-				/* TODO: glibc uses regular DUPFD for dup2, which is racy. */
-				return sysdup(fd, newfd, FALSE);
-			case (F_GETFD):
-			case (F_SETFD):
-			case (F_SYNC):
-			case (F_ADVISE):
-				/* TODO: 9ns versions */
-				return 0;
-			case (F_GETFL):
-				return fd_getfl(fd);
-			case (F_SETFL):
-				return fd_setfl(fd, arg1);
-		}
-		set_errno(EBADF);
-		return -1;
-	}
-
-	/* TODO: these are racy */
 	switch (cmd) {
-		case (F_DUPFD):
-			newfd = arg1;
-			if (newfd < 0) {
-				set_errno(EBADF);
-				return -1;
-			}
-			retval = insert_file(&p->open_files, file, newfd, FALSE, FALSE);
-			if (retval < 0) {
-				set_errno(-retval);
-				retval = -1;
-			}
-			break;
-		case (F_GETFD):
-			retval = p->open_files.fd[fd].fd_flags;
-			break;
-		case (F_SETFD):
-			/* I'm considering not supporting this at all.  They must do it at
-			 * open time or fix their buggy/racy code. */
-			spin_lock(&p->open_files.lock);
-			if (arg1 & FD_CLOEXEC)
-				p->open_files.fd[fd].fd_flags |= FD_CLOEXEC;
-			retval = p->open_files.fd[fd].fd_flags;
-			spin_unlock(&p->open_files.lock);
-			break;
-		case (F_GETFL):
-			retval = file->f_flags;
-			break;
-		case (F_SETFL):
-			/* only allowed to set certain flags. */
-			arg1 &= O_FCNTL_SET_FLAGS;
-			file->f_flags = (file->f_flags & ~O_FCNTL_SET_FLAGS) | arg1;
-			break;
-		case (F_SYNC):
-			/* TODO (if we keep the VFS) */
-			retval = 0;
-			break;
-		case (F_ADVISE):
-			/* TODO  (if we keep the VFS)*/
-			retval = 0;
-			break;
-		default:
-			set_errno(EINVAL);
-			retval = -1;
+	case (F_DUPFD):
+		newfd = arg1;
+		if (newfd < 0) {
+			set_errno(EBADF);
+			return -1;
+		}
+		/* TODO: glibc uses regular DUPFD for dup2, which is racy. */
+		return sysdup(fd, newfd, FALSE);
+	case (F_GETFD):
+	case (F_SETFD):
+	case (F_SYNC):
+	case (F_ADVISE):
+		/* TODO: 9ns versions */
+		return 0;
+	case (F_GETFL):
+		return fd_getfl(fd);
+	case (F_SETFL):
+		return fd_setfl(fd, arg1);
 	}
-	kref_put(&file->f_kref);
-	return retval;
+	set_errno(EBADF);
+	return -1;
 }
 
 static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
@@ -1969,18 +1830,12 @@ static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
 
 	if (!t_path)
 		return -1;
-	retval = do_access(t_path, mode);
-	printd("Access for path: %s retval: %d\n", path, retval);
-	if (retval < 0) {
-		unset_errno();
-		dir = sysdirstat(t_path);
-		if (!dir)
-			goto out;
-		if ((mode == F_OK) || caller_has_dir_perms(dir,
-		                             access_bits_to_omode(mode)))
-			retval = 0;
-		kfree(dir);
-	}
+	dir = sysdirstat(t_path);
+	if (!dir)
+		goto out;
+	if ((mode == F_OK) || caller_has_dir_perms(dir, access_bits_to_omode(mode)))
+		retval = 0;
+	kfree(dir);
 out:
 	free_path(p, t_path);
 	return retval;
@@ -2002,19 +1857,12 @@ static intreg_t sys_llseek(struct proc *p, int fd, off_t offset_hi,
 	off64_t retoff = 0;
 	off64_t tempoff = 0;
 	int ret = 0;
-	struct file *file;
+
 	tempoff = offset_hi;
 	tempoff <<= 32;
 	tempoff |= offset_lo;
-	file = get_file_from_fd(&p->open_files, fd);
-	if (file) {
-		ret = file->f_op->llseek(file, tempoff, &retoff, whence);
-		kref_put(&file->f_kref);
-	} else {
-		retoff = sysseek(fd, tempoff, whence);
-		ret = (retoff < 0);
-	}
-
+	retoff = sysseek(fd, tempoff, whence);
+	ret = (retoff < 0);
 	if (ret)
 		return -1;
 	if (memcpy_to_user_errno(p, result, &retoff, sizeof(off64_t)))
@@ -2044,13 +1892,10 @@ intreg_t sys_unlink(struct proc *p, const char *path, size_t path_l)
 {
 	int retval;
 	char *t_path = copy_in_path(p, path, path_l);
+
 	if (!t_path)
 		return -1;
-	retval = do_unlink(t_path);
-	if (retval && (get_errno() == ENOENT)) {
-		unset_errno();
-		retval = sysremove(t_path);
-	}
+	retval = sysremove(t_path);
 	free_path(p, t_path);
 	return retval;
 }
@@ -2067,11 +1912,7 @@ intreg_t sys_symlink(struct proc *p, char *old_path, size_t old_l,
 		free_path(p, t_oldpath);
 		return -1;
 	}
-	ret = do_symlink(t_newpath, t_oldpath, S_IRWXU | S_IRWXG | S_IRWXO);
-	if (ret && (get_errno() == ENOENT)) {
-		unset_errno();
-		ret = syssymlink(t_newpath, t_oldpath);
-	}
+	ret = syssymlink(t_newpath, t_oldpath);
 	free_path(p, t_oldpath);
 	free_path(p, t_newpath);
 	return ret;
@@ -2083,32 +1924,22 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	char *symname = NULL;
 	ssize_t copy_amt;
 	int ret = -1;
-	struct dentry *path_d;
 	char *t_path = copy_in_path(p, path, path_l);
 	struct dir *dir = NULL;
 
 	if (t_path == NULL)
 		return -1;
-	path_d = lookup_dentry(t_path, 0);
-	if (!path_d) {
-		dir = sysdirlstat(t_path);
-		if (!(dir->mode & DMSYMLINK))
-			set_error(EINVAL, "not a symlink: %s", t_path);
-		else
-			symname = dir->ext;
-	} else {
-		symname = path_d->d_inode->i_op->readlink(path_d);
-	}
-
+	dir = sysdirlstat(t_path);
+	if (!(dir->mode & DMSYMLINK))
+		set_error(EINVAL, "not a symlink: %s", t_path);
+	else
+		symname = dir->ext;
 	free_path(p, t_path);
-
 	if (symname){
 		copy_amt = strnlen(symname, buf_l - 1) + 1;
 		if (!memcpy_to_user_errno(p, u_buf, symname, copy_amt))
 			ret = copy_amt - 1;
 	}
-	if (path_d)
-		kref_put(&path_d->d_kref);
 	kfree(dir);
 	return ret;
 }
@@ -2119,6 +1950,7 @@ static intreg_t sys_chdir(struct proc *p, pid_t pid, const char *path,
 	int retval;
 	char *t_path;
 	struct proc *target = get_controllable_proc(p, pid);
+
 	if (!target)
 		return -1;
 	t_path = copy_in_path(p, path, path_l);
@@ -2126,11 +1958,7 @@ static intreg_t sys_chdir(struct proc *p, pid_t pid, const char *path,
 		proc_decref(target);
 		return -1;
 	}
-	retval = do_chdir(&target->fs_env, t_path);
-	if (retval < 0) {
-		unset_errno();
-		retval = syschdir(t_path);
-	}
+	retval = syschdir(t_path);
 	free_path(p, t_path);
 	proc_decref(target);
 	return retval;
@@ -2138,20 +1966,12 @@ static intreg_t sys_chdir(struct proc *p, pid_t pid, const char *path,
 
 static intreg_t sys_fchdir(struct proc *p, pid_t pid, int fd)
 {
-	struct file *file;
 	int retval;
 	struct proc *target = get_controllable_proc(p, pid);
+
 	if (!target)
 		return -1;
-	file = get_file_from_fd(&p->open_files, fd);
-	if (!file) {
-		unset_errno();
-		retval = sysfchdir(fd);
-		proc_decref(target);
-		return retval;
-	}
-	retval = do_fchdir(&target->fs_env, file);
-	kref_put(&file->f_kref);
+	retval = sysfchdir(fd);
 	proc_decref(target);
 	return retval;
 }
@@ -2160,11 +1980,13 @@ static intreg_t sys_fchdir(struct proc *p, pid_t pid, int fd)
 intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 {
 	int retval = 0;
-	char *kfree_this;
 	char *k_cwd;
-	k_cwd = do_getcwd(&p->fs_env, &kfree_this, cwd_l);
-	if (!k_cwd)
-		return -1;		/* errno set by do_getcwd */
+
+	k_cwd = sysgetcwd();
+	if (!k_cwd) {
+		set_error(EINVAL, "unable to getcwd");
+		return -1;
+	}
 	if (strlen(k_cwd) + 1 > cwd_l) {
 		set_error(ERANGE, "getcwd buf too small, needed %d", strlen(k_cwd) + 1);
 		retval = -1;
@@ -2173,7 +1995,7 @@ intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 	if (memcpy_to_user_errno(p, u_cwd, k_cwd, strlen(k_cwd) + 1))
 		retval = -1;
 out:
-	kfree(kfree_this);
+	kfree(k_cwd);
 	return retval;
 }
 
@@ -2181,17 +2003,18 @@ intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
 {
 	int retval;
 	char *t_path = copy_in_path(p, path, path_l);
+
 	if (!t_path)
 		return -1;
 	mode &= S_PMASK;
 	mode &= ~p->fs_env.umask;
-	retval = do_mkdir(t_path, mode);
-	if (retval && (get_errno() == ENOENT)) {
-		unset_errno();
-		/* mixing plan9 and glibc here, make sure DMDIR doesn't overlap with any
-		 * permissions */
-		static_assert(!(S_PMASK & DMDIR));
-		retval = syscreate(t_path, O_RDWR, DMDIR | mode);
+	/* mixing plan9 and glibc here, make sure DMDIR doesn't overlap with any
+	 * permissions */
+	static_assert(!(S_PMASK & DMDIR));
+	retval = syscreate(t_path, O_READ, DMDIR | mode);
+	if (retval >= 0) {
+		sysclose(retval);
+		retval = 0;
 	}
 	free_path(p, t_path);
 	return retval;
@@ -2201,13 +2024,10 @@ intreg_t sys_rmdir(struct proc *p, const char *path, size_t path_l)
 {
 	int retval;
 	char *t_path = copy_in_path(p, path, path_l);
+
 	if (!t_path)
 		return -1;
-	retval = do_rmdir(t_path);
-	if (retval < 0) {
-		unset_errno();
-		retval = sysremove(t_path);
-	}
+	retval = sysremove(t_path);
 	free_path(p, t_path);
 	return retval;
 }
@@ -2395,86 +2215,23 @@ intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 	return ret;
 }
 
-/* Helper, interprets the wstat and performs the VFS action.  Returns stat_sz on
- * success for all ops, -1 or 0 o/w.  If one op fails, it'll skip the remaining
- * ones. */
-static int vfs_wstat(struct file *file, uint8_t *stat_m, size_t stat_sz,
-                     int flags)
-{
-	struct dir *dir;
-	int m_sz;
-	int retval = 0;
-
-	dir = kzmalloc(sizeof(struct dir) + stat_sz, MEM_WAIT);
-	m_sz = convM2D(stat_m, stat_sz, &dir[0], (char*)&dir[1]);
-	if (m_sz != stat_sz) {
-		set_error(EINVAL, ERROR_FIXME);
-		kfree(dir);
-		return -1;
-	}
-	if (flags & WSTAT_MODE) {
-		retval = do_file_chmod(file, dir->mode);
-		if (retval < 0)
-			goto out;
-	}
-	if (flags & WSTAT_LENGTH) {
-		retval = do_truncate(file->f_dentry->d_inode, dir->length);
-		if (retval < 0)
-			goto out;
-	}
-	if (flags & WSTAT_ATIME)
-		file->f_dentry->d_inode->i_atime = dir->atime;
-	if (flags & WSTAT_MTIME)
-		file->f_dentry->d_inode->i_mtime = dir->mtime;
-
-out:
-	kfree(dir);
-	/* convert vfs retval to wstat retval */
-	if (retval >= 0)
-		retval = stat_sz;
-	return retval;
-}
-
 intreg_t sys_wstat(struct proc *p, char *path, size_t path_l,
                    uint8_t *stat_m, size_t stat_sz, int flags)
 {
 	int retval = 0;
 	char *t_path = copy_in_path(p, path, path_l);
-	struct file *file;
 
 	if (!t_path)
 		return -1;
 	retval = syswstat(t_path, stat_m, stat_sz);
-	if (retval == stat_sz) {
-		free_path(p, t_path);
-		return stat_sz;
-	}
-	/* 9ns failed, we'll need to check the VFS */
-	file = do_file_open(t_path, O_READ, 0);
 	free_path(p, t_path);
-	if (!file)
-		return -1;
-	retval = vfs_wstat(file, stat_m, stat_sz, flags);
-	kref_put(&file->f_kref);
 	return retval;
 }
 
 intreg_t sys_fwstat(struct proc *p, int fd, uint8_t *stat_m, size_t stat_sz,
                     int flags)
 {
-	int retval = 0;
-	struct file *file;
-
-	retval = sysfwstat(fd, stat_m, stat_sz);
-	if (retval == stat_sz)
-		return stat_sz;
-	/* 9ns failed, we'll need to check the VFS */
-	file = get_file_from_fd(&p->open_files, fd);
-	if (!file)
-		return -1;
-	retval = vfs_wstat(file, stat_m, stat_sz, flags);
-	kref_put(&file->f_kref);
-	return retval;
+	return sysfwstat(fd, stat_m, stat_sz);
 }
 
 intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
@@ -2486,12 +2243,7 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 
 	if ((!from_path) || (!to_path))
 		return -1;
-	printk("sys_rename :%s: to :%s: : ", from_path, to_path);
-
-	retval = do_rename(from_path, to_path);
-	/* This isn't quite true, but will work til we get rid of the VFS */
-	if (retval < 0)
-		set_error(EXDEV, "no 9ns rename yet");
+	set_error(EXDEV, "no 9ns rename yet");
 	free_path(p, from_path);
 	free_path(p, to_path);
 	return retval;
@@ -2504,7 +2256,6 @@ static intreg_t sys_dup_fds_to(struct proc *p, unsigned int pid,
 	ssize_t ret = 0;
 	struct proc *child;
 	int slot;
-	struct file *file;
 
 	if (!is_user_rwaddr(map, sizeof(struct childfdmap) * nentries)) {
 		set_errno(EINVAL);
@@ -2515,17 +2266,6 @@ static intreg_t sys_dup_fds_to(struct proc *p, unsigned int pid,
 		return -1;
 	for (int i = 0; i < nentries; i++) {
 		map[i].ok = -1;
-		file = get_file_from_fd(&p->open_files, map[i].parentfd);
-		if (file) {
-			slot = insert_file(&child->open_files, file, map[i].childfd, TRUE,
-			                   FALSE);
-			if (slot == map[i].childfd) {
-				map[i].ok = 0;
-				ret++;
-			}
-			kref_put(&file->f_kref);
-			continue;
-		}
 		if (!sys_dup_to(p, map[i].parentfd, child, map[i].childfd)) {
 			map[i].ok = 0;
 			ret++;

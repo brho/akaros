@@ -1276,20 +1276,8 @@ void procstopwait(struct proc *p, int ctl)
 static void procctlcloseone(struct proc *p, int fd)
 {
 // TODO: resolve this and sys_close
-	struct file *file = get_file_from_fd(&p->open_files, fd);
-	int retval = 0;
-	printd("%s %d\n", __func__, fd);
-	/* VFS */
-	if (file) {
-		put_file_from_fd(&p->open_files, fd);
-		kref_put(&file->f_kref);	/* Drop the ref from get_file */
-		return;
-	}
-	/* 9ns, should also handle errors (bad FD, etc) */
-	retval = sysclose(fd);
+	sysclose(fd);
 	return;
-
-	//sys_close(p, fd);
 }
 
 void procctlclosefiles(struct proc *p, int all, int fd)

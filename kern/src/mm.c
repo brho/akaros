@@ -42,8 +42,6 @@ static int populate_pm_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
 static struct page_map *foc_to_pm(struct file_or_chan *foc)
 {
 	switch (foc->type) {
-	case F_OR_C_FILE:
-		return foc->file->f_mapping;
 	case F_OR_C_CHAN:
 		assert(foc->fsf);
 		return foc->fsf->pm;
@@ -59,8 +57,6 @@ static struct page_map *vmr_to_pm(struct vm_region *vmr)
 char *foc_to_name(struct file_or_chan *foc)
 {
 	switch (foc->type) {
-	case F_OR_C_FILE:
-		return foc->file->f_dentry->d_name.name;
 	case F_OR_C_CHAN:
 		if (foc->fsf)
 			return foc->fsf->dir.name;
@@ -73,8 +69,6 @@ char *foc_to_name(struct file_or_chan *foc)
 char *foc_abs_path(struct file_or_chan *foc, char *path, size_t max_size)
 {
 	switch (foc->type) {
-	case F_OR_C_FILE:
-		return file_abs_path(foc->file, path, max_size);
 	case F_OR_C_CHAN:
 		return foc->chan->name->s;
 	}
@@ -88,8 +82,6 @@ ssize_t foc_read(struct file_or_chan *foc, void *buf, size_t amt, off64_t off)
 	ssize_t ret = -1;
 
 	switch (foc->type) {
-	case F_OR_C_FILE:
-		return foc->file->f_op->read(foc->file, buf, amt, &fake_off);
 	case F_OR_C_CHAN:
 		if (!(foc->chan->qid.type & QTFILE))
 			return -1;
@@ -106,9 +98,6 @@ static void foc_release(struct kref *kref)
 	struct file_or_chan *foc = container_of(kref, struct file_or_chan, kref);
 
 	switch (foc->type) {
-	case F_OR_C_FILE:
-		kref_put(&foc->file->f_kref);
-		break;
 	case F_OR_C_CHAN:
 		cclose(foc->chan);
 		break;
@@ -136,11 +125,6 @@ struct file_or_chan *foc_open(char *path, int omode, int perm)
 
 	if (!foc)
 		return NULL;
-	foc->file = do_file_open(path, omode, perm);
-	if (foc->file) {
-		foc->type = F_OR_C_FILE;
-		return foc;
-	}
 	if (waserror()) {
 		kfree(foc);
 		poperror();
@@ -159,11 +143,6 @@ struct file_or_chan *fd_to_foc(struct fd_table *fdt, int fd)
 
 	if (!foc)
 		return NULL;
-	foc->file = get_file_from_fd(fdt, fd);
-	if (foc->file) {
-		foc->type = F_OR_C_FILE;
-		return foc;
-	}
 	if (waserror()) {
 		kfree(foc);
 		poperror();
@@ -191,8 +170,6 @@ void *foc_pointer(struct file_or_chan *foc)
 	if (!foc)
 		return NULL;
 	switch (foc->type) {
-	case F_OR_C_FILE:
-		return foc->file;
 	case F_OR_C_CHAN:
 		return foc->chan;
 	default:
@@ -203,36 +180,11 @@ void *foc_pointer(struct file_or_chan *foc)
 size_t foc_get_len(struct file_or_chan *foc)
 {
 	switch (foc->type) {
-	case F_OR_C_FILE:
-		return foc->file->f_dentry->d_inode->i_size;
 	case F_OR_C_CHAN:
 		assert(foc->fsf);
 		return foc->fsf->dir.length;
 	}
 	panic("unknown F_OR_C type, %d", foc->type);
-}
-
-/* Helper: returns TRUE if the VMR is allowed to access the file with prot.
- *
- * http://pubs.opengroup.org/onlinepubs/9699919799/functions/mmap.html
- * - FD must be opened PROT_READ for any mmap
- * - you can have a PROT_WRITE, MAP_PRIVATE mmap with an FD that isn't
- *   PROT_WRITE */
-static bool check_file_perms(struct vm_region *vmr, struct file *file, int prot)
-{
-	assert(file);
-	/* VFS stores it as rwx for some reason */
-	if (!(file->f_mode & S_IRUSR))
-		goto out_error;
-	if ((prot & PROT_WRITE) & !(vmr->vm_flags & MAP_PRIVATE)) {
-		if (!(file->f_mode & S_IWUSR))
-			goto out_error;
-	}
-	return true;
-out_error:	/* for debugging */
-	printk("[kernel] mmap perm check failed for %s for prot %o\n",
-	       file_name(file), prot);
-	return false;
 }
 
 static bool check_chan_perms(struct vm_region *vmr, struct chan *chan, int prot)
@@ -250,8 +202,6 @@ static bool check_foc_perms(struct vm_region *vmr, struct file_or_chan *foc,
                             int prot)
 {
 	switch (foc->type) {
-	case F_OR_C_FILE:
-		return check_file_perms(vmr, foc->file, prot);
 	case F_OR_C_CHAN:
 		return check_chan_perms(vmr, foc->chan, prot);
 	}
@@ -264,8 +214,6 @@ static int foc_dev_mmap(struct file_or_chan *foc, struct vm_region *vmr,
 	if (!check_foc_perms(vmr, foc, prot))
 		return -1;
 	switch (foc->type) {
-	case F_OR_C_FILE:
-		return foc->file->f_op->mmap(foc->file, vmr);
 	case F_OR_C_CHAN:
 		if (!devtab[foc->chan->type].mmap) {
 			set_error(ENODEV, "device does not support mmap");

@@ -19,13 +19,10 @@ struct chan;
 struct fd_table;
 struct proc;								/* preprocessor games */
 
-#define F_OR_C_NONE 0
-#define F_OR_C_FILE 1
 #define F_OR_C_CHAN 2
 
 struct file_or_chan {
 	int type;
-	struct file *file;
 	struct chan *chan;
 	struct fs_file *fsf;	/* weak ref, set during mmap. */
 	struct kref kref;
