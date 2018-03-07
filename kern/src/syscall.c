@@ -1696,7 +1696,7 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 	if (!t_path)
 		return -1;
 	sysc_save_str("open %s at fd %d", t_path, fromfd);
-	mode &= ~p->fs_env.umask;
+	mode &= ~p->umask;
 	fd = sysopenat(fromfd, t_path, oflag);
 	/* successful lookup with CREATE and EXCL is an error */
 	if (fd != -1) {
@@ -1843,8 +1843,9 @@ out:
 
 intreg_t sys_umask(struct proc *p, int mask)
 {
-	int old_mask = p->fs_env.umask;
-	p->fs_env.umask = mask & S_PMASK;
+	int old_mask = p->umask;
+
+	p->umask = mask & S_PMASK;
 	return old_mask;
 }
 
@@ -2007,7 +2008,7 @@ intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
 	if (!t_path)
 		return -1;
 	mode &= S_PMASK;
-	mode &= ~p->fs_env.umask;
+	mode &= ~p->umask;
 	/* mixing plan9 and glibc here, make sure DMDIR doesn't overlap with any
 	 * permissions */
 	static_assert(!(S_PMASK & DMDIR));

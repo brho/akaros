@@ -421,14 +421,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	                SYSEVENTRINGSIZE);
 
 	/* Init FS structures TODO: cleanup (might pull this out) */
-	kref_get(&default_ns.kref, 1);
-	p->ns = &default_ns;
-	spinlock_init(&p->fs_env.lock);
-	p->fs_env.umask = parent ? parent->fs_env.umask : S_IWGRP | S_IWOTH;
-	p->fs_env.root = p->ns->root->mnt_root;
-	kref_get(&p->fs_env.root->d_kref, 1);
-	p->fs_env.pwd = parent ? parent->fs_env.pwd : p->fs_env.root;
-	kref_get(&p->fs_env.pwd->d_kref, 1);
+	p->umask = parent ? parent->umask : S_IWGRP | S_IWOTH;
 	memset(&p->open_files, 0, sizeof(p->open_files));	/* slightly ghetto */
 	spinlock_init(&p->open_files.lock);
 	p->open_files.max_files = NR_OPEN_FILES_DEFAULT;
@@ -519,8 +512,6 @@ static void __proc_free(struct kref *kref)
 	cclose(p->dot);
 	cclose(p->slash);
 	p->dot = p->slash = 0; /* catch bugs */
-	kref_put(&p->fs_env.root->d_kref);
-	kref_put(&p->fs_env.pwd->d_kref);
 	/* now we'll finally decref files for the file-backed vmrs */
 	unmap_and_destroy_vmrs(p);
 	/* Remove us from the pid_hash and give our PID back (in that order). */

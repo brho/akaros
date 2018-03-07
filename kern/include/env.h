@@ -98,8 +98,7 @@ struct proc {
 	sysevent_front_ring_t syseventfrontring;
 
 	/* Filesystem info */
-	struct namespace			*ns;
-	struct fs_struct			fs_env;
+	int							umask;
 	struct fd_table				open_files;
 	struct pgrp					*pgrp;
 	struct chan					*slash;

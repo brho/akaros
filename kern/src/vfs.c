@@ -337,7 +337,7 @@ static int follow_symlink(struct nameidata *nd)
 		if (!current)
 			nd->dentry = default_ns.root->mnt_root;
 		else
-			nd->dentry = current->fs_env.root;
+			nd->dentry = NULL; // current->fs_env.root;
 		nd->mnt = nd->dentry->d_sb->s_mount;
 		kref_get(&nd->mnt->mnt_kref, 1);
 		kref_get(&nd->dentry->d_kref, 1);
@@ -540,11 +540,11 @@ int path_lookup(char *path, int flags, struct nameidata *nd)
 		if (!current)
 			nd->dentry = default_ns.root->mnt_root;
 		else
-			nd->dentry = current->fs_env.root;
+			nd->dentry = NULL; // current->fs_env.root;
 	} else {						/* relative lookup */
 		assert(current);
 		/* Don't need to lock on the fs_env since we're reading one item */
-		nd->dentry = current->fs_env.pwd;
+		nd->dentry = NULL; // current->fs_env.pwd;
 	}
 	nd->mnt = nd->dentry->d_sb->s_mount;
 	/* Whenever references get put in the nd, incref them.  Whenever they are
