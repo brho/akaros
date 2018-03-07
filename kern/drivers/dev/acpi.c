@@ -8,7 +8,6 @@
  */
 
 #include <vfs.h>
-#include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

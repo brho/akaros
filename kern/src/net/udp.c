@@ -28,7 +28,6 @@
 
 #define DEBUG
 #include <vfs.h>
-#include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>
@@ -42,7 +41,6 @@
 #include <net/ip.h>
 
 #include <vfs.h>
-#include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

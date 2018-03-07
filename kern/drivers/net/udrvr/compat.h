@@ -212,6 +212,7 @@ struct ib_ud_header {
 };
 
 extern void sysfs_init(void);
+struct file_operations;
 extern void sysfs_create(int devnum, const struct file_operations *verb_fops,
                          void *ptr);
 

@@ -22,7 +22,6 @@
  * giving it's refs to some other file in the walk. */
 
 #include <vfs.h>
-#include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

@@ -18,7 +18,6 @@
 #include <schedule.h>
 #include <syscall.h>
 #include <ktest.h>
-#include <kfs.h>
 #include <stdio.h>
 #include <time.h>
 #include <monitor.h>

@@ -13,7 +13,6 @@
 #include <cpio.h>
 #include <error.h>
 #include <net/ip.h>
-#include <kfs.h>
 #include <kmalloc.h>
 #include <kref.h>
 #include <pmap.h>

@@ -26,7 +26,6 @@
 #include <hashtable.h>
 #include <bitmask.h>
 #include <vfs.h>
-#include <devfs.h>
 #include <smp.h>
 #include <arsc_server.h>
 #include <event.h>

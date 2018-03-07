@@ -3844,7 +3844,6 @@ module_exit(mlx4_cleanup);
 /* Network driver stub for mlx4 */
 
 #include <vfs.h>
-#include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

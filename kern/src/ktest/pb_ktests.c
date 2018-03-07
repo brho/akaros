@@ -24,7 +24,6 @@
 #include <process.h>
 #include <syscall.h>
 #include <time.h>
-#include <kfs.h>
 #include <mm.h>
 #include <multiboot.h>
 #include <pmap.h>

@@ -13,7 +13,6 @@
 #include <error.h>
 #include <pmap.h>
 #include <smp.h>
-#include <devfs.h>
 #include <linux/rdma/ib_user_verbs.h>
 #include "uverbs.h"
 #include <ros/procinfo.h>
@@ -223,11 +222,13 @@ static ssize_t ib_api_ver_read(struct file *filp, char __user *buf,
 	return sysfs_read(buf, count, pos, src);
 }
 
+#if 0 // AKAROS_PORT (9ns hooks)
 static const struct file_operations ib_api_ver = {
 	.read	= ib_api_ver_read,
 	.open	= kfs_open,
 	.release= kfs_release,
 };
+#endif
 
 static ssize_t mlx4_mgm_read(struct file *filp, char __user *buf,
     size_t count, loff_t *pos)
@@ -241,11 +242,13 @@ static ssize_t mlx4_mgm_read(struct file *filp, char __user *buf,
 	return sysfs_read(buf, count, pos, src);
 }
 
+#if 0 // AKAROS_PORT
 static const struct file_operations mlx4_mgm = {
 	.read	= mlx4_mgm_read,
 	.open	= kfs_open,
 	.release= kfs_release,
 };
+#endif
 
 #if 0
 static void stradd(char *dest, int val, int num)
@@ -300,6 +303,9 @@ static const struct file_operations cpuinfo = {
 
 void sysfs_init(void)
 {
+#if 1 // AKAROS_PORT
+	warn("mlx4: udrvr stuff requires various files, implement for 9ns!");
+#else
 	do_mkdir("/dev_vfs/infiniband", S_IRWXU | S_IRWXG | S_IRWXO);
 	do_mkdir("/sys", S_IRWXU | S_IRWXG | S_IRWXO);
 	do_mkdir("/sys/class", S_IRWXU | S_IRWXG | S_IRWXO);
@@ -323,6 +329,7 @@ void sysfs_init(void)
 	do_mkdir("/proc", S_IRWXU | S_IRWXG | S_IRWXO);
 	make_device("/proc/cpuinfo", S_IWUSR | S_IWGRP | S_IWOTH | S_IRUSR |
 	    S_IRGRP | S_IROTH, __S_IFCHR, (struct file_operations *)&cpuinfo);
+#endif
 #endif
 }
 
@@ -379,6 +386,7 @@ static ssize_t vsd_read(struct file *filp, char __user *buf,
 	return sysfs_read(buf, count, pos, src);
 }
 
+#if 0 // AKAROS_PORT
 static const struct file_operations dver_fops = {
 	.read	= dver_read,
 	.open	= kfs_open,
@@ -414,10 +422,14 @@ static const struct file_operations vsd_fops = {
 	.open	= kfs_open,
 	.release= kfs_release,
 };
+#endif
 
 void sysfs_create(int devnum, const struct file_operations *verb_fops,
     void *ptr)
 {
+#if 1 // AKAROS_PORT
+	warn("mlx4: udrvr stuff requires various files, implement for 9ns!");
+#else
 	char		sysname[256] = "/sys/class/infiniband_verbs/uverbs0";
 	char		devname[] = "/dev_vfs/infiniband/uverbs0";
 	char		drvname[64] = "/sys/class/infiniband/";
@@ -489,6 +501,7 @@ void sysfs_create(int devnum, const struct file_operations *verb_fops,
 	    S_IWUSR | S_IWGRP | S_IWOTH | S_IRUSR | S_IRGRP | S_IROTH,
 	    __S_IFCHR, (struct file_operations *)&dver_fops);
 	set_fs_info(fp, ptr);
+#endif
 }
 
 /* END: Linux /sys support for lib/apps */

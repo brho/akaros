@@ -33,10 +33,7 @@
 #include <arch/init.h>
 #include <bitmask.h>
 #include <slab.h>
-#include <kfs.h>
 #include <vfs.h>
-#include <devfs.h>
-#include <blockdev.h>
 #include <kthread.h>
 #include <linker_func.h>
 #include <net/ip.h>
@@ -157,11 +154,8 @@ static void __kernel_init_part_deux(void *arg)
 {
 	kernel_msg_init();
 	timer_init();
-	vfs_init();
-	devfs_init();
 	time_init();
 	arch_init();
-	block_init();
 	enable_irq();
 	run_linker_funcs();
 	/* reset/init devtab after linker funcs 3 and 4.  these run NIC and medium

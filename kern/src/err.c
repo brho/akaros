@@ -4,7 +4,6 @@
 //#define DEBUG
 #include <setjmp.h>
 #include <vfs.h>
-#include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

@@ -22,7 +22,6 @@
 #include <radix.h>
 #include <hashtable.h>
 #include <pagemap.h>
-#include <blockdev.h>
 #include <fdtap.h>
 
 /* ghetto preprocessor hacks (since proc includes vfs) */

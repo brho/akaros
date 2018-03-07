@@ -30,7 +30,6 @@
  * 	made sure igbepci only runs once, even if it fails */
 
 #include <vfs.h>
-#include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

@@ -5,7 +5,6 @@
  * See LICENSE for details.  */
 
 #include <vfs.h>
-#include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

@@ -35,7 +35,6 @@
  * much slower (as is true of the 82579), never allow jumbos.
  */
 #include <vfs.h>
-#include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

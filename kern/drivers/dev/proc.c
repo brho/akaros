@@ -18,7 +18,6 @@
  * #if 0 until we know we don't want it
  */
 #include <vfs.h>
-#include <kfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>
