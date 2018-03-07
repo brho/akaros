@@ -1360,10 +1360,10 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 		/* We are probably spawned by the kernel directly, and have no parent to
 		 * inherit from. */
 		new_proc->pgrp = newpgrp();
-		new_proc->slash = namec("#root", Atodir, 0, 0, NULL);
+		new_proc->slash = namec("#kfs", Atodir, 0, 0, NULL);
 		if (!new_proc->slash)
-			panic("no root device");
-		/* Want the name to be "/" instead of "#root" */
+			panic("no kfs device");
+		/* Want the name to be "/" instead of "#kfs" */
 		cnameclose(new_proc->slash->name);
 		new_proc->slash->name = newcname("/");
 		new_proc->dot = cclone(new_proc->slash);
