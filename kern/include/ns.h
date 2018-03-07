@@ -488,6 +488,8 @@ struct chan {
 	void *synth_buf;
 };
 
+extern struct chan *kern_slash;
+
 struct cname {
 	struct kref ref;
 	int alen;					/* allocated length */

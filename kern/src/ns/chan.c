@@ -40,6 +40,8 @@
 #include <smp.h>
 #include <syscall.h>
 
+struct chan *kern_slash;
+
 char *channame(struct chan *c)
 {	/* DEBUGGING */
 	if (c == NULL)
@@ -619,6 +621,8 @@ static bool is_mount_point(struct chan *c)
 	int dev = c->dev;
 	struct qid qid = c->qid;
 
+	if (!current)
+		return false;
 	pg = current->pgrp;
 	rlock(&pg->ns);
 	for (m = MOUNTH(pg, qid); m; m = m->hash) {
@@ -645,6 +649,8 @@ findmount(struct chan **cp,
 	struct pgrp *pg;
 	struct mhead *m;
 
+	if (!current)
+		return 0;
 	pg = current->pgrp;
 	rlock(&pg->ns);
 	for (m = MOUNTH(pg, qid); m; m = m->hash) {
@@ -689,6 +695,8 @@ struct chan *undomount(struct chan *c, struct cname *name)
 	struct mount *t;
 	struct mhead **h, **he, *f;
 
+	if (!current)
+		return c;
 	pg = current->pgrp;
 	rlock(&pg->ns);
 	if (waserror()) {
@@ -1390,9 +1398,10 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm, void *ext)
 	 */
 	switch (name[0]) {
 		case '/':
-			/* TODO: kernel walkers will crash here */
-			assert(current && current->slash);
-			c = current->slash;
+			if (current)
+				c = current->slash;
+			else
+				c = kern_slash;
 			chan_incref(c);
 			break;
 
@@ -1608,9 +1617,10 @@ static struct chan *walk_symlink(struct chan *symlink, struct walk_helper *wh,
 	kfree(dir);
 
 	if (link_name[0] == '/') {
-		/* TODO: kernel walkers will crash here, just like namec() */
-		assert(current && current->slash);
-		from = current->slash;
+		if (current)
+			from = current->slash;
+		else
+			from = kern_slash;
 	} else {
 		from = symlink;
 		link_name -= 3;
