@@ -22,8 +22,7 @@
 # TODO:
 #	- Consider merging the two target-detection bits (Linux's config, mixed, or
 #	dot target, and the symlink handling).  Also, could consider moving around
-#	the KFS and EXT2 targets.  Clean doesn't need to know about them, for
-#	instance.
+#	the KFS target.  Clean doesn't need to know about it, for instance.
 #
 #	- Review, with an eye for being better about $(srctree).  It might only be
 #	necessary in this file, if we every do the KBUILD_OUTPUT option.  But we
@@ -458,16 +457,6 @@ akaros-deps := $(kbuild_akaros_main)  kern/arch/$(ARCH)/$(KERNEL_LD)
 
 kern_cpio := $(OBJDIR)/kern/initramfs.cpio
 kern_cpio_obj := $(kern_cpio).o
-
-# ext2 will crash at runtime if we don't have a block device.  try to catch the
-# errors now.  if it is a bad one, you're just out of luck.
-ifneq ($(CONFIG_EXT2FS),)
-ext2-bdev := $(patsubst "%",%,$(CONFIG_EXT2_BDEV))
-ifeq ($(ext2-bdev),)
-$(error EXT2 selected with no block device [$(ext2-bdev)], fix your .config)
-endif
-ext2_bdev_obj = $(OBJDIR)/kern/$(shell basename $(ext2-bdev)).o
-endif
 
 # a bit hacky: we want to make sure the directories exist, and error out
 # otherwise.  we also want to error out before the initramfs target, otherwise

@@ -13,7 +13,6 @@
 #include <slab.h>
 #include <kmalloc.h>
 #include <kfs.h>
-#include <ext2fs.h>
 #include <pmap.h>
 #include <umem.h>
 #include <smp.h>
@@ -131,9 +130,6 @@ void vfs_init(void)
 	/* build list of all FS's in the system.  put yours here.  if this is ever
 	 * done on the fly, we'll need to lock. */
 	TAILQ_INSERT_TAIL(&file_systems, &kfs_fs_type, list);
-#ifdef CONFIG_EXT2FS
-	TAILQ_INSERT_TAIL(&file_systems, &ext2_fs_type, list);
-#endif
 	TAILQ_FOREACH(fs, &file_systems, list)
 		printk("Supports the %s Filesystem\n", fs->name);
 

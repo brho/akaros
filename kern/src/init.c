@@ -37,7 +37,6 @@
 #include <vfs.h>
 #include <devfs.h>
 #include <blockdev.h>
-#include <ext2fs.h>
 #include <kthread.h>
 #include <linker_func.h>
 #include <net/ip.h>
@@ -170,9 +169,6 @@ static void __kernel_init_part_deux(void *arg)
 	devtabreset();
 	devtabinit();
 
-#ifdef CONFIG_EXT2FS
-	mount_fs(&ext2_fs_type, "/dev_vfs/ramdisk", "/mnt", 0);
-#endif /* CONFIG_EXT2FS */
 #ifdef CONFIG_ETH_AUDIO
 	eth_audio_init();
 #endif /* CONFIG_ETH_AUDIO */

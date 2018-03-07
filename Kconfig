@@ -60,23 +60,6 @@ config KFS_CPIO_BIN
 		This binary (relative to the root directory) will be run before
 		bundling the KFS Paths into the CPIO.
 
-config EXT2FS
-	bool "Ext2 filesystem"
-	default n
-	help
-		Build in support for ext2.  Extremely experimental, and only works with
-		a block device image, which will be mounted at /mnt.  If you select
-		this, you must specify a block device.
-
-config EXT2_BDEV
-	depends on EXT2FS
-	string "Ext2 image file"
-	default mnt/ext2fs.img
-	help
-		This file needs to be an ext2 image (file that looks like a block
-		device).  You should be able to mount this file in your host OS.  It
-		will be bundled into the kernel and mounted at /mnt.
-
 endmenu
 
 choice COREALLOC_POLICY

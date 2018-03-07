@@ -41,7 +41,6 @@ obj-y						+= env.o
 obj-y						+= err.o
 obj-$(CONFIG_ETH_AUDIO)		+= eth_audio.o
 obj-y						+= event.o
-obj-y						+= ext2fs.o
 obj-y						+= ex_table.o
 obj-y						+= fdtap.o
 obj-$(CONFIG_COREALLOC_FCFS) += corealloc_fcfs.o

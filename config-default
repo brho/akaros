@@ -33,7 +33,6 @@ CONFIG_SOCKET=y
 CONFIG_KFS=y
 CONFIG_KFS_PATHS="kern/kfs"
 CONFIG_KFS_CPIO_BIN=""
-# CONFIG_EXT2FS is not set
 
 #
 # Kernel Debugging

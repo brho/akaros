@@ -28,29 +28,6 @@ void block_init(void)
 				      sizeof(struct buffer_head),
 				      __alignof__(struct buffer_head), 0,
 				      NULL, 0, 0, NULL);
-
-	#ifdef CONFIG_EXT2FS
-	/* Now probe for and init the block device for the ext2 ram disk */
-	extern uint8_t _binary_mnt_ext2fs_img_size[];
-	extern uint8_t _binary_mnt_ext2fs_img_start[];
-	/* Build and init the block device */
-	struct block_device *ram_bd = kmalloc(sizeof(struct block_device), 0);
-	memset(ram_bd, 0, sizeof(struct block_device));
-	ram_bd->b_id = 31337;
-	ram_bd->b_sector_sz = 512;
-	ram_bd->b_nr_sector = (unsigned long)_binary_mnt_ext2fs_img_size / 512;
-	kref_init(&ram_bd->b_kref, fake_release, 1);
-	pm_init(&ram_bd->b_pm, &block_pm_op, ram_bd);
-	ram_bd->b_data = _binary_mnt_ext2fs_img_start;
-	strlcpy(ram_bd->b_name, "RAMDISK", BDEV_INLINE_NAME);
-	/* Connect it to the file system */
-	struct file *ram_bf = make_device("/dev_vfs/ramdisk", S_IRUSR | S_IWUSR,
-	                                  __S_IFBLK, &block_f_op);
-	/* make sure the inode tracks the right pm (not it's internal one) */
-	ram_bf->f_dentry->d_inode->i_mapping = &ram_bd->b_pm;
-	ram_bf->f_dentry->d_inode->i_bdev = ram_bd;	/* this holds the bd kref */
-	kref_put(&ram_bf->f_kref);
-	#endif /* CONFIG_EXT2FS */
 }
 
 /* Generic helper, returns a kref'd reference out of principle. */
