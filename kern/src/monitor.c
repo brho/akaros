@@ -48,7 +48,6 @@ static command_t commands[] = {
 	{ "cpuinfo", "Prints CPU diagnostics", mon_cpuinfo},
 	{ "ps", "Prints process list", mon_ps},
 	{ "nanwan", "Meet Nanwan!!", mon_nanwan},
-	{ "bin_ls", "List files in /bin", mon_bin_ls},
 	{ "bin_run", "Create and run a program from /bin", mon_bin_run},
 	{ "manager", "Run the manager", mon_manager},
 	{ "procinfo", "Show information about processes", mon_procinfo},
@@ -61,7 +60,6 @@ static command_t commands[] = {
 	{ "measure", "Run a specific measurement", mon_measure},
 	{ "trace", "Run some tracing functions", mon_trace},
 	{ "monitor", "Run the monitor on another core", mon_monitor},
-	{ "fs", "Filesystem Diagnostics", mon_fs},
 	{ "sh", "Try to run a shell (bash)", mon_shell},
 	{ "bash", "Try to run a shell (bash)", mon_shell},
 	{ "bb", "Try to run a shell (bash)", mon_shell},
@@ -280,26 +278,6 @@ int mon_nanwan(int argc, char **argv, struct hw_trapframe *hw_tf)
 	printk("                                \\'   .\\#\n");
 	printk("                             jgs \\   ::\\#\n");
 	printk("                                  \\      \n");
-	return 0;
-}
-
-int mon_bin_ls(int argc, char **argv, struct hw_trapframe *hw_tf)
-{
-	struct kdirent dir = {0};
-	struct file *bin_dir;
-	int retval = 0;
-
-	bin_dir = do_file_open("/bin", O_EXEC | O_READ, 0);
-	if (!bin_dir) {
-		printk("No /bin directory!\n");
-		return 1;
-	}
-	printk("Files in /bin:\n-------------------------------\n");
-	do {
-		retval = bin_dir->f_op->readdir(bin_dir, &dir);
-		printk("%s\n", dir.d_name);
-	} while (retval == 1);
-	kref_put(&bin_dir->f_kref);
 	return 0;
 }
 
@@ -943,125 +921,6 @@ void monitor(struct hw_trapframe *hw_tf)
 				break;
 		}
 	}
-}
-
-static void pm_flusher(void *unused)
-{
-	struct super_block *sb;
-	struct inode *inode;
-	unsigned long nr_pages;
-
-	/* could also put the delay between calls, or even within remove, during the
-	 * WB phase. */
-	printk("GIANT WARNING: the pm_flusher is running and will never stop!\n");
-	while (1) {
-		kthread_usleep(5000);
-		TAILQ_FOREACH(sb, &super_blocks, s_list) {
-			TAILQ_FOREACH(inode, &sb->s_inodes, i_sb_list) {
-				nr_pages = ROUNDUP(inode->i_size, PGSIZE) >> PGSHIFT;
-				if (nr_pages)
-					pm_remove_contig(inode->i_mapping, 0, nr_pages);
-			}
-		}
-	}
-}
-
-int mon_fs(int argc, char **argv, struct hw_trapframe *hw_tf)
-{
-	/* this assumes one mounted FS at the NS root */
-	struct super_block *sb;
-	struct file *file;
-	struct inode *inode;
-	struct dentry *dentry;
-	if (argc < 2) {
-		printk("Usage: fs OPTION\n");
-		printk("\topen: show all open files\n");
-		printk("\tinodes: show all inodes\n");
-		printk("\tdentries [lru|prune]: show all dentries, opt LRU/prune\n");
-		printk("\tls DIR: print the dir tree starting with DIR\n");
-		printk("\tpid: proc PID's fs crap placeholder\n");
-		printk("\tpmflusher: start a ktask to keep flushing all PMs\n");
-		return 1;
-	}
-	if (!strcmp(argv[1], "open")) {
-		printk("Open Files:\n----------------------------\n");
-		TAILQ_FOREACH(sb, &super_blocks, s_list) {
-			printk("Superblock for %s\n", sb->s_name);
-			TAILQ_FOREACH(file, &sb->s_files, f_list)
-				printk("File: %p, %s, Refs: %d, Drefs: %d, Irefs: %d PM: %p\n",
-				       file, file_name(file), kref_refcnt(&file->f_kref),
-				       kref_refcnt(&file->f_dentry->d_kref),
-				       kref_refcnt(&file->f_dentry->d_inode->i_kref),
-					   file->f_mapping);
-		}
-	} else if (!strcmp(argv[1], "inodes")) {
-		printk("Mounted FS Inodes:\n----------------------------\n");
-		TAILQ_FOREACH(sb, &super_blocks, s_list) {
-			printk("Superblock for %s\n", sb->s_name);
-			TAILQ_FOREACH(inode, &sb->s_inodes, i_sb_list) {
-				printk("Inode: %p, Refs: %d, Nlinks: %d, Size(B): %d\n",
-				       inode, kref_refcnt(&inode->i_kref), inode->i_nlink,
-				       inode->i_size);
-				TAILQ_FOREACH(dentry, &inode->i_dentry, d_alias)
-					printk("\t%s: Dentry: %p, Refs: %d\n",
-					       dentry->d_name.name, dentry,
-					       kref_refcnt(&dentry->d_kref));
-			}
-		}
-	} else if (!strcmp(argv[1], "dentries")) {
-		printk("Dentry Cache:\n----------------------------\n");
-		TAILQ_FOREACH(sb, &super_blocks, s_list) {
-			printk("Superblock for %s\n", sb->s_name);
-			printk("DENTRY     FLAGS      REFCNT NAME\n");
-			printk("--------------------------------\n");
-			/* Hash helper */
-			void print_dcache_entry(void *item, void *opaque)
-			{
-				struct dentry *d_i = (struct dentry*)item;
-				printk("%p %p %02d     %s\n", d_i, d_i->d_flags,
-				       kref_refcnt(&d_i->d_kref), d_i->d_name.name);
-			}
-			hash_for_each(sb->s_dcache, print_dcache_entry, NULL);
-		}
-		if (argc < 3)
-			return 0;
-		if (!strcmp(argv[2], "lru")) {
-			printk("LRU lists:\n");
-			TAILQ_FOREACH(sb, &super_blocks, s_list) {
-				printk("Superblock for %s\n", sb->s_name);
-				TAILQ_FOREACH(dentry, &sb->s_lru_d, d_lru)
-					printk("Dentry: %p, Name: %s\n", dentry,
-					       dentry->d_name.name);
-			}
-		} else if (!strcmp(argv[2], "prune")) {
-			printk("Pruning unused dentries\n");
-			TAILQ_FOREACH(sb, &super_blocks, s_list)
-				dcache_prune(sb, FALSE);
-		}
-	} else if (!strcmp(argv[1], "ls")) {
-		if (argc != 3) {
-			printk("Give me a dir.\n");
-			return 1;
-		}
-		if (argv[2][0] != '/') {
-			printk("Dear fellow giraffe lover, Use absolute paths.\n");
-			return 1;
-		}
-		ls_dash_r(argv[2]);
-		/* whatever.  placeholder. */
-	} else if (!strcmp(argv[1], "pid")) {
-		if (argc != 3) {
-			printk("Give me a pid number.\n");
-			return 1;
-		}
-		/* whatever.  placeholder. */
-	} else if (!strcmp(argv[1], "pmflusher")) {
-		ktask("pm_flusher", pm_flusher, 0);
-	} else {
-		printk("Bad option\n");
-		return 1;
-	}
-	return 0;
 }
 
 int mon_shell(int argc, char **argv, struct hw_trapframe *hw_tf)
