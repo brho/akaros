@@ -2440,13 +2440,8 @@ void print_proc_info(pid_t pid, int verbosity)
 	for (int i = 0; i < files->max_files; i++) {
 		if (GET_BITMASK_BIT(files->open_fds->fds_bits, i)) {
 			printk("\tFD: %02d, ", i);
-			if (files->fd[i].fd_file) {
-				printk("File: %p, File name: %s\n", files->fd[i].fd_file,
-				       file_name(files->fd[i].fd_file));
-			} else {
-				assert(files->fd[i].fd_chan);
-				print_chaninfo(files->fd[i].fd_chan);
-			}
+			assert(files->fd[i].fd_chan);
+			print_chaninfo(files->fd[i].fd_chan);
 		}
 	}
 	spin_unlock(&files->lock);

@@ -1761,8 +1761,7 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 		retval = -1;
 		goto out_with_path;
 	}
-	retval = sysstatakaros(t_path, (struct kstat *)kbuf,
-	                       flags & LOOKUP_FOLLOW ? 0 : O_NOFOLLOW);
+	retval = sysstatakaros(t_path, (struct kstat *)kbuf, flags);
 	if (retval < 0)
 		goto out_with_kbuf;
 	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
@@ -1780,14 +1779,14 @@ out_with_path:
 static intreg_t sys_stat(struct proc *p, const char *path, size_t path_l,
                          struct kstat *u_stat)
 {
-	return stat_helper(p, path, path_l, u_stat, LOOKUP_FOLLOW);
+	return stat_helper(p, path, path_l, u_stat, 0);
 }
 
 /* Don't follow a final symlink */
 static intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l,
                           struct kstat *u_stat)
 {
-	return stat_helper(p, path, path_l, u_stat, 0);
+	return stat_helper(p, path, path_l, u_stat, O_NOFOLLOW);
 }
 
 intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
@@ -1882,7 +1881,8 @@ intreg_t sys_link(struct proc *p, char *old_path, size_t old_l,
 		free_path(p, t_oldpath);
 		return -1;
 	}
-	ret = do_link(t_oldpath, t_newpath);
+	set_error(ENOSYS, "no link");
+	ret = -1;
 	free_path(p, t_oldpath);
 	free_path(p, t_newpath);
 	return ret;
