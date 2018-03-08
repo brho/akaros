@@ -54,7 +54,7 @@ int newfd(struct chan *c, int low_fd, int oflags, bool must_use_low)
 {
 	int ret = insert_obj_fdt(&current->open_files, c, low_fd,
 	                         oflags & O_CLOEXEC ? FD_CLOEXEC : 0,
-	                         must_use_low, FALSE);
+	                         must_use_low);
 	if (ret >= 0)
 		cclose(c);
 	return ret;
@@ -65,7 +65,7 @@ struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
 {
 	struct chan *c;
 
-	c = lookup_fd(fdt, fd, iref, FALSE);
+	c = lookup_fd(fdt, fd, iref);
 	if (!c) {
 		/* We lost the info about why there was a problem (we used to track file
 		 * group closed too, can add that in later). */
@@ -271,7 +271,7 @@ int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
 		cclose(c);
 		error(EPERM, ERROR_FIXME);
 	}
-	ret = insert_obj_fdt(&to_proc->open_files, c, to_fd, 0, TRUE, FALSE);
+	ret = insert_obj_fdt(&to_proc->open_files, c, to_fd, 0, TRUE);
 	/* drop the ref from fdtochan.  if insert succeeded, there is one other ref
 	 * stored in the FDT */
 	cclose(c);

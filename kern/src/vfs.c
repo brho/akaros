@@ -56,14 +56,13 @@ void *kread_whole_file(struct file_or_chan *file)
 
 /* Process-related File management functions */
 
-/* Given any FD, get the appropriate object, 0 o/w.  Set vfs if you're looking
- * for a file, o/w a chan.  Set incref if you want a reference count (which is a
- * 9ns thing, you can't use the pointer if you didn't incref). */
-void *lookup_fd(struct fd_table *fdt, int fd, bool incref, bool vfs)
+/* Given any FD, get the appropriate object, 0 o/w. Set incref if you want a
+ * reference count (which is a 9ns thing, you can't use the pointer if you
+ * didn't incref). */
+void *lookup_fd(struct fd_table *fdt, int fd, bool incref)
 {
 	void *retval = 0;
 
-	assert(!vfs);
 	if (fd < 0)
 		return 0;
 	spin_lock(&fdt->lock);
@@ -83,12 +82,6 @@ void *lookup_fd(struct fd_table *fdt, int fd, bool incref, bool vfs)
 	}
 	spin_unlock(&fdt->lock);
 	return retval;
-}
-
-/* Given any FD, get the appropriate file, 0 o/w */
-struct file *get_file_from_fd(struct fd_table *open_files, int file_desc)
-{
-	return lookup_fd(open_files, file_desc, TRUE, TRUE);
 }
 
 /* Grow the vfs fd set */
@@ -154,7 +147,6 @@ static void free_fd_set(struct fd_table *open_files)
 /* If FD is in the group, remove it, decref it, and return TRUE. */
 bool close_fd(struct fd_table *fdt, int fd)
 {
-	struct file *file = 0;
 	struct chan *chan = 0;
 	struct fd_tap *tap = 0;
 	bool ret = FALSE;
@@ -166,10 +158,8 @@ bool close_fd(struct fd_table *fdt, int fd)
 			/* while max_files and max_fdset might not line up, we should never
 			 * have a valid fdset higher than files */
 			assert(fd < fdt->max_files);
-			file = fdt->fd[fd].fd_file;
 			chan = fdt->fd[fd].fd_chan;
 			tap = fdt->fd[fd].fd_tap;
-			fdt->fd[fd].fd_file = 0;
 			fdt->fd[fd].fd_chan = 0;
 			fdt->fd[fd].fd_tap = 0;
 			CLR_BITMASK_BIT(fdt->open_fds->fds_bits, fd);
@@ -210,7 +200,7 @@ static int __get_fd(struct fd_table *open_files, int low_fd, bool must_use_low)
 			slot = low_fd;
 			SET_BITMASK_BIT(open_files->open_fds->fds_bits, slot);
 			assert(slot < open_files->max_files &&
-			       open_files->fd[slot].fd_file == 0);
+			       open_files->fd[slot].fd_chan == 0);
 			/* We know slot >= hint, since we started with the hint */
 			if (update_hint)
 				open_files->hint_min_fd = slot + 1;
@@ -228,11 +218,10 @@ static int __get_fd(struct fd_table *open_files, int low_fd, bool must_use_low)
  * If must_use_low, then we have to insert at FD = low_fd.  o/w we start looking
  * for empty slots at low_fd. */
 int insert_obj_fdt(struct fd_table *fdt, void *obj, int low_fd, int fd_flags,
-                   bool must_use_low, bool vfs)
+                   bool must_use_low)
 {
 	int slot;
 
-	assert(!vfs);
 	spin_lock(&fdt->lock);
 	slot = __get_fd(fdt, low_fd, must_use_low);
 	if (slot < 0) {
@@ -240,9 +229,8 @@ int insert_obj_fdt(struct fd_table *fdt, void *obj, int low_fd, int fd_flags,
 		return slot;
 	}
 	assert(slot < fdt->max_files &&
-	       fdt->fd[slot].fd_file == 0);
+	       fdt->fd[slot].fd_chan == 0);
 	chan_incref((struct chan*)obj);
-	fdt->fd[slot].fd_file = 0;
 	fdt->fd[slot].fd_chan = obj;
 	fdt->fd[slot].fd_flags = fd_flags;
 	spin_unlock(&fdt->lock);
@@ -263,7 +251,6 @@ int insert_obj_fdt(struct fd_table *fdt, void *obj, int low_fd, int fd_flags,
  *   never happen with the current code). */
 void close_fdt(struct fd_table *fdt, bool cloexec)
 {
-	struct file *file;
 	struct chan *chan;
 	struct file_desc *to_close;
 	int idx = 0;
@@ -283,17 +270,11 @@ void close_fdt(struct fd_table *fdt, bool cloexec)
 			assert(i < fdt->max_files);
 			if (cloexec && !(fdt->fd[i].fd_flags & FD_CLOEXEC))
 				continue;
-			file = fdt->fd[i].fd_file;
 			chan = fdt->fd[i].fd_chan;
 			to_close[idx].fd_tap = fdt->fd[i].fd_tap;
 			fdt->fd[i].fd_tap = 0;
-			if (file) {
-				fdt->fd[i].fd_file = 0;
-				to_close[idx++].fd_file = file;
-			} else {
-				fdt->fd[i].fd_chan = 0;
-				to_close[idx++].fd_chan = chan;
-			}
+			fdt->fd[i].fd_chan = 0;
+			to_close[idx++].fd_chan = chan;
 			CLR_BITMASK_BIT(fdt->open_fds->fds_bits, i);
 		}
 	}
@@ -318,7 +299,6 @@ void close_fdt(struct fd_table *fdt, bool cloexec)
 /* Inserts all of the files from src into dst, used by sys_fork(). */
 void clone_fdt(struct fd_table *src, struct fd_table *dst)
 {
-	struct file *file;
 	struct chan *chan;
 	int ret;
 
@@ -348,11 +328,9 @@ void clone_fdt(struct fd_table *src, struct fd_table *dst)
 			/* while max_files and max_fdset might not line up, we should never
 			 * have a valid fdset higher than files */
 			assert(i < src->max_files);
-			file = src->fd[i].fd_file;
 			chan = src->fd[i].fd_chan;
-			assert(i < dst->max_files && dst->fd[i].fd_file == 0);
+			assert(i < dst->max_files && dst->fd[i].fd_chan == 0);
 			SET_BITMASK_BIT(dst->open_fds->fds_bits, i);
-			dst->fd[i].fd_file = file;
 			dst->fd[i].fd_chan = chan;
 			chan_incref(chan);
 		}

@@ -40,7 +40,6 @@ struct small_fd_set {
  * per file descriptor, not per file (like the file status flags). */
 struct chan;	/* from 9ns */
 struct file_desc {
-	struct file					*fd_file;
 	struct chan					*fd_chan;
 	unsigned int				fd_flags;
 	struct fd_tap				*fd_tap;
@@ -63,9 +62,9 @@ ssize_t kread_file(struct file_or_chan *file, void *buf, size_t sz);
 void *kread_whole_file(struct file_or_chan *file);
 
 /* Process-related File management functions */
-void *lookup_fd(struct fd_table *fdt, int fd, bool incref, bool vfs);
+void *lookup_fd(struct fd_table *fdt, int fd, bool incref);
 int insert_obj_fdt(struct fd_table *fdt, void *obj, int low_fd, int fd_flags,
-                   bool must_use_low, bool vfs);
+                   bool must_use_low);
 bool close_fd(struct fd_table *fdt, int fd);
 void close_fdt(struct fd_table *open_files, bool cloexec);
 void clone_fdt(struct fd_table *src, struct fd_table *dst);

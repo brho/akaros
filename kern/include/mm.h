@@ -14,7 +14,6 @@
 #include <slab.h>
 #include <kref.h>
 
-struct file;
 struct chan;
 struct fd_table;
 struct proc;								/* preprocessor games */
