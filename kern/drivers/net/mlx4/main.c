@@ -3951,12 +3951,14 @@ static int mlx4_pnp(struct ether *edev)
 	 * mlx4_init(), mlx4_en_init() and mlx4_ib_init() should be invoked
 	 * from ethermlx4_link() prior to device probe.
 	 */
+#if 0 // AKAROS_PORT
 #ifdef CONFIG_MLX4_INFINIBAND
 	extern int mlx4_ib_init();
 	extern int ib_uverbs_init();
 
 	ib_uverbs_init();
 	mlx4_ib_init();
+#endif
 #endif
 
 	// edev->ctlr is already initialized to struct mlx4_en_priv.

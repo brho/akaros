@@ -2,8 +2,8 @@
 obj-y							+= dummy.o
 obj-$(CONFIG_BNX2X)				+= bnx2x/
 obj-$(CONFIG_MLX4_CORE)					+= mlx4/
-obj-$(CONFIG_MLX4_INFINIBAND)				+= mlx4u/
-obj-$(CONFIG_MLX4_INFINIBAND)				+= udrvr/
+#obj-$(CONFIG_MLX4_INFINIBAND)				+= mlx4u/
+#obj-$(CONFIG_MLX4_INFINIBAND)				+= udrvr/
 obj-y							+= ether8139.o
 obj-y							+= ether82563.o
 obj-y							+= ethermii.o
