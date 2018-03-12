@@ -33,7 +33,6 @@
 #include <arch/init.h>
 #include <bitmask.h>
 #include <slab.h>
-#include <vfs.h>
 #include <kthread.h>
 #include <linker_func.h>
 #include <net/ip.h>

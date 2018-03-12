@@ -6,7 +6,6 @@
  * FD's underlying device file/qid. */
 
 #include <fdtap.h>
-#include <vfs.h>
 #include <event.h>
 #include <kmalloc.h>
 #include <syscall.h>

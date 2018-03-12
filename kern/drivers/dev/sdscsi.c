@@ -7,7 +7,6 @@
  * in the LICENSE file.
  */
 
-#include <vfs.h>
 
 #include <assert.h>
 #include <cpio.h>

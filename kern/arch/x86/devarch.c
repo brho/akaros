@@ -8,7 +8,6 @@
  */
 
 #include <ros/memops.h>
-#include <vfs.h>
 #include <kmalloc.h>
 #include <kref.h>
 #include <kthread.h>

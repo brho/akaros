@@ -21,7 +21,6 @@
 #include <syscall.h>
 #include <slab.h>
 #include <kmalloc.h>
-#include <vfs.h>
 #include <smp.h>
 #include <profiler.h>
 #include <umem.h>

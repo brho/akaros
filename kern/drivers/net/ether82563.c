@@ -34,7 +34,6 @@
  * on the assumption that allowing jumbo packets makes the controller
  * much slower (as is true of the 82579), never allow jumbos.
  */
-#include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

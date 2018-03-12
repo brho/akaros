@@ -31,7 +31,6 @@
  * Error recovery for the various over/under -flow conditions
  * may need work.
  */
-#include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

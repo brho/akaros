@@ -12,7 +12,6 @@
 // commands to the monitor.
 // TODO: read them back :-)
 
-#include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

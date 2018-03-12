@@ -11,6 +11,7 @@
 #include <kref.h>
 #include <assert.h>
 #include <stdio.h>
+#include <pagemap.h>
 
 void pm_add_vmr(struct page_map *pm, struct vm_region *vmr)
 {

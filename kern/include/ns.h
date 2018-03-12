@@ -35,7 +35,10 @@
 #include <linker_func.h>
 #include <fdtap.h>
 #include <ros/fs.h>
-#include <vfs.h>
+#include <bitmask.h>
+#include <mm.h>
+#include <sys/uio.h>
+#include <time.h>
 
 /*
  * functions (possibly) linked in, complete, from libc.

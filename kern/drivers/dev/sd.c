@@ -11,7 +11,6 @@
  * Storage Device.
  */
 
-#include <vfs.h>
 
 #include <assert.h>
 #include <cpio.h>

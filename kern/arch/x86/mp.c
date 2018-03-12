@@ -5,7 +5,6 @@
  * modified, propagated, or distributed except according to the terms contained
  * in the LICENSE file. */
 
-#include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

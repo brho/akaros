@@ -26,7 +26,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE. */
 
-#include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

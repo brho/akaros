@@ -4,7 +4,6 @@
  *
  * Default implementations and global values for the VFS. */
 
-#include <vfs.h> // keep this first
 #include <ros/errno.h>
 #include <sys/queue.h>
 #include <assert.h>

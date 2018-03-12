@@ -9,7 +9,6 @@
 
 #include <ros/profiler_records.h>
 #include <arch/time.h>
-#include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

@@ -16,6 +16,7 @@
 #include <alarm.h>
 #include <sys/queue.h>
 #include <arsc_server.h>
+#include <hashtable.h>
 
 /* Process Lists.  'unrunnable' is a holding list for SCPs that are running or
  * waiting or otherwise not considered for sched decisions. */

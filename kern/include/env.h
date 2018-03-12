@@ -17,7 +17,6 @@
 #include <sys/queue.h>
 #include <atomic.h>
 #include <mm.h>
-#include <vfs.h>
 #include <schedule.h>
 #include <devalarm.h>
 #include <ns.h>

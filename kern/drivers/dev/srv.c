@@ -21,7 +21,6 @@
  * and then we might not close.  This ends up decreffing top_dir too much, and
  * giving it's refs to some other file in the walk. */
 
-#include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

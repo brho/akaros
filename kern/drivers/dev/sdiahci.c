@@ -12,7 +12,6 @@
  * copyright © 2007-8 coraid, inc.
  */
 
-#include <vfs.h>
 
 #include <assert.h>
 #include <cpio.h>

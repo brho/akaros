@@ -30,7 +30,6 @@
 #include <env.h>
 #include <process.h>
 #include <mm.h>
-#include <vfs.h>
 #include <kmalloc.h>
 #include <pmap.h>
 #include <kref.h>

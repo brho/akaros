@@ -27,7 +27,6 @@
  * SOFTWARE. */
 
 #define DEBUG
-#include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>
@@ -40,7 +39,6 @@
 #include <smp.h>
 #include <net/ip.h>
 
-#include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

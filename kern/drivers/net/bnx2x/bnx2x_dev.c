@@ -7,7 +7,6 @@
 
 /* Network driver stub for bnx2x_ */
 
-#include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>

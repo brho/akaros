@@ -17,7 +17,6 @@
  * rather than excise code that won't work, I'm bracketing it with
  * #if 0 until we know we don't want it
  */
-#include <vfs.h>
 #include <slab.h>
 #include <kmalloc.h>
 #include <kref.h>
