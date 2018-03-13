@@ -900,6 +900,7 @@ void proc_destroy(struct proc *p)
 		/* should never fail, lock should cover the race.  invariant: any child
 		 * on the list should have us as a parent */
 		assert(!ret);
+		proc_decref(child_i);
 	}
 	spin_unlock(&p->proc_lock);
 	/* Wake any of our kthreads waiting on children, so they can abort */
@@ -945,7 +946,9 @@ void proc_signal_parent(struct proc *child)
 
 /* Called when a parent is done with its child, and no longer wants to track the
  * child, nor to allow the child to track it.  Call with a lock (cv) held.
- * Returns 0 if we disowned, -1 on failure. */
+ * Returns 0 if we disowned, -1 on failure.
+ *
+ * If we disowned, (ret == 0), the caller must decref the child. */
 int __proc_disown_child(struct proc *parent, struct proc *child)
 {
 	/* Bail out if the child has already been reaped */
@@ -957,7 +960,6 @@ int __proc_disown_child(struct proc *parent, struct proc *child)
 	/* After this, the child won't be able to get more refs to us, but it may
 	 * still have some references in running code. */
 	child->ppid = 0;
-	proc_decref(child);	/* ref that was keeping the child alive on the list */
 	return 0;
 }
 

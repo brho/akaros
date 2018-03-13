@@ -1111,9 +1111,10 @@ all_out:
  * process if we waited on it successfully, and the status will be passed back
  * in ret_status (kernel memory).  Returns 0 if the wait failed and we should
  * try again.  Returns -1 if we should abort.  Only handles DYING.  Callers
- * need to lock to protect the children tailq and reaping bits. */
-static pid_t try_wait(struct proc *parent, struct proc *child, int *ret_status,
-                      int options)
+ * need to lock to protect the children tailq and reaping bits.  Callers must
+ * decref the child on success. */
+static pid_t __try_wait(struct proc *parent, struct proc *child,
+                        int *ret_status, int options)
 {
 	if (proc_is_dying(child)) {
 		/* Disown returns -1 if it's already been disowned or we should o/w
@@ -1135,25 +1136,30 @@ static pid_t try_wait(struct proc *parent, struct proc *child, int *ret_status,
 	return 0;
 }
 
-/* Helper, like try_wait, but attempts a wait on any of the children, returning
- * the specific PID we waited on, 0 to try again (a waitable exists), and -1 to
- * abort (no children/waitables exist).  Callers need to lock to protect the
- * children tailq and reaping bits.*/
-static pid_t try_wait_any(struct proc *parent, int *ret_status, int options)
+/* Helper, like __try_wait, but attempts a wait on any of the children,
+ * returning the specific PID we waited on, 0 to try again (a waitable exists),
+ * and -1 to abort (no children/waitables exist).  Callers need to lock to
+ * protect the children tailq and reaping bits.  Callers must decref the child,
+ * if successful. */
+static pid_t __try_wait_any(struct proc *parent, int *ret_status, int options,
+                            struct proc **child)
 {
 	struct proc *i, *temp;
 	pid_t retval;
+
 	if (TAILQ_EMPTY(&parent->children))
 		return -1;
 	/* Could have concurrent waiters mucking with the tailq, caller must lock */
 	TAILQ_FOREACH_SAFE(i, &parent->children, sibling_link, temp) {
-		retval = try_wait(parent, i, ret_status, options);
+		retval = __try_wait(parent, i, ret_status, options);
 		/* This catches a thread causing a wait to fail but not taking the
 		 * child off the list before unlocking.  Should never happen. */
 		assert(retval != -1);
 		/* Succeeded, return the pid of the child we waited on */
-		if (retval)
+		if (retval) {
+			*child = i;
 			return retval;
+		}
 	}
 	assert(retval == 0);
 	return 0;
@@ -1166,9 +1172,10 @@ static pid_t wait_one(struct proc *parent, struct proc *child, int *ret_status,
                       int options)
 {
 	pid_t retval;
+
 	cv_lock(&parent->child_wait);
 	/* retval == 0 means we should block */
-	retval = try_wait(parent, child, ret_status, options);
+	retval = __try_wait(parent, child, ret_status, options);
 	if ((retval == 0) && (options & WNOHANG))
 		goto out_unlock;
 	while (!retval) {
@@ -1181,7 +1188,7 @@ static pid_t wait_one(struct proc *parent, struct proc *child, int *ret_status,
 			goto out_unlock;
 		/* Any child can wake us up, but we check for the particular child we
 		 * care about */
-		retval = try_wait(parent, child, ret_status, options);
+		retval = __try_wait(parent, child, ret_status, options);
 	}
 	if (retval == -1) {
 		/* Child was already waited on by a concurrent syscall. */
@@ -1190,6 +1197,8 @@ static pid_t wait_one(struct proc *parent, struct proc *child, int *ret_status,
 	/* Fallthrough */
 out_unlock:
 	cv_unlock(&parent->child_wait);
+	if (retval > 0)
+		proc_decref(child);
 	return retval;
 }
 
@@ -1200,8 +1209,10 @@ out_unlock:
 static pid_t wait_any(struct proc *parent, int *ret_status, int options)
 {
 	pid_t retval;
+	struct proc *child;
+
 	cv_lock(&parent->child_wait);
-	retval = try_wait_any(parent, ret_status, options);
+	retval = __try_wait_any(parent, ret_status, options, &child);
 	if ((retval == 0) && (options & WNOHANG))
 		goto out_unlock;
 	while (!retval) {
@@ -1209,15 +1220,17 @@ static pid_t wait_any(struct proc *parent, int *ret_status, int options)
 		cv_wait(&parent->child_wait);
 		if (proc_is_dying(parent))
 			goto out_unlock;
-		/* Any child can wake us up from the CV.  This is a linear try_wait
+		/* Any child can wake us up from the CV.  This is a linear __try_wait
 		 * scan.  If we have a lot of children, we could optimize this. */
-		retval = try_wait_any(parent, ret_status, options);
+		retval = __try_wait_any(parent, ret_status, options, &child);
 	}
 	if (retval == -1)
 		assert(TAILQ_EMPTY(&parent->children));
 	/* Fallthrough */
 out_unlock:
 	cv_unlock(&parent->child_wait);
+	if (retval > 0)
+		proc_decref(child);
 	return retval;
 }
 
