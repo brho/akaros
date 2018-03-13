@@ -18,5 +18,6 @@ obj-y						+= sd.o
 obj-y						+= sdscsi.o
 obj-y						+= sdiahci.o
 obj-y						+= srv.o
+obj-y						+= tmpfs.o
 obj-y						+= version.o
 obj-$(CONFIG_DEVVARS)		+= vars.o
