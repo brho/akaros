@@ -818,6 +818,27 @@ void proc_restartcore(void)
 	__proc_startcore(pcpui->owning_proc, pcpui->cur_ctx);
 }
 
+/* Helper for proc_destroy.  Disowns any children. */
+static void proc_disown_children(struct proc *parent)
+{
+	struct proc *child_i, *temp;
+	struct proc_list todo = TAILQ_HEAD_INITIALIZER(todo);
+	int ret;
+
+	cv_lock(&parent->child_wait);
+	TAILQ_FOREACH_SAFE(child_i, &parent->children, sibling_link, temp) {
+		ret = __proc_disown_child(parent, child_i);
+		/* should never fail, lock should cover the race.  invariant: any child
+		 * on the list should have us as a parent */
+		assert(!ret);
+		TAILQ_INSERT_TAIL(&todo, child_i, sibling_link);
+	}
+	cv_unlock(&parent->child_wait);
+
+	TAILQ_FOREACH_SAFE(child_i, &todo, sibling_link, temp)
+		proc_decref(child_i);
+}
+
 /* Destroys the process.  It will destroy the process and return any cores
  * to the ksched via the __sched_proc_destroy() CB.
  *
@@ -891,18 +912,8 @@ void proc_destroy(struct proc *p)
 	 * interrupts should be on when you call proc_destroy locally, but currently
 	 * aren't for all things (like traphandlers). */
 	__proc_set_state(p, PROC_DYING);
-	/* Disown any children.  If we want to have init inherit or something,
-	 * change __disown to set the ppid accordingly and concat this with init's
-	 * list (instead of emptying it like disown does).  Careful of lock ordering
-	 * between procs (need to lock to protect lists) */
-	TAILQ_FOREACH_SAFE(child_i, &p->children, sibling_link, temp) {
-		int ret = __proc_disown_child(p, child_i);
-		/* should never fail, lock should cover the race.  invariant: any child
-		 * on the list should have us as a parent */
-		assert(!ret);
-		proc_decref(child_i);
-	}
 	spin_unlock(&p->proc_lock);
+	proc_disown_children(p);
 	/* Wake any of our kthreads waiting on children, so they can abort */
 	cv_broadcast(&p->child_wait);
 	/* we need to close files here, and not in free, since we could have a
