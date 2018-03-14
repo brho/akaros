@@ -1065,7 +1065,7 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 {
 	ERRSTACK(2);
 	int len, npath;
-	struct chan *cnew;
+	struct chan *cnew, *renamee;
 	struct cname *cname;
 	Elemlist e;
 	struct mhead *m;
@@ -1095,16 +1095,14 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 
 	if (e.mustbedir)
 		omode &= ~O_NOFOLLOW;
-	/*
-	 * On create, ....
-	 */
-	if (amode == Acreate) {
+
+	switch (amode) {
+	case Acreate:
 		/* perm must have DMDIR if last element is / or /. */
 		if (e.mustbedir && !(perm & DMDIR)) {
 			npath = e.ARRAY_SIZEs;
 			error(EINVAL, "create without DMDIR");
 		}
-
 		/* don't try to walk the last path element just yet. */
 		if (e.ARRAY_SIZEs == 0)
 			error(EEXIST, ERROR_FIXME);
@@ -1112,8 +1110,13 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 		/* We're dropping the last element, which O_NOFOLLOW applied to.  Not
 		 * sure if there are any legit reasons to have O_NOFOLLOW with create.*/
 		omode &= ~O_NOFOLLOW;
-	}
-	switch (amode) {
+		break;
+	case Arename:
+		if (e.ARRAY_SIZEs == 0)
+			error(EINVAL, "rename needs at least one name");
+		e.ARRAY_SIZEs--;
+		omode &= ~O_NOFOLLOW;
+		break;
 	/* the difference for stat and lstat (Aaccess) are handled in sysfile.c */
 	case Abind:
 	case Amount:
@@ -1121,6 +1124,7 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 		omode |= O_NOFOLLOW;
 		break;
 	}
+
 	if (omode & O_NOFOLLOW)
 		wh->no_follow = true;
 
@@ -1247,6 +1251,50 @@ Open:
 			 * one wants subsequent mounts to be attached to the
 			 * original directory, not the replacement.  Don't domount.
 			 */
+			break;
+
+		case Arename:
+			/* We already walked to the parent of new_path, which is in c.
+			 * We're a lot like create here - need to find mounts, etc.  On the
+			 * way out, we putmhead if we have an m, and clean up our chans.  On
+			 * success, c becomes cnew (thus close the old c).  On failure, we
+			 * just close cnew. */
+			e.ARRAY_SIZEs++;
+			m = NULL;
+			cnew = NULL;
+			if (waserror()) {
+				/* rename or createdir failed */
+				cclose(cnew);
+				if (m)
+					putmhead(m);
+				nexterror();	/* safe since we're in a waserror() */
+			}
+			if (wh->can_mount && findmount(&cnew, &m, c->type, c->dev,
+			                               c->qid)) {
+				cnew = createdir(cnew, m);
+			} else {
+				cnew = c;
+				chan_incref(cnew);
+			}
+			cnew = cunique(cnew);
+			cnameclose(cnew->name);
+			cnew->name = c->name;
+			kref_get(&cnew->name->ref, 1);
+			/* At this point, we have our new_path parent chan (cnew) and the
+			 * renamee chan */
+			renamee = ext;
+			if (cnew->type != renamee->type)
+				error(EXDEV, "can't rename across device types");
+
+			devtab[cnew->type].rename(renamee, cnew,
+			                          e.elems[e.ARRAY_SIZEs - 1], 0);
+			poperror();
+
+			if (m)
+				putmhead(m);
+			cclose(c);
+			c = cnew;
+			c->name = addelem(c->name, e.elems[e.ARRAY_SIZEs - 1]);
 			break;
 
 		case Acreate:

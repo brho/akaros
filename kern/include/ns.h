@@ -380,6 +380,7 @@ enum {
 	Amount,						/* to be mounted or mounted upon */
 	Acreate,					/* is to be created */
 	Aremove,					/* will be removed by caller */
+	Arename,					/* new_path of a rename */
 
 	/* internal chan flags, used by the kernel only */
 	COPEN = 		0x0001,	/* for i/o */
@@ -519,6 +520,7 @@ struct dev {
 	size_t (*write)(struct chan *, void *, size_t, off64_t);
 	size_t (*bwrite)(struct chan *, struct block *, off64_t);
 	void (*remove)(struct chan *);
+	void (*rename)(struct chan *, struct chan *, const char *, int);
 	size_t (*wstat)(struct chan *, uint8_t *, size_t);
 	void (*power)(int);		/* power mgt: power(1) → on, power (0) → off */
 //  int (*config)( int unused_int, char *unused_char_p_t, DevConf*);
@@ -1089,6 +1091,7 @@ void read_exactly_n(struct chan *c, void *vp, long n);
 long sysread(int fd, void *va, long n);
 long syspread(int fd, void *va, long n, int64_t off);
 int sysremove(char *path);
+int sysrename(char *from_path, char *to_path);
 int64_t sysseek(int fd, int64_t off, int whence);
 void validstat(uint8_t * s, int n, int slashok);
 int sysstat(char *path, uint8_t*, int n);

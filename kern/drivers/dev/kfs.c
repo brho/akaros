@@ -292,6 +292,7 @@ struct dev kfs_devtab __devtab = {
 	.write = tree_chan_write,
 	.bwrite = devbwrite,
 	.remove = tree_chan_remove,
+	.rename = tree_chan_rename,
 	.wstat = tree_chan_wstat,
 	.power = devpower,
 	.chaninfo = devchaninfo,

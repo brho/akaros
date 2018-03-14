@@ -2238,14 +2238,14 @@ intreg_t sys_rename(struct proc *p, char *old_path, size_t old_path_l,
 {
 	char *from_path = copy_in_path(p, old_path, old_path_l);
 	char *to_path = copy_in_path(p, new_path, new_path_l);
-	int retval = -1;
+	int ret;
 
 	if ((!from_path) || (!to_path))
 		return -1;
-	set_error(EXDEV, "no 9ns rename yet");
+	ret = sysrename(from_path, to_path);
 	free_path(p, from_path);
 	free_path(p, to_path);
-	return retval;
+	return ret;
 }
 
 /* Careful: if an FD is busy, we don't close the old object, it just fails */

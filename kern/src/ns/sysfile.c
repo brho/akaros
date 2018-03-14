@@ -835,6 +835,35 @@ int sysremove(char *path)
 	return 0;
 }
 
+int sysrename(char *from_path, char *to_path)
+{
+	ERRSTACK(1);
+	struct chan *volatile renamee = NULL;
+	struct chan *parent_chan;
+
+	if (waserror()) {
+		cclose(renamee);
+		poperror();
+		return -1;
+	}
+	renamee = namec(from_path, Aremove, 0, 0, NULL);
+	/* We might need to support wstat for 'short' rename (intra-directory, with
+	 * no slashes).  Til then, we can just go with EXDEV. */
+	if (!devtab[renamee->type].rename)
+		error(EXDEV, "device does not support rename");
+	parent_chan = namec(to_path, Arename, 0, 0, (char*)renamee);
+	/* When we're done, renamee still points to the file, but it's in the new
+	 * location.  Its cname is still the old location, similar to remove.  If
+	 * anyone cares, we can change it.  parent_chan still points to the parent -
+	 * it didn't get moved like create does.  Though it does have the name of
+	 * the new location.  If we want, we can hand that to renamee.  It's a moot
+	 * point, since they are both getting closed. */
+	cclose(renamee);
+	cclose(parent_chan);
+	poperror();
+	return 0;
+}
+
 int64_t sysseek(int fd, int64_t off, int whence)
 {
 	ERRSTACK(2);

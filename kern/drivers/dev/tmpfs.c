@@ -233,6 +233,19 @@ static void tmpfs_remove(struct chan *c)
 	poperror();
 }
 
+void tmpfs_rename(struct chan *c, struct chan *new_p_c, const char *name,
+                  int flags)
+{
+	struct tmpfs *tmpfs_old = chan_to_tmpfs(c);
+	struct tmpfs *tmpfs_new = chan_to_tmpfs(new_p_c);
+
+	/* namec checked that both were from the same device.  It is our
+	 * responsibility to make sure they are the same version. */
+	if (tmpfs_old != tmpfs_new)
+		error(EXDEV, "can't rename across tmpfs instances");
+	tree_chan_rename(c, new_p_c, name, flags);
+}
+
 struct dev tmpfs_devtab __devtab = {
 	.name = "tmpfs",
 	.reset = devreset,
@@ -249,6 +262,7 @@ struct dev tmpfs_devtab __devtab = {
 	.write = tree_chan_write,
 	.bwrite = devbwrite,
 	.remove = tmpfs_remove,
+	.rename = tmpfs_rename,
 	.wstat = tree_chan_wstat,
 	.power = devpower,
 	.chaninfo = devchaninfo,
