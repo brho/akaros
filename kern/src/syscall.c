@@ -56,7 +56,7 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
 		len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
 		      "E [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
 		      "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: --- proc: %d core: %d "
-		      "vcore: %d data: ",
+		      "vcore: %d errno: --- data: ",
 		               ts_start.tv_sec,
 		               ts_start.tv_nsec,
 		               ts_end.tv_sec,
@@ -76,7 +76,7 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
 		len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
 		      "X [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
 		      "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: 0x%llx proc: %d core: %d "
-		      "vcore: %d data: ",
+		      "vcore: %d errno: %3d data: ",
 		               ts_start.tv_sec,
 		               ts_start.tv_nsec,
 		               ts_end.tv_sec,
@@ -92,7 +92,8 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
 		               trace->retval,
 		               trace->pid,
 		               trace->coreid,
-		               trace->vcoreid);
+		               trace->vcoreid,
+		               trace->errno);
 	}
 	len += printdump(trace->pretty_buf + len, trace->datalen,
 	                 SYSTR_PRETTY_BUF_SZ - len - 1,
@@ -205,6 +206,90 @@ static void snprintf_to_trace(struct systrace_record *trace, const char *fmt,
 static bool trace_data_full(struct systrace_record *trace)
 {
 	return trace->datalen == sizeof(trace->data);
+}
+
+static bool systrace_has_error(struct systrace_record *trace)
+{
+	switch (trace->syscallno) {
+	case SYS_getpcoreid:
+	case SYS_getvcoreid:
+	case SYS_reboot:
+	case SYS_proc_yield:
+	case SYS_vc_entry:
+	case SYS_umask:
+	case SYS_init_arsc:
+		return false;
+	case SYS_abort_sysc:
+	case SYS_abort_sysc_fd:
+		/* These two are a little weird */
+		return false;
+	case SYS_null:
+	case SYS_block:
+	case SYS_nanosleep:
+	case SYS_cache_invalidate:
+	case SYS_proc_run:
+	case SYS_proc_destroy:
+	case SYS_exec:
+	case SYS_munmap:
+	case SYS_mprotect:
+	case SYS_notify:
+	case SYS_self_notify:
+	case SYS_send_event:
+	case SYS_halt_core:
+	case SYS_pop_ctx:
+	case SYS_vmm_poke_guest:
+	case SYS_poke_ksched:
+	case SYS_llseek:
+	case SYS_close:
+	case SYS_fstat:
+	case SYS_stat:
+	case SYS_lstat:
+	case SYS_access:
+	case SYS_link:
+	case SYS_unlink:
+	case SYS_symlink:
+	case SYS_chdir:
+	case SYS_fchdir:
+	case SYS_getcwd:
+	case SYS_mkdir:
+	case SYS_rmdir:
+	case SYS_tcgetattr:
+	case SYS_tcsetattr:
+	case SYS_setuid:
+	case SYS_setgid:
+	case SYS_rename:
+	case SYS_nunmount:
+	case SYS_fd2path:
+		return trace->retval != 0;
+	case SYS_proc_create:
+	case SYS_change_vcore:
+	case SYS_fork:
+	case SYS_waitpid:
+	case SYS_shared_page_alloc:
+	case SYS_shared_page_free:
+	case SYS_provision:
+	case SYS_change_to_m:
+	case SYS_vmm_ctl:
+	case SYS_read:
+	case SYS_write:
+	case SYS_openat:
+	case SYS_fcntl:
+	case SYS_readlink:
+	case SYS_nbind:
+	case SYS_nmount:
+	case SYS_wstat:
+	case SYS_fwstat:
+		return (long)trace->retval < 0;
+	case SYS_mmap:
+		return (void*)trace->retval == MAP_FAILED;
+	case SYS_vmm_add_gpcs:
+	case SYS_populate_va:
+	case SYS_dup_fds_to:
+	case SYS_tap_fds:
+		return (long)trace->retval <= 0;
+	};
+	warn_once("Unhandled syscall number %d", trace->syscallno);
+	return true;
 }
 
 /* Starts a trace for p running sysc, attaching it to kthread.  Pairs with
@@ -332,9 +417,13 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 	trace = kthread->strace;
 	trace->end_timestamp = read_tsc();
 	trace->retval = retval;
+	trace->errno = get_errno();
+	trace->datalen = 0;
 
 	/* Only try to do the trace data if we didn't do it on entry */
-	if (!trace->datalen) {
+	if (systrace_has_error(trace)) {
+		snprintf_to_trace(trace, "errstr: %s", current_errstr());
+	} else {
 		switch (trace->syscallno) {
 		case SYS_read:
 			if (retval <= 0)

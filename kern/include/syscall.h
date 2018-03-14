@@ -39,6 +39,7 @@ struct systrace_record {
 		uint32_t		vcoreid;
 		char			*pretty_buf;
 		uint8_t			datalen;
+		int				errno;
 	};
 	uint8_t			data[SYSTR_RECORD_SZ - sizeof(struct systrace_record_anon)];
 };
