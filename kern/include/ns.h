@@ -126,9 +126,9 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 #define DMWRITABLE	0x08000000	/* non-standard, for select() */
 #define DMREADABLE	0x04000000	/* non-standard, for select() */
 #define DMSYMLINK	0x02000000	/* symlink -- from 9p2000.u */
-#define DMREAD		0x4	/* mode bit for read permission */
-#define DMWRITE		0x2	/* mode bit for write permission */
-#define DMEXEC		0x1	/* mode bit for execute permission */
+/* The lower parts of dir.mode are the three rwx perms (S_PMASK) */
+#define DMMODE_BITS (DMDIR | DMAPPEND | DMEXCL | DMMOUNT | DMWRITABLE \
+                     | DMREADABLE | DMSYMLINK)
 
 struct qid {
 	uint64_t path;

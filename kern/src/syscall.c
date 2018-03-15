@@ -1783,7 +1783,6 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 	if (!t_path)
 		return -1;
 	sysc_save_str("open %s at fd %d", t_path, fromfd);
-	mode &= ~p->umask;
 	fd = sysopenat(fromfd, t_path, oflag);
 	/* successful lookup with CREATE and EXCL is an error */
 	if (fd != -1) {
@@ -1795,7 +1794,9 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 		}
 	} else {
 		if (oflag & O_CREATE) {
+			mode &= ~p->umask;
 			mode &= S_PMASK;
+			static_assert(!(DMMODE_BITS & S_PMASK));
 			fd = syscreate(t_path, oflag, mode);
 		}
 	}
@@ -2094,11 +2095,9 @@ intreg_t sys_mkdir(struct proc *p, const char *path, size_t path_l, int mode)
 
 	if (!t_path)
 		return -1;
-	mode &= S_PMASK;
 	mode &= ~p->umask;
-	/* mixing plan9 and glibc here, make sure DMDIR doesn't overlap with any
-	 * permissions */
-	static_assert(!(S_PMASK & DMDIR));
+	mode &= S_PMASK;
+	static_assert(!(DMMODE_BITS & S_PMASK));
 	retval = syscreate(t_path, O_READ, DMDIR | mode);
 	if (retval >= 0) {
 		sysclose(retval);

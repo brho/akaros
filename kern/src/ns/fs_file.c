@@ -86,6 +86,8 @@ void fs_file_init_dir(struct fs_file *f, int dir_type, int dir_dev,
 		dir->qid.type |= QTSYMLINK;
 	if (!(dir->qid.type & (QTSYMLINK | QTDIR)))
 		dir->qid.type |= QTFILE;
+	/* dir->mode stores all the DM bits, but note that userspace can only affect
+	 * the permissions (S_PMASK) bits. */
 	dir->mode = perm;
 	__set_acmtime(f, FSF_ATIME | FSF_BTIME | FSF_MTIME | FSF_CTIME);
 	dir->length = 0;
@@ -416,6 +418,7 @@ static void wstat_mode(struct fs_file *f, int new_mode)
 		error(EPERM, "wrong user for wstat, need %s", f->dir.uid);
 	/* Only allowing changes in permissions, not random stuff like whether it is
 	 * a directory or symlink. */
+	static_assert(!(DMMODE_BITS & S_PMASK));
 	mode = (f->dir.mode & ~S_PMASK) | (new_mode & S_PMASK);
 	WRITE_ONCE(f->dir.mode, mode);
 	__set_acmtime(f, FSF_CTIME);
