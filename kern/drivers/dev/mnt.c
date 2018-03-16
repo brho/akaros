@@ -132,8 +132,6 @@ static void mntinit(void)
 	//fmtinstall('F', fcallfmt);
 /*	fmtinstall('D', dirfmt); */
 /*	fmtinstall('M', dirmodefmt);  */
-
-	cinit();
 }
 
 /*
@@ -575,9 +573,6 @@ static struct chan *mntopencreate(int type, struct chan *c, char *name,
 	poperror();
 	mntfree(r);
 
-	if (c->flag & CCACHE)
-		copen(c);
-
 	return c;
 }
 
@@ -692,34 +687,15 @@ static size_t mntwstat(struct chan *c, uint8_t *dp, size_t n)
 static size_t mntread(struct chan *c, void *buf, size_t n, off64_t off)
 {
 	uint8_t *p, *e;
-	int nc, cache, isdir, dirlen;
+	int nc, dirlen;
 	int numdirent = 0;
 
-	isdir = 0;
-	cache = c->flag & CCACHE;
-	if (c->qid.type & QTDIR) {
-		cache = 0;
-		isdir = 1;
-	}
 
 	p = buf;
-	if (cache) {
-		nc = cread(c, buf, n, off);
-		if (nc > 0) {
-			n -= nc;
-			if (n == 0)
-				return nc;
-			p += nc;
-			off += nc;
-		}
-		n = mntrdwr(Tread, c, p, n, off);
-		cupdate(c, p, n, off);
-		return n + nc;
-	}
 
 	n = mntrdwr(Tread, c, buf, n, off);
 
-	if (isdir) {
+	if (c->qid.type & QTDIR) {
 		for (e = &p[n]; p + BIT16SZ < e; p += dirlen) {
 			dirlen = BIT16SZ + GBIT16(p);
 			if (p + dirlen > e){
@@ -751,15 +727,11 @@ size_t mntrdwr(int type, struct chan *c, void *buf, size_t n, off64_t off)
 	struct mnt *m;
 	struct mntrpc *r;			/* TO DO: volatile struct { Mntrpc *r; } r; */
 	char *uba;
-	int cache;
 	uint32_t cnt, nr, nreq;
 
 	m = mntchk(c);
 	uba = buf;
 	cnt = 0;
-	cache = c->flag & CCACHE;
-	if (c->qid.type & QTDIR)
-		cache = 0;
 	for (;;) {
 		r = mntralloc(c, m->msize);
 		if (waserror()) {
@@ -782,8 +754,6 @@ size_t mntrdwr(int type, struct chan *c, void *buf, size_t n, off64_t off)
 
 		if (type == Tread)
 			r->b = bl2mem((uint8_t *) uba, r->b, nr);
-		else if (cache)
-			cwrite(c, (uint8_t *) uba, nr, off);
 
 		poperror();
 		mntfree(r);
