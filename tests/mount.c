@@ -14,6 +14,8 @@ int main(int argc, char *argv[])
 { 
 	int fd;
 	int flag = 0;
+	int ret;
+
 	/* crap arg handling for now. */
 	argc--,argv++;
 	while (argc > 2){
@@ -24,15 +26,17 @@ int main(int argc, char *argv[])
 			break;
 			case 'c': flag |= 4;
 			break;
+			case 'C': flag |= 0x10;
+			break;
 			default: 
-				printf("-a or -b and/or -c for now\n");
+				printf("-a or -b and/or -c and/or -C for now\n");
 				exit(-1);
 		}
 		argc--, argv++;
 	}
 
 	if (argc < 2) {
-		fprintf(stderr, "usage: mount [-a|-b|-c] channel onto_path\n");
+		fprintf(stderr, "usage: mount [-a|-b|-c|-C] channel onto_path\n");
 		exit(-1);
 	}
 	fd = open(argv[0], O_RDWR);
@@ -40,6 +44,10 @@ int main(int argc, char *argv[])
 		perror("Unable to open chan for mounting");
 		exit(-1);
 	}
-	syscall(SYS_nmount, fd, argv[1], strlen(argv[1]), flag);
+	ret = syscall(SYS_nmount, fd, argv[1], strlen(argv[1]), flag);
+	if (ret < 0) {
+		perror("sys_mount:");
+		return -1;
+	}
 	return 0;
 }
