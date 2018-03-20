@@ -82,7 +82,7 @@ ssize_t foc_read(struct file_or_chan *foc, void *buf, size_t amt, off64_t off)
 
 	switch (foc->type) {
 	case F_OR_C_CHAN:
-		if (!(foc->chan->qid.type & QTFILE))
+		if (!qid_is_file(foc->chan->qid))
 			return -1;
 		if (!waserror())
 			ret = devtab[foc->chan->type].read(foc->chan, buf, amt, off);

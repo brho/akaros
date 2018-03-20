@@ -116,7 +116,7 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 #define QTMOUNT		0x10	/* type bit for mounted channel */
 #define QTAUTH		0x08	/* type bit for authentication file */
 #define QTSYMLINK	0x02	/* type bit for symlinks */
-#define QTFILE		0x01	/* plain file */
+#define QTFILE		0x00	/* plain file.  Yeah, a zero.  Fucking 9p. */
 
 /* bits in Dir.mode */
 #define DMDIR		0x80000000	/* mode bit for directories */
@@ -135,6 +135,11 @@ struct qid {
 	uint32_t vers;
 	uint8_t type;
 };
+
+static inline bool qid_is_file(struct qid q)
+{
+	return (q.type & (QTDIR | QTSYMLINK)) == 0;
+}
 
 struct dir {
 	/* system-modified data */

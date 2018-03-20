@@ -200,7 +200,7 @@ static inline bool tree_file_is_dir(struct tree_file *tf)
 
 static inline bool tree_file_is_file(struct tree_file *tf)
 {
-	return tree_file_to_qid(tf).type & QTFILE ? true : false;
+	return qid_is_file(tree_file_to_qid(tf));
 }
 
 static inline bool tree_file_is_symlink(struct tree_file *tf)

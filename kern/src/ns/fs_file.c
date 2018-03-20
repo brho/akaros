@@ -84,8 +84,6 @@ void fs_file_init_dir(struct fs_file *f, int dir_type, int dir_dev,
 		dir->qid.type |= QTEXCL;
 	if (perm & DMSYMLINK)
 		dir->qid.type |= QTSYMLINK;
-	if (!(dir->qid.type & (QTSYMLINK | QTDIR)))
-		dir->qid.type |= QTFILE;
 	/* dir->mode stores all the DM bits, but note that userspace can only affect
 	 * the permissions (S_PMASK) bits. */
 	dir->mode = perm;

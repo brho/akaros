@@ -1161,9 +1161,6 @@ static void dump_tf(struct tree_file *tf, int tabs)
 	    !!(tf->file.dir.qid.type & QTSYMLINK))
 		warn("%s has differing symlink bits", tree_file_to_name(tf));
 
-	if ((tf->file.dir.qid.type & (QTFILE | QTDIR | QTSYMLINK)) == 0)
-		warn("%s has no type!  (prob QTFILE)", tree_file_to_name(tf));
-
 	for (int i = 0; i < tabs; i++)
 		printk("    ");
 	print_tf(tf);
