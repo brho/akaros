@@ -15,20 +15,14 @@
 
 /* Need to be careful, due to some ghetto circular references */
 struct page;
-struct inode;
-struct block_device;
 struct chan;
 struct page_map_operations;
 
-/* Every object that has pages, like an inode or the swap (or even direct block
- * devices) has a page_map, tracking which of its pages are currently in memory.
- * It is a map, per object, from index to physical page frame. */
+/* Every object that has pages has a page_map, tracking which of its pages are
+ * currently in memory.  It is a map, per object, from index to physical page
+ * frame. */
 struct page_map {
-	union {
-		struct inode				*pm_host;	/* inode of the owner, if any */
-		struct block_device			*pm_bdev;	/* bdev of the owner, if any */
-		struct chan					*pm_chan;
-	};
+	struct fs_file				*pm_file;
 	struct radix_tree			pm_tree;		/* tracks present pages */
 	unsigned long				pm_num_pages;	/* how many pages are present */
 	struct page_map_operations	*pm_op;

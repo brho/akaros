@@ -99,11 +99,11 @@ static void *pm_slot_set_page(void *slot_val, struct page *pg)
 	                               ~((1UL << PM_FLAGS_SHIFT) - 1)));
 }
 
-/* Initializes a PM.  Host should be an *inode or a *bdev (doesn't matter).  The
- * reference this stores is uncounted. */
+/* Initializes a PM.  Host should be an fs_file.  The reference this stores is
+ * uncounted. */
 void pm_init(struct page_map *pm, struct page_map_operations *op, void *host)
 {
-	pm->pm_bdev = host;						/* note the uncounted ref */
+	pm->pm_file = host;
 	radix_tree_init(&pm->pm_tree);
 	pm->pm_num_pages = 0;					/* no pages in a new pm */
 	pm->pm_op = op;
