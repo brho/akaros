@@ -1118,8 +1118,6 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		user_memdup_free(p, kargenv);
 		return -1;
 	}
-	/* This could block: */
-	program = foc_open(t_path, O_EXEC | O_READ, 0);
 	/* Clear the current_ctx.  We won't be returning the 'normal' way.  Even if
 	 * we want to return with an error, we need to go back differently in case
 	 * we succeed.  This needs to be done before we could possibly block, but
@@ -1128,6 +1126,8 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	 * Note that we will 'hard block' if we block at all.  We can't return to
 	 * userspace and then asynchronously finish the exec later. */
 	clear_owning_proc(core_id());
+	/* This could block: */
+	program = foc_open(t_path, O_EXEC | O_READ, 0);
 	if (!program)
 		goto early_error;
 	if (!is_valid_elf(program)) {
