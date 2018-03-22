@@ -282,6 +282,9 @@ static bool vmr_has_page_idx(struct vm_region *vmr, unsigned long pg_idx)
 {
 	unsigned long nr_pgs = (vmr->vm_end - vmr->vm_base) >> PGSHIFT;
 	unsigned long start_pg = vmr->vm_foff >> PGSHIFT;
+
+	if (!vmr->vm_ready)
+		return false;
 	return ((start_pg <= pg_idx) && (pg_idx < start_pg + nr_pgs));
 }
 

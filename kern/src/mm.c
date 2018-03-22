@@ -244,16 +244,31 @@ void vmr_init(void)
 				       0, 0, NULL);
 }
 
-/* For now, the caller will set the prot, flags, file, and offset.  In the
- * future, we may put those in here, to do clever things with merging vm_regions
- * that are the same.
+static struct vm_region *vmr_zalloc(void)
+{
+	struct vm_region *vmr;
+
+	vmr = kmem_cache_alloc(vmr_kcache, MEM_WAIT);
+	memset(vmr, 0, sizeof(struct vm_region));
+	return vmr;
+}
+
+static void vmr_free(struct vm_region *vmr)
+{
+	kmem_cache_free(vmr_kcache, vmr);
+}
+
+/* The caller will set the prot, flags, file, and offset.  We find a spot for it
+ * in p's address space, set proc, base, and end.  Caller holds p's vmr_lock.
  *
  * TODO: take a look at solari's vmem alloc.  And consider keeping these in a
  * tree of some sort for easier lookups. */
-static struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
+static bool vmr_insert(struct vm_region *vmr, struct proc *p, uintptr_t va,
+                       size_t len)
 {
-	struct vm_region *vmr = 0, *vm_i, *vm_next;
+	struct vm_region *vm_i, *vm_next;
 	uintptr_t gap_end;
+	bool ret = false;
 
 	assert(!PGOFF(va));
 	assert(!PGOFF(len));
@@ -263,12 +278,9 @@ static struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 	/* This works for now, but if all we have is BRK_END ones, we'll start
 	 * growing backwards (TODO) */
 	if (!vm_i || (va + len <= vm_i->vm_base)) {
-		vmr = kmem_cache_alloc(vmr_kcache, 0);
-		if (!vmr)
-			panic("EOM!");
-		memset(vmr, 0, sizeof(struct vm_region));
 		vmr->vm_base = va;
 		TAILQ_INSERT_HEAD(&p->vm_regions, vmr, vm_link);
+		ret = true;
 	} else {
 		TAILQ_FOREACH(vm_i, &p->vm_regions, vm_link) {
 			vm_next = TAILQ_NEXT(vm_i, vm_link);
@@ -278,10 +290,6 @@ static struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 				continue;
 			/* Find a gap that is big enough */
 			if (gap_end - vm_i->vm_end >= len) {
-				vmr = kmem_cache_alloc(vmr_kcache, 0);
-				if (!vmr)
-					panic("EOM!");
-				memset(vmr, 0, sizeof(struct vm_region));
 				/* if we can put it at va, let's do that.  o/w, put it so it
 				 * fits */
 				if ((gap_end >= va + len) && (va >= vm_i->vm_end))
@@ -289,18 +297,19 @@ static struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 				else
 					vmr->vm_base = vm_i->vm_end;
 				TAILQ_INSERT_AFTER(&p->vm_regions, vm_i, vmr, vm_link);
+				ret = true;
 				break;
 			}
 		}
 	}
 	/* Finalize the creation, if we got one */
-	if (vmr) {
+	if (ret) {
 		vmr->vm_proc = p;
 		vmr->vm_end = vmr->vm_base + len;
 	}
-	if (!vmr)
+	if (!ret)
 		warn("Not making a VMR, wanted %p, + %p = %p", va, len, va + len);
-	return vmr;
+	return ret;
 }
 
 /* Split a VMR at va, returning the new VMR.  It is set up the same way, with
@@ -344,7 +353,7 @@ static void destroy_vmr(struct vm_region *vmr)
 		foc_decref(vmr->__vm_foc);
 	}
 	TAILQ_REMOVE(&vmr->vm_proc->vm_regions, vmr, vm_link);
-	kmem_cache_free(vmr_kcache, vmr);
+	vmr_free(vmr);
 }
 
 /* Merges two vm regions.  For now, it will check to make sure they are the
@@ -578,7 +587,7 @@ int duplicate_vmrs(struct proc *p, struct proc *new_p)
 				pm_remove_vmr(vmr_to_pm(vm_i), vmr);
 				foc_decref(vm_i->__vm_foc);
 			}
-			kmem_cache_free(vmr_kcache, vm_i);
+			vmr_free(vmr);
 			return ret;
 		}
 		TAILQ_INSERT_TAIL(&new_p->vm_regions, vmr, vm_link);
@@ -821,52 +830,33 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	struct vm_region *vmr, *vmr_temp;
 
 	assert(mmap_flags_priv_ok(flags));
-	/* read/write vmr lock (will change the tree) */
-	spin_lock(&p->vmr_lock);
-	p->vmr_history++;
+	vmr = vmr_zalloc();
+
 	/* Sanity check, for callers that bypass mmap().  We want addr for anon
 	 * memory to start above the break limit (BRK_END), but not 0.  Keep this in
 	 * sync with BRK_END in mmap(). */
 	if (addr == 0)
 		addr = BRK_END;
 	assert(!PGOFF(offset));
-
 	/* MCPs will need their code and data pinned.  This check will start to fail
 	 * after uthread_slim_init(), at which point userspace should have enough
 	 * control over its mmaps (i.e. no longer done by LD or load_elf) that it
 	 * can ask for pinned and populated pages.  Except for dl_opens(). */
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
+
 	if (file && (atomic_read(&vcpd->flags) & VC_SCP_NOVCCTX))
 		flags |= MAP_POPULATE | MAP_LOCKED;
-	/* Need to make sure nothing is in our way when we want a FIXED location.
-	 * We just need to split on the end points (if they exist), and then remove
-	 * everything in between.  __do_munmap() will do this.  Careful, this means
-	 * an mmap can be an implied munmap() (not my call...). */
-	if (flags & MAP_FIXED)
-		__do_munmap(p, addr, len);
-	vmr = create_vmr(p, addr, len);
-	if (!vmr) {
-		printk("[kernel] do_mmap() aborted for %p + %p!\n", addr, len);
-		set_errno(ENOMEM);
-		spin_unlock(&p->vmr_lock);
-		return MAP_FAILED;
-	}
-	addr = vmr->vm_base;
 	vmr->vm_prot = prot;
-	vmr->vm_flags = flags & MAP_PERSIST_FLAGS;
 	vmr->vm_foff = offset;
-	vmr->__vm_foc = NULL;
+	vmr->vm_flags = flags & MAP_PERSIST_FLAGS;
+	/* We grab the file early, so we can block.  This is all hokey.  The VMR
+	 * isn't ready yet, so the PM code will ignore it. */
 	if (file) {
 		/* Prep the FS and make sure it can mmap the file.  The device/FS checks
-		 * perms, and does whatever else it needs to make the mmap work.
-		 *
-		 * Slightly weird semantics: if we fail and had munmapped the space,
-		 * they will have a hole in their VM now. */
+		 * perms, and does whatever else it needs to make the mmap work. */
 		if (foc_dev_mmap(file, vmr, prot)) {
-			assert(!vmr->__vm_foc);
-			destroy_vmr(vmr);
+			vmr_free(vmr);
 			set_errno(EACCES);	/* not quite */
-			spin_unlock(&p->vmr_lock);
 			return MAP_FAILED;
 		}
 		/* TODO: push the PM stuff into the chan/fs_file. */
@@ -885,6 +875,29 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 			flags &= ~MAP_POPULATE;
 		}
 	}
+	/* read/write vmr lock (will change the tree) */
+	spin_lock(&p->vmr_lock);
+	p->vmr_history++;
+	/* Need to make sure nothing is in our way when we want a FIXED location.
+	 * We just need to split on the end points (if they exist), and then remove
+	 * everything in between.  __do_munmap() will do this.  Careful, this means
+	 * an mmap can be an implied munmap() (not my call...). */
+	if (flags & MAP_FIXED)
+		__do_munmap(p, addr, len);
+	if (!vmr_insert(vmr, p, addr, len)) {
+		spin_unlock(&p->vmr_lock);
+		if (vmr_has_file(vmr)) {
+			pm_remove_vmr(vmr_to_pm(vmr), vmr);
+			foc_decref(vmr->__vm_foc);
+		}
+		vmr_free(vmr);
+		set_error(ENOMEM, "probably tried to mmap beyond UMAPTOP");
+		/* Slightly weird semantics: if we fail and had munmapped the space,
+		 * they will have a hole in their VM now. */
+		return MAP_FAILED;
+	}
+	addr = vmr->vm_base;
+	vmr->vm_ready = true;
 
 	vmr = merge_me(vmr);		/* attempts to merge with neighbors */
 
