@@ -250,7 +250,7 @@ void vmr_init(void)
  *
  * TODO: take a look at solari's vmem alloc.  And consider keeping these in a
  * tree of some sort for easier lookups. */
-struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
+static struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 {
 	struct vm_region *vmr = 0, *vm_i, *vm_next;
 	uintptr_t gap_end;
@@ -306,7 +306,7 @@ struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len)
 /* Split a VMR at va, returning the new VMR.  It is set up the same way, with
  * file offsets fixed accordingly.  'va' is the beginning of the new one, and
  * must be page aligned. */
-struct vm_region *split_vmr(struct vm_region *old_vmr, uintptr_t va)
+static struct vm_region *split_vmr(struct vm_region *old_vmr, uintptr_t va)
 {
 	struct vm_region *new_vmr;
 
@@ -335,9 +335,21 @@ struct vm_region *split_vmr(struct vm_region *old_vmr, uintptr_t va)
 	return new_vmr;
 }
 
+/* Called by the unmapper, just cleans up.  Whoever calls this will need to sort
+ * out the page table entries. */
+static void destroy_vmr(struct vm_region *vmr)
+{
+	if (vmr_has_file(vmr)) {
+		pm_remove_vmr(vmr_to_pm(vmr), vmr);
+		foc_decref(vmr->__vm_foc);
+	}
+	TAILQ_REMOVE(&vmr->vm_proc->vm_regions, vmr, vm_link);
+	kmem_cache_free(vmr_kcache, vmr);
+}
+
 /* Merges two vm regions.  For now, it will check to make sure they are the
  * same.  The second one will be destroyed. */
-int merge_vmr(struct vm_region *first, struct vm_region *second)
+static int merge_vmr(struct vm_region *first, struct vm_region *second)
 {
 	assert(first->vm_proc == second->vm_proc);
 	if ((first->vm_end != second->vm_base) ||
@@ -356,7 +368,7 @@ int merge_vmr(struct vm_region *first, struct vm_region *second)
 /* Attempts to merge vmr with adjacent VMRs, returning a ptr to be used for vmr.
  * It could be the same struct vmr, or possibly another one (usually lower in
  * the address space. */
-struct vm_region *merge_me(struct vm_region *vmr)
+static struct vm_region *merge_me(struct vm_region *vmr)
 {
 	struct vm_region *vmr_temp;
 	/* Merge will fail if it cannot do it.  If it succeeds, the second VMR is
@@ -373,7 +385,7 @@ struct vm_region *merge_me(struct vm_region *vmr)
 
 /* Grows the vm region up to (and not including) va.  Fails if another is in the
  * way, etc. */
-int grow_vmr(struct vm_region *vmr, uintptr_t va)
+static int grow_vmr(struct vm_region *vmr, uintptr_t va)
 {
 	assert(!PGOFF(va));
 	struct vm_region *next = TAILQ_NEXT(vmr, vm_link);
@@ -387,7 +399,7 @@ int grow_vmr(struct vm_region *vmr, uintptr_t va)
 
 /* Shrinks the vm region down to (and not including) va.  Whoever calls this
  * will need to sort out the page table entries. */
-int shrink_vmr(struct vm_region *vmr, uintptr_t va)
+static int shrink_vmr(struct vm_region *vmr, uintptr_t va)
 {
 	assert(!PGOFF(va));
 	if ((va < vmr->vm_base) || (va > vmr->vm_end))
@@ -396,21 +408,9 @@ int shrink_vmr(struct vm_region *vmr, uintptr_t va)
 	return 0;
 }
 
-/* Called by the unmapper, just cleans up.  Whoever calls this will need to sort
- * out the page table entries. */
-void destroy_vmr(struct vm_region *vmr)
-{
-	if (vmr_has_file(vmr)) {
-		pm_remove_vmr(vmr_to_pm(vmr), vmr);
-		foc_decref(vmr->__vm_foc);
-	}
-	TAILQ_REMOVE(&vmr->vm_proc->vm_regions, vmr, vm_link);
-	kmem_cache_free(vmr_kcache, vmr);
-}
-
 /* Given a va and a proc (later an mm, possibly), returns the owning vmr, or 0
  * if there is none. */
-struct vm_region *find_vmr(struct proc *p, uintptr_t va)
+static struct vm_region *find_vmr(struct proc *p, uintptr_t va)
 {
 	struct vm_region *vmr;
 	/* ugly linear seach */
@@ -423,7 +423,7 @@ struct vm_region *find_vmr(struct proc *p, uintptr_t va)
 
 /* Finds the first vmr after va (including the one holding va), or 0 if there is
  * none. */
-struct vm_region *find_first_vmr(struct proc *p, uintptr_t va)
+static struct vm_region *find_first_vmr(struct proc *p, uintptr_t va)
 {
 	struct vm_region *vmr;
 	/* ugly linear seach */
@@ -438,7 +438,7 @@ struct vm_region *find_first_vmr(struct proc *p, uintptr_t va)
 
 /* Makes sure that no VMRs cross either the start or end of the given region
  * [va, va + len), splitting any VMRs that are on the endpoints. */
-void isolate_vmrs(struct proc *p, uintptr_t va, size_t len)
+static void isolate_vmrs(struct proc *p, uintptr_t va, size_t len)
 {
 	struct vm_region *vmr;
 	if ((vmr = find_vmr(p, va)))

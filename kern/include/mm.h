@@ -69,19 +69,7 @@ static inline char *vmr_to_filename(struct vm_region *vmr)
 	return foc_to_name(vmr->__vm_foc);
 }
 
-/* VM Region Management Functions.  For now, these just maintain themselves -
- * anything related to mapping needs to be done by the caller. */
 void vmr_init(void);
-struct vm_region *create_vmr(struct proc *p, uintptr_t va, size_t len);
-struct vm_region *split_vmr(struct vm_region *vmr, uintptr_t va);
-int merge_vmr(struct vm_region *first, struct vm_region *second);
-struct vm_region *merge_me(struct vm_region *vmr);
-int grow_vmr(struct vm_region *vmr, uintptr_t va);
-int shrink_vmr(struct vm_region *vmr, uintptr_t va);
-void destroy_vmr(struct vm_region *vmr);
-struct vm_region *find_vmr(struct proc *p, uintptr_t va);
-struct vm_region *find_first_vmr(struct proc *p, uintptr_t va);
-void isolate_vmrs(struct proc *p, uintptr_t va, size_t len);
 void unmap_and_destroy_vmrs(struct proc *p);
 int duplicate_vmrs(struct proc *p, struct proc *new_p);
 void print_vmrs(struct proc *p);
