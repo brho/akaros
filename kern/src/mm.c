@@ -1022,13 +1022,18 @@ int munmap(struct proc *p, uintptr_t addr, size_t len)
 	return ret;
 }
 
-static int __munmap_mark_not_present(struct proc *p, pte_t pte, void *va,
-                                     void *arg)
+static int __munmap_pte(struct proc *p, pte_t pte, void *va, void *arg)
 {
 	bool *shootdown_needed = (bool*)arg;
+	struct page *page;
+
 	/* could put in some checks here for !P and also !0 */
 	if (!pte_is_present(pte))	/* unmapped (== 0) *ptes are also not PTE_P */
 		return 0;
+	if (pte_is_dirty(pte)) {
+		page = pa2page(pte_get_paddr(pte));
+		atomic_or(&page->pg_flags, PG_DIRTY);
+	}
 	pte_clear_present(pte);
 	*shootdown_needed = TRUE;
 	return 0;
@@ -1072,7 +1077,7 @@ int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 	spin_lock(&p->pte_lock);	/* changing PTEs */
 	while (vmr && vmr->vm_base < addr + len) {
 		env_user_mem_walk(p, (void*)vmr->vm_base, vmr->vm_end - vmr->vm_base,
-		                  __munmap_mark_not_present, &shootdown_needed);
+		                  __munmap_pte, &shootdown_needed);
 		vmr = TAILQ_NEXT(vmr, vm_link);
 	}
 	spin_unlock(&p->pte_lock);
