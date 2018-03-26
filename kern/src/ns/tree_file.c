@@ -71,6 +71,7 @@ bool tf_kref_get(struct tree_file *tf)
 	}
 	__remove_from_lru(tf);
 	__kref_get(&tf->kref, 1);
+	tf->flags |= TF_F_HAS_BEEN_USED;
 	spin_unlock(&tf->lifetime);
 	return true;
 }
@@ -552,6 +553,12 @@ struct walkqid *tree_file_walk(struct tree_file *from, char **name,
 			assert(next);
 		}
 		if (tree_file_is_negative(next)) {
+			/* lockless peek.  other flag users aren't atomic, etc. */
+			if (!(next->flags & TF_F_HAS_BEEN_USED)) {
+				spin_lock(&next->lifetime);
+				next->flags |= TF_F_HAS_BEEN_USED;
+				spin_unlock(&next->lifetime);
+			}
 			if (i == 0)
 				error(ENOENT, "file does not exist");
 			break;
@@ -1176,4 +1183,167 @@ static void dump_tf(struct tree_file *tf, int tabs)
 void __tfs_dump(struct tree_filesystem *tfs)
 {
 	dump_tf(tfs->root, 0);
+}
+
+/* Runs a callback on every non-negative TF on the LRU list, for a given
+ * snapshot of the LRU list.  The CB returns true if it wants us to attempt to
+ * free the TF.  One invariant is that we can never remove a TF from the tree
+ * while it is dirty; it is the job of the CB to maintain that.  Note the CB can
+ * run on a TF as soon as that TF was linked to the parent (see lookup).
+ *
+ * The work list is a list of strong refs.  We need to keep one in case the file
+ * is disconnected while we're running our CBs.  Since we incref, we yank from
+ * the LRU list.  We could design the rest of the TF code so that we stay on the
+ * LRU list throughout, but I like the invariant of "kref == 0 IFF on LRU".
+ *
+ * Since we're only on one list at a time ('wc->lru' or 'work'), we can use the
+ * lru list_head in the TF.  We know that so long as we hold our kref on a TF,
+ * no one will attempt to put it back on the LRU list. */
+void tfs_lru_for_each(struct tree_filesystem *tfs, bool cb(struct tree_file *),
+                      size_t max_tfs)
+{
+	struct list_head work = LIST_HEAD_INIT(work);
+	struct walk_cache *wc = &tfs->wc;
+	struct tree_file *tf, *temp, *parent;
+	size_t nr_tfs = 0;
+
+	/* We can have multiple LRU workers in flight, though a given TF will be on
+	 * only one CB list at a time. */
+	spin_lock(&wc->lru_lock);
+	list_for_each_entry_safe(tf, temp, &wc->lru, lru) {
+		/* lockless peak at the flag.  once it's NEGATIVE, it never goes back */
+		if (tree_file_is_negative(tf))
+			continue;
+		/* Normal lock order is TF -> LRU.  Best effort is fine for LRU. */
+		if (!spin_trylock(&tf->lifetime))
+			continue;
+		/* Can't be disconnected and on LRU */
+		assert(!(tf->flags & TF_F_DISCONNECTED));
+		assert((tf->flags & TF_F_ON_LRU));
+		tf->flags &= ~TF_F_ON_LRU;
+		list_del(&tf->lru);
+		__kref_get(&tf->kref, 1);
+		/* The 'used' bit is the what allows us to detect a user in between our
+		 * callback and the disconnection/freeing.  It's a moot point if the CB
+		 * returns false. */
+		tf->flags &= ~TF_F_HAS_BEEN_USED;
+		spin_unlock(&tf->lifetime);
+		list_add_tail(&tf->lru, &work);
+		if (++nr_tfs >= max_tfs)
+			break;
+	}
+	spin_unlock(&wc->lru_lock);
+
+	/* We have a snapshot of the LRU list.  As soon as we unlocked a file,
+	 * someone could incref it (e.g. to something > 1), and they'll set the used
+	 * bit.  That won't abort the CB.  New TFs could be added to the LRU list.
+	 * Those are ignored for this pass. */
+	list_for_each_entry_safe(tf, temp, &work, lru) {
+		if (!cb(tf)) {
+			list_del(&tf->lru);
+			tf_kref_put(tf);
+			continue;
+		}
+	}
+
+	/* Now we have a list of victims to be removed, so long as they haven't been
+	 * used since. */
+	list_for_each_entry_safe(tf, temp, &work, lru) {
+		parent = get_locked_and_kreffed_parent(tf);
+		if (!parent) {
+			list_del(&tf->lru);
+			tf_kref_put(tf);
+			continue;
+		}
+		spin_lock(&tf->lifetime);
+		if (tf->flags & TF_F_HAS_BEEN_USED) {
+			spin_unlock(&tf->lifetime);
+			qunlock(&parent->file.qlock);
+			tf_kref_put(parent);
+			list_del(&tf->lru);
+			tf_kref_put(tf);
+			continue;
+		}
+		tf->flags |= TF_F_DISCONNECTED;
+		/* We hold a ref, so it shouldn't have found its way back on LRU */
+		assert(!(tf->flags & TF_F_ON_LRU));
+		spin_unlock(&tf->lifetime);
+		__remove_from_parent_list(parent, tf);
+		wc_remove_child(parent, tf);
+		/* If we get tired of unlocking and relocking, we could see if the next
+		 * parent is the current parent before unlocking. */
+		qunlock(&parent->file.qlock);
+		tf_kref_put(parent);
+	}
+	/* Now we have a list of refs that are all disconnected, kref == 1 (because
+	 * no one used them since we increffed them when they were LRU, which was
+	 * when the refcnt was 0).  Each TF has a ref on its parent btw, so parents
+	 * will never be on the LRU list.  (leaves only).
+	 *
+	 * We need to synchronize_rcu() too, since we could have had lockless
+	 * lookups that have pointers to TF and are waiting to notice that it is
+	 * disconnected. */
+	synchronize_rcu();
+	list_for_each_entry_safe(tf, temp, &work, lru) {
+		assert(kref_refcnt(&tf->kref) == 1);
+		list_del(&tf->lru);
+		/* We could decref, but instead we can directly free.  We know the ref
+		 * == 1 and it is disconnected.  Directly freeing bypasses call_rcu. */
+		__tf_free(tf);
+	}
+}
+
+/* Does a one-cycle 'clock' algorithm to detect use.  On a given pass, we either
+ * clear HAS_BEEN_USED xor we remove it.  For negative entries, that bit is used
+ * when we look at an entry (use it), compared to positive entries, which is
+ * used when we get a reference.  (we never get refs on negatives). */
+void tfs_lru_prune_neg(struct tree_filesystem *tfs)
+{
+	struct list_head work = LIST_HEAD_INIT(work);
+	struct walk_cache *wc = &tfs->wc;
+	struct tree_file *tf, *temp, *parent;
+
+	spin_lock(&wc->lru_lock);
+	list_for_each_entry_safe(tf, temp, &wc->lru, lru) {
+		if (!tree_file_is_negative(tf))
+			continue;
+		if (!spin_trylock(&tf->lifetime))
+			continue;
+		if (tf->flags & TF_F_HAS_BEEN_USED) {
+			tf->flags &= ~TF_F_HAS_BEEN_USED;
+			spin_unlock(&tf->lifetime);
+			continue;
+		}
+		rcu_read_lock();	/* holding a spinlock, but just to be clear. */
+		parent = rcu_dereference(tf->parent);
+		/* Again, inverting the lock order, so best effort trylock */
+		if (!canqlock(&parent->file.qlock)) {
+			rcu_read_unlock();
+			spin_unlock(&tf->lifetime);
+			continue;
+		}
+		__remove_from_parent_list(parent, tf);
+		wc_remove_child(parent, tf);
+		qunlock(&parent->file.qlock);
+		/* We're off the list, but our kref == 0 still.  We can break that
+		 * invariant since we have the only ref and are about to free the TF. */
+		tf->flags &= ~TF_F_ON_LRU;
+		list_del(&tf->lru);
+		spin_unlock(&tf->lifetime);
+		list_add_tail(&tf->lru, &work);
+	}
+	spin_unlock(&wc->lru_lock);
+	/* Now we have a list of refs that are all unlinked (but actually not
+	 * flagged DISCONNECTED; that's only necessary for positives), kref == 0
+	 * (because they are negatives).
+	 *
+	 * We need to synchronize_rcu() too, since we could have had lockless
+	 * lookups that have pointers to TF, and they may even mark HAS_BEEN_USED.
+	 * Too late. */
+	synchronize_rcu();
+	list_for_each_entry_safe(tf, temp, &work, lru) {
+		assert(kref_refcnt(&tf->kref) == 0);
+		list_del(&tf->lru);
+		__tf_free(tf);
+	}
 }

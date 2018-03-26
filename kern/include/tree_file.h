@@ -175,6 +175,7 @@ struct tree_file {
 #define TF_F_NEGATIVE			(1 << 1)
 #define TF_F_ON_LRU				(1 << 2)
 #define TF_F_IS_ROOT			(1 << 3)
+#define TF_F_HAS_BEEN_USED		(1 << 4)
 
 /* Devices can put their tree_files / fs_files whereever they want.  For now,
  * all of them will use aux.  We can make ops for this if we need it. */
@@ -274,3 +275,7 @@ void tfs_frontend_for_each(struct tree_filesystem *tfs,
 void tfs_frontend_purge(struct tree_filesystem *tfs,
                         void (*cb)(struct tree_file *tf));
 void __tfs_dump(struct tree_filesystem *tfs);
+
+void tfs_lru_for_each(struct tree_filesystem *tfs, bool cb(struct tree_file *),
+                      size_t max_tfs);
+void tfs_lru_prune_neg(struct tree_filesystem *tfs);
