@@ -769,6 +769,11 @@ static int populate_pm_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
 	int vmr_history = ACCESS_ONCE(p->vmr_history);
 	struct page *page;
 
+	/* This is a racy check - see the comments in fs_file.c.  Also, we're not
+	 * even attempting to populate the va, though we could do a partial if
+	 * necessary. */
+	if (pm_idx0 + nr_pgs > nr_pages(fs_file_get_length(pm->pm_file)))
+		return -ESPIPE;
 	/* locking rules: start the loop holding the vmr lock, enter and exit the
 	 * entire func holding the lock. */
 	for (long i = 0; i < nr_pgs; i++) {
@@ -1220,12 +1225,8 @@ refault:
 		 * such that we can block and resume later. */
 		assert(!PGOFF(va - vmr->vm_base + vmr->vm_foff));
 		f_idx = (va - vmr->vm_base + vmr->vm_foff) >> PGSHIFT;
-		/* TODO: need some sort of lock on the file to deal with someone
-		 * concurrently shrinking it.  Adding 1 to f_idx, since it is
-		 * zero-indexed */
+		/* This is a racy check - see the comments in fs_file.c */
 		if (f_idx + 1 > nr_pages(foc_get_len(file))) {
-			/* We're asking for pages that don't exist in the file */
-			/* TODO: unlock the file */
 			ret = -ESPIPE; /* linux sends a SIGBUS at access time */
 			goto out;
 		}

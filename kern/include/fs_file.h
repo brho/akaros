@@ -29,22 +29,16 @@
  * ------------------
  * Note this qlock is also used by tree_file code.  See below for details.
  *
- * Hold the qlock when changing the contents of a file.  This includes writes
- * (which need to adjust the len and add data), truncate / hole-punches
- * (which need to adjust the len and remove data), changing parts of dir (name,
- * permissions/mode, atimes), etc.  Tree files will hold this qlock when
- * changing a parent's children.
+ * Hold the qlock when changing the metadata of a file.  This includes changing
+ * parts of dir (length, name, permissions/mode, atimes), etc.  Tree files will
+ * hold this qlock when changing a parent's children.  See the notes around
+ * fs_file_punch_hole for details about read, write, trunc, and the length.
  *
  * Readers who just 'peak' at atomically-writable fields do not need to grab the
  * qlock.  For example, you can glance at dir->perms.  In arbitrary cases, you
  * can't look at name, since we can't change it atomically (it can smear or run
  * into other issues).  'name' is somewhat special: if you find the tree_file
  * via a RCU protected wc hash lookup, you can access name.
- *
- * fs_file_read() can skip the qlock in the common case.  It can try to grab a
- * page from the PM (if it was there, then some ordering exists on the
- * concurrent ops where the read partially succeeds).  If the read fails to find
- * a page, then we'd need to lock, since that interacts with length.
  *
  * There's actually not a lot in dir that is atomically writable.
  * atime/mtime/ctime won't be when we use timespecs.  We might be able to craft
@@ -57,8 +51,9 @@
  * chown will work.
  *
  * Note that even if we can atomically write to the dir, we should still grab
- * the qlock.  The reason is that there may be readers who want to make sure
- * parts of the dir doesn't change.
+ * the qlock.  Often we're syncing with other writers anyways, and there may be
+ * readers who want to make sure parts of the dir doesn't change.  When we do
+ * write a field that can be locklessly read, use WRITE_ONCE.
  *
  * The PM code is pretty rough.  For now, we're using the old VFS PM code, but
  * it needs a few changes:
@@ -113,6 +108,11 @@ static inline bool caller_has_file_perms(struct fs_file *f, int omode)
 static inline void fs_file_perm_check(struct fs_file *f, int omode)
 {
 	dir_perm_check(&f->dir, omode);
+}
+
+static inline size_t fs_file_get_length(struct fs_file *f)
+{
+	return ACCESS_ONCE(f->dir.length);
 }
 
 void fs_file_init(struct fs_file *f, const char *name, struct fs_file_ops *ops);

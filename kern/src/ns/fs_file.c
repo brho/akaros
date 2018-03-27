@@ -221,9 +221,64 @@ size_t fs_file_stat(struct fs_file *f, uint8_t *m_buf, size_t m_buf_sz)
 	return ret;
 }
 
+/* Helper: update file metadata after a write */
+static void write_metadata(struct fs_file *f, off64_t offset,
+                           bool always_update_len)
+{
+	qlock(&f->qlock);
+	f->flags |= FSF_DIRTY;
+	if (always_update_len || (offset > f->dir.length))
+		WRITE_ONCE(f->dir.length, offset);
+	__set_acmtime(f, FSF_MTIME | FSF_CTIME);
+	qunlock(&f->qlock);
+}
+
 /* Punches a hole from begin to end.  Pages completely in the hole will be
- * removed.  Otherwise, the edges will be zeroed.  Caller holds the qlock. */
-static void __fs_file_punch_hole(struct fs_file *f, off64_t begin, off64_t end)
+ * removed.  Otherwise, the edges will be zeroed.
+ *
+ * Concurrent truncates with reads and writes can lead to weird data.
+ * truncate()/punch_hole will attempt to remove data in page-sized chunks.
+ * Concurrent users (with a PM refcnt, under the current code) will prevent
+ * removal.  punch_hole will memset those areas to 0, similar to a concurrent
+ * write.
+ *
+ * read() will return data that is up to the file's length.  write() and
+ * punch_hole() will add or remove data and set the length.  When adding data
+ * (write), we add it first, then set the len.  When removing data, we set the
+ * len, then remove it.  If you mix those ops, the len could be set above an
+ * area where the data is still being mucked with.  read/write/mmap all grab
+ * references to the PM's page slot, locking the page in the page cache for a
+ * little.  Truncate often won't remove those pages, but it will try to zero
+ * them.  reads and mmaps will check the length on their own, while it is being
+ * changed by other ops.
+ *
+ * A few examples:
+ * - Trunc to 0 during write to N.  A reader might get zeros instead of the data
+ *   written (trunc was dropping/zeroing the pages after write wrote them).
+ * - Trunc to 0, trunc back to N, with concurrent reads/mmaps of the area in
+ *   between: a reader might see the old data or tears in the data.
+ * - mmaps of pages in a region that gets hole-punched and faults at the same
+ *   time might not get a SIGBUS / ESPIPE.  That length check is best effort.
+ * - After we remove hole pages from the page cache, but before we tell the
+ *   backend, a read/write/mmap-fault to a page in the hole could fetch the old
+ *   data from the backend before the FS op removes the data from the backend,
+ *   and we'd end up with some old data.  The root issue here is that the
+ *   frontend is a cache, and it has the most recent version of the data.  In
+ *   the case of hole punching, we want there to be an absence of data.
+ *   Technically, we could have zeroed pages, but we don't want the overhead of
+ *   that.  So we drop the pages - that situation looks the same as not having
+ *   the data in the cache/frontend.
+ *
+ * To prevent these things, we could qlock the entire file during all ops, or
+ * even just for trunc, write, and loading pages into the PM for read.  That was
+ * my first version of this.  But you can imagine backends that don't require
+ * this sort of serialization (e.g. ramfs, future #mnts, etc), and it
+ * complicates some mmap / pagemap code.  If you want the qlock to protect the
+ * invariant (one of which is that the file's contents below len are always
+ * valid; another is that hole punches don't keep old data), then we can add
+ * some sort of file locking.
+ */
+static void fs_file_punch_hole(struct fs_file *f, off64_t begin, off64_t end)
 {
 	size_t first_pg_idx, last_pg_idx, nr_pages, zero_amt;
 	struct page *page;
@@ -232,11 +287,12 @@ static void __fs_file_punch_hole(struct fs_file *f, off64_t begin, off64_t end)
 	/* Caller should check for this */
 	assert((long)begin >= 0);
 	assert((long)end >= 0);
-	end = MIN(end, f->dir.length);
 	if (end <= begin)
 		return;
+	/* We're punching for the range [begin, end), but inclusive for the pages:
+	 * [first_pg_idx, last_pg_idx]. */
 	first_pg_idx = LA2PPN(begin);
-	last_pg_idx = LA2PPN(end);
+	last_pg_idx = LA2PPN(ROUNDUP(end, PGSIZE)) - 1;
 	nr_pages = last_pg_idx - first_pg_idx + 1;
 	if (PGOFF(begin)) {
 		error = pm_load_page(f->pm, first_pg_idx, &page);
@@ -246,58 +302,52 @@ static void __fs_file_punch_hole(struct fs_file *f, off64_t begin, off64_t end)
 		memset(page2kva(page) + PGOFF(begin), 0, zero_amt);
 		atomic_or(&page->pg_flags, PG_DIRTY);
 		pm_put_page(page);
-		first_pg_idx--;
+		first_pg_idx++;
 		nr_pages--;
 		if (!nr_pages)
 			return;
 	}
-	if (PGOFF(end) && (end < f->dir.length)) {
+	if (PGOFF(end)) {
+		/* if this unaligned end is beyond the EOF, we might pull in a page of
+		 * zeros, then zero the first part of it. */
 		error = pm_load_page(f->pm, last_pg_idx, &page);
 		if (error)
 			error(-error, "punch_hole pm_load_page failed");
 		memset(page2kva(page), 0, PGOFF(end));
 		atomic_or(&page->pg_flags, PG_DIRTY);
 		pm_put_page(page);
+		last_pg_idx--;
 		nr_pages--;
 		if (!nr_pages)
 			return;
 	}
-	/* We hold the qlock, so new pages won't get loaded (load_nowait will fail).
-	 * However, this won't remove all pages yet! (see PM comments above) */
+	/* TODO: this isn't quite the right command */
 	pm_remove_contig(f->pm, first_pg_idx, nr_pages);
-	/* Need to do an FS op to immediately tell the backing store before we read
-	 * a page back in to the PM.  Otherwise, we might see old data.  Consider a
-	 * truncate to 0, then back to len. */
-	f->ops->punch_hole(f, begin, end);
+	/* After we removed the pages from the PM, but before we tell the backend,
+	 * someone could load a backend page.  Note that we only tell the backend
+	 * about the intermediate pages - we already dealt with the edge pages
+	 * above, and the PM has the latest, dirty version of them. */
+	f->ops->punch_hole(f, first_pg_idx << PGSHIFT,
+	                   (first_pg_idx + nr_pages) << PGSHIFT);
 }
 
 void fs_file_truncate(struct fs_file *f, off64_t to)
 {
-	ERRSTACK(1);
+	off64_t old_len = fs_file_get_length(f);
 
 	fs_file_perm_check(f, O_WRITE);
-	qlock(&f->qlock);
-	if (waserror()) {
-		qunlock(&f->qlock);
-		nexterror();
+	if ((to > old_len) && !f->ops->can_grow_to(f, to))
+		error(EINVAL, "can't grow file to %lu bytes", to);
+	write_metadata(f, to, true);
+	if (to < old_len) {
+		/* Round up the old_len to avoid making an unnecessary partial page of
+		 * zeros at the end of the file. */
+		fs_file_punch_hole(f, to, ROUNDUP(old_len, PGSIZE));
 	}
-	if (to < f->dir.length) {
-		__fs_file_punch_hole(f, to, f->dir.length);
-	} else {
-		if (!f->ops->can_grow_to(f, to))
-			error(EINVAL, "can't grow file to %lu bytes", to);
-	}
-	WRITE_ONCE(f->dir.length, to);
-	__set_acmtime(f, FSF_MTIME | FSF_CTIME);
-	qunlock(&f->qlock);
-	poperror();
 }
 
-/* This attempts to avoid the file qlock when pages are in the page cache.
- *
- * If we want to go simpler and use the qlock, always check len, don't use
- * _nowait, it's not a 'lockless peak', write can set the len at the top, and
- * all writes to dir.length can be normal. */
+/* Standard read.  We sync with write, in that once the length is set, we'll
+ * attempt to read those bytes. */
 size_t fs_file_read(struct fs_file *f, uint8_t *buf, size_t count,
                     off64_t offset)
 {
@@ -316,27 +366,19 @@ size_t fs_file_read(struct fs_file *f, uint8_t *buf, size_t count,
 		nexterror();
 	}
 	while (buf < buf_end) {
+		/* Check early, so we don't load pages beyond length needlessly.  The
+		 * PM/FSF op might just create zeroed pages when asked. */
+		if (offset + so_far >= fs_file_get_length(f))
+			break;
 		pg_off = PGOFF(offset + so_far);
 		pg_idx = LA2PPN(offset + so_far);
-		error = pm_load_page_nowait(f->pm, pg_idx, &page);
-		if (error == -EAGAIN) {
-			qlock(&f->qlock);
-			/* Don't attempt to load pages beyond len.  The rest of the read
-			 * code can handle it (it won't copy), but the backend FS might get
-			 * confused. */
-			if (f->dir.length <= offset + so_far) {
-				qunlock(&f->qlock);
-				break;
-			}
-			error = pm_load_page(f->pm, pg_idx, &page);
-			qunlock(&f->qlock);
-		}
+		error = pm_load_page(f->pm, pg_idx, &page);
 		if (error)
 			error(-error, "read pm_load_page failed");
 		copy_amt = MIN(PGSIZE - pg_off, buf_end - buf);
 		/* Lockless peak.  Check the len so we don't read beyond EOF.  We have a
 		 * page, but we don't necessarily have access to all of it. */
-		total_remaining = ACCESS_ONCE(f->dir.length) - (offset + so_far);
+		total_remaining = fs_file_get_length(f) - (offset + so_far);
 		if (copy_amt > total_remaining) {
 			copy_amt = total_remaining;
 			buf_end = buf + copy_amt;
@@ -362,20 +404,18 @@ size_t fs_file_write(struct fs_file *f, const uint8_t *buf, size_t count,
 	const uint8_t *buf_end = buf + count;
 	int error;
 
-	qlock(&f->qlock);
 	if (waserror()) {
-		qunlock(&f->qlock);
 		if (so_far) {
+			write_metadata(f, offset + so_far, false);
 			poperror();
 			return so_far;
 		}
 		nexterror();
 	};
-	if (offset + count > f->dir.length) {
+	if (offset + count > fs_file_get_length(f)) {
 		if (!f->ops->can_grow_to(f, offset + count))
 			error(EINVAL, "can't write file to %lu bytes", offset + count);
 	}
-	f->flags |= FSF_DIRTY;
 	while (buf < buf_end) {
 		pg_off = PGOFF(offset + so_far);
 		pg_idx = LA2PPN(offset + so_far);
@@ -390,14 +430,12 @@ size_t fs_file_write(struct fs_file *f, const uint8_t *buf, size_t count,
 		pm_put_page(page);
 	}
 	assert(buf == buf_end);
+	assert(count == so_far);
 	/* We set the len *after* writing for our lockless reads.  If we set len
 	 * before, then read() could start as soon as we loaded the page (all
 	 * zeros), but before we wrote the actual data.  They'd get zeros instead of
 	 * what we added. */
-	if (offset + count > f->dir.length)
-		WRITE_ONCE(f->dir.length, offset + count);
-	__set_acmtime(f, FSF_MTIME | FSF_CTIME);
-	qunlock(&f->qlock);
+	write_metadata(f, offset + so_far, false);
 	poperror();
 	return so_far;
 }
