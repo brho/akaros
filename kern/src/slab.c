@@ -634,6 +634,7 @@ void kmem_cache_free(struct kmem_cache *kc, void *buf)
 	struct kmem_depot *depot = &kc->depot;
 	struct kmem_magazine *mag;
 
+	assert(buf);	/* catch bugs */
 	lock_pcu_cache(pcc);
 try_free:
 	if (pcc->loaded->nr_rounds < pcc->magsize) {
