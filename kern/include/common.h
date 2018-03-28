@@ -7,8 +7,6 @@
 #ifdef CONFIG_64BIT
 #endif
 
-#define SIZE_MAX        (~(size_t)0)
-
 // Efficient min and max operations
 #define MIN(_a, _b)						\
 ({								\
