@@ -203,6 +203,98 @@ void **radix_lookup_slot(struct radix_tree *tree, unsigned long key)
 	return &r_node->items[key];
 }
 
+/* [x_left, x_right) and [y_left, y_right). */
+static bool ranges_overlap(unsigned long x_left, unsigned long x_right,
+                           unsigned long y_left, unsigned long y_right)
+{
+	return ((x_left <= y_left) && (y_left < x_right)) ||
+	       ((y_left <= x_left) && (x_left < y_right));
+}
+
+/* Given an index at a depth for a child, returns whether part of it is in the
+ * global range.
+ *
+ * Recall the key is partitioned like so: ....444444333333222222111111.  The
+ * depth is 1 when we're in the last rnode and our children are items.  When
+ * we're an intermediate node, our depth is higher, and our start/end is the
+ * entire reach of us + our children. */
+static bool child_overlaps_range(unsigned long idx, int depth,
+                                 unsigned long glb_start_idx,
+                                 unsigned long glb_end_idx)
+{
+	unsigned long start = idx << (LOG_RNODE_SLOTS * (depth - 1));
+	unsigned long end = (idx + 1) << (LOG_RNODE_SLOTS * (depth - 1));
+
+	return ranges_overlap(start, end, glb_start_idx, glb_end_idx);
+}
+
+/* Helper for walking down a tree.
+ * - depth == 1 means we're on the last radix_node, whose items are all the
+ *   actual items.
+ * - tree_idx is the index for our item/node.  It encodes the path we took
+ *   through the radix tree to get to where we are.  For leaves (items), it is
+ *   their index in the address space.  For internal rnodes, it is a temporary
+ *   number, but combined with the depth, you can determine the range of the
+ *   rnode's descendents.
+ * - glb_start_idx and glb_end_idx is the global start and end for the entire
+ *   for_each operation.
+ *
+ * Returns true if our r_node *was already deleted*.  When we call
+ * __radix_remove_slot(), if we removed the last item for r_node, the removal
+ * code will recurse *up* the tree, such that r_node might already be freed.
+ * Same goes for our parent!  Hence, we're careful to only access r_node when we
+ * know we have children (once we enter the loop and might remove a slot). */
+static bool rnode_for_each(struct radix_node *r_node, int depth,
+                           unsigned long tree_idx, unsigned long glb_start_idx,
+                           unsigned long glb_end_idx,
+                           radix_cb_t cb, void *arg)
+{
+	unsigned int num_children = ACCESS_ONCE(r_node->num_items);
+
+	/* The tree_idx we were passed was from our parent's perspective.  We need
+	 * shift it over each time we walk down to put it in terms of our
+	 * level/depth.  Or think of it as making room for our bits (the values of
+	 * i). */
+	tree_idx <<= LOG_RNODE_SLOTS;
+	for (int i = 0; num_children && (i < NR_RNODE_SLOTS); i++) {
+		if (r_node->items[i]) {
+			/* If we really care, we can try to abort the rest of the loop.  Not
+			 * a big deal */
+			if (!child_overlaps_range(tree_idx + i, depth, glb_start_idx,
+			                          glb_end_idx))
+				continue;
+			if (depth > 1) {
+				if (rnode_for_each(r_node->items[i], depth - 1, tree_idx + i,
+				                   glb_start_idx, glb_end_idx, cb, arg))
+					num_children--;
+			} else {
+				if (cb(&r_node->items[i], tree_idx + i, arg)) {
+					__radix_remove_slot(r_node,
+					                    (struct radix_node**)&r_node->items[i]);
+					num_children--;
+				}
+			}
+		}
+	}
+	return num_children ? false : true;
+}
+
+/* [start_idx, end_idx) */
+void radix_for_each_slot_in_range(struct radix_tree *tree,
+                                  unsigned long start_idx,
+                                  unsigned long end_idx,
+                                  radix_cb_t cb, void *arg)
+{
+	if (!tree->root)
+		return;
+	rnode_for_each(tree->root, tree->depth, 0, start_idx, end_idx, cb, arg);
+}
+
+void radix_for_each_slot(struct radix_tree *tree, radix_cb_t cb, void *arg)
+{
+	radix_for_each_slot_in_range(tree, 0, ULONG_MAX, cb, arg);
+}
+
 int radix_gang_lookup(struct radix_tree *tree, void **results,
                       unsigned long first, unsigned int max_items)
 {

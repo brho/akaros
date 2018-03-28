@@ -49,8 +49,14 @@ int radix_insert(struct radix_tree *tree, unsigned long key, void *item,
 void *radix_delete(struct radix_tree *tree, unsigned long key);
 void *radix_lookup(struct radix_tree *tree, unsigned long key);
 void **radix_lookup_slot(struct radix_tree *tree, unsigned long key);
-int radix_gang_lookup(struct radix_tree *tree, void **results,
-                      unsigned long first, unsigned int max_items);
+
+typedef bool (*radix_cb_t)(void **slot, unsigned long tree_idx, void *arg);
+void radix_for_each_slot(struct radix_tree *tree, radix_cb_t cb, void *arg);
+/* [start_idx, end_idx) */
+void radix_for_each_slot_in_range(struct radix_tree *tree,
+                                  unsigned long start_idx,
+                                  unsigned long end_idx,
+                                  radix_cb_t cb, void *arg);
 
 /* Memory management */
 int radix_grow(struct radix_tree *tree, unsigned long max);
