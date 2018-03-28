@@ -33,6 +33,12 @@ void radix_tree_init(struct radix_tree *tree)
 	tree->upper_bound = 0;
 }
 
+static bool __should_not_run_cb(void **slot, unsigned long tree_idx, void *a)
+{
+	panic("Tried destroying a non-empty tree! (slot %p, idx %lu)",
+	      *slot, tree_idx);
+}
+
 /* Will clean up all the memory associated with a tree.  Shouldn't be necessary
  * if you delete all of the items, which you should do anyways since they are
  * usually void*.  Might expand this to have a function to call on every leaf
@@ -41,7 +47,11 @@ void radix_tree_destroy(struct radix_tree *tree)
 {
 	/* Currently, we may have a root node, even if all the elements were removed
 	 */
-	panic("Not implemented");
+	radix_for_each_slot(tree, __should_not_run_cb, NULL);
+	if (tree->root) {
+		kmem_cache_free(radix_kcache, tree->root);
+		tree->root = NULL;
+	}
 }
 
 /* Attempts to insert an item in the tree at the given key.  ENOMEM if we ran
