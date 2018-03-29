@@ -80,6 +80,11 @@ static inline void pte_clear_present(pte_t pte)
 	*(kpte_t*)pte &= ~PTE_P;
 }
 
+static inline void pte_clear_dirty(pte_t pte)
+{
+	*(kpte_t*)pte &= ~PTE_D;
+}
+
 static inline void pte_clear(pte_t pte)
 {
 	*(kpte_t*)pte = 0;

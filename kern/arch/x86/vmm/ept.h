@@ -118,6 +118,11 @@ static inline void epte_clear_present(epte_t *epte)
 	*epte &= ~EPTE_P;
 }
 
+static inline void epte_clear_dirty(epte_t *epte)
+{
+	*epte &= ~EPTE_D;
+}
+
 static inline void epte_clear(epte_t *epte)
 {
 	*epte = 0;

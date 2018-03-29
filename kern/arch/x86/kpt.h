@@ -66,6 +66,11 @@ static inline void kpte_clear_present(kpte_t *kpte)
 	*kpte &= ~PTE_P;
 }
 
+static inline void kpte_clear_dirty(kpte_t *kpte)
+{
+	*kpte &= ~PTE_D;
+}
+
 static inline void kpte_clear(kpte_t *kpte)
 {
 	*kpte = 0;

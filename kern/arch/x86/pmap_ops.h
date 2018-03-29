@@ -101,6 +101,12 @@ static inline void pte_clear_present(pte_t pte)
 	epte_clear_present(kpte_to_epte(pte));
 }
 
+static inline void pte_clear_dirty(pte_t pte)
+{
+	kpte_clear_dirty(pte);
+	epte_clear_dirty(kpte_to_epte(pte));
+}
+
 static inline void pte_clear(pte_t pte)
 {
 	kpte_clear(pte);
