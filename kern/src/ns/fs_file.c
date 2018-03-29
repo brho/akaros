@@ -321,8 +321,7 @@ static void fs_file_punch_hole(struct fs_file *f, off64_t begin, off64_t end)
 		if (!nr_pages)
 			return;
 	}
-	/* TODO: this isn't quite the right command */
-	pm_remove_contig(f->pm, first_pg_idx, nr_pages);
+	pm_remove_or_zero_pages(f->pm, first_pg_idx, nr_pages);
 	/* After we removed the pages from the PM, but before we tell the backend,
 	 * someone could load a backend page.  Note that we only tell the backend
 	 * about the intermediate pages - we already dealt with the edge pages

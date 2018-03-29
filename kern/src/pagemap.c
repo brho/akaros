@@ -613,6 +613,64 @@ handle_dirty:
 	return nr_removed;
 }
 
+static bool pm_has_vmr_with_page(struct page_map *pm, unsigned long pg_idx)
+{
+	struct vm_region *vmr_i;
+
+	TAILQ_FOREACH(vmr_i, &pm->pm_vmrs, vm_pm_link) {
+		if (vmr_has_page_idx(vmr_i, pg_idx))
+			return true;
+	}
+	return false;
+}
+
+static bool __remove_or_zero_cb(void **slot, unsigned long tree_idx, void *arg)
+{
+	struct page_map *pm = arg;
+	struct page *page;
+	void *old_slot_val, *slot_val;
+
+	old_slot_val = ACCESS_ONCE(*slot);
+	slot_val = old_slot_val;
+	page = pm_slot_get_page(slot_val);
+	/* We shouldn't have an item in the tree without a page, unless there's
+	 * another removal.  Currently, this CB is called with a spinlock. */
+	assert(page);
+	/* Don't even bother with VMRs that might have faulted in the page */
+	if (pm_has_vmr_with_page(pm, tree_idx)) {
+		memset(page2kva(page), 0, PGSIZE);
+		return false;
+	}
+	/* syncing with lookups, writebacks, etc - anyone who gets a ref on a PM
+	 * leaf/page (e.g. pm_load_page / pm_find_page. */
+	slot_val = pm_slot_set_page(slot_val, NULL);
+	if (pm_slot_check_refcnt(slot_val) ||
+	        !atomic_cas_ptr(slot, old_slot_val, slot_val)) {
+		memset(page2kva(page), 0, PGSIZE);
+		return false;
+	}
+	/* We yanked the page out.  The radix tree still has an item until we return
+	 * true, but this is fine.  Future lock-free lookups will now fail (since
+	 * the page is 0), and insertions will block on the write lock. */
+	atomic_set(&page->pg_flags, 0);	/* cause/catch bugs */
+	page_decref(page);
+	return true;
+}
+
+void pm_remove_or_zero_pages(struct page_map *pm, unsigned long start_idx,
+                             unsigned long nr_pgs)
+{
+	unsigned long end_idx = start_idx + nr_pgs;
+
+	assert(end_idx > start_idx);
+	/* Before removing the lock, double check the CB.  For instance, we assume a
+	 * single remover */
+	spin_lock(&pm->pm_lock);
+	radix_for_each_slot_in_range(&pm->pm_tree, start_idx, end_idx,
+	                             __remove_or_zero_cb, pm);
+	spin_unlock(&pm->pm_lock);
+}
+
 static bool __destroy_cb(void **slot, unsigned long tree_idx, void *arg)
 {
 	struct page *page = pm_slot_get_page(*slot);
