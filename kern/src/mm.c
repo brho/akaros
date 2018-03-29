@@ -482,6 +482,8 @@ void unmap_and_destroy_vmrs(struct proc *p)
 static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
                       uintptr_t va_end)
 {
+	int ret;
+
 	/* Sanity checks.  If these fail, we had a screwed up VMR.
 	 * Check for: alignment, wraparound, or userspace addresses */
 	if ((PGOFF(va_start)) ||
@@ -518,8 +520,11 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 		}
 		return 0;
 	}
-	return env_user_mem_walk(p, (void*)va_start, va_end - va_start, &copy_page,
-	                         new_p);
+	spin_lock(&p->pte_lock);	/* walking and changing PTEs */
+	ret = env_user_mem_walk(p, (void*)va_start, va_end - va_start, &copy_page,
+	                        new_p);
+	spin_unlock(&p->pte_lock);
+	return ret;
 }
 
 static int fill_vmr(struct proc *p, struct proc *new_p, struct vm_region *vmr)
