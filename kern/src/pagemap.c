@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <pagemap.h>
+#include <rcu.h>
 
 void pm_add_vmr(struct page_map *pm, struct vm_region *vmr)
 {
@@ -105,11 +106,11 @@ void pm_init(struct page_map *pm, struct page_map_operations *op, void *host)
 {
 	pm->pm_file = host;
 	radix_tree_init(&pm->pm_tree);
-	pm->pm_num_pages = 0;					/* no pages in a new pm */
+	pm->pm_num_pages = 0;
 	pm->pm_op = op;
+	qlock_init(&pm->pm_qlock);
 	spinlock_init(&pm->pm_lock);
 	TAILQ_INIT(&pm->pm_vmrs);
-	atomic_set(&pm->pm_removal, 0);
 }
 
 /* Looks up the index'th page in the page map, returning a refcnt'd reference
@@ -119,8 +120,10 @@ static struct page *pm_find_page(struct page_map *pm, unsigned long index)
 	void **tree_slot;
 	void *old_slot_val, *slot_val;
 	struct page *page = 0;
-	/* Read walking the PM tree TODO: (RCU) */
-	spin_lock(&pm->pm_lock);
+
+	/* We use rcu to protect our radix walk, specifically the tree_slot pointer.
+	 * We get our own 'pm refcnt' on the slot itself, which doesn't need RCU. */
+	rcu_read_lock();
 	/* We're syncing with removal.  The deal is that if we grab the page (and
 	 * we'd only do that if the page != 0), we up the slot ref and clear
 	 * removal.  A remover will only remove it if removal is still set.  If we
@@ -142,7 +145,7 @@ static struct page *pm_find_page(struct page_map *pm, unsigned long index)
 	} while (!atomic_cas_ptr(tree_slot, old_slot_val, slot_val));
 	assert(page->pg_tree_slot == tree_slot);
 out:
-	spin_unlock(&pm->pm_lock);
+	rcu_read_unlock();
 	return page;
 }
 
@@ -161,8 +164,7 @@ static int pm_insert_page(struct page_map *pm, unsigned long index,
 	int ret;
 	void **tree_slot;
 	void *slot_val = 0;
-	/* write locking the PM */
-	spin_lock(&pm->pm_lock);
+
 	page->pg_mapping = pm;	/* debugging */
 	page->pg_index = index;
 	/* no one should be looking at the tree slot til we stop write locking.  the
@@ -171,16 +173,15 @@ static int pm_insert_page(struct page_map *pm, unsigned long index,
 	slot_val = pm_slot_inc_refcnt(slot_val);
 	/* passing the page ref from the caller to the slot */
 	slot_val = pm_slot_set_page(slot_val, page);
-	/* shouldn't need a CAS or anything for the slot write, since we hold the
-	 * write lock.  o/w, we'd need to get the slot and CAS instead of insert. */
+	qlock(&pm->pm_qlock);
 	ret = radix_insert(&pm->pm_tree, index, slot_val, &tree_slot);
 	if (ret) {
-		spin_unlock(&pm->pm_lock);
+		qunlock(&pm->pm_qlock);
 		return ret;
 	}
 	page->pg_tree_slot = tree_slot;
 	pm->pm_num_pages++;
-	spin_unlock(&pm->pm_lock);
+	qunlock(&pm->pm_qlock);
 	return 0;
 }
 
@@ -393,21 +394,14 @@ int pm_remove_contig(struct page_map *pm, unsigned long index,
 	void *ptr_store[PTR_ARR_LEN];
 	int ptr_free_idx = 0;
 	struct page *page;
+
 	/* could also call a simpler remove if nr_pgs == 1 */
 	if (!nr_pgs)
 		return 0;
-	/* only one remover at a time (since we walk the PM multiple times as our
-	 * 'working list', and need the REMOVAL flag to tell us which pages we're
-	 * working on.  with more than one remover, we'd be confused and would need
-	 * another list.) */
-	if (atomic_swap(&pm->pm_removal, 1)) {
-		/* We got a 1 back, so someone else is already removing */
-		return 0;
-	}
-	/* TODO: RCU: we're read walking the PM tree and write walking the VMR list.
-	 * the reason for the write lock is since we need to prevent new VMRs or the
-	 * changing of a VMR to being pinned. o/w, we could fail to unmap and check
-	 * for dirtiness. */
+
+	/* This is a mess.  Qlock due to the radix_delete later.  spinlock for the
+	 * VMR lists. */
+	qlock(&pm->pm_qlock);
 	spin_lock(&pm->pm_lock);
 	assert(index + nr_pgs > index);	/* til we figure out who validates */
 	/* check for any pinned VMRs.  if we have none, then we can skip some loops
@@ -609,7 +603,7 @@ handle_dirty:
 	}
 	pm->pm_num_pages -= nr_removed;
 	spin_unlock(&pm->pm_lock);
-	atomic_set(&pm->pm_removal, 0);
+	qunlock(&pm->pm_qlock);
 	return nr_removed;
 }
 
@@ -617,10 +611,14 @@ static bool pm_has_vmr_with_page(struct page_map *pm, unsigned long pg_idx)
 {
 	struct vm_region *vmr_i;
 
+	spin_lock(&pm->pm_lock);
 	TAILQ_FOREACH(vmr_i, &pm->pm_vmrs, vm_pm_link) {
-		if (vmr_has_page_idx(vmr_i, pg_idx))
+		if (vmr_has_page_idx(vmr_i, pg_idx)) {
+			spin_unlock(&pm->pm_lock);
 			return true;
+		}
 	}
+	spin_unlock(&pm->pm_lock);
 	return false;
 }
 
@@ -634,7 +632,7 @@ static bool __remove_or_zero_cb(void **slot, unsigned long tree_idx, void *arg)
 	slot_val = old_slot_val;
 	page = pm_slot_get_page(slot_val);
 	/* We shouldn't have an item in the tree without a page, unless there's
-	 * another removal.  Currently, this CB is called with a spinlock. */
+	 * another removal.  Currently, this CB is called with a qlock. */
 	assert(page);
 	/* Don't even bother with VMRs that might have faulted in the page */
 	if (pm_has_vmr_with_page(pm, tree_idx)) {
@@ -663,12 +661,10 @@ void pm_remove_or_zero_pages(struct page_map *pm, unsigned long start_idx,
 	unsigned long end_idx = start_idx + nr_pgs;
 
 	assert(end_idx > start_idx);
-	/* Before removing the lock, double check the CB.  For instance, we assume a
-	 * single remover */
-	spin_lock(&pm->pm_lock);
+	qlock(&pm->pm_qlock);
 	radix_for_each_slot_in_range(&pm->pm_tree, start_idx, end_idx,
 	                             __remove_or_zero_cb, pm);
-	spin_unlock(&pm->pm_lock);
+	qunlock(&pm->pm_qlock);
 }
 
 static bool __destroy_cb(void **slot, unsigned long tree_idx, void *arg)

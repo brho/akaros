@@ -22,6 +22,8 @@
 #define NR_RNODE_SLOTS (1 << LOG_RNODE_SLOTS)
 
 #include <ros/common.h>
+#include <kthread.h>
+#include <atomic.h>
 
 struct radix_node {
 	void						*items[NR_RNODE_SLOTS];
@@ -31,15 +33,36 @@ struct radix_node {
 	struct radix_node			**my_slot;
 };
 
-/* Defines the whole tree. */
+/* writers (insert, delete, and callbacks) must synchronize externally, e.g. a
+ * qlock in the pagemap.
+ *
+ * radix_lookup_slot returns an rcu-protected pointer that needs to be
+ * rcu_read_locked.  The item in the slot (either by *slot or by a regular
+ * radix_lookup) has limited protections.  Higher layers (pagemap) can do their
+ * own thing.  For instance, the page cache writers can zero an item if they
+ * know they cleared the page without someone else grabbing a ref.  We'll
+ * rcu-protect the item pointer, so that higher layers can use RCU for the
+ * actual object.
+ *
+ * Basically the only functions that don't need the caller to hold a qlock are
+ * the two lookup routines: the readers.  The seq counter protects the atomicity
+ * of root, depth, and upper_bound, which defines the reader's start point.  RCU
+ * protects the lifetime of the rnodes, which is where lookup_slot's pointer
+ * points to.
+ *
+ * Note that we use rcu_assign_pointer and rcu_dereference whenever we
+ * manipulate pointers in the tree (pointers to or within rnodes).  We use RCU
+ * for the item pointer too, so that our callers can use RCU if they want.  Both
+ * the slot pointer and what it points to are protected by RCU.
+ */
 struct radix_tree {
+	seq_ctr_t					seq;
 	struct radix_node			*root;
 	unsigned int				depth;
 	unsigned long				upper_bound;
 };
 
 void radix_init(void);		/* initializes the whole radix system */
-#define RADIX_INITIALIZER {0, 0, 0}
 void radix_tree_init(struct radix_tree *tree);	/* inits one tree */
 void radix_tree_destroy(struct radix_tree *tree);
 

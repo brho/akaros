@@ -7,8 +7,10 @@
 #include <ros/errno.h>
 #include <radix.h>
 #include <slab.h>
+#include <kmalloc.h>
 #include <string.h>
 #include <stdio.h>
+#include <rcu.h>
 
 struct kmem_cache *radix_kcache;
 static struct radix_node *__radix_lookup_node(struct radix_tree *tree,
@@ -28,6 +30,7 @@ void radix_init(void)
 /* Initializes a tree dynamically */
 void radix_tree_init(struct radix_tree *tree)
 {
+	tree->seq = SEQCTR_INITIALIZER;
 	tree->root = 0;
 	tree->depth = 0;
 	tree->upper_bound = 0;
@@ -56,19 +59,19 @@ void radix_tree_destroy(struct radix_tree *tree)
 
 /* Attempts to insert an item in the tree at the given key.  ENOMEM if we ran
  * out of memory, EEXIST if an item is already in the tree.  On success, will
- * also return the slot pointer, if requested. */
+ * also return the slot pointer, if requested.
+ *
+ * Caller must maintain mutual exclusion (qlock) */
 int radix_insert(struct radix_tree *tree, unsigned long key, void *item,
                  void ***slot_p)
 {
-	printd("RADIX: insert %p at %d\n", item, key);
 	struct radix_node *r_node;
 	void **slot;
+
 	/* Is the tree tall enough?  if not, it needs to grow a level.  This will
 	 * also create the initial node (upper bound starts at 0). */
 	while (key >= tree->upper_bound) {
-		r_node = kmem_cache_alloc(radix_kcache, 0);
-		if (!r_node)
-			return -ENOMEM;
+		r_node = kmem_cache_alloc(radix_kcache, MEM_WAIT);
 		memset(r_node, 0, sizeof(struct radix_node));
 		if (tree->root) {
 			/* tree->root is the old root, now a child of the future root */
@@ -81,32 +84,38 @@ int radix_insert(struct radix_tree *tree, unsigned long key, void *item,
 			r_node->leaf = TRUE;
 			r_node->parent = 0;
 		}
+		/* Need to atomically change root, depth, and upper_bound for our
+		 * readers, who will check the seq ctr. */
+		__seq_start_write(&tree->seq);
 		tree->root = r_node;
 		r_node->my_slot = &tree->root;
 		tree->depth++;
 		tree->upper_bound = 1ULL << (LOG_RNODE_SLOTS * tree->depth);
+		__seq_end_write(&tree->seq);
 	}
 	assert(tree->root);
 	/* the tree now thinks it is tall enough, so find the last node, insert in
 	 * it, etc */
+	/* This gives us an rcu-protected pointer, though we hold the lock. */
 	r_node = __radix_lookup_node(tree, key, TRUE);
 	assert(r_node);		/* we want an ENOMEM actually, but i want to see this */
 	slot = &r_node->items[key & (NR_RNODE_SLOTS - 1)];
 	if (*slot)
 		return -EEXIST;
-	*slot = item;
+	rcu_assign_pointer(*slot, item);
 	r_node->num_items++;
 	if (slot_p)
-		*slot_p = slot;
+		*slot_p = slot;	/* passing back an rcu-protected pointer */
 	return 0;
 }
 
 /* Removes an item from it's parent's structure, freeing the parent if there is
  * nothing left, potentially recursively. */
-static void __radix_remove_slot(struct radix_node *r_node, struct radix_node **slot)
+static void __radix_remove_slot(struct radix_node *r_node,
+                                struct radix_node **slot)
 {
 	assert(*slot);		/* make sure there is something there */
-	*slot = 0;
+	rcu_assign_pointer(*slot, NULL);
 	r_node->num_items--;
 	/* this check excludes the root, but the if else handles it.  For now, once
 	 * we have a root, we'll always keep it (will need some changing in
@@ -116,6 +125,7 @@ static void __radix_remove_slot(struct radix_node *r_node, struct radix_node **s
 			__radix_remove_slot(r_node->parent, r_node->my_slot);
 		else			/* we're the last node, attached to the actual tree */
 			*(r_node->my_slot) = 0;
+		synchronize_rcu();
 		kmem_cache_free(radix_kcache, r_node);
 	}
 }
@@ -123,17 +133,21 @@ static void __radix_remove_slot(struct radix_node *r_node, struct radix_node **s
 /* Removes a key/item from the tree, returning that item (the void*).  If it
  * detects a radix_node is now unused, it will dealloc that node.  Though the
  * tree will still think it is tall enough to handle its old upper_bound.  It
- * won't "shrink". */
+ * won't "shrink".
+ *
+ * Caller must maintain mutual exclusion (qlock) */
 void *radix_delete(struct radix_tree *tree, unsigned long key)
 {
-	printd("RADIX: delete %d\n", key);
 	void **slot;
 	void *retval;
-	struct radix_node *r_node = __radix_lookup_node(tree, key, 0);
+	struct radix_node *r_node;
+
+	/* This is an rcu-protected pointer, though the caller holds a lock. */
+	r_node = __radix_lookup_node(tree, key, false);
 	if (!r_node)
 		return 0;
 	slot = &r_node->items[key & (NR_RNODE_SLOTS - 1)];
-	retval = *slot;
+	retval = rcu_dereference(*slot);
 	if (retval) {
 		__radix_remove_slot(r_node, (struct radix_node**)slot);
 	} else {
@@ -146,11 +160,13 @@ void *radix_delete(struct radix_tree *tree, unsigned long key)
 /* Returns the item for a given key.  0 means no item, etc. */
 void *radix_lookup(struct radix_tree *tree, unsigned long key)
 {
-	printd("RADIX: lookup %d\n", key);
 	void **slot = radix_lookup_slot(tree, key);
+
 	if (!slot)
 		return 0;
-	return *slot;
+	/* slot was rcu-protected, pointing into the memory of an r_node.  we also
+	 * want *slot, which is "void *item" to be an rcu-protected pointer. */
+	return rcu_dereference(*slot);
 }
 
 /* Returns a pointer to the radix_node holding a given key.  0 if there is no
@@ -161,42 +177,47 @@ void *radix_lookup(struct radix_tree *tree, unsigned long key)
  * ......444444333333222222111111
  *
  * If an interior node of the tree is missing, this will add one if it was
- * directed to extend the tree. */
+ * directed to extend the tree.
+ *
+ * If we might extend, the caller must maintain mutual exclusion (qlock) */
 static struct radix_node *__radix_lookup_node(struct radix_tree *tree,
                                               unsigned long key, bool extend)
 {
-	printd("RADIX: lookup_node %d, %d\n", key, extend);
-	unsigned long idx;
-	struct radix_node *child_node, *r_node = tree->root;
-	if (key	>= tree->upper_bound) {
+	unsigned long idx, upper_bound;
+	unsigned int depth;
+	seq_ctr_t seq;
+	struct radix_node *child_node, *r_node;
+
+	do {
+		seq = ACCESS_ONCE(tree->seq);
+		rmb();
+		r_node = rcu_dereference(tree->root);
+		depth = tree->depth;
+		upper_bound = tree->upper_bound;
+	} while (seqctr_retry(tree->seq, seq));
+
+	if (key	>= upper_bound) {
 		if (extend)
-			warn("Bound (%d) not set for key %d!\n", tree->upper_bound, key);
+			warn("Bound (%d) not set for key %d!\n", upper_bound, key);
 		return 0;
 	}
-	for (int i = tree->depth; i > 1; i--) {	 /* i = ..., 4, 3, 2 */
+	for (int i = depth; i > 1; i--) {	 /* i = ..., 4, 3, 2 */
 		idx = (key >> (LOG_RNODE_SLOTS * (i - 1))) & (NR_RNODE_SLOTS - 1);
 		/* There might not be a node at this part of the tree */
 		if (!r_node->items[idx]) {
-			if (!extend) {
+			if (!extend)
 				return 0;
-			} else {
-				/* so build one, possibly returning 0 if we couldn't */
-				child_node = kmem_cache_alloc(radix_kcache, 0);
-				if (!child_node)
-					return 0;
-				r_node->items[idx] = child_node;
-				memset(child_node, 0, sizeof(struct radix_node));
-				/* when we are on the last iteration (i == 2), the child will be
-				 * a leaf. */
-				child_node->leaf = (i == 2) ? TRUE : FALSE;
-				child_node->parent = r_node;
-				child_node->my_slot = (struct radix_node**)&r_node->items[idx];
-				r_node->num_items++;
-				r_node = (struct radix_node*)r_node->items[idx];
-			}
-		} else {
-			r_node = (struct radix_node*)r_node->items[idx];
+			child_node = kmem_cache_alloc(radix_kcache, MEM_WAIT);
+			memset(child_node, 0, sizeof(struct radix_node));
+			/* when we are on the last iteration (i == 2), the child will be
+			 * a leaf. */
+			child_node->leaf = (i == 2) ? TRUE : FALSE;
+			child_node->parent = r_node;
+			child_node->my_slot = (struct radix_node**)&r_node->items[idx];
+			r_node->num_items++;
+			rcu_assign_pointer(r_node->items[idx], child_node);
 		}
+		r_node = (struct radix_node*)rcu_dereference(r_node->items[idx]);
 	}
 	return r_node;
 }
@@ -205,11 +226,13 @@ static struct radix_node *__radix_lookup_node(struct radix_tree *tree,
  * etc */
 void **radix_lookup_slot(struct radix_tree *tree, unsigned long key)
 {
-	printd("RADIX: lookup slot %d\n", key);
 	struct radix_node *r_node = __radix_lookup_node(tree, key, FALSE);
+
 	if (!r_node)
 		return 0;
 	key = key & (NR_RNODE_SLOTS - 1);
+	/* r_node is rcu-protected.  Our retval is too, since it's a pointer into
+	 * the same object as r_node. */
 	return &r_node->items[key];
 }
 
@@ -289,7 +312,9 @@ static bool rnode_for_each(struct radix_node *r_node, int depth,
 	return num_children ? false : true;
 }
 
-/* [start_idx, end_idx) */
+/* [start_idx, end_idx).
+ *
+ * Caller must maintain mutual exclusion (qlock) */
 void radix_for_each_slot_in_range(struct radix_tree *tree,
                                   unsigned long start_idx,
                                   unsigned long end_idx,
@@ -300,6 +325,7 @@ void radix_for_each_slot_in_range(struct radix_tree *tree,
 	rnode_for_each(tree->root, tree->depth, 0, start_idx, end_idx, cb, arg);
 }
 
+/* Caller must maintain mutual exclusion (qlock) */
 void radix_for_each_slot(struct radix_tree *tree, radix_cb_t cb, void *arg)
 {
 	radix_for_each_slot_in_range(tree, 0, ULONG_MAX, cb, arg);
