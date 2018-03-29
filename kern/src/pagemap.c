@@ -613,9 +613,21 @@ handle_dirty:
 	return nr_removed;
 }
 
+static bool __destroy_cb(void **slot, unsigned long tree_idx, void *arg)
+{
+	struct page *page = pm_slot_get_page(*slot);
+
+	/* Should be no users or need to sync */
+	assert(pm_slot_check_refcnt(*slot) == 0);
+	atomic_set(&page->pg_flags, 0);	/* catch bugs */
+	page_decref(page);
+	return true;
+}
+
 void pm_destroy(struct page_map *pm)
 {
-	/* TODO: implement me! */
+	radix_for_each_slot(&pm->pm_tree, __destroy_cb, pm);
+	radix_tree_destroy(&pm->pm_tree);
 }
 
 void print_page_map_info(struct page_map *pm)
