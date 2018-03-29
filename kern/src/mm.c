@@ -92,9 +92,9 @@ ssize_t foc_read(struct file_or_chan *foc, void *buf, size_t amt, off64_t off)
 	panic("unknown F_OR_C type");
 }
 
-static void foc_release(struct kref *kref)
+static void __foc_free_rcu(struct rcu_head *head)
 {
-	struct file_or_chan *foc = container_of(kref, struct file_or_chan, kref);
+	struct file_or_chan *foc = container_of(head, struct file_or_chan, rcu);
 
 	switch (foc->type) {
 	case F_OR_C_CHAN:
@@ -104,6 +104,15 @@ static void foc_release(struct kref *kref)
 		panic("unknown F_OR_C type, %d", foc->type);
 	}
 	kfree(foc);
+}
+
+static void foc_release(struct kref *kref)
+{
+	struct file_or_chan *foc = container_of(kref, struct file_or_chan, kref);
+
+	/* A lot of places decref while holding a spinlock, but we can't free then,
+	 * since the cclose() might block. */
+	call_rcu(&foc->rcu, __foc_free_rcu);
 }
 
 static struct file_or_chan *foc_alloc(void)

@@ -13,6 +13,7 @@
 #include <sys/queue.h>
 #include <slab.h>
 #include <kref.h>
+#include <rcu.h>
 
 struct chan;
 struct fd_table;
@@ -25,6 +26,7 @@ struct file_or_chan {
 	struct chan *chan;
 	struct fs_file *fsf;	/* weak ref, set during mmap. */
 	struct kref kref;
+	struct rcu_head rcu;
 };
 
 char *foc_to_name(struct file_or_chan *foc);
