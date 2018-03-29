@@ -311,6 +311,7 @@ static struct vm_region *split_vmr(struct vm_region *old_vmr, uintptr_t va)
 	if ((old_vmr->vm_base >= va) || (old_vmr->vm_end <= va))
 		return 0;
 	new_vmr = kmem_cache_alloc(vmr_kcache, 0);
+	assert(new_vmr);
 	TAILQ_INSERT_AFTER(&old_vmr->vm_proc->vm_regions, old_vmr, new_vmr,
 	                   vm_link);
 	new_vmr->vm_proc = old_vmr->vm_proc;
