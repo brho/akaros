@@ -1159,7 +1159,7 @@ struct dir *chandirstat(struct chan *c)
 
 	nd = DIRSIZE;
 	for (i = 0; i < 2; i++) {	/* should work by the second try */
-		d = kzmalloc(sizeof(struct dir) + nd, 0);
+		d = kzmalloc(sizeof(struct dir) + nd, MEM_WAIT);
 		buf = (uint8_t *) & d[1];
 		if (waserror()) {
 			kfree(d);
@@ -1249,7 +1249,7 @@ int sysdirwstat(char *name, struct dir *dir)
 	int r;
 
 	r = sizeD2M(dir);
-	buf = kzmalloc(r, 0);
+	buf = kzmalloc(r, MEM_WAIT);
 	convD2M(dir, buf, r);
 	r = syswstat(name, buf, r);
 	kfree(buf);
@@ -1263,7 +1263,7 @@ int sysdirfwstat(int fd, struct dir *dir)
 	int r;
 
 	r = sizeD2M(dir);
-	buf = kzmalloc(r, 0);
+	buf = kzmalloc(r, MEM_WAIT);
 	convD2M(dir, buf, r);
 	r = sysfwstat(fd, buf, r);
 	kfree(buf);
