@@ -62,6 +62,7 @@ int pm_remove_contig(struct page_map *pm, unsigned long index,
                      unsigned long nr_pgs);
 void pm_remove_or_zero_pages(struct page_map *pm, unsigned long start_idx,
                              unsigned long nr_pgs);
+void pm_writeback_pages(struct page_map *pm);
 void pm_destroy(struct page_map *pm);
 void pm_page_asserter(struct page *page, char *str);
 void print_page_map_info(struct page_map *pm);

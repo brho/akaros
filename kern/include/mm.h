@@ -55,6 +55,7 @@ struct vm_region {
 	struct file_or_chan			*__vm_foc;
 	size_t						vm_foff;
 	bool						vm_ready;	/* racy, for the PM checks */
+	bool						vm_shootdown_needed;
 };
 TAILQ_HEAD(vmr_tailq, vm_region);			/* Declares 'struct vmr_tailq' */
 

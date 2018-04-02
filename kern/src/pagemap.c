@@ -290,26 +290,38 @@ static bool vmr_has_page_idx(struct vm_region *vmr, unsigned long pg_idx)
 	return ((start_pg <= pg_idx) && (pg_idx < start_pg + nr_pgs));
 }
 
-static void *vmr_idx_to_va(struct vm_region *vmr, unsigned long pg_idx)
-{
-	uintptr_t va = vmr->vm_base + ((pg_idx << PGSHIFT) - vmr->vm_foff);
-	assert(va < vmr->vm_end);
-	return (void*)va;
-}
-
 static unsigned long vmr_get_end_idx(struct vm_region *vmr)
 {
 	return ((vmr->vm_end - vmr->vm_base) + vmr->vm_foff) >> PGSHIFT;
 }
 
+/* Runs CB on every PTE in the VMR that corresponds to the file's pg_idx, for up
+ * to max_nr_pgs. */
 static void vmr_for_each(struct vm_region *vmr, unsigned long pg_idx,
                          unsigned long max_nr_pgs, mem_walk_callback_t callback)
 {
-	void *start_va = vmr_idx_to_va(vmr, pg_idx);
-	size_t len = vmr->vm_end - (uintptr_t)start_va;
-	len = MIN(len, max_nr_pgs << PGSHIFT);
-	/* TODO: start using pml_for_each, across all arches */
-	env_user_mem_walk(vmr->vm_proc, start_va, len, callback, 0);
+	uintptr_t start_va;
+	off64_t file_off = pg_idx << PGSHIFT;
+	size_t len = max_nr_pgs << PGSHIFT;
+
+	if (file_off < vmr->vm_foff) {
+		len -= vmr->vm_foff - file_off;
+		file_off = vmr->vm_foff;
+	}
+
+	start_va = vmr->vm_base + (file_off - vmr->vm_foff);
+	if (start_va < vmr->vm_base) {
+		warn("wraparound! %p %p %p %p", start_va, vmr->vm_base, vmr->vm_foff,
+		     pg_idx);
+		return;
+	}
+	if (start_va >= vmr->vm_end)
+		return;
+
+	len = MIN(len, vmr->vm_end - start_va);
+	if (!len)
+		return;
+	env_user_mem_walk(vmr->vm_proc, (void*)start_va, len, callback, vmr);
 }
 
 /* These next two helpers are called on a VMR's range of VAs corresponding to a
@@ -664,6 +676,105 @@ void pm_remove_or_zero_pages(struct page_map *pm, unsigned long start_idx,
 	qlock(&pm->pm_qlock);
 	radix_for_each_slot_in_range(&pm->pm_tree, start_idx, end_idx,
 	                             __remove_or_zero_cb, pm);
+	qunlock(&pm->pm_qlock);
+}
+
+static int __pm_mark_and_clear_dirty(struct proc *p, pte_t pte, void *va,
+                                     void *arg)
+{
+	struct page *page = pa2page(pte_get_paddr(pte));
+	struct vm_region *vmr = arg;
+
+	if (!pte_is_present(pte) || !pte_is_dirty(pte))
+		return 0;
+	if (!(atomic_read(&page->pg_flags) & PG_DIRTY))
+		atomic_or(&page->pg_flags, PG_DIRTY);
+	pte_clear_dirty(pte);
+	vmr->vm_shootdown_needed = true;
+	return 0;
+}
+
+/* Dirty PTE bits will get marked to the struct page itself, and the PTEs will
+ * have the dirty bit cleared.  VMRs that need a shootdown are marked.  Note
+ * this only marks PTEs and VMRs if they were the one to do some of the
+ * dirtying. */
+static void mark_and_clear_dirty_ptes(struct page_map *pm)
+{
+	struct vm_region *vmr_i;
+	pte_t pte;
+
+	spin_lock(&pm->pm_lock);
+	TAILQ_FOREACH(vmr_i, &pm->pm_vmrs, vm_pm_link) {
+		if (!(vmr_i->vm_prot & PROT_WRITE))
+			continue;
+		/* Only care about shared mappings, not private.  Private mappings have
+		 * a reference to the file, but the pages are not in the page cache -
+		 * they hang directly off the PTEs (for now). */
+		if (!(vmr_i->vm_flags & MAP_SHARED))
+			continue;
+		spin_lock(&vmr_i->vm_proc->pte_lock);
+		vmr_for_each(vmr_i, 0, ULONG_MAX, __pm_mark_and_clear_dirty);
+		spin_unlock(&vmr_i->vm_proc->pte_lock);
+	}
+	spin_unlock(&pm->pm_lock);
+}
+
+static void shootdown_vmrs(struct page_map *pm)
+{
+	struct vm_region *vmr_i;
+
+	/* The VMR flag shootdown_needed is owned by the PM.  Each VMR is hooked to
+	 * at most one file, so there's no issue there.  We might have a proc that
+	 * has multiple non-private VMRs in the same file, but it shouldn't be a big
+	 * enough issue to worry about. */
+	spin_lock(&pm->pm_lock);
+	TAILQ_FOREACH(vmr_i, &pm->pm_vmrs, vm_pm_link) {
+		if (vmr_i->vm_shootdown_needed) {
+			vmr_i->vm_shootdown_needed = false;
+			proc_tlbshootdown(vmr_i->vm_proc, 0, 0);
+		}
+	}
+	spin_unlock(&pm->pm_lock);
+}
+
+/* Send any queued WBs that haven't been sent yet. */
+static void flush_queued_writebacks(struct page_map *pm)
+{
+	/* TODO (WB) */
+}
+
+/* Batches up pages to be written back, preferably as one big op.  If we have a
+ * bunch outstanding, we'll send them. */
+static void queue_writeback(struct page_map *pm, struct page *page)
+{
+	/* TODO (WB): add a bulk op (instead of only writepage()), collect extents,
+	 * and send them to the device.  Probably do something similar for reads. */
+	pm->pm_op->writepage(pm, page);
+}
+
+static bool __writeback_cb(void **slot, unsigned long tree_idx, void *arg)
+{
+	struct page_map *pm = arg;
+	struct page *page = pm_slot_get_page(*slot);
+
+	/* We're qlocked, so all items should have pages. */
+	assert(page);
+	if (atomic_read(&page->pg_flags) & PG_DIRTY) {
+		atomic_and(&page->pg_flags, ~PG_DIRTY);
+		queue_writeback(pm, page);
+	}
+	return false;
+}
+
+/* Every dirty page gets written back, regardless of whether it's in a VMR or
+ * not.  All the dirty bits get cleared too, before writing back. */
+void pm_writeback_pages(struct page_map *pm)
+{
+	qlock(&pm->pm_qlock);
+	mark_and_clear_dirty_ptes(pm);
+	shootdown_vmrs(pm);
+	radix_for_each_slot(&pm->pm_tree, __writeback_cb, pm);
+	flush_queued_writebacks(pm);
 	qunlock(&pm->pm_qlock);
 }
 
