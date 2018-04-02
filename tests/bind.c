@@ -1,6 +1,6 @@
 #define _LARGEFILE64_SOURCE /* needed to use lseek64 */
 
-#include <stdio.h> 
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -16,24 +16,28 @@
  * 		bind src_path onto_path
  * plan9 says bind NEW OLD, where new is *src*, and old is *onto*.
  * Linux says mount --bind OLD NEW, where OLD is *src* and NEW is *onto*. */
-int main(int argc, char *argv[]) 
-{ 
+int main(int argc, char *argv[])
+{
 	int ret;
 	int flag = 0;
 	char *src_path, *onto_path;
+
 	/* crap arg handling for now. */
-	argc--,argv++;
-	if (argc > 2){
-		switch(argv[0][1]){
-			case 'b': flag = 1;
+	argc--, argv++;
+	while (argc > 2) {
+		switch (argv[0][1]) {
+		case 'b':
+			flag |= 1;
 			break;
-			case 'a': flag = 2;
+		case 'a':
+			flag |= 2;
 			break;
-			case 'c': flag = 4;
+		case 'c':
+			flag |= 4;
 			break;
-			default: 
-				printf("-a or -b and/or -c for now\n");
-				exit(0);
+		default:
+			printf("-a or -b and/or -c for now\n");
+			exit(0);
 		}
 		argc--, argv++;
 	}
