@@ -1096,6 +1096,8 @@ int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 	vmr = first_vmr;
 	spin_lock(&p->pte_lock);	/* changing PTEs */
 	while (vmr && vmr->vm_base < addr + len) {
+		/* It's important that we call __munmap_pte and sync the PG_DIRTY bit
+		 * before we unhook the VMR from the PM (in destroy_vmr). */
 		env_user_mem_walk(p, (void*)vmr->vm_base, vmr->vm_end - vmr->vm_base,
 		                  __munmap_pte, &shootdown_needed);
 		vmr = TAILQ_NEXT(vmr, vm_link);

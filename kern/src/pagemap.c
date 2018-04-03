@@ -778,6 +778,68 @@ void pm_writeback_pages(struct page_map *pm)
 	qunlock(&pm->pm_qlock);
 }
 
+static bool __flush_unused_cb(void **slot, unsigned long tree_idx, void *arg)
+{
+	struct page_map *pm = arg;
+	struct page *page = pm_slot_get_page(*slot);
+	void *old_slot_val, *slot_val;
+
+	/* We're qlocked, so all items should have pages. */
+	assert(page);
+	old_slot_val = ACCESS_ONCE(*slot);
+	slot_val = old_slot_val;
+	/* Under any contention, we just skip it */
+	if (pm_slot_check_refcnt(slot_val))
+		return false;
+	assert(pm_slot_get_page(slot_val) == page);
+	slot_val = pm_slot_set_page(slot_val, NULL);
+	if (!atomic_cas_ptr(slot, old_slot_val, slot_val))
+		return false;
+	/* At this point, we yanked the page.  any concurrent wait-free users that
+	 * want to get this page will fail (pm_find_page / pm_load_page_nowait).
+	 * They will block on the qlock that we hold when they try to insert a page
+	 * (as part of pm_load_page, for both reading or writing).  We can still
+	 * bail out and everything will be fine, so long as we put the page back.
+	 *
+	 * We can't tell from looking at the page if it was actually faulted into
+	 * the VMR; we just know it was possible.  (currently).  Also, we need to do
+	 * this check after removing the page from the PM slot, since the mm
+	 * faulting code (hpf) will attempt a non-blocking PM lookup. */
+	if (pm_has_vmr_with_page(pm, tree_idx)) {
+		slot_val = pm_slot_set_page(slot_val, page);
+		/* No one should be writing to it.  We hold the qlock, and any readers
+		 * should not have increffed while the page was NULL. */
+		WRITE_ONCE(*slot, slot_val);
+		return false;
+	}
+	/* Need to check PG_DIRTY *after* checking VMRs.  o/w we could check, PAUSE,
+	 * see no VMRs.  But in the meantime, we had a VMR that munmapped and
+	 * wrote-back the dirty flag. */
+	if (atomic_read(&page->pg_flags) & PG_DIRTY) {
+		/* If we want to batch these, we'll also have to batch the freeing,
+		 * which isn't a big deal.  Just do it before freeing and before
+		 * unlocking the PM; we don't want someone to load the page from the
+		 * backing store and get an old value. */
+		pm->pm_op->writepage(pm, page);
+	}
+	/* All clear - the page is unused and (now) clean. */
+	atomic_set(&page->pg_flags, 0);	/* catch bugs */
+	page_decref(page);
+	return true;
+}
+
+/* Unused pages (not currently involved in a read, write, or mmap) are pruned.
+ * Dirty pages are written back first.
+ *
+ * We ignore anything mapped in a VMR.  Not bothering with unmapping or
+ * shootdowns or anything.  At least for now. */
+void pm_free_unused_pages(struct page_map *pm)
+{
+	qlock(&pm->pm_qlock);
+	radix_for_each_slot(&pm->pm_tree, __flush_unused_cb, pm);
+	qunlock(&pm->pm_qlock);
+}
+
 static bool __destroy_cb(void **slot, unsigned long tree_idx, void *arg)
 {
 	struct page *page = pm_slot_get_page(*slot);
