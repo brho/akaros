@@ -57,14 +57,6 @@
  *
  * The PM code is pretty rough.  For now, we're using the old VFS PM code, but
  * it needs a few changes:
- * - Hole punching / truncate:  pm_remove_contig() leaves behind pages if they
- *   were concurrently opened.  We can't detach from the tree since the pm_page
- *   assumes it is always hooked in.  This means a truncate during a read or
- *   mmap could leave data behind in the PM, which will be accessible when len
- *   gets increased again (e.g. seek and write).  Truncate could zero that page,
- *   though we'd need a history counter so reads don't see a partial value.
- *   Further, pinned VMRs get skipped.  During trunc, they should get removed
- *   and generate a SIGBUS on access.
  * - Heavily integrated with struct page.  Maybe some sort of 'struct page' on
  *   demand, that is built for an IO mapping.  There might be some huge-page
  *   stuff here too.

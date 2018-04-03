@@ -58,8 +58,6 @@ int pm_load_page_nowait(struct page_map *pm, unsigned long index,
 void pm_put_page(struct page *page);
 void pm_add_vmr(struct page_map *pm, struct vm_region *vmr);
 void pm_remove_vmr(struct page_map *pm, struct vm_region *vmr);
-int pm_remove_contig(struct page_map *pm, unsigned long index,
-                     unsigned long nr_pgs);
 void pm_remove_or_zero_pages(struct page_map *pm, unsigned long start_idx,
                              unsigned long nr_pgs);
 void pm_writeback_pages(struct page_map *pm);
