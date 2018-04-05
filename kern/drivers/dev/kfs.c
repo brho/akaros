@@ -241,20 +241,44 @@ static int add_kfs_entry(struct cpio_bin_hdr *c_bhdr, void *cb_arg)
 	return 0;
 }
 
-static void kfs_extract_cpio(void)
+struct cpio_info {
+	void *base;
+	size_t sz;
+};
+
+static void kfs_get_cpio_info(struct cpio_info *ci)
 {
 	extern uint8_t _binary_obj_kern_initramfs_cpio_size[];
 	extern uint8_t _binary_obj_kern_initramfs_cpio_start[];
 
-	void *cpio_base = (void*)_binary_obj_kern_initramfs_cpio_start;
-	size_t cpio_sz = (size_t)_binary_obj_kern_initramfs_cpio_size;
+	ci->base = (void*)_binary_obj_kern_initramfs_cpio_start;
+	ci->sz = (size_t)_binary_obj_kern_initramfs_cpio_size;
+}
 
-	parse_cpio_entries(cpio_base, cpio_sz, add_kfs_entry, kfs.tfs.root);
+static void kfs_extract_cpio(struct cpio_info *ci)
+{
+	parse_cpio_entries(ci->base, ci->sz, add_kfs_entry, kfs.tfs.root);
+}
+
+static void kfs_free_cpio(struct cpio_info *ci)
+{
+	void *base = ci->base;
+	size_t sz = ci->sz;
+
+	/* The base arena requires page aligned, page sized segments. */
+	sz -= ROUNDUP(base, PGSIZE) - base;
+	sz = ROUNDDOWN(sz, PGSIZE);
+	base = ROUNDUP(base, PGSIZE);
+	/* Careful - the CPIO is part of the kernel blob and a code address. */
+	base = KBASEADDR(base);
+	printk("Freeing %d MB of CPIO RAM\n", sz >> 20);
+	arena_add(base_arena, base, sz, MEM_WAIT);
 }
 
 static void kfs_init(void)
 {
 	struct tree_filesystem *tfs = &kfs.tfs;
+	struct cpio_info ci[1];
 
 	/* This gives us one ref on tfs->root. */
 	tfs_init(tfs);
@@ -264,7 +288,9 @@ static void kfs_init(void)
 	__kfs_tf_init(tfs->root, &kfs_devtab - devtab, 0, &eve, DMDIR | 0777);
 	/* Other devices might want to create things like kthreads that run the LRU
 	 * pruner or PM sweeper. */
-	kfs_extract_cpio();
+	kfs_get_cpio_info(ci);
+	kfs_extract_cpio(ci);
+	kfs_free_cpio(ci);
 	/* This has another kref.  Note that each attach gets a ref and each new
 	 * process gets a ref. */
 	kern_slash = tree_file_alloc_chan(kfs.tfs.root, &kfs_devtab, "/");
