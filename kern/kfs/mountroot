@@ -37,4 +37,4 @@ fi
 
 srv $DIALSTRING $SRVNAME
 
-mount -a -c /srv/$SRVNAME /mnt
+mount -b -c -C /srv/$SRVNAME /mnt

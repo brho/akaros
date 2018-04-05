@@ -507,7 +507,8 @@ int sysmount(int fd, int afd, char *old, int flags, char *spec)
 	mntparam.spec = spec;
 	mntparam.flags = flags;
 	c0.c = devtab[devno("mnt", 0)].attach((char *)&mntparam);
-
+	if (flags & MCACHE)
+		c0.c = devtab[devno("gtfs", 0)].attach((char*)c0.c);
 	r = bindmount(c0.c, old, flags, spec);
 	poperror();
 	cclose(ac.c);

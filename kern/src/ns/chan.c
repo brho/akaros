@@ -1472,8 +1472,12 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm, void *ext)
 			} else {
 				devspec = &devname[n];
 			}
+			/* These devices have special attach functions that treat the char *
+			 * as a blob pointer */
 			if (!strcmp(devname, "mnt"))
-				error(EINVAL, ERROR_FIXME);
+				error(EINVAL, "can't namec-attach #mnt");
+			if (!strcmp(devname, "gtfs"))
+				error(EINVAL, "can't namec-attach #gtfs");
 			/* TODO: deal with this "nodevs" business. */
 			#if 0
 			/*
