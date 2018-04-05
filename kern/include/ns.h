@@ -460,8 +460,8 @@ struct chan {
 	struct chan *next;			/* allocation */
 	struct chan *link;
 	int64_t offset;				/* in file */
-	int type;
-	uint32_t dev;
+	int type;					/* ID for device type, e.g. #mnt, #kfs, #ip */
+	uint32_t dev;				/* device specific; can be an instance ID */
 	uint16_t mode;				/* read/write */
 	int flag;
 	struct qid qid;
