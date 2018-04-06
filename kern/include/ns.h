@@ -1042,6 +1042,11 @@ uint16_t nhgets(void *);
 
 char *get_cur_genbuf(void);
 
+static inline const char *chan_dev_name(struct chan *c)
+{
+	return devtab[c->type].name;
+}
+
 /* hack for now. */
 #define	NOW	tsc2msec(read_tsc())
 #define	seconds() tsc2sec(read_tsc())
