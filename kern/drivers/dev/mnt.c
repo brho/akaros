@@ -346,15 +346,9 @@ static struct chan *mntattach(char *muxattach)
 	struct mnt *m;
 	struct chan *c;
 	struct mntrpc *r;
-	struct bogus {
-		struct chan *chan;
-		struct chan *authchan;
-		char *spec;
-		int flags;
-	} bogus;
+	struct mntparam *params = (struct mntparam *)muxattach;
 
-	bogus = *((struct bogus *)muxattach);
-	c = bogus.chan;
+	c = params->chan;
 
 	m = c->mux;
 
@@ -383,12 +377,12 @@ static struct chan *mntattach(char *muxattach)
 
 	r->request.type = Tattach;
 	r->request.fid = c->fid;
-	if (bogus.authchan == NULL)
+	if (params->authchan == NULL)
 		r->request.afid = NOFID;
 	else
-		r->request.afid = bogus.authchan->fid;
+		r->request.afid = params->authchan->fid;
 	r->request.uname = current->user.name;
-	r->request.aname = bogus.spec;
+	r->request.aname = params->spec;
 	mountrpc(m, r);
 
 	c->qid = r->reply.qid;
@@ -401,7 +395,7 @@ static struct chan *mntattach(char *muxattach)
 
 	poperror();	/* c */
 
-	if (bogus.flags & MCACHE)
+	if (params->flags & MCACHE)
 		c->flag |= CCACHE;
 	return c;
 }
