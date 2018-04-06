@@ -302,6 +302,18 @@ static struct chan *kfs_attach(char *spec)
 	return tree_file_alloc_chan(kfs.tfs.root, &kfs_devtab, "#kfs");
 }
 
+static unsigned long kfs_chan_ctl(struct chan *c, int op, unsigned long a1,
+                                  unsigned long a2, unsigned long a3,
+                                  unsigned long a4)
+{
+	switch (op) {
+	case CCTL_SYNC:
+		return 0;
+	default:
+		error(EINVAL, "%s does not support %d", __func__, op);
+	}
+}
+
 struct dev kfs_devtab __devtab = {
 	.name = "kfs",
 	.reset = devreset,
@@ -323,4 +335,5 @@ struct dev kfs_devtab __devtab = {
 	.power = devpower,
 	.chaninfo = devchaninfo,
 	.mmap = tree_chan_mmap,
+	.chan_ctl = kfs_chan_ctl,
 };

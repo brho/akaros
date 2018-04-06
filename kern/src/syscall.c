@@ -1895,10 +1895,11 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
 		return sysdup(fd, newfd, FALSE);
 	case (F_GETFD):
 	case (F_SETFD):
-	case (F_SYNC):
 	case (F_ADVISE):
 		/* TODO: 9ns versions */
 		return 0;
+	case (F_SYNC):
+		return fd_sync(fd);
 	case (F_GETFL):
 		return fd_getfl(fd);
 	case (F_SETFL):

@@ -810,6 +810,22 @@ static void gtfs_sync_chans_fs(struct chan *any_c)
 	gtfs_sync_gtfs(chan_to_gtfs(any_c));
 }
 
+static unsigned long gtfs_chan_ctl(struct chan *c, int op, unsigned long a1,
+                                   unsigned long a2, unsigned long a3,
+                                   unsigned long a4)
+{
+	switch (op) {
+	case CCTL_SYNC:
+		if (tree_file_is_dir(chan_to_tree_file(c)))
+			gtfs_sync_chans_fs(c);
+		else
+			gtfs_sync_chan(c);
+		return 0;
+	default:
+		error(EINVAL, "%s does not support %d", __func__, op);
+	}
+}
+
 struct dev gtfs_devtab __devtab = {
 	.name = "gtfs",
 
@@ -831,4 +847,5 @@ struct dev gtfs_devtab __devtab = {
 	.power = devpower,
 	.chaninfo = devchaninfo,
 	.mmap = tree_chan_mmap,
+	.chan_ctl = gtfs_chan_ctl,
 };

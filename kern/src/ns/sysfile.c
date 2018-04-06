@@ -1521,6 +1521,30 @@ int fd_setfl(int fd, int flags)
 	return ret;
 }
 
+int fd_sync(int fd)
+{
+	ERRSTACK(2);
+	struct chan *c;
+	int ret = 0;
+
+	if (waserror()) {
+		poperror();
+		return -1;
+	}
+	c = fdtochan(&current->open_files, fd, -1, 0, 1);
+	if (waserror()) {
+		cclose(c);
+		nexterror();
+	}
+	if (!devtab[c->type].chan_ctl)
+		error(EINVAL, "can't fsync, %s has no chan_ctl", chan_dev_name(c));
+	ret = devtab[c->type].chan_ctl(c, CCTL_SYNC, 0, 0, 0, 0);
+	poperror();
+	cclose(c);
+	poperror();
+	return ret;
+}
+
 ssize_t kread_file(struct file_or_chan *file, void *buf, size_t sz)
 {
 	/* TODO: (KFOP) (VFS kernel read/writes need to be from a ktask) */

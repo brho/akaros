@@ -134,6 +134,7 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
  * chan, you already have the flags.  It's not like when you have an FD and
  * don't (yet) have the Unix struct file. */
 #define CCTL_SET_FL				1
+#define CCTL_SYNC				2
 
 struct qid {
 	uint64_t path;
@@ -1124,6 +1125,7 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags);
 int iseve(void);
 int fd_getfl(int fd);
 int fd_setfl(int fd, int flags);
+int fd_sync(int fd);
 
 /* kern/drivers/dev/srv.c */
 char *srvname(struct chan *c);

@@ -246,6 +246,18 @@ void tmpfs_rename(struct chan *c, struct chan *new_p_c, const char *name,
 	tree_chan_rename(c, new_p_c, name, flags);
 }
 
+static unsigned long tmpfs_chan_ctl(struct chan *c, int op, unsigned long a1,
+                                    unsigned long a2, unsigned long a3,
+                                    unsigned long a4)
+{
+	switch (op) {
+	case CCTL_SYNC:
+		return 0;
+	default:
+		error(EINVAL, "%s does not support %d", __func__, op);
+	}
+}
+
 struct dev tmpfs_devtab __devtab = {
 	.name = "tmpfs",
 	.reset = devreset,
@@ -267,4 +279,5 @@ struct dev tmpfs_devtab __devtab = {
 	.power = devpower,
 	.chaninfo = devchaninfo,
 	.mmap = tree_chan_mmap,
+	.chan_ctl = tmpfs_chan_ctl,
 };
