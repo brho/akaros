@@ -1881,23 +1881,19 @@ static intreg_t sys_lstat(struct proc *p, const char *path, size_t path_l,
 intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
                    unsigned long arg2, unsigned long arg3, unsigned long arg4)
 {
-	int retval = 0;
-	int newfd;
-
 	switch (cmd) {
 	case (F_DUPFD):
-		newfd = arg1;
-		if (newfd < 0) {
-			set_errno(EBADF);
+		/* TODO: glibc uses regular DUPFD for dup2, which is racy. */
+		return sysdup(fd, arg1, FALSE);
+	case (F_GETFD):
+		return fd_get_fd_flags(&p->open_files, fd);
+	case (F_SETFD):
+		if (arg1 & ~FD_VALID_FLAGS) {
+			set_error(EINVAL, "Bad FD flags %p, valid are %p", arg1,
+			          FD_VALID_FLAGS);
 			return -1;
 		}
-		/* TODO: glibc uses regular DUPFD for dup2, which is racy. */
-		return sysdup(fd, newfd, FALSE);
-	case (F_GETFD):
-	case (F_SETFD):
-	case (F_ADVISE):
-		/* TODO: 9ns versions */
-		return 0;
+		return fd_set_fd_flags(&p->open_files, fd, arg1);
 	case (F_SYNC):
 		return fd_sync(fd);
 	case (F_GETFL):
@@ -1905,7 +1901,7 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
 	case (F_SETFL):
 		return fd_setfl(fd, arg1);
 	}
-	set_errno(EBADF);
+	set_error(EINVAL, "Unsupported fcntl cmd %d", cmd);
 	return -1;
 }
 

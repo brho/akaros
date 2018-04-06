@@ -73,8 +73,11 @@ struct kstat {
 #define F_SETFL		4	/* Set file status flags */
 #define F_SYNC		101	/* fsync() */
 #define F_ADVISE	102	/* posix_fadvise{,64}() */
+
 /* For F_[GET|SET]FD */
 #define FD_CLOEXEC	1
+#define FD_VALID_FLAGS (FD_CLOEXEC)
+
 /* Advise to `posix_fadvise'.  */
 #define POSIX_FADV_NORMAL		0	/* No further special treatment */
 #define POSIX_FADV_RANDOM		1	/* Expect random page references */

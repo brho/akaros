@@ -1126,6 +1126,8 @@ int iseve(void);
 int fd_getfl(int fd);
 int fd_setfl(int fd, int flags);
 int fd_sync(int fd);
+int fd_get_fd_flags(struct fd_table *fdt, int fd);
+int fd_set_fd_flags(struct fd_table *fdt, int fd, int new_fl);
 
 /* kern/drivers/dev/srv.c */
 char *srvname(struct chan *c);

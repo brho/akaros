@@ -1869,3 +1869,41 @@ void clone_fdt(struct fd_table *src, struct fd_table *dst)
 	spin_unlock(&dst->lock);
 	spin_unlock(&src->lock);
 }
+
+int fd_get_fd_flags(struct fd_table *fdt, int fd)
+{
+	int ret = -1;
+
+	if (fd < 0)
+		return -1;
+	spin_lock(&fdt->lock);
+	if (fdt->closed) {
+		spin_unlock(&fdt->lock);
+		return -1;
+	}
+	if ((fd < fdt->max_fdset) && GET_BITMASK_BIT(fdt->open_fds->fds_bits, fd))
+		ret = fdt->fd[fd].fd_flags;
+	spin_unlock(&fdt->lock);
+	if (ret == -1)
+		set_error(EBADF, "FD was not open");
+	return ret;
+}
+
+int fd_set_fd_flags(struct fd_table *fdt, int fd, int new_fl)
+{
+	int ret = -1;
+
+	if (fd < 0)
+		return -1;
+	spin_lock(&fdt->lock);
+	if (fdt->closed) {
+		spin_unlock(&fdt->lock);
+		return -1;
+	}
+	if ((fd < fdt->max_fdset) && GET_BITMASK_BIT(fdt->open_fds->fds_bits, fd))
+		fdt->fd[fd].fd_flags = new_fl;
+	spin_unlock(&fdt->lock);
+	if (ret == -1)
+		set_error(EBADF, "FD was not open");
+	return ret;
+}
