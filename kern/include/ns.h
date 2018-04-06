@@ -397,8 +397,7 @@ enum {
 	COPEN = 		0x0001,	/* for i/o */
 	CMSG = 			0x0002,	/* the message channel for a mount */
 	CFREE = 		0x0004,	/* not in use */
-	CCACHE = 		0x0008,	/* client cache */
-	CINTERNAL_FLAGS = (COPEN | CMSG | CFREE | CCACHE),
+	CINTERNAL_FLAGS = (COPEN | CMSG | CFREE),
 
 	/* chan/file flags, getable via fcntl/getfl and setably via open and
 	 * sometimes fcntl/setfl.  those that can't be set cause an error() in
@@ -619,7 +618,6 @@ struct mntparam {
 	struct chan *chan;
 	struct chan *authchan;
 	char *spec;
-	int flags;
 };
 
 struct pgrp {

@@ -394,9 +394,6 @@ static struct chan *mntattach(char *muxattach)
 	mntfree(r);
 
 	poperror();	/* c */
-
-	if (params->flags & MCACHE)
-		c->flag |= CCACHE;
 	return c;
 }
 

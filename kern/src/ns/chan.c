@@ -1218,8 +1218,6 @@ Open:
 						c->umh = m;
 					else
 						putmhead(m);
-					if (omode == O_EXEC)
-						c->flag &= ~CCACHE;
 					/* here is where convert omode/vfs flags to c->flags.
 					 * careful, O_CLOEXEC and O_REMCLO are in there.  might need
 					 * to change that. */
