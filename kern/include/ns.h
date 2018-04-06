@@ -130,6 +130,11 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 #define DMMODE_BITS (DMDIR | DMAPPEND | DMEXCL | DMMOUNT | DMWRITABLE \
                      | DMREADABLE | DMSYMLINK)
 
+/* We don't need a GET_FL.  The caller has the chan / FID.  If you have the
+ * chan, you already have the flags.  It's not like when you have an FD and
+ * don't (yet) have the Unix struct file. */
+#define CCTL_SET_FL				1
+
 struct qid {
 	uint64_t path;
 	uint32_t vers;
@@ -531,7 +536,9 @@ struct dev {
 //  int (*config)( int unused_int, char *unused_char_p_t, DevConf*);
 	char *(*chaninfo)(struct chan *, char *, size_t);
 	int (*tapfd)(struct chan *, struct fd_tap *, int);
-	int (*chan_ctl)(struct chan *, int);
+	unsigned long (*chan_ctl)(struct chan *c, int op, unsigned long a1,
+	                          unsigned long a2, unsigned long a3,
+	                          unsigned long a4);
 	struct fs_file *(*mmap)(struct chan *, struct vm_region *, int, int);
 	/* we need to be aligned to 64 bytes for the linker tables. */
 } __attribute__ ((aligned(64)));

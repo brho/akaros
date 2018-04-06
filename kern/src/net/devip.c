@@ -1638,6 +1638,18 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 	}
 }
 
+static unsigned long ip_chan_ctl(struct chan *c, int op, unsigned long a1,
+                                 unsigned long a2, unsigned long a3,
+                                 unsigned long a4)
+{
+	switch (op) {
+	case CCTL_SET_FL:
+		return 0;
+	default:
+		error(EINVAL, "%s does not support %d", __func__, op);
+	}
+}
+
 struct dev ipdevtab __devtab = {
 	.name = "ip",
 
@@ -1659,6 +1671,7 @@ struct dev ipdevtab __devtab = {
 	.power = devpower,
 	.chaninfo = ipchaninfo,
 	.tapfd = iptapfd,
+	.chan_ctl = ip_chan_ctl,
 };
 
 int Fsproto(struct Fs *f, struct Proto *p)

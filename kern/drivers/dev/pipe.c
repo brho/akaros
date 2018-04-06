@@ -645,6 +645,18 @@ static int pipetapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 	}
 }
 
+static unsigned long pipe_chan_ctl(struct chan *c, int op, unsigned long a1,
+                                   unsigned long a2, unsigned long a3,
+                                   unsigned long a4)
+{
+	switch (op) {
+	case CCTL_SET_FL:
+		return 0;
+	default:
+		error(EINVAL, "%s does not support %d", __func__, op);
+	}
+}
+
 struct dev pipedevtab __devtab = {
 	.name = "pipe",
 
@@ -666,4 +678,5 @@ struct dev pipedevtab __devtab = {
 	.power = devpower,
 	.chaninfo = pipechaninfo,
 	.tapfd = pipetapfd,
+	.chan_ctl = pipe_chan_ctl,
 };

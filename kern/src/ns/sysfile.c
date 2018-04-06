@@ -1510,11 +1510,10 @@ int fd_setfl(int fd, int flags)
 		error(EINVAL, "can't toggle O_REMCLO with setfl");
 	if (cexternal_flags_differ(flags, c->flag, O_PATH))
 		error(EINVAL, "can't toggle O_PATH with setfl");
-	/* Devices can do various prep work, including RPCs to other servers (#mnt)
-	 * for a chan_ctl operation.  If they want to not support the new flags,
-	 * they can throw an error. */
-	if (devtab[c->type].chan_ctl)
-		ret = devtab[c->type].chan_ctl(c, flags & CEXTERNAL_FLAGS);
+	if (!devtab[c->type].chan_ctl)
+		error(EINVAL, "can't setfl, %s has no chan_ctl", chan_dev_name(c));
+	ret = devtab[c->type].chan_ctl(c, CCTL_SET_FL, flags & CEXTERNAL_FLAGS,
+	                               0, 0, 0);
 	c->flag = (c->flag & ~CEXTERNAL_FLAGS) | (flags & CEXTERNAL_FLAGS);
 	poperror();
 	cclose(c);
