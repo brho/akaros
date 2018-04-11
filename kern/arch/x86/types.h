@@ -5,11 +5,6 @@
 #define LITTLE_ENDIAN
 #endif /* !LITTLE_ENDIAN */
 
-//Constants for byte sizes
-#define ONE_KILOBYTE  (1L<<10)
-#define ONE_MEGABYTE  (1L<<20)
-#define ONE_GIGABYTE  (1L<<30)
-
 // Explicitly-sized versions of integer types
 typedef __signed char int8_t;
 typedef unsigned char uint8_t;
