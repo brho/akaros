@@ -17,18 +17,6 @@ expression TMAX;
 -barrier();
 +cmb();
 
-// akaros RMW, locking atomics provide hw memory barriers.
-// (excluding set, init, and read)
-@@
-@@
--smp_mb__before_atomic();
-+cmb();
-
-@@
-@@
--smp_mb__after_atomic();
-+cmb();
-
 @@
 @@
 -smp_mb();
