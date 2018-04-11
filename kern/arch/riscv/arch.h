@@ -3,7 +3,7 @@
 #include <ros/arch/arch.h>
 #include <arch/mmu.h>
 #include <ros/common.h>
-#include <ros/arch/membar.h>
+#include <arch/membar.h>
 #include <arch/riscv.h>
 #include <arch/time.h>
 

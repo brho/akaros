@@ -32,7 +32,6 @@
 
 #include <sys/types.h>
 #include <arch/ros/msr-index.h>
-#include <arch/ros/membar.h>
 #include <arch/x86.h>
 #include <arch/msr.h>
 #include <arch/uaccess.h>

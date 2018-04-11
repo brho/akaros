@@ -25,7 +25,6 @@
 #include <pmap.h>
 #include <arch/console.h>
 #include <time.h>
-#include <ros/arch/membar.h>
 
 /*
  * Currently, if you leave this function by way of proc_run (process_workqueue

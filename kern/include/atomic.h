@@ -15,6 +15,7 @@
 
 #include <ros/common.h>
 #include <ros/atomic.h>
+#include <arch/membar.h>
 #include <arch/mmu.h>
 #include <arch/arch.h>
 #include <assert.h>

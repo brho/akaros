@@ -7,7 +7,7 @@
 #pragma once
 
 #include <ros/common.h>
-#include <ros/arch/membar.h>
+#include <arch/membar.h>
 #include <arch/x86.h>
 #include <arch/arch.h>
 
