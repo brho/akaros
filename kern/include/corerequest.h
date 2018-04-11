@@ -13,6 +13,8 @@
   #include <corealloc_fcfs.h>
 #elif defined(CONFIG_COREALLOC_PACKED)
   #include <corealloc_packed.h>
+#else
+  #error "Need a corealloc header!"
 #endif
 
 /* Initialize any data assocaited with doing core allocation. */
