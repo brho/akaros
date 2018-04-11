@@ -1,27 +1,21 @@
 #pragma once
 
-#ifdef __GNUC__
-
-#define likely(x) __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
-#define __weak __attribute__((weak))
-
-#else /* #ifdef __GNUC__ */
-
-#define likely(x) (x)
-#define unlikely(x) (x)
-#define __weak
-
-#endif /* #ifdef __GNUC__ */
-
-#define __always_inline inline __attribute__((always_inline))
-
-#ifdef __GNUC__
-
-#define uninitialized_var(x) x = x
-
-#elif defined(__clang__)
-
-#define uninitialized_var(x) x = *(&(x))
-
+/* Linux calls it __ASSEMBLY__ */
+#ifdef __ASSEMBLER__
+#define __ASSEMBLY__ 1
 #endif
+
+/* This is a bit hokey.  It turns off the #define inline to include
+ * always_inline, which breaks our uses of "extern inline". */
+#define CONFIG_ARCH_SUPPORTS_OPTIMIZED_INLINING 1
+#define CONFIG_OPTIMIZE_INLINING 1
+
+/* Make sure Linux's compiler.h is only included here. */
+#define __AKAROS_COMPILER_H 1
+#include <linux/compiler.h>
+#undef __AKAROS_COMPILER_H
+
+/* Linux uses this as a tag for the __CHECKER__ and either defined it to
+ * nothing or to some attribute.  We use it for the name of the pcpu variables
+ * .section, so need it to not be #defined yet. */
+#undef __percpu

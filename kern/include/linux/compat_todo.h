@@ -116,8 +116,6 @@ extern int ____ilog2_NaN;
 	LOG2_UP(n)				\
  )
 
-#define __printf(...)
-
 #define sprintf(s, fmt, ...) ({ \
 	int ret = -1; \
 	if (__builtin_types_compatible_p(typeof(s), char[])) \
@@ -384,14 +382,6 @@ struct device_attribute {
 
 #define DEFINE_MUTEX(mutexname) \
 	qlock_t mutexname = QLOCK_INITIALIZER(mutexname);
-
-#define IS_ENABLED(...) (0)
-
-/* linux/compiler-gcc.h */
-#define __packed                        __attribute__((packed))
-#define __attribute_const__             __attribute__((__const__))
-#define __aligned(n)                    __attribute__((aligned(n)))
-#define __always_unused                 __attribute__((unused))
 
 /*
  * Check at compile time that something is of a particular type.

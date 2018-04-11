@@ -1,3 +1,7 @@
+#ifndef __AKAROS_COMPILER_H
+#error "Please don't include <linux/compiler.h> directly, include <compiler.h> instead."
+#endif
+
 #ifndef __LINUX_COMPILER_H
 #define __LINUX_COMPILER_H
 
@@ -228,7 +232,15 @@ void ftrace_likely_update(struct ftrace_likely_data *f, int val,
 # define __UNIQUE_ID(prefix) __PASTE(__PASTE(__UNIQUE_ID_, prefix), __LINE__)
 #endif
 
+#if 0 // AKAROS_PORT
 #include <uapi/linux/types.h>
+#else
+#include <sys/types.h>
+typedef uint8_t __u8;
+typedef uint16_t __u16;
+typedef uint32_t __u32;
+typedef uint64_t __u64;
+#endif
 
 #define __READ_ONCE_SIZE						\
 ({									\

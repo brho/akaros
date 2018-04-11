@@ -1275,7 +1275,7 @@ bool test_memset(void)
 	return true;
 }
 
-void __attribute__((noinline)) __longjmp_wrapper(struct jmpbuf* jb)
+void noinline __longjmp_wrapper(struct jmpbuf *jb)
 {
 	asm ("");
 	printk("Starting: %s\n", __FUNCTION__);

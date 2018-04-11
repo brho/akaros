@@ -390,7 +390,7 @@ static bool nmi_check_and_hack_tf(struct hw_trapframe *hw_tf)
 
 /* Bottom half of the NMI handler.  This can be interrupted under some
  * circumstances by NMIs.  It exits by popping the hw_tf in assembly. */
-void __attribute__((noinline, noreturn))
+void noinline __attribute__((noreturn))
 __nmi_bottom_half(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];

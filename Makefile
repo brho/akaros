@@ -363,7 +363,7 @@ CFLAGS_KERNEL += -std=gnu99 -fgnu89-inline
 CFLAGS_KERNEL += -fno-strict-aliasing -fno-omit-frame-pointer
 CFLAGS_KERNEL += -fno-stack-protector
 CFLAGS_KERNEL += -Wall -Wno-format -Wno-unused -Werror -Wreturn-type
-CFLAGS_KERNEL += -DROS_KERNEL
+CFLAGS_KERNEL += -DROS_KERNEL -D__KERNEL__
 CFLAGS_KERNEL += -include include/generated/autoconf.h -include include/common.h
 CFLAGS_KERNEL += -fplan9-extensions
 ifeq ($(CONFIG_64BIT),y)
