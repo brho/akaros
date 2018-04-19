@@ -512,8 +512,8 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
 #ifndef __compiletime_warning
 # define __compiletime_warning(message)
 #endif
-#ifndef __compiletime_error
-# define __compiletime_error(message)
+#ifndef __compiletime_error_foo
+# define __compiletime_error_foo(message)
 /*
  * Sparse complains of variable sized arrays due to the temporary variable in
  * __compiletime_assert. Unfortunately we can't just expand it out to make
@@ -533,7 +533,7 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
 # define __compiletime_assert(condition, msg, prefix, suffix)		\
 	do {								\
 		bool __cond = !(condition);				\
-		extern void prefix ## suffix(void) __compiletime_error(msg); \
+		extern void prefix ## suffix(void) __compiletime_error_foo(msg); \
 		if (__cond)						\
 			prefix ## suffix();				\
 		__compiletime_error_fallback(__cond);			\
