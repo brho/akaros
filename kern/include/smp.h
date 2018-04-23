@@ -86,6 +86,13 @@ struct per_cpu_info {
 typedef struct per_cpu_info  per_cpu_info_t;
 extern per_cpu_info_t per_cpu_info[MAX_NUM_CORES];
 
+#define for_each_core(i) for (int (i) = 0; (i) < num_cores; (i)++)
+
+#define pcpui_ptr(i) &per_cpu_info[(i)]
+#define pcpui_var(i, var) per_cpu_info[(i)].var
+#define this_pcpui_ptr() pcpui_ptr(core_id())
+#define this_pcpui_var(var) pcpui_var(core_id(), var)
+
 /* SMP bootup functions */
 void smp_boot(void);
 void smp_idle(void) __attribute__((noreturn));

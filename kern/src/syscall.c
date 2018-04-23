@@ -467,7 +467,7 @@ static void free_sysc_str(struct kthread *kth)
 
 #define sysc_save_str(...)                                                     \
 {                                                                              \
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];                     \
+	struct per_cpu_info *pcpui = this_pcpui_ptr();                             \
                                                                                \
 	if (pcpui->cur_kthread->name)                                              \
 		snprintf(pcpui->cur_kthread->name, SYSCALL_STRLEN, __VA_ARGS__);       \
@@ -516,7 +516,7 @@ static void finish_sysc(struct syscall *sysc, struct proc *p, long retval)
 static void finish_current_sysc(long retval)
 {
 	/* Need to re-load pcpui, in case we migrated */
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
 	struct syscall *sysc = pcpui->cur_kthread->sysc;
 
 	assert(sysc);
@@ -528,7 +528,7 @@ static void finish_current_sysc(long retval)
 	strncpy(sysc->errstr, pcpui->cur_kthread->errstr, MAX_ERRSTR_LEN);
 	free_sysc_str(pcpui->cur_kthread);
 	systrace_finish_trace(pcpui->cur_kthread, retval);
-	pcpui = &per_cpu_info[core_id()];	/* reload again */
+	pcpui = this_pcpui_ptr();	/* reload again */
 	finish_sysc(pcpui->cur_kthread->sysc, pcpui->cur_proc, retval);
 	pcpui->cur_kthread->sysc = NULL;
 }
@@ -537,7 +537,7 @@ static void finish_current_sysc(long retval)
  */
 void set_errno(int errno)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
 
 	if (pcpui->cur_kthread)
 		pcpui->cur_kthread->errno = errno;
@@ -547,7 +547,7 @@ void set_errno(int errno)
  */
 int get_errno(void)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
 
 	if (pcpui->cur_kthread)
 		return pcpui->cur_kthread->errno;
@@ -557,7 +557,7 @@ int get_errno(void)
 
 void unset_errno(void)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
 
 	if (!pcpui->cur_kthread)
 		return;
@@ -567,7 +567,7 @@ void unset_errno(void)
 
 void vset_errstr(const char *fmt, va_list ap)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
 
 	if (!pcpui->cur_kthread)
 		return;
@@ -590,7 +590,7 @@ void set_errstr(const char *fmt, ...)
 
 char *current_errstr(void)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
 
 	if (!pcpui->cur_kthread)
 		return "no errstr";
@@ -611,19 +611,18 @@ void set_error(int error, const char *fmt, ...)
 
 struct errbuf *get_cur_errbuf(void)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	return pcpui->cur_kthread->errbuf;
+	return this_pcpui_var(cur_kthread)->errbuf;
 }
 
 void set_cur_errbuf(struct errbuf *ebuf)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	pcpui->cur_kthread->errbuf = ebuf;
+	this_pcpui_var(cur_kthread)->errbuf = ebuf;
 }
 
 char *get_cur_genbuf(void)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
+
 	assert(pcpui->cur_kthread);
 	return pcpui->cur_kthread->generic_buf;
 }
@@ -936,7 +935,7 @@ static ssize_t sys_fork(env_t* e)
 {
 	uintptr_t temp;
 	int ret;
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
 
 	// TODO: right now we only support fork for single-core processes
 	if (e->state != PROC_RUNNING_S) {
@@ -972,7 +971,7 @@ static ssize_t sys_fork(env_t* e)
 	 * is cloned before we return for the original process.  If we ever do CoW
 	 * for forked memory, this will be the first place that gets CoW'd. */
 	temp = switch_to(env);
-	pcpui = &per_cpu_info[core_id()];	/* reload in case of migration */
+	pcpui = this_pcpui_ptr();	/* reload in case of migration */
 	finish_sysc(pcpui->cur_kthread->sysc, env, 0);
 	switch_back(env, temp);
 
@@ -1069,7 +1068,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	int ret = -1;
 	char *t_path = NULL;
 	struct file_or_chan *program;
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
 	int argc, envc;
 	char **argv, **envp;
 	struct argenv *kargenv;
@@ -1538,7 +1537,7 @@ static int sys_vc_entry(struct proc *p)
  * notif will wake it up, but it won't break it out of a uthread loop. */
 static int sys_halt_core(struct proc *p, unsigned long usec)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
 	struct preempt_data *vcpd;
 
 	/* The user can only halt CG cores!  (ones it owns) */
@@ -2485,14 +2484,13 @@ const int max_syscall = sizeof(syscall_table)/sizeof(syscall_table[0]);
 intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
                  uintreg_t a2, uintreg_t a3, uintreg_t a4, uintreg_t a5)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	intreg_t ret = -1;
 	ERRSTACK(1);
 
 	if (sc_num > max_syscall || syscall_table[sc_num].call == NULL) {
 		printk("[kernel] Invalid syscall %d for proc %d\n", sc_num, p->pid);
 		printk("\tArgs: %p, %p, %p, %p, %p, %p\n", a0, a1, a2, a3, a4, a5);
-		print_user_ctx(per_cpu_info[core_id()].cur_ctx);
+		print_user_ctx(this_pcpui_var(cur_ctx));
 		return -1;
 	}
 
@@ -2524,7 +2522,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 /* Execute the syscall on the local core */
 void run_local_syscall(struct syscall *sysc)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
 	struct proc *p = pcpui->cur_proc;
 	long retval;
 
@@ -2538,7 +2536,7 @@ void run_local_syscall(struct syscall *sysc)
 	pcpui->cur_kthread->sysc = sysc;	/* let the core know which sysc it is */
 	unset_errno();
 	systrace_start_trace(pcpui->cur_kthread, sysc);
-	pcpui = &per_cpu_info[core_id()];	/* reload again */
+	pcpui = this_pcpui_ptr();	/* reload again */
 	alloc_sysc_str(pcpui->cur_kthread);
 	/* syscall() does not return for exec and yield, so put any cleanup in there
 	 * too. */
