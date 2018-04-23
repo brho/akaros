@@ -35,7 +35,6 @@
 void manager(void)
 {
 	// LoL
-	#define PASTE(s1,s2) s1 ## s2
 	#define MANAGER_FUNC(dev) PASTE(manager_,dev)
 
 	#if !defined(DEVELOPER_NAME) && \

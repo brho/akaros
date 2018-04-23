@@ -39,9 +39,6 @@
 #define PERCPU_SECTION __percpu
 #define PERCPU_SECTION_STR STRINGIFY(PERCPU_SECTION)
 
-#define PASTE_THEM(x, y) x ## y
-#define PASTE(x, y) PASTE_THEM(x, y)
-
 #define PERCPU_VARNAME(var) PASTE(__percpu_, var)
 
 #define PERCPU_START_VAR PASTE(__start_, PERCPU_SECTION)

@@ -7,6 +7,9 @@
 #ifdef CONFIG_64BIT
 #endif
 
+#define PASTE_THEM(x, y) x ## y
+#define PASTE(x, y) PASTE_THEM(x, y)
+
 // Efficient min and max operations
 #define MIN(_a, _b)						\
 ({								\
