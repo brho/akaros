@@ -28,11 +28,7 @@
 
 #pragma once
 
-/* TODO: eventually we'll support some form of RCU and concurrent rb-tree
- * usage.  When we do that, we'll need to grab these functions from Linux. */
-#ifndef rcu_assign_pointer
-#define rcu_assign_pointer(d, s) (d) = (s)
-#endif
+#include <rcu.h>
 
 struct rb_node {
 	unsigned long  __rb_parent_color;

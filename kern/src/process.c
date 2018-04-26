@@ -25,6 +25,7 @@
 #include <kmalloc.h>
 #include <ros/procinfo.h>
 #include <init.h>
+#include <rcu.h>
 
 struct kmem_cache *proc_cache;
 
@@ -803,6 +804,7 @@ void proc_restartcore(void)
 		smp_idle();
 	}
 	assert(pcpui->cur_ctx);
+	rcu_report_qs();
 	__proc_startcore(pcpui->owning_proc, pcpui->cur_ctx);
 }
 

@@ -23,40 +23,6 @@
 #ifndef __LINUX_RCU_H
 #define __LINUX_RCU_H
 
-#include <trace/events/rcu.h>
-#ifdef CONFIG_RCU_TRACE
-#define RCU_TRACE(stmt) stmt
-#else /* #ifdef CONFIG_RCU_TRACE */
-#define RCU_TRACE(stmt)
-#endif /* #else #ifdef CONFIG_RCU_TRACE */
-
-/*
- * Process-level increment to ->dynticks_nesting field.  This allows for
- * architectures that use half-interrupts and half-exceptions from
- * process context.
- *
- * DYNTICK_TASK_NEST_MASK defines a field of width DYNTICK_TASK_NEST_WIDTH
- * that counts the number of process-based reasons why RCU cannot
- * consider the corresponding CPU to be idle, and DYNTICK_TASK_NEST_VALUE
- * is the value used to increment or decrement this field.
- *
- * The rest of the bits could in principle be used to count interrupts,
- * but this would mean that a negative-one value in the interrupt
- * field could incorrectly zero out the DYNTICK_TASK_NEST_MASK field.
- * We therefore provide a two-bit guard field defined by DYNTICK_TASK_MASK
- * that is set to DYNTICK_TASK_FLAG upon initial exit from idle.
- * The DYNTICK_TASK_EXIT_IDLE value is thus the combined value used upon
- * initial exit from idle.
- */
-#define DYNTICK_TASK_NEST_WIDTH 7
-#define DYNTICK_TASK_NEST_VALUE ((LLONG_MAX >> DYNTICK_TASK_NEST_WIDTH) + 1)
-#define DYNTICK_TASK_NEST_MASK  (LLONG_MAX - DYNTICK_TASK_NEST_VALUE + 1)
-#define DYNTICK_TASK_FLAG	   ((DYNTICK_TASK_NEST_VALUE / 8) * 2)
-#define DYNTICK_TASK_MASK	   ((DYNTICK_TASK_NEST_VALUE / 8) * 3)
-#define DYNTICK_TASK_EXIT_IDLE	   (DYNTICK_TASK_NEST_VALUE + \
-				    DYNTICK_TASK_FLAG)
-
-
 /*
  * Grace-period counter management.
  */
@@ -88,7 +54,7 @@ static inline int rcu_seq_state(unsigned long s)
  */
 static inline void rcu_seq_set_state(unsigned long *sp, int newstate)
 {
-	WARN_ON_ONCE(newstate & ~RCU_SEQ_STATE_MASK);
+	warn_on_once(newstate & ~RCU_SEQ_STATE_MASK);
 	WRITE_ONCE(*sp, (*sp & ~RCU_SEQ_STATE_MASK) + newstate);
 }
 
@@ -96,15 +62,15 @@ static inline void rcu_seq_set_state(unsigned long *sp, int newstate)
 static inline void rcu_seq_start(unsigned long *sp)
 {
 	WRITE_ONCE(*sp, *sp + 1);
-	smp_mb(); /* Ensure update-side operation after counter increment. */
-	WARN_ON_ONCE(rcu_seq_state(*sp) != 1);
+	mb(); /* Ensure update-side operation after counter increment. */
+	warn_on_once(rcu_seq_state(*sp) != 1);
 }
 
 /* Adjust sequence number for end of update-side operation. */
 static inline void rcu_seq_end(unsigned long *sp)
 {
-	smp_mb(); /* Ensure update-side operation before counter increment. */
-	WARN_ON_ONCE(!rcu_seq_state(*sp));
+	mb(); /* Ensure update-side operation before counter increment. */
+	warn_on_once(!rcu_seq_state(*sp));
 	WRITE_ONCE(*sp, (*sp | RCU_SEQ_STATE_MASK) + 1);
 }
 
@@ -114,7 +80,7 @@ static inline unsigned long rcu_seq_snap(unsigned long *sp)
 	unsigned long s;
 
 	s = (READ_ONCE(*sp) + 2 * RCU_SEQ_STATE_MASK + 1) & ~RCU_SEQ_STATE_MASK;
-	smp_mb(); /* Above access must not bleed into critical section. */
+	mb(); /* Above access must not bleed into critical section. */
 	return s;
 }
 
@@ -133,115 +99,14 @@ static inline bool rcu_seq_done(unsigned long *sp, unsigned long s)
 	return ULONG_CMP_GE(READ_ONCE(*sp), s);
 }
 
-/*
- * debug_rcu_head_queue()/debug_rcu_head_unqueue() are used internally
- * by call_rcu() and rcu callback execution, and are therefore not part of the
- * RCU API. Leaving in rcupdate.h because they are used by all RCU flavors.
- */
-
-#ifdef CONFIG_DEBUG_OBJECTS_RCU_HEAD
-# define STATE_RCU_HEAD_READY	0
-# define STATE_RCU_HEAD_QUEUED	1
-
-extern struct debug_obj_descr rcuhead_debug_descr;
-
-static inline int debug_rcu_head_queue(struct rcu_head *head)
-{
-	int r1;
-
-	r1 = debug_object_activate(head, &rcuhead_debug_descr);
-	debug_object_active_state(head, &rcuhead_debug_descr,
-				  STATE_RCU_HEAD_READY,
-				  STATE_RCU_HEAD_QUEUED);
-	return r1;
-}
-
-static inline void debug_rcu_head_unqueue(struct rcu_head *head)
-{
-	debug_object_active_state(head, &rcuhead_debug_descr,
-				  STATE_RCU_HEAD_QUEUED,
-				  STATE_RCU_HEAD_READY);
-	debug_object_deactivate(head, &rcuhead_debug_descr);
-}
-#else	/* !CONFIG_DEBUG_OBJECTS_RCU_HEAD */
-static inline int debug_rcu_head_queue(struct rcu_head *head)
-{
-	return 0;
-}
-
-static inline void debug_rcu_head_unqueue(struct rcu_head *head)
-{
-}
-#endif	/* #else !CONFIG_DEBUG_OBJECTS_RCU_HEAD */
-
-void kfree(const void *);
-
-/*
- * Reclaim the specified callback, either by invoking it (non-lazy case)
- * or freeing it directly (lazy case).  Return true if lazy, false otherwise.
- */
-static inline bool __rcu_reclaim(const char *rn, struct rcu_head *head)
-{
-	unsigned long offset = (unsigned long)head->func;
-
-	rcu_lock_acquire(&rcu_callback_map);
-	if (__is_kfree_rcu_offset(offset)) {
-		RCU_TRACE(trace_rcu_invoke_kfree_callback(rn, head, offset);)
-		kfree((void *)head - offset);
-		rcu_lock_release(&rcu_callback_map);
-		return true;
-	} else {
-		RCU_TRACE(trace_rcu_invoke_callback(rn, head);)
-		head->func(head);
-		rcu_lock_release(&rcu_callback_map);
-		return false;
-	}
-}
-
-#ifdef CONFIG_RCU_STALL_COMMON
-
-extern int rcu_cpu_stall_suppress;
-int rcu_jiffies_till_stall_check(void);
-
-#endif /* #ifdef CONFIG_RCU_STALL_COMMON */
-
-/*
- * Strings used in tracepoints need to be exported via the
- * tracing system such that tools like perf and trace-cmd can
- * translate the string address pointers to actual text.
- */
-#define TPS(x)  tracepoint_string(x)
-
-/*
- * Dump the ftrace buffer, but only one time per callsite per boot.
- */
-#define rcu_ftrace_dump(oops_dump_mode) \
-do { \
-	static atomic_t ___rfd_beenhere = ATOMIC_INIT(0); \
-	\
-	if (!atomic_read(&___rfd_beenhere) && \
-	    !atomic_xchg(&___rfd_beenhere, 1)) \
-		ftrace_dump(oops_dump_mode); \
-} while (0)
-
-void rcu_early_boot_tests(void);
-void rcu_test_sync_prims(void);
-
-/*
- * This function really isn't for public consumption, but RCU is special in
- * that context switches can allow the state machine to make progress.
- */
-extern void resched_cpu(int cpu);
-
-#if defined(SRCU) || !defined(TINY_RCU)
-
-#include <linux/rcu_node_tree.h>
+#include <rcu_node_tree.h>
 
 extern int rcu_num_lvls;
 extern int num_rcu_lvl[];
 extern int rcu_num_nodes;
-static bool rcu_fanout_exact;
-static int rcu_fanout_leaf;
+extern bool rcu_fanout_exact;
+extern int rcu_fanout_leaf;
+extern int rcu_num_cores;
 
 /*
  * Compute the per-level fanout, either using the exact fanout specified
@@ -259,7 +124,7 @@ static inline void rcu_init_levelspread(int *levelspread, const int *levelcnt)
 		int ccur;
 		int cprv;
 
-		cprv = nr_cpu_ids;
+		cprv = rcu_num_cores;
 		for (i = rcu_num_lvls - 1; i >= 0; i--) {
 			ccur = levelcnt[i];
 			levelspread[i] = (cprv + ccur - 1) / ccur;
@@ -352,43 +217,9 @@ do {									\
 	___locked;							\
 })
 
-#endif /* #if defined(SRCU) || !defined(TINY_RCU) */
-
-#ifdef CONFIG_TINY_RCU
-/* Tiny RCU doesn't expedite, as its purpose in life is instead to be tiny. */
-static inline bool rcu_gp_is_normal(void)  /* Internal RCU use. */
-{
-	return true;
-}
-static inline bool rcu_gp_is_expedited(void)  /* Internal RCU use. */
-{
-	return false;
-}
-
-static inline void rcu_expedite_gp(void)
-{
-}
-
-static inline void rcu_unexpedite_gp(void)
-{
-}
-#else /* #ifdef CONFIG_TINY_RCU */
-bool rcu_gp_is_normal(void);     /* Internal RCU use. */
-bool rcu_gp_is_expedited(void);  /* Internal RCU use. */
-void rcu_expedite_gp(void);
-void rcu_unexpedite_gp(void);
-void rcupdate_announce_bootup_oddness(void);
-#endif /* #else #ifdef CONFIG_TINY_RCU */
-
 #define RCU_SCHEDULER_INACTIVE	0
 #define RCU_SCHEDULER_INIT	1
 #define RCU_SCHEDULER_RUNNING	2
-
-#ifdef CONFIG_TINY_RCU
-static inline void rcu_request_urgent_qs_task(struct task_struct *t) { }
-#else /* #ifdef CONFIG_TINY_RCU */
-void rcu_request_urgent_qs_task(struct task_struct *t);
-#endif /* #else #ifdef CONFIG_TINY_RCU */
 
 enum rcutorture_type {
 	RCU_FLAVOR,
@@ -399,7 +230,6 @@ enum rcutorture_type {
 	INVALID_RCU_FLAVOR
 };
 
-#if defined(CONFIG_TREE_RCU) || defined(CONFIG_PREEMPT_RCU)
 void rcutorture_get_gp_data(enum rcutorture_type test_type, int *flags,
 			    unsigned long *gpnum, unsigned long *completed);
 void rcutorture_record_test_transition(void);
@@ -409,165 +239,5 @@ void do_trace_rcu_torture_read(const char *rcutorturename,
 			       unsigned long secs,
 			       unsigned long c_old,
 			       unsigned long c);
-#else
-static inline void rcutorture_get_gp_data(enum rcutorture_type test_type,
-					  int *flags,
-					  unsigned long *gpnum,
-					  unsigned long *completed)
-{
-	*flags = 0;
-	*gpnum = 0;
-	*completed = 0;
-}
-static inline void rcutorture_record_test_transition(void)
-{
-}
-static inline void rcutorture_record_progress(unsigned long vernum)
-{
-}
-#ifdef CONFIG_RCU_TRACE
-void do_trace_rcu_torture_read(const char *rcutorturename,
-			       struct rcu_head *rhp,
-			       unsigned long secs,
-			       unsigned long c_old,
-			       unsigned long c);
-#else
-#define do_trace_rcu_torture_read(rcutorturename, rhp, secs, c_old, c) \
-	do { } while (0)
-#endif
-#endif
-
-#ifdef CONFIG_TINY_SRCU
-
-static inline void srcutorture_get_gp_data(enum rcutorture_type test_type,
-					   struct srcu_struct *sp, int *flags,
-					   unsigned long *gpnum,
-					   unsigned long *completed)
-{
-	if (test_type != SRCU_FLAVOR)
-		return;
-	*flags = 0;
-	*completed = sp->srcu_idx;
-	*gpnum = *completed;
-}
-
-#elif defined(CONFIG_TREE_SRCU)
-
-void srcutorture_get_gp_data(enum rcutorture_type test_type,
-			     struct srcu_struct *sp, int *flags,
-			     unsigned long *gpnum, unsigned long *completed);
-
-#endif
-
-#ifdef CONFIG_TINY_RCU
-
-/*
- * Return the number of grace periods started.
- */
-static inline unsigned long rcu_batches_started(void)
-{
-	return 0;
-}
-
-/*
- * Return the number of bottom-half grace periods started.
- */
-static inline unsigned long rcu_batches_started_bh(void)
-{
-	return 0;
-}
-
-/*
- * Return the number of sched grace periods started.
- */
-static inline unsigned long rcu_batches_started_sched(void)
-{
-	return 0;
-}
-
-/*
- * Return the number of grace periods completed.
- */
-static inline unsigned long rcu_batches_completed(void)
-{
-	return 0;
-}
-
-/*
- * Return the number of bottom-half grace periods completed.
- */
-static inline unsigned long rcu_batches_completed_bh(void)
-{
-	return 0;
-}
-
-/*
- * Return the number of sched grace periods completed.
- */
-static inline unsigned long rcu_batches_completed_sched(void)
-{
-	return 0;
-}
-
-/*
- * Return the number of expedited grace periods completed.
- */
-static inline unsigned long rcu_exp_batches_completed(void)
-{
-	return 0;
-}
-
-/*
- * Return the number of expedited sched grace periods completed.
- */
-static inline unsigned long rcu_exp_batches_completed_sched(void)
-{
-	return 0;
-}
-
-static inline unsigned long srcu_batches_completed(struct srcu_struct *sp)
-{
-	return 0;
-}
-
-static inline void rcu_force_quiescent_state(void)
-{
-}
-
-static inline void rcu_bh_force_quiescent_state(void)
-{
-}
-
-static inline void rcu_sched_force_quiescent_state(void)
-{
-}
-
-static inline void show_rcu_gp_kthreads(void)
-{
-}
-
-#else /* #ifdef CONFIG_TINY_RCU */
-extern unsigned long rcutorture_testseq;
-extern unsigned long rcutorture_vernum;
-unsigned long rcu_batches_started(void);
-unsigned long rcu_batches_started_bh(void);
-unsigned long rcu_batches_started_sched(void);
-unsigned long rcu_batches_completed(void);
-unsigned long rcu_batches_completed_bh(void);
-unsigned long rcu_batches_completed_sched(void);
-unsigned long rcu_exp_batches_completed(void);
-unsigned long rcu_exp_batches_completed_sched(void);
-unsigned long srcu_batches_completed(struct srcu_struct *sp);
-void show_rcu_gp_kthreads(void);
-void rcu_force_quiescent_state(void);
-void rcu_bh_force_quiescent_state(void);
-void rcu_sched_force_quiescent_state(void);
-#endif /* #else #ifdef CONFIG_TINY_RCU */
-
-#ifdef CONFIG_RCU_NOCB_CPU
-bool rcu_is_nocb_cpu(int cpu);
-#else
-static inline bool rcu_is_nocb_cpu(int cpu) { return false; }
-#endif
 
 #endif /* __LINUX_RCU_H */

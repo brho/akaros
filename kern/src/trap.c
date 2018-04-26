@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <kdebug.h>
 #include <kmalloc.h>
+#include <rcu.h>
 
 static void print_unhandled_trap(struct proc *p, struct user_context *ctx,
                                  unsigned int trap_nr, unsigned int err,
@@ -239,6 +240,10 @@ void process_routine_kmsg(void)
 		 * then smp_idle() will deal with the flags.  The default state includes
 		 * 'not a ktask'. */
 		pcpui->cur_kthread->flags = KTH_DEFAULT_FLAGS;
+		/* PRKM is like a cooperative ksched, and our 'thread' just yielded.  If
+		 * this is too much, we can do something more limited, e.g. wait for
+		 * idle, check a pcpui bit that means 'check in', etc. */
+		rcu_report_qs();
 		/* If we aren't still in early RKM, it is because the KMSG blocked
 		 * (thus leaving early RKM, finishing in default context) and then
 		 * returned.  This is a 'detached' RKM.  Must idle in this scenario,

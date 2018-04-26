@@ -20,6 +20,7 @@
 #include <kmalloc.h>
 #include <core_set.h>
 #include <completion.h>
+#include <rcu.h>
 
 struct all_cpu_work {
 	struct completion comp;
@@ -71,6 +72,7 @@ static void __attribute__((noreturn)) __smp_idle(void *arg)
 		process_routine_kmsg();
 		try_run_proc();
 		cpu_bored();		/* call out to the ksched */
+		rcu_report_qs();
 		/* cpu_halt() atomically turns on interrupts and halts the core.
 		 * Important to do this, since we could have a RKM come in via an
 		 * interrupt right while PRKM is returning, and we wouldn't catch

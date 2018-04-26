@@ -38,6 +38,7 @@
 #include <net/ip.h>
 #include <acpi.h>
 #include <coreboot_tables.h>
+#include <rcu.h>
 
 #define MAX_BOOT_CMDLINE_SIZE 4096
 
@@ -155,6 +156,7 @@ static void __kernel_init_part_deux(void *arg)
 	timer_init();
 	time_init();
 	arch_init();
+	rcu_init();
 	enable_irq();
 	run_linker_funcs();
 	/* reset/init devtab after linker funcs 3 and 4.  these run NIC and medium

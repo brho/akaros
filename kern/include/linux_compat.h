@@ -37,17 +37,10 @@
 //#define CONFIG_INET 1 	// will deal with this manually
 #define CONFIG_PCI_MSI 1
 
-#define __rcu
-#define rcu_read_lock()
-#define rcu_read_unlock()
-#define rcu_dereference(x) (x)
-#define rcu_dereference_protected(x, y) (x)
-#ifndef rcu_assign_pointer
-#define rcu_assign_pointer(dst, src) (dst) = (src)
-#endif
-#define RCU_INIT_POINTER(dst, src) rcu_assign_pointer(dst, src)
-#define synchronize_rcu()
-#define synchronize_sched()
+static inline void synchronize_sched(void)
+{
+	synchronize_rcu();
+}
 
 #define atomic_cmpxchg(_addr, _old, _new)                                      \
 ({                                                                             \

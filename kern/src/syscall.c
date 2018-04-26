@@ -32,6 +32,7 @@
 #include <termios.h>
 #include <manager.h>
 #include <ros/procinfo.h>
+#include <rcu.h>
 
 static int execargs_stringer(struct proc *p, char *d, size_t slen,
 			     char *path, size_t path_l,
@@ -1543,6 +1544,7 @@ static int sys_halt_core(struct proc *p, unsigned long usec)
 	/* The user can only halt CG cores!  (ones it owns) */
 	if (management_core())
 		return -1;
+	rcu_report_qs();
 	disable_irq();
 	/* both for accounting and possible RKM optimizations */
 	__set_cpu_state(pcpui, CPU_STATE_IDLE);

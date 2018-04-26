@@ -31,22 +31,25 @@
  */
 
 
-/* Dump rcu_node combining tree at boot to verify correct setup. */
-static bool dump_tree;
-module_param(dump_tree, bool, 0444);
+#include <rcu.h>
+#include <assert.h>
+#include <smp.h>
+
 /* Control rcu_node-tree auto-balancing at boot time. */
-static bool rcu_fanout_exact;
-module_param(rcu_fanout_exact, bool, 0444);
+bool rcu_fanout_exact;
 /* Increase (but not decrease) the RCU_FANOUT_LEAF at boot time. */
-static int rcu_fanout_leaf = RCU_FANOUT_LEAF;
-module_param(rcu_fanout_leaf, int, 0444);
-int rcu_num_lvls __read_mostly = RCU_NUM_LVLS;
+int rcu_fanout_leaf = RCU_FANOUT_LEAF;
+int rcu_num_lvls = RCU_NUM_LVLS;
 /* Number of rcu_nodes at specified level. */
 int num_rcu_lvl[] = NUM_RCU_LVL_INIT;
-int rcu_num_nodes __read_mostly = NUM_RCU_NODES; /* Total # rcu_nodes in use. */
-/* panic() on RCU Stall sysctl. */
-int sysctl_panic_on_rcu_stall __read_mostly;
+int rcu_num_nodes = NUM_RCU_NODES; /* Total # rcu_nodes in use. */
+/* Number of cores RCU thinks exist.  Set to 0 or nothing to use 'num_cores'.
+ * The extra cores are called 'fake cores' in rcu.c, and are used for testing
+ * the tree. */
+int rcu_num_cores;
 
+/* in rcu.c */
+extern struct rcu_state rcu_state;
 
 /**
  * get_state_synchronize_rcu - Snapshot current RCU state
@@ -61,16 +64,15 @@ unsigned long get_state_synchronize_rcu(void)
 	 * Any prior manipulation of RCU-protected data must happen
 	 * before the load from ->gpnum.
 	 */
-	smp_mb();  /* ^^^ */
+	mb();  /* ^^^ */
 
 	/*
 	 * Make sure this load happens before the purportedly
 	 * time-consuming work between get_state_synchronize_rcu()
 	 * and cond_synchronize_rcu().
 	 */
-	return smp_load_acquire(&rcu_state_p->gpnum);
+	return smp_load_acquire(&rcu_state.gpnum);
 }
-EXPORT_SYMBOL_GPL(get_state_synchronize_rcu);
 
 /**
  * cond_synchronize_rcu - Conditionally wait for an RCU grace period
@@ -94,31 +96,29 @@ void cond_synchronize_rcu(unsigned long oldstate)
 	 * Ensure that this load happens before any RCU-destructive
 	 * actions the caller might carry out after we return.
 	 */
-	newstate = smp_load_acquire(&rcu_state_p->completed);
+	newstate = smp_load_acquire(&rcu_state.completed);
 	if (ULONG_CMP_GE(oldstate, newstate))
 		synchronize_rcu();
 }
-EXPORT_SYMBOL_GPL(cond_synchronize_rcu);
-
 
 
 /*
  * Helper function for rcu_init() that initializes one rcu_state structure.
  */
-static void __init rcu_init_one(struct rcu_state *rsp)
+void rcu_init_one(struct rcu_state *rsp)
 {
-	static const char * const buf[] = RCU_NODE_NAME_INIT;
-	static const char * const fqs[] = RCU_FQS_NAME_INIT;
-	static struct lock_class_key rcu_node_class[RCU_NUM_LVLS];
-	static struct lock_class_key rcu_fqs_class[RCU_NUM_LVLS];
-
 	int levelspread[RCU_NUM_LVLS];		/* kids/node in each level. */
 	int cpustride = 1;
 	int i;
 	int j;
 	struct rcu_node *rnp;
+	struct rcu_pcpui *rpi;
 
-	BUILD_BUG_ON(RCU_NUM_LVLS > ARRAY_SIZE(buf));  /* Fix buf[] init! */
+	rendez_init(&rsp->gp_ktask_rv);
+	rsp->gp_ktask_ctl = 0;
+	/* To test wraparound early */
+	rsp->gpnum = ULONG_MAX - 20;
+	rsp->completed = ULONG_MAX - 20;
 
 	/* Silence gcc 4.8 false positive about array index out of range. */
 	if (rcu_num_lvls <= 0 || rcu_num_lvls > RCU_NUM_LVLS)
@@ -126,6 +126,7 @@ static void __init rcu_init_one(struct rcu_state *rsp)
 
 	/* Initialize the level-tracking arrays. */
 
+	rsp->level[0] = &rsp->node[0];
 	for (i = 1; i < rcu_num_lvls; i++)
 		rsp->level[i] = rsp->level[i - 1] + num_rcu_lvl[i - 1];
 	rcu_init_levelspread(levelspread, num_rcu_lvl);
@@ -136,20 +137,12 @@ static void __init rcu_init_one(struct rcu_state *rsp)
 		cpustride *= levelspread[i];
 		rnp = rsp->level[i];
 		for (j = 0; j < num_rcu_lvl[i]; j++, rnp++) {
-			raw_spin_lock_init(&ACCESS_PRIVATE(rnp, lock));
-			lockdep_set_class_and_name(&ACCESS_PRIVATE(rnp, lock),
-						   &rcu_node_class[i], buf[i]);
-			raw_spin_lock_init(&rnp->fqslock);
-			lockdep_set_class_and_name(&rnp->fqslock,
-						   &rcu_fqs_class[i], fqs[i]);
-			rnp->gpnum = rsp->gpnum;
-			rnp->completed = rsp->completed;
 			rnp->qsmask = 0;
 			rnp->qsmaskinit = 0;
 			rnp->grplo = j * cpustride;
 			rnp->grphi = (j + 1) * cpustride - 1;
-			if (rnp->grphi >= nr_cpu_ids)
-				rnp->grphi = nr_cpu_ids - 1;
+			if (rnp->grphi >= rcu_num_cores)
+				rnp->grphi = rcu_num_cores - 1;
 			if (i == 0) {
 				rnp->grpnum = 0;
 				rnp->grpmask = 0;
@@ -161,26 +154,21 @@ static void __init rcu_init_one(struct rcu_state *rsp)
 						  j / levelspread[i - 1];
 			}
 			rnp->level = i;
-			INIT_LIST_HEAD(&rnp->blkd_tasks);
-			rcu_init_one_nocb(rnp);
-			init_waitqueue_head(&rnp->exp_wq[0]);
-			init_waitqueue_head(&rnp->exp_wq[1]);
-			init_waitqueue_head(&rnp->exp_wq[2]);
-			init_waitqueue_head(&rnp->exp_wq[3]);
-			spin_lock_init(&rnp->exp_lock);
 		}
 	}
 
-	init_swait_queue_head(&rsp->gp_wq);
-	init_swait_queue_head(&rsp->expedited_wq);
 	rnp = rsp->level[rcu_num_lvls - 1];
-	for_each_possible_cpu(i) {
+	for_each_core(i) {
 		while (i > rnp->grphi)
 			rnp++;
-		per_cpu_ptr(rsp->rda, i)->mynode = rnp;
-		rcu_boot_init_percpu_data(i, rsp);
+		rpi = _PERCPU_VARPTR(rcu_pcpui, i);
+		rpi->my_node = rnp;
+		rcu_init_pcpui(rsp, rpi, i);
 	}
-	list_add(&rsp->flavors, &rcu_struct_flavors);
+	/* Akaros has static rnps, so we can init these once. */
+	rcu_for_each_node_breadth_first(rsp, rnp)
+		if (rnp->parent)
+			rnp->parent->qsmaskinit |= rnp->grpmask;
 }
 
 /*
@@ -188,30 +176,20 @@ static void __init rcu_init_one(struct rcu_state *rsp)
  * replace the definitions in tree.h because those are needed to size
  * the ->node array in the rcu_state structure.
  */
-static void __init rcu_init_geometry(void)
+void rcu_init_geometry(void)
 {
-	ulong d;
 	int i;
 	int rcu_capacity[RCU_NUM_LVLS];
+	int nr_cpu_ids;
 
-	/*
-	 * Initialize any unspecified boot parameters.
-	 * The default values of jiffies_till_first_fqs and
-	 * jiffies_till_next_fqs are set to the RCU_JIFFIES_TILL_FORCE_QS
-	 * value, which is a function of HZ, then adding one for each
-	 * RCU_JIFFIES_FQS_DIV CPUs that might be on the system.
-	 */
-	d = RCU_JIFFIES_TILL_FORCE_QS + nr_cpu_ids / RCU_JIFFIES_FQS_DIV;
-	if (jiffies_till_first_fqs == ULONG_MAX)
-		jiffies_till_first_fqs = d;
-	if (jiffies_till_next_fqs == ULONG_MAX)
-		jiffies_till_next_fqs = d;
-
+	if (!rcu_num_cores)
+		rcu_num_cores = num_cores;
+	nr_cpu_ids = rcu_num_cores;
 	/* If the compile-time values are accurate, just leave. */
 	if (rcu_fanout_leaf == RCU_FANOUT_LEAF &&
 		nr_cpu_ids == NR_CPUS)
 		return;
-	pr_info("RCU: Adjusting geometry for rcu_fanout_leaf=%d, nr_cpu_ids=%d\n",
+	printk("RCU: Adjusting geometry for rcu_fanout_leaf=%d, nr_cpu_ids=%d\n",
 		rcu_fanout_leaf, nr_cpu_ids);
 
 	/*
@@ -223,7 +201,7 @@ static void __init rcu_init_geometry(void)
 	if (rcu_fanout_leaf < 2 ||
 		rcu_fanout_leaf > sizeof(unsigned long) * 8) {
 		rcu_fanout_leaf = RCU_FANOUT_LEAF;
-		WARN_ON(1);
+		warn_on(1);
 		return;
 	}
 
@@ -241,7 +219,7 @@ static void __init rcu_init_geometry(void)
 	 */
 	if (nr_cpu_ids > rcu_capacity[RCU_NUM_LVLS - 1]) {
 		rcu_fanout_leaf = RCU_FANOUT_LEAF;
-		WARN_ON(1);
+		warn_on(1);
 		return;
 	}
 
@@ -266,20 +244,20 @@ static void __init rcu_init_geometry(void)
  * Dump out the structure of the rcu_node combining tree associated
  * with the rcu_state structure referenced by rsp.
  */
-static void __init rcu_dump_rcu_node_tree(struct rcu_state *rsp)
+void rcu_dump_rcu_node_tree(struct rcu_state *rsp)
 {
 	int level = 0;
 	struct rcu_node *rnp;
 
-	pr_info("rcu_node tree layout dump\n");
-	pr_info(" ");
+	printk("rcu_node tree layout dump\n");
+	printk(" ");
 	rcu_for_each_node_breadth_first(rsp, rnp) {
 		if (rnp->level != level) {
-			pr_cont("\n");
-			pr_info(" ");
+			printk("\n");
+			printk(" ");
 			level = rnp->level;
 		}
-		pr_cont("%d:%d ^%d  ", rnp->grplo, rnp->grphi, rnp->grpnum);
+		printk("%d:%d ^%d ", rnp->grplo, rnp->grphi, rnp->grpnum);
 	}
-	pr_cont("\n");
+	printk("\n");
 }
