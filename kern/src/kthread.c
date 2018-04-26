@@ -329,15 +329,16 @@ void sem_init_irqsave(struct semaphore *sem, int signals)
 	sem->irq_okay = TRUE;
 }
 
-bool sem_trydown(struct semaphore *sem)
+bool sem_trydown_bulk(struct semaphore *sem, int nr_signals)
 {
 	bool ret = FALSE;
+
 	/* lockless peek */
-	if (sem->nr_signals <= 0)
+	if (sem->nr_signals - nr_signals < 0)
 		return ret;
 	debug_lock_semlist();
 	spin_lock(&sem->lock);
-	if (sem->nr_signals > 0) {
+	if (sem->nr_signals - nr_signals >= 0) {
 		sem->nr_signals--;
 		ret = TRUE;
 		debug_downed_sem(sem);
@@ -345,6 +346,11 @@ bool sem_trydown(struct semaphore *sem)
 	spin_unlock(&sem->lock);
 	debug_unlock_semlist();
 	return ret;
+}
+
+bool sem_trydown(struct semaphore *sem)
+{
+	return sem_trydown_bulk(sem, 1);
 }
 
 /* Bottom-half of sem_down.  This is called after we jumped to the new stack. */
@@ -435,7 +441,8 @@ void sem_down(struct semaphore *sem)
 		goto block_return_path;
 	debug_lock_semlist();
 	spin_lock(&sem->lock);
-	if (sem->nr_signals-- <= 0) {
+	sem->nr_signals -= 1;
+	if (sem->nr_signals < 0) {
 		TAILQ_INSERT_TAIL(&sem->waiters, kthread, link);
 		debug_downed_sem(sem);	/* need to debug after inserting */
 		/* At this point, we know we'll sleep and change stacks.  Once we unlock
@@ -475,6 +482,20 @@ block_return_path:
 	return;
 }
 
+void sem_down_bulk(struct semaphore *sem, int nr_signals)
+{
+	/* This is far from ideal.  Our current sem code expects a 1:1 pairing of
+	 * signals to waiters.  For instance, if we have 10 waiters of -1 each or 1
+	 * waiter of -10, we can't tell from looking at the overall structure.  We'd
+	 * need to track the desired number of signals per waiter.
+	 *
+	 * Note that if there are a bunch of signals available, sem_down will
+	 * quickly do a try_down and return, so we won't block repeatedly.  But if
+	 * we do block, we could wake up N times. */
+	for (int i = 0; i < nr_signals; i++)
+		sem_down(sem);
+}
+
 /* Ups the semaphore.  If it was < 0, we need to wake up someone, which we do.
  * Returns TRUE if we woke someone, FALSE o/w (used for debugging in some
  * places).  If we need more control, we can implement a version of the old
@@ -506,20 +527,33 @@ bool sem_up(struct semaphore *sem)
 	return FALSE;
 }
 
-bool sem_trydown_irqsave(struct semaphore *sem, int8_t *irq_state)
+bool sem_trydown_bulk_irqsave(struct semaphore *sem, int nr_signals,
+                              int8_t *irq_state)
 {
 	bool ret;
+
 	disable_irqsave(irq_state);
-	ret = sem_trydown(sem);
+	ret = sem_trydown_bulk(sem, nr_signals);
 	enable_irqsave(irq_state);
 	return ret;
 }
 
-void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state)
+bool sem_trydown_irqsave(struct semaphore *sem, int8_t *irq_state)
+{
+	return sem_trydown_bulk_irqsave(sem, 1, irq_state);
+}
+
+void sem_down_bulk_irqsave(struct semaphore *sem, int nr_signals,
+                           int8_t *irq_state)
 {
 	disable_irqsave(irq_state);
-	sem_down(sem);
+	sem_down_bulk(sem, nr_signals);
 	enable_irqsave(irq_state);
+}
+
+void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state)
+{
+	sem_down_bulk_irqsave(sem, 1, irq_state);
 }
 
 bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state)

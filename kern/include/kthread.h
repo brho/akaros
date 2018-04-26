@@ -118,10 +118,16 @@ static inline bool is_ktask(struct kthread *kthread)
 
 void sem_init(struct semaphore *sem, int signals);
 void sem_init_irqsave(struct semaphore *sem, int signals);
+bool sem_trydown_bulk(struct semaphore *sem, int nr_signals);
 bool sem_trydown(struct semaphore *sem);
+void sem_down_bulk(struct semaphore *sem, int nr_signals);
 void sem_down(struct semaphore *sem);
 bool sem_up(struct semaphore *sem);
+bool sem_trydown_bulk_irqsave(struct semaphore *sem, int nr_signals,
+                              int8_t *irq_state);
 bool sem_trydown_irqsave(struct semaphore *sem, int8_t *irq_state);
+void sem_down_bulk_irqsave(struct semaphore *sem, int nr_signals,
+                           int8_t *irq_state);
 void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state);
 bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state);
 void print_all_sem_info(pid_t pid);
