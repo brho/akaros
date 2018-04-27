@@ -64,9 +64,9 @@
 #define PERCPU_VAR(var) (*__PERCPU_VARPTR(PERCPU_VARNAME(var), core_id()))
 
 #define DEFINE_PERCPU(type, var)						\
-	type PERCPU_VARNAME(var) __attribute__ ((section (PERCPU_SECTION_STR)))
+	__typeof__(type) PERCPU_VARNAME(var) __attribute__ ((section (PERCPU_SECTION_STR)))
 #define DECLARE_PERCPU(type, var)								\
-	extern type PERCPU_VARNAME(var)								\
+	extern __typeof__(type) PERCPU_VARNAME(var)					\
 		__attribute__ ((section (PERCPU_SECTION_STR)))
 
 #define PERCPU_INIT_SECTION __percpu_init
