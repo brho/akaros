@@ -372,6 +372,25 @@ static inline void del_timer_sync(struct timer_list *timer)
 	panic("del_timer_sync unimplemented");
 }
 
+static inline void setup_timer_on_stack(struct timer_list *timer,
+                                        void (*func)(unsigned long),
+                                        unsigned long data)
+{
+	setup_timer(timer, func, data);
+}
+
+static inline void destroy_timer_on_stack(struct timer_list *timer)
+{
+}
+
+/* TODO: This is nasty (all of the timer stuff).  We don't know if a timer
+ * actually finished or not.  Someone could mod_timer repeatedly and have the
+ * same handler running concurrently.  */
+static inline bool timer_pending(struct timer_list *timer)
+{
+	return timer->expires >= jiffies;
+}
+
 struct cpu_rmap {
 };
 
@@ -1039,3 +1058,37 @@ static inline void eth_broadcast_addr(uint8_t *addr)
 #define NOTIFY_DONE 0
 #define SIOCGHWTSTAMP 1
 #define SIOCSHWTSTAMP 2
+
+/* Misc crap (from rcu/torture.c), which might be unused. */
+#define DEFINE_SPINLOCK(x) spinlock_t x = SPINLOCK_INITIALIZER_IRQSAVE
+
+#define DEFINE_PER_CPU DEFINE_PERCPU
+#define __this_cpu_inc(x) PERCPU_VAR(x)++
+#define per_cpu(var, i) _PERCPU_VAR(var, i)
+#define for_each_possible_cpu(x) for_each_core(x)
+
+typedef atomic_t atomic_long_t;
+#define atomic_long_inc atomic_inc
+#define atomic_long_read atomic_read
+
+static inline void local_irq_disable(void)
+{
+	disable_irq();
+}
+
+static inline void local_irq_enable(void)
+{
+	enable_irq();
+}
+
+static inline void preempt_disable(void)
+{
+}
+
+static inline void preempt_enable(void)
+{
+}
+
+static inline void preempt_schedule(void)
+{
+}

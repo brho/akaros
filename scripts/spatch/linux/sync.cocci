@@ -21,6 +21,13 @@ expression E;
 @@
 expression E;
 @@
+-mutex_trylock(
++canqlock(
+ E)
+
+@@
+expression E;
+@@
 -mutex_unlock(
 +qunlock(
  E)

@@ -308,16 +308,6 @@ expression STMT;
 
 @@
 @@
--WARN
-+warn
-
-@@
-@@
--WARN_ONCE
-+warn_once
-
-@@
-@@
 -WARN_ON
 +warn_on
 
