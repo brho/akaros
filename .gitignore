@@ -26,7 +26,6 @@ user/parlib/syscall_tbl.c
 Documentation/doxygen/rosdoc
 sim/
 sim
-fs
 tools/.*
 tools/syscall_server/syscall_server_*
 tools/syscall_server/sandbox/
