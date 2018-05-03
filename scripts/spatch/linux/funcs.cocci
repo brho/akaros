@@ -122,6 +122,40 @@ expression lock, flags;
 +spin_unlock_irqsave(lock)
 
 @@
+typedef raw_spinlock_t;
+typedef spinlock_t;
+@@
+-raw_spinlock_t
++spinlock_t
+
+@@
+expression E;
+@@
+-raw_spin_lock_init(E)
++spinlock_init_irqsave(E)
+
+@@
+expression E;
+@@
+-raw_spin_lock(E)
++spin_lock_irqsave(E)
+
+@@
+expression E;
+@@
+-raw_spin_unlock(E)
++spin_unlock_irqsave(E)
+
+@@
+expression lock, flags;
+@@
+-raw_spin_lock_irqsave(lock, flags)
++spin_lock_irqsave(lock)
+...
+-raw_spin_unlock_irqrestore(lock, flags)
++spin_unlock_irqsave(lock)
+
+@@
 expression E;
 @@
 -ilog2(E)
