@@ -1063,13 +1063,29 @@ static inline void eth_broadcast_addr(uint8_t *addr)
 #define DEFINE_SPINLOCK(x) spinlock_t x = SPINLOCK_INITIALIZER_IRQSAVE
 
 #define DEFINE_PER_CPU DEFINE_PERCPU
-#define __this_cpu_inc(x) PERCPU_VAR(x)++
 #define per_cpu(var, i) _PERCPU_VAR(var, i)
+/* Don't macro per_cpu_ptr, since its usage differs for static and dynamic */
 #define for_each_possible_cpu(x) for_each_core(x)
+#define for_each_online_cpu(x) for_each_core(x)
+
+#define alloc_percpu_gfp(x, f) percpu_alloc(x, f)
+#define free_percpu(x) percpu_free(x)
+
+#define __this_cpu_read(x) PERCPU_VAR(x)
+#define __this_cpu_add(x, v) ({PERCPU_VAR(x) + (v)})
+#define __this_cpu_sub(x, v) __this_cpu_add(x, -(v))
+#define __this_cpu_inc(x) __this_cpu_add(x, 1)
+
+#define this_cpu_read __this_cpu_read
+#define this_cpu_add __this_cpu_add
+#define this_cpu_sub __this_cpu_sub
+#define this_cpu_inc __this_cpu_inc
 
 typedef atomic_t atomic_long_t;
 #define atomic_long_inc atomic_inc
 #define atomic_long_read atomic_read
+
+#define __read_mostly
 
 static inline void local_irq_disable(void)
 {
