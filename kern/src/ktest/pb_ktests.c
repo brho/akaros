@@ -1936,6 +1936,84 @@ bool test_cmdline_parse(void)
 	return TRUE;
 }
 
+static bool __pcpu_ptr_is_dyn(void *ptr)
+{
+	char *p_c = ptr;
+
+	return (PERCPU_STOP_VAR <= p_c) &&
+	       (p_c < PERCPU_STOP_VAR + PERCPU_DYN_SIZE);
+}
+
+static bool test_percpu_zalloc(void)
+{
+	uint8_t *u8 = percpu_zalloc(*u8, MEM_WAIT);
+	uint64_t *u64 = percpu_zalloc(uint64_t, MEM_WAIT);
+	uint32_t *u32 = percpu_zalloc(uint32_t, MEM_WAIT);
+	uint64_t *old_u64;
+
+	KT_ASSERT(__pcpu_ptr_is_dyn(u8));
+	KT_ASSERT(__pcpu_ptr_is_dyn(u64));
+	KT_ASSERT(__pcpu_ptr_is_dyn(u32));
+
+	/* The order here is a bit hokey too - the first alloc is usually 16 byte
+	 * aligned, so if we did a packed alloc, the u64 wouldn't be aligned. */
+	KT_ASSERT(ALIGNED(u8, __alignof__(*u8)));
+	KT_ASSERT(ALIGNED(u64, __alignof__(*u64)));
+	KT_ASSERT(ALIGNED(u32, __alignof__(*u32)));
+
+	/* Testing zalloc.  Though the first alloc ever is likely to be zero. */
+	for_each_core(i)
+		KT_ASSERT(_PERCPU_VAR(*u64, i) == 0);
+	for_each_core(i)
+		_PERCPU_VAR(*u64, i) = i;
+	for_each_core(i)
+		KT_ASSERT(_PERCPU_VAR(*u64, i) == i);
+	/* If we free and realloc, we're likely to get the same one.  This is due
+	 * to the ARENA_BESTFIT policy with xalloc. */
+	old_u64 = u64;
+	percpu_free(u64);
+	u64 = percpu_zalloc(uint64_t, MEM_WAIT);
+	/* If this trips, then we didn't test this as well as we'd like. */
+	warn_on(u64 != old_u64);
+	for_each_core(i)
+		KT_ASSERT(_PERCPU_VAR(*u64, i) == 0);
+
+	/* Yes, if an assert failed, we leak memory. */
+	percpu_free(u8);
+	percpu_free(u64);
+	percpu_free(u32);
+	return true;
+}
+
+static void __inc_foo(uint32_t srcid, long a0, long a1, long a2)
+{
+	uint64_t *foos = (uint64_t*)a0;
+	atomic_t *check_in_p = (atomic_t*)a1;
+
+	for (int i = 0; i < core_id() + 1; i++)
+		PERCPU_VAR(*foos)++;
+	cmb();
+	atomic_dec(check_in_p);
+}
+
+static bool test_percpu_increment(void)
+{
+	uint64_t *foos = percpu_zalloc(uint64_t, MEM_WAIT);
+	atomic_t check_in;
+
+	atomic_set(&check_in, num_cores);
+	for_each_core(i)
+		send_kernel_message(i, __inc_foo, (long)foos, (long)&check_in, 0,
+		                    KMSG_IMMEDIATE);
+	while (atomic_read(&check_in))
+		cpu_relax();
+	for_each_core(i)
+		KT_ASSERT(_PERCPU_VAR(*foos, i) == i + 1);
+	/* Yes, if an assert failed, we leak memory. */
+	percpu_free(foos);
+	return true;
+}
+
 static struct ktest ktests[] = {
 #ifdef CONFIG_X86
 	KTEST_REG(ipi_sending,        CONFIG_TEST_ipi_sending),
@@ -1970,6 +2048,8 @@ static struct ktest ktests[] = {
 	KTEST_REG(uaccess,            CONFIG_TEST_uaccess),
 	KTEST_REG(sort,               CONFIG_TEST_sort),
 	KTEST_REG(cmdline_parse,      CONFIG_TEST_cmdline_parse),
+	KTEST_REG(percpu_zalloc,      CONFIG_TEST_percpu_zalloc),
+	KTEST_REG(percpu_increment,   CONFIG_TEST_percpu_increment),
 };
 static int num_ktests = sizeof(ktests) / sizeof(struct ktest);
 linker_func_1(register_pb_ktests)

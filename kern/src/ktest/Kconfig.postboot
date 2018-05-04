@@ -260,3 +260,13 @@ config TEST_cmdline_parse
     depends on PB_KTESTS
     bool "Tests command line parsing functions"
     default y
+
+config TEST_percpu_zalloc
+    depends on PB_KTESTS
+    bool "percpu dynamic zalloc"
+    default y
+
+config TEST_percpu_increment
+    depends on PB_KTESTS
+    bool "percpu dynamic alloc: increment"
+    default y
