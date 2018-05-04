@@ -1,6 +1,7 @@
 obj-y						+= address_range.o
 obj-y						+= circular_buffer.o
 obj-y						+= cpio.o
+obj-y						+= percpu_counter.o
 obj-y						+= rbtree.o
 obj-y						+= slice.o
 obj-y						+= sort.o

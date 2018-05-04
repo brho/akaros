@@ -1,61 +1,11 @@
+/* Copyright (C) 1991-2017, the Linux Kernel authors */
+
 /*
  * Fast batching percpu counters.
  */
 
-#include <linux/percpu_counter.h>
-#include <linux/notifier.h>
-#include <linux/mutex.h>
-#include <linux/init.h>
-#include <linux/cpu.h>
-#include <linux/module.h>
-#include <linux/debugobjects.h>
-
-#ifdef CONFIG_HOTPLUG_CPU
-static LIST_HEAD(percpu_counters);
-static DEFINE_SPINLOCK(percpu_counters_lock);
-#endif
-
-#ifdef CONFIG_DEBUG_OBJECTS_PERCPU_COUNTER
-
-static struct debug_obj_descr percpu_counter_debug_descr;
-
-static bool percpu_counter_fixup_free(void *addr, enum debug_obj_state state)
-{
-	struct percpu_counter *fbc = addr;
-
-	switch (state) {
-	case ODEBUG_STATE_ACTIVE:
-		percpu_counter_destroy(fbc);
-		debug_object_free(fbc, &percpu_counter_debug_descr);
-		return true;
-	default:
-		return false;
-	}
-}
-
-static struct debug_obj_descr percpu_counter_debug_descr = {
-	.name		= "percpu_counter",
-	.fixup_free	= percpu_counter_fixup_free,
-};
-
-static inline void debug_percpu_counter_activate(struct percpu_counter *fbc)
-{
-	debug_object_init(fbc, &percpu_counter_debug_descr);
-	debug_object_activate(fbc, &percpu_counter_debug_descr);
-}
-
-static inline void debug_percpu_counter_deactivate(struct percpu_counter *fbc)
-{
-	debug_object_deactivate(fbc, &percpu_counter_debug_descr);
-	debug_object_free(fbc, &percpu_counter_debug_descr);
-}
-
-#else	/* CONFIG_DEBUG_OBJECTS_PERCPU_COUNTER */
-static inline void debug_percpu_counter_activate(struct percpu_counter *fbc)
-{ }
-static inline void debug_percpu_counter_deactivate(struct percpu_counter *fbc)
-{ }
-#endif	/* CONFIG_DEBUG_OBJECTS_PERCPU_COUNTER */
+#include <percpu_counter.h>
+#include <linux_compat.h>
 
 void percpu_counter_set(struct percpu_counter *fbc, int64_t amount)
 {
@@ -64,13 +14,12 @@ void percpu_counter_set(struct percpu_counter *fbc, int64_t amount)
 
 	spin_lock_irqsave(&fbc->lock);
 	for_each_possible_cpu(cpu) {
-		int32_t *pcount = per_cpu_ptr(fbc->counters, cpu);
+		int32_t *pcount = _PERCPU_VARPTR(*fbc->counters, cpu);
 		*pcount = 0;
 	}
 	fbc->count = amount;
 	spin_unlock_irqsave(&fbc->lock);
 }
-EXPORT_SYMBOL(percpu_counter_set);
 
 /**
  * This function is both preempt and irq safe. The former is due to explicit
@@ -97,7 +46,6 @@ void percpu_counter_add_batch(struct percpu_counter *fbc, int64_t amount,
 	}
 	preempt_enable();
 }
-EXPORT_SYMBOL(percpu_counter_add_batch);
 
 /*
  * Add up all the per-cpu counts, return the result.  This is a more accurate
@@ -112,37 +60,24 @@ int64_t __percpu_counter_sum(struct percpu_counter *fbc)
 	spin_lock_irqsave(&fbc->lock);
 	ret = fbc->count;
 	for_each_online_cpu(cpu) {
-		int32_t *pcount = per_cpu_ptr(fbc->counters, cpu);
+		int32_t *pcount = _PERCPU_VARPTR(*fbc->counters, cpu);
 		ret += *pcount;
 	}
 	spin_unlock_irqsave(&fbc->lock);
 	return ret;
 }
-EXPORT_SYMBOL(__percpu_counter_sum);
 
-int __percpu_counter_init(struct percpu_counter *fbc, int64_t amount, gfp_t gfp,
-			  struct lock_class_key *key)
+int percpu_counter_init(struct percpu_counter *fbc, int64_t amount, gfp_t gfp)
 {
 	unsigned long flags __maybe_unused;
 
 	spinlock_init_irqsave(&fbc->lock);
-	lockdep_set_class(&fbc->lock, key);
 	fbc->count = amount;
 	fbc->counters = alloc_percpu_gfp(int32_t, gfp);
 	if (!fbc->counters)
 		return -ENOMEM;
-
-	debug_percpu_counter_activate(fbc);
-
-#ifdef CONFIG_HOTPLUG_CPU
-	INIT_LIST_HEAD(&fbc->list);
-	spin_lock_irqsave(&percpu_counters_lock);
-	list_add(&fbc->list, &percpu_counters);
-	spin_unlock_irqsave(&percpu_counters_lock);
-#endif
 	return 0;
 }
-EXPORT_SYMBOL(__percpu_counter_init);
 
 void percpu_counter_destroy(struct percpu_counter *fbc)
 {
@@ -150,51 +85,11 @@ void percpu_counter_destroy(struct percpu_counter *fbc)
 
 	if (!fbc->counters)
 		return;
-
-	debug_percpu_counter_deactivate(fbc);
-
-#ifdef CONFIG_HOTPLUG_CPU
-	spin_lock_irqsave(&percpu_counters_lock);
-	list_del(&fbc->list);
-	spin_unlock_irqsave(&percpu_counters_lock);
-#endif
 	free_percpu(fbc->counters);
 	fbc->counters = NULL;
 }
-EXPORT_SYMBOL(percpu_counter_destroy);
 
 int percpu_counter_batch __read_mostly = 32;
-EXPORT_SYMBOL(percpu_counter_batch);
-
-static int compute_batch_value(unsigned int cpu)
-{
-	int nr = num_online_cpus();
-
-	percpu_counter_batch = MAX(32, nr * 2);
-	return 0;
-}
-
-static int percpu_counter_cpu_dead(unsigned int cpu)
-{
-#ifdef CONFIG_HOTPLUG_CPU
-	struct percpu_counter *fbc;
-
-	compute_batch_value(cpu);
-
-	spin_lock_irqsave(&percpu_counters_lock);
-	list_for_each_entry(fbc, &percpu_counters, list) {
-		int32_t *pcount;
-
-		spin_lock_irqsave(&fbc->lock);
-		pcount = per_cpu_ptr(fbc->counters, cpu);
-		fbc->count += *pcount;
-		*pcount = 0;
-		spin_unlock_irqsave(&fbc->lock);
-	}
-	spin_unlock_irqsave(&percpu_counters_lock);
-#endif
-	return 0;
-}
 
 /*
  * Compare counter against given value.
@@ -222,19 +117,3 @@ int __percpu_counter_compare(struct percpu_counter *fbc, int64_t rhs,
 	else
 		return 0;
 }
-EXPORT_SYMBOL(__percpu_counter_compare);
-
-static int __init percpu_counter_startup(void)
-{
-	int ret;
-
-	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "lib/percpu_cnt:online",
-				compute_batch_value, NULL);
-	warn_on(ret < 0);
-	ret = cpuhp_setup_state_nocalls(CPUHP_PERCPU_CNT_DEAD,
-					"lib/percpu_cnt:dead", NULL,
-					percpu_counter_cpu_dead);
-	warn_on(ret < 0);
-	return 0;
-}
-module_init(percpu_counter_startup);
