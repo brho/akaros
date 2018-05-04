@@ -1,0 +1,6 @@
+#!/bin/sh
+dmesg -C
+echo ktest > '#regress/monctl'
+echo ""
+echo Tests complete
+dmesg | grep FAILED

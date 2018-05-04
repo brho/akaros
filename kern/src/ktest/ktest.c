@@ -41,6 +41,8 @@ void run_ktest_suite(struct ktest_suite *suite)
 			} else {
 				printk(fmt, "FAILED", test->name, et_s, et_us, ktest_msg);
 			}
+			/* Some older tests disable IRQs */
+			enable_irq();
 		} else {
 			printk("\tDISABLED [%s]\n", test->name);
 		}
