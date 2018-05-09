@@ -420,6 +420,11 @@ struct {								\
 
 #define	BSD_LIST_NEXT(elm, field)	((elm)->field.le_next)
 
+#define	BSD_LIST_PREV(elm, head, type, field)			\
+	((elm)->field.le_prev == &BSD_LIST_FIRST((head)) ? NULL :	\
+	    container_of((elm)->field.le_prev,			\
+	    struct type, field.le_next))
+
 #define	BSD_LIST_REMOVE(elm, field) do {					\
 	QMD_SAVELINK(oldnext, (elm)->field.le_next);			\
 	QMD_SAVELINK(oldprev, (elm)->field.le_prev);			\
