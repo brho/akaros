@@ -1072,7 +1072,7 @@ static inline void eth_broadcast_addr(uint8_t *addr)
 #define free_percpu(x) percpu_free(x)
 
 #define __this_cpu_read(x) PERCPU_VAR(x)
-#define __this_cpu_add(x, v) ({PERCPU_VAR(x) + (v)})
+#define __this_cpu_add(x, v) ({ PERCPU_VAR(x) + (v); })
 #define __this_cpu_sub(x, v) __this_cpu_add(x, -(v))
 #define __this_cpu_inc(x) __this_cpu_add(x, 1)
 
