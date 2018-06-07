@@ -19,6 +19,7 @@
 #include <parlib/arch/trap.h>
 #include <parlib/ros_debug.h>
 #include <parlib/stdio.h>
+#include <sys/fork_cb.h>
 
 /* TODO: eventually, we probably want to split this into the pthreads interface
  * and a default 2LS.  That way, apps can use the pthreads interface and use any
@@ -38,6 +39,7 @@ int threads_ready = 0;
 int threads_active = 0;
 atomic_t threads_total;
 bool need_tls = TRUE;
+static bool skip_non_thread0;
 
 /* Array of per-vcore structs to manage waiting on syscalls and handling
  * overflow.  Init'd in pth_init(). */
@@ -107,7 +109,12 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 		handle_events(vcoreid);
 		__check_preempt_pending(vcoreid);
 		mcs_pdr_lock(&queue_lock);
-		new_thread = TAILQ_FIRST(&ready_queue);
+		TAILQ_FOREACH(new_thread, &ready_queue, tq_next) {
+			if (skip_non_thread0 &&
+			    !uthread_is_thread0((struct uthread*)new_thread))
+				continue;
+			break;
+		}
 		if (new_thread) {
 			TAILQ_REMOVE(&ready_queue, new_thread, tq_next);
 			assert(new_thread->state == PTH_RUNNABLE);
@@ -507,6 +514,24 @@ int pthread_getattr_np(pthread_t __th, pthread_attr_t *__attr)
 	return 0;
 }
 
+/* All threading is suspended during a fork.  Parents will continue threading
+ * after the fork.  Children will never thread again.  If they fork, but don't
+ * exec, then their threading will be broken.  Oh well - stop using fork. */
+static void pth_pre_fork(void)
+{
+	if (!uthread_is_thread0(current_uthread))
+		panic("Tried to fork from a non-thread0 thread!");
+	if (in_multi_mode())
+		panic("Tried to fork from an MCP!");
+	skip_non_thread0 = true;
+}
+
+static void pth_post_fork(pid_t ret)
+{
+	if (ret)
+		skip_non_thread0 = false;
+}
+
 /* Do whatever init you want.  At some point call uthread_2ls_init() and pass it
  * a uthread representing thread0 (int main()) */
 void pth_sched_init(void)
@@ -587,6 +612,8 @@ void pth_sched_init(void)
 #endif
 	uthread_2ls_init((struct uthread*)t, pth_handle_syscall, NULL);
 	atomic_init(&threads_total, 1);			/* one for thread0 */
+	pre_fork_2ls = pth_pre_fork;
+	post_fork_2ls = pth_post_fork;
 }
 
 /* Make sure our scheduler runs inside an MCP rather than an SCP. */

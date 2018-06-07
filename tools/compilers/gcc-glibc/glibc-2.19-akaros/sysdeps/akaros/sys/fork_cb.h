@@ -23,6 +23,12 @@
 
 #pragma once
 
+#include <sys/types.h>
+
+/* 2LSs need to set these CBs if they want to be able to fork. */
+extern void (*pre_fork_2ls)(void);
+extern void (*post_fork_2ls)(pid_t ret);
+
 struct fork_cb {
 	struct fork_cb				*next;
 	void (*func)(void);

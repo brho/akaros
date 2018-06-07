@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <ros/syscall.h>
 #include <sys/fork_cb.h>
 
@@ -31,7 +32,13 @@ pid_t __fork(void)
 	pid_t ret;
 	struct fork_cb *cb;
 
+	if (!pre_fork_2ls || !post_fork_2ls) {
+		fprintf(stderr, "[user] Tried to fork without 2LS support!\n");
+		assert(0);
+	}
+	pre_fork_2ls();
 	ret = ros_syscall(SYS_fork, 0, 0, 0, 0, 0, 0);
+	post_fork_2ls(ret);
 	if (ret == 0) {
 		cb = fork_callbacks;
 		while (cb) {

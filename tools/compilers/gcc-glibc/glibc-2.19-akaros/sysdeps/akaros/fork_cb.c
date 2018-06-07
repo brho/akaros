@@ -7,6 +7,9 @@
 #include <sys/fork_cb.h>
 #include <ros/common.h>
 
+void (*pre_fork_2ls)(void);
+void (*post_fork_2ls)(pid_t ret);
+
 struct fork_cb *fork_callbacks;
 
 void register_fork_cb(struct fork_cb *cb)

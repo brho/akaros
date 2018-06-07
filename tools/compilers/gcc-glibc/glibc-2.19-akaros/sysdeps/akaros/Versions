@@ -114,5 +114,9 @@ libc {
     dtls_key_create;
     set_dtls;
     get_dtls;
+
+    # Function pointers in fork_cb.c
+    pre_fork_2ls;
+    post_fork_2ls;
   }
 }

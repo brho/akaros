@@ -16,6 +16,7 @@
 #include <parlib/arch/trap.h>
 #include <parlib/ros_debug.h>
 #include <stdlib.h>
+#include <sys/fork_cb.h>
 
 static void thread0_sched_init(void);
 static void thread0_sched_entry(void);
@@ -74,6 +75,14 @@ void thread0_handle_syscall(struct event_msg *ev_msg,
 	thread0_info.is_blocked = FALSE;
 }
 
+static void thread0_pre_fork(void)
+{
+}
+
+static void thread0_post_fork(pid_t ret)
+{
+}
+
 void thread0_sched_init(void)
 {
 	int ret;
@@ -87,6 +96,8 @@ void thread0_sched_init(void)
 	sysc_evq = get_eventq(EV_MBOX_BITMAP);
 	sysc_evq->ev_flags = EVENT_INDIR | EVENT_WAKEUP;
 	uthread_2ls_init(thread0_uth, thread0_handle_syscall, NULL);
+	pre_fork_2ls = thread0_pre_fork;
+	post_fork_2ls = thread0_post_fork;
 }
 
 /* Thread0 scheduler ops (for processes that haven't linked in a full 2LS) */
