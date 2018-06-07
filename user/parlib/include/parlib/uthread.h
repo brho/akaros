@@ -211,6 +211,11 @@ static inline bool cur_uth_is_sw_ctx(void)
 	return get_cur_uth_ctx()->type == ROS_SW_CTX;
 }
 
+static inline bool uthread_is_thread0(struct uthread *uth)
+{
+	return uth->flags & UTHREAD_IS_THREAD0;
+}
+
 #define uthread_set_tls_var(uth, name, val)                                    \
 ({                                                                             \
 	typeof(val) __val = val;                                                   \
