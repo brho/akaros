@@ -24,8 +24,10 @@
 #include <ros/common.h>
 #include <kthread.h>
 #include <atomic.h>
+#include <rcu.h>
 
 struct radix_node {
+	struct rcu_head				rcu;
 	void						*items[NR_RNODE_SLOTS];
 	unsigned int				num_items;
 	bool						leaf;

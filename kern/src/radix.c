@@ -109,6 +109,13 @@ int radix_insert(struct radix_tree *tree, unsigned long key, void *item,
 	return 0;
 }
 
+static void __rnode_free_rcu(struct rcu_head *head)
+{
+	struct radix_node *r_node = container_of(head, struct radix_node, rcu);
+
+	kmem_cache_free(radix_kcache, r_node);
+}
+
 /* Removes an item from it's parent's structure, freeing the parent if there is
  * nothing left, potentially recursively. */
 static void __radix_remove_slot(struct radix_node *r_node,
@@ -125,8 +132,7 @@ static void __radix_remove_slot(struct radix_node *r_node,
 			__radix_remove_slot(r_node->parent, r_node->my_slot);
 		else			/* we're the last node, attached to the actual tree */
 			*(r_node->my_slot) = 0;
-		synchronize_rcu();
-		kmem_cache_free(radix_kcache, r_node);
+		call_rcu(&r_node->rcu, __rnode_free_rcu);
 	}
 }
 
