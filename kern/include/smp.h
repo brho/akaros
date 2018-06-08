@@ -74,15 +74,6 @@ struct per_cpu_info {
 	void *profiling;
 }__attribute__((aligned(ARCH_CL_SIZE)));
 
-/* Allows the kernel to figure out what process is running on this core.  Can be
- * used just like a pointer to a struct proc. */
-#define current per_cpu_info[core_id()].cur_proc
-/* Allows the kernel to figure out what *user* ctx is on this core's stack.  Can
- * be used just like a pointer to a struct user_context.  Note the distinction
- * between kernel and user contexts.  The kernel always returns to its nested,
- * interrupted contexts via iret/etc.  We never do that for user contexts. */
-#define current_ctx per_cpu_info[core_id()].cur_ctx
-
 typedef struct per_cpu_info  per_cpu_info_t;
 extern per_cpu_info_t per_cpu_info[MAX_NUM_CORES];
 
@@ -92,6 +83,17 @@ extern per_cpu_info_t per_cpu_info[MAX_NUM_CORES];
 #define pcpui_var(i, var) per_cpu_info[(i)].var
 #define this_pcpui_ptr() pcpui_ptr(core_id())
 #define this_pcpui_var(var) pcpui_var(core_id(), var)
+
+/* Allows the kernel to figure out what process is running on this core.  Can be
+ * used just like a pointer to a struct proc. */
+#define current this_pcpui_var(cur_proc)
+/* Allows the kernel to figure out what *user* ctx is on this core's stack.  Can
+ * be used just like a pointer to a struct user_context.  Note the distinction
+ * between kernel and user contexts.  The kernel always returns to its nested,
+ * interrupted contexts via iret/etc.  We never do that for user contexts. */
+#define current_ctx this_pcpui_var(cur_ctx)
+
+#define current_kthread this_pcpui_var(cur_kthread)
 
 /* SMP bootup functions */
 void smp_boot(void);

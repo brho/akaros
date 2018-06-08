@@ -126,7 +126,7 @@ void restart_kthread(struct kthread *kthread)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	uintptr_t current_stacktop;
-	struct kthread *current_kthread;
+	struct kthread *cur_kth;
 	/* Avoid messy complications.  The kthread will enable_irqsave() when it
 	 * comes back up. */
 	disable_irq();
@@ -138,11 +138,11 @@ void restart_kthread(struct kthread *kthread)
 		put_kstack(pcpui->spare->stacktop);
 		kmem_cache_free(kthread_kcache, pcpui->spare);
 	}
-	current_kthread = pcpui->cur_kthread;
-	current_stacktop = current_kthread->stacktop;
-	assert(!current_kthread->sysc);	/* catch bugs, prev user should clear */
+	cur_kth = pcpui->cur_kthread;
+	current_stacktop = cur_kth->stacktop;
+	assert(!cur_kth->sysc);	/* catch bugs, prev user should clear */
 	/* Set the spare stuff (current kthread, which includes its stacktop) */
-	pcpui->spare = current_kthread;
+	pcpui->spare = cur_kth;
 	/* When a kthread runs, its stack is the default kernel stack */
 	set_stack_top(kthread->stacktop);
 	pcpui->cur_kthread = kthread;
