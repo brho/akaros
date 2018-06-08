@@ -116,6 +116,8 @@ void synchronize_rcu(void)
 	struct sync_cb_blob b[1];
 	struct semaphore sem[1];
 
+	if (is_rcu_ktask(current_kthread))
+		panic("Attempted synchronize_rcu() from an RCU callback!");
 	sem_init(sem, 0);
 	init_rcu_head_on_stack(&b->h);
 	b->sem = sem;
@@ -227,6 +229,8 @@ void rcu_barrier(void)
 	struct sync_cb_blob *b;
 	int nr_sent = 0;
 
+	if (is_rcu_ktask(current_kthread))
+		panic("Attempted rcu_barrier() from an RCU callback!");
 	/* TODO: if we have concurrent rcu_barriers, we might be able to share the
 	 * CBs.  Say we have 1 CB on a core, then N rcu_barriers.  We'll have N
 	 * call_rcus in flight, though we could share.  Linux does this with a mtx
@@ -459,6 +463,7 @@ static void rcu_gp_ktask(void *arg)
 {
 	struct rcu_state *rsp = arg;
 
+	current_kthread->flags |= KTH_IS_RCU_KTASK;
 	while (1) {
 		rendez_sleep_timeout(&rsp->gp_ktask_rv, should_wake_ctl,
 		                     &rsp->gp_ktask_ctl, RCU_GP_MIN_PERIOD);
@@ -528,6 +533,7 @@ static void rcu_mgmt_ktask(void *arg)
 	struct rcu_pcpui *rpi = arg;
 	struct rcu_state *rsp = rpi->rsp;
 
+	current_kthread->flags |= KTH_IS_RCU_KTASK;
 	while (1) {
 		rendez_sleep(&rpi->mgmt_ktask_rv, should_wake_ctl,
 		             &rpi->mgmt_ktask_ctl);

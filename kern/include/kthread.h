@@ -29,7 +29,12 @@ TAILQ_HEAD(semaphore_tailq, semaphore);
 
 #define KTH_IS_KTASK			(1 << 0)
 #define KTH_SAVE_ADDR_SPACE		(1 << 1)
+#define KTH_IS_RCU_KTASK		(1 << 2)
+
+/* These flag sets are for toggling between ktasks and default/process ktasks */
+/* These are the flags for *any* ktask */
 #define KTH_KTASK_FLAGS			(KTH_IS_KTASK)
+/* These are the flags used for normal process context */
 #define KTH_DEFAULT_FLAGS		(KTH_SAVE_ADDR_SPACE)
 
 /* This captures the essence of a kernel context that we want to suspend.  When
@@ -114,6 +119,11 @@ void ktask(char *name, void (*fn)(void*), void *arg);
 static inline bool is_ktask(struct kthread *kthread)
 {
 	return kthread->flags & KTH_IS_KTASK;
+}
+
+static inline bool is_rcu_ktask(struct kthread *kthread)
+{
+	return kthread->flags & KTH_IS_RCU_KTASK;
 }
 
 void sem_init(struct semaphore *sem, int signals);
