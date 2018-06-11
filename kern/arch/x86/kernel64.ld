@@ -28,9 +28,8 @@ SECTIONS
 
 	.text : AT(ADDR(.text) - KERN_LOAD_ADDR) {
 		*(.text .stub .text.* .gnu.linkonce.t.*)
+		PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
 	}
-
-	PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
 
 	INCLUDE kern/linker_tables.ld
 	INCLUDE kern/build_id.ld
@@ -41,10 +40,14 @@ SECTIONS
 
 	/* TODO: add some debug info.  i hear stabs are 32 bit only, so we'll need
 	 * to bring in some dwarves.  for now, hack in the symbols to compile. */
-	PROVIDE(__STAB_BEGIN__ = .);
-	PROVIDE(__STAB_END__ = .);
-	PROVIDE(__STABSTR_BEGIN__ = .);
-	PROVIDE(__STABSTR_END__ = .);
+	.stab : {
+		PROVIDE(__STAB_BEGIN__ = .);
+		PROVIDE(__STAB_END__ = .);
+	}
+	.stabstr : {
+		PROVIDE(__STABSTR_BEGIN__ = .);
+		PROVIDE(__STABSTR_END__ = .);
+	}
 
 	/* Adjust the address for the data segment to the next page */
 	. = ALIGN(0x1000);
@@ -61,7 +64,11 @@ SECTIONS
 		PROVIDE(__stop_bss = .);
 	}
 
-	PROVIDE(end = .);
+	/* 'end' isn't a real section, but everything needs a name.  It'll show up
+	 * as 'N' (debug) in the nm / ksyms.map output. */
+	.end : {
+		PROVIDE(end = .);
+	}
 
 	/DISCARD/ : {
 		*(.eh_frame .note.GNU-stack)
