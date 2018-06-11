@@ -141,7 +141,7 @@ _init (int argc, char **argv, char **envp)
   /* Initialize ctype data.  */
   __ctype_init ();
 
-#ifdef SHARED
+#if defined SHARED && !defined NO_CTORS_DTORS_SECTIONS
   __libc_global_ctors ();
 #endif
 
