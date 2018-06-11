@@ -1,7 +1,7 @@
 # Number of make jobs to spawn.  Define it in Makelocal
 MAKE_JOBS ?= $(shell expr `cat /proc/cpuinfo | grep processor | wc -l` - 1)
 
-BINUTILS_VERSION := 2.24
+BINUTILS_VERSION := 2.30
 GCC_VERSION := 4.9.2
 GLIBC_VERSION := 2.19
 GMP_VERSION := 5.1.3
