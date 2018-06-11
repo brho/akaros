@@ -10,9 +10,8 @@ SECTIONS
 
 	.text 0xFFFFFFFF80002000 : AT(0x2000) {
 		*(.text .stub .text.* .gnu.linkonce.t.*)
+		PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
 	}
-
-	PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
 
 	INCLUDE kern/linker_tables.ld
 	INCLUDE kern/build_id.ld
@@ -58,7 +57,9 @@ SECTIONS
 		PROVIDE(__stop_bss = .);
 	}
 
-	PROVIDE(end = .);
+	.end : {
+		PROVIDE(end = .);
+	}
 
 	/DISCARD/ : {
 		*(.eh_frame .note.GNU-stack)
