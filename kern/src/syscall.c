@@ -1076,67 +1076,86 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 
 	/* We probably want it to never be allowed to exec if it ever was _M */
 	if (p->state != PROC_RUNNING_S) {
-		set_errno(EINVAL);
+		set_error(EINVAL, "Can't exec an MCP");
 		return -1;
 	}
-	if (p != pcpui->cur_proc) {
-		set_errno(EINVAL);
-		return -1;
-	}
-
-	/* Can't exec if we don't have a current_ctx to restart (if we fail).  This
-	 * isn't 100% true, but I'm okay with it. */
-	if (!pcpui->cur_ctx) {
-		set_errno(EINVAL);
-		return -1;
-	}
-	/* Preemptively copy out the cur_ctx, in case we fail later (easier on
-	 * cur_ctx if we do this now) */
-	assert(pcpui->cur_proc == pcpui->owning_proc);
-	copy_current_ctx_to(&p->scp_ctx);
 	/* Check the size of the argenv array, error out if too large. */
 	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {
 		set_error(EINVAL, "The argenv array has an invalid size: %lu\n",
 				  argenv_l);
 		return -1;
 	}
+
+	if (p != pcpui->owning_proc) {
+		warn("Proc %d tried to exec and wasn't owning_proc", p->pid);
+		set_error(EAGAIN, "exec may have blocked during execution");
+		return -1;
+	}
+	/* Not sure if these can happen; I don't expect them. */
+	assert(pcpui->cur_ctx);
+	assert(pcpui->cur_proc == pcpui->owning_proc);
+	/* Before this, we shouldn't have blocked (maybe with strace, though we
+	 * explicitly don't block exec for strace).  The owning proc, cur_proc, and
+	 * cur_ctx checks should catch that.  After this, we might still block, such
+	 * as on accessing the filesystem.
+	 *
+	 * After this point, we're treated like a yield - we're waiting until
+	 * something wakes us.  The kthread might block, error and fail, or succeed.
+	 * We shouldn't return to userspace before one of those.  The only way out
+	 * of this function is via smp_idle, not returning the way we came.
+	 *
+	 * Under normal situations, the only thing that will wake us is this kthread
+	 * completing.  I think you can trigger wakeups with events and async
+	 * syscalls started before the exec.  I'm not sure if that could trigger
+	 * more bugs or if that would hurt the kernel.  If so, we could add an
+	 * EXEC_LIMBO state.
+	 *
+	 * Note that we will 'hard block' if we block at all.  We can't return to
+	 * userspace and then asynchronously finish the exec later. */
+	spin_lock(&p->proc_lock);
+	/* We only need the context for the error case.  We have to save it now,
+	 * since once we leave this core, such as when the kthread blocks, the old
+	 * SCP's context will be gone. */
+	__proc_save_context_s(p);
+	/* We are no longer owning, but we are still current, like any
+	 * kthread-that-blocked-on-behalf of a process.  I think one invariant for
+	 * SCPs is: "RUNNING_S <==> is the owning proc". */
+	clear_owning_proc(core_id());
+	__proc_set_state(p, PROC_WAITING);
+	spin_unlock(&p->proc_lock);
+
 	/* Copy the argenv array into a kernel buffer. */
 	kargenv = user_memdup_errno(p, argenv, argenv_l);
 	if (!kargenv) {
-		set_errstr("Failed to copy in the args and environment");
-		return -1;
+		set_error(EINVAL, "Failed to copy in the args and environment");
+		goto out_error;
 	}
 	/* Unpack the argenv array into more usable variables. Integrity checking
 	 * done along side this as well. */
 	if (unpack_argenv(kargenv, argenv_l, &argc, &argv, &envc, &envp)) {
-		user_memdup_free(p, kargenv);
 		set_error(EINVAL, "Failed to unpack the args");
-		return -1;
+		goto out_error_kargenv;
 	}
 	t_path = copy_in_path(p, path, path_l);
 	if (!t_path) {
 		user_memdup_free(p, kargenv);
-		return -1;
+		goto out_error_kargenv;
 	}
-	/* Clear the current_ctx.  We won't be returning the 'normal' way.  Even if
-	 * we want to return with an error, we need to go back differently in case
-	 * we succeed.  This needs to be done before we could possibly block, but
-	 * unfortunately happens before the point of no return.
-	 *
-	 * Note that we will 'hard block' if we block at all.  We can't return to
-	 * userspace and then asynchronously finish the exec later. */
-	clear_owning_proc(core_id());
-	/* This could block: */
 	program = foc_open(t_path, O_EXEC | O_READ, 0);
 	if (!program)
-		goto early_error;
+		goto out_error_tpath;
 	if (!is_valid_elf(program)) {
-		set_errno(ENOEXEC);
-		goto mid_error;
+		set_error(ENOEXEC, "Program was not a valid ELF");
+		goto out_error_program;
 	}
-	/* This is the point of no return for the process. */
+
+	/* This is the point of no return for the process.  Any errors here lead to
+	 * destruction. */
+
 	/* progname is argv0, which accounts for symlinks */
 	proc_replace_binary_path(p, t_path);
+	/* p now owns the t_path, and it'll get freed when we destroy p. */
+	t_path = NULL;
 	proc_set_progname(p, argc ? argv[0] : NULL);
 	proc_init_procdata(p);
 	p->procinfo->program_end = 0;
@@ -1147,8 +1166,12 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	close_fdt(&p->open_files, TRUE);
 	env_user_mem_free(p, 0, UMAPTOP);
 	if (load_elf(p, program, argc, argv, envc, envp)) {
+		set_error(EINVAL, "Failed to load elf");
+		/* At this point, we destroyed memory and can't return to the app.  We
+		 * can't use the error cases, since they assume we'll return. */
 		foc_decref(program);
 		user_memdup_free(p, kargenv);
+		/* We finish the trace and not the sysc, since the sysc is gone. */
 		systrace_finish_trace(pcpui->cur_kthread, -1);
 		/* Note this is an inedible reference, but proc_destroy now returns */
 		proc_destroy(p);
@@ -1158,29 +1181,24 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	}
 	printd("[PID %d] exec %s\n", p->pid, foc_to_name(program));
 	foc_decref(program);
-	systrace_finish_trace(pcpui->cur_kthread, 0);
-	goto success;
-	/* These error and out paths are so we can handle the async interface, both
-	 * for when we want to error/return to the proc, as well as when we succeed
-	 * and want to start the newly exec'd _S */
-mid_error:
-	/* These two error paths are for when we want to restart the process with an
-	 * error value (errno is already set). */
-	foc_decref(program);
-early_error:
-	/* Note the t_path is passed to proc_replace_binary_path for success */
-	free_path(p, t_path);
-	finish_current_sysc(-1);
-success:
 	user_memdup_free(p, kargenv);
-	/* Here's how we restart the new (on success) or old (on failure) proc: */
-	spin_lock(&p->proc_lock);
-	__seq_start_write(&p->procinfo->coremap_seqctr);
-	__unmap_vcore(p, 0);
-	__seq_end_write(&p->procinfo->coremap_seqctr);
-	__proc_set_state(p, PROC_WAITING);	/* fake a yield */
-	spin_unlock(&p->proc_lock);
+	systrace_finish_trace(pcpui->cur_kthread, 0);
 	proc_wakeup(p);
+
+	goto all_out;
+
+out_error_program:
+	foc_decref(program);
+out_error_tpath:
+	/* Note the t_path is passed to proc_replace_binary_path in the non
+	 * out_error cases. */
+	free_path(p, t_path);
+out_error_kargenv:
+	user_memdup_free(p, kargenv);
+out_error:
+	finish_current_sysc(-1);
+	proc_wakeup(p);
+
 all_out:
 	/* This free and setting sysc = NULL may happen twice (early errors do it),
 	 * but they are idempotent. */
