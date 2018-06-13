@@ -33,14 +33,15 @@ static uint64_t compute_tsc_freq(void)
 
 static void set_tsc_freq(void)
 {
-	uint64_t msr_val, tsc_freq;
+	uint64_t msr_val, tsc_freq = 0;
 	bool computed = FALSE;
 
-	if (read_msr_safe(MSR_PLATFORM_INFO, &msr_val)) {
+	if (!read_msr_safe(MSR_PLATFORM_INFO, &msr_val))
+		tsc_freq = __proc_global_info.bus_freq * ((msr_val >> 8) & 0xff);
+	/* Even if we have the MSR, it might have given us 0. (QEMU). */
+	if (!tsc_freq) {
 		tsc_freq = compute_tsc_freq();
 		computed = TRUE;
-	} else {
-		tsc_freq = __proc_global_info.bus_freq * ((msr_val >> 8) & 0xff);
 	}
 	__proc_global_info.tsc_freq = tsc_freq;
 	printk("TSC Frequency: %llu%s\n", tsc_freq, computed ? " (computed)" : "");
