@@ -1,7 +1,7 @@
 .*
 *-builddir
-binutils-2.24.tar.bz2
-binutils-2.24
+binutils-2.30.tar.bz2
+binutils-2.30
 glibc-2.19.tar.bz2
 glibc-2.19
 gcc-4.9.2.tar.bz2

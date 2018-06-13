@@ -284,7 +284,6 @@ binutils-$(BINUTILS_VERSION): binutils-$(BINUTILS_VERSION).tar.bz2
 	rm -rf binutils-$(BINUTILS_VERSION);
 	tar -jxf binutils-$(BINUTILS_VERSION).tar.bz2
 	patch -p0 < binutils-$(BINUTILS_VERSION)-akaros.patch
-	patch --no-backup-if-mismatch -p0 < binutils-$(BINUTILS_VERSION)-riscv.patch
 
 $(BINARY_PREFIX)binutils-builddir: binutils-$(BINUTILS_VERSION)
 	rm -rf $@
