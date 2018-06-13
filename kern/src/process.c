@@ -883,7 +883,7 @@ void proc_destroy(struct proc *p)
 				current = NULL;
 			}
 			#endif
-			send_kernel_message(get_pcoreid(p, 0), __death, 0, 0, 0,
+			send_kernel_message(get_pcoreid(p, 0), __death, (long)p, 0, 0,
 			                    KMSG_ROUTINE);
 			__seq_start_write(&p->procinfo->coremap_seqctr);
 			__unmap_vcore(p, 0);
@@ -1693,7 +1693,7 @@ static void __proc_revoke_core(struct proc *p, uint32_t vcoreid, bool preempt)
 		atomic_or(&vcpd->flags, VC_K_LOCK);
 		send_kernel_message(pcoreid, __preempt, (long)p, 0, 0, KMSG_ROUTINE);
 	} else {
-		send_kernel_message(pcoreid, __death, 0, 0, 0, KMSG_ROUTINE);
+		send_kernel_message(pcoreid, __death, (long)p, 0, 0, KMSG_ROUTINE);
 	}
 }
 
@@ -2284,18 +2284,24 @@ void __death(uint32_t srcid, long a0, long a1, long a2)
 {
 	uint32_t vcoreid, coreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
-	struct proc *p = pcpui->owning_proc;
-	if (p) {
-		vcoreid = pcpui->owning_vcoreid;
-		printd("[kernel] death on physical core %d for process %d's vcore %d\n",
-		       coreid, p->pid, vcoreid);
-		vcore_account_offline(p, vcoreid);	/* in case anyone is counting */
-		/* We won't restart the process later.  current gets cleared later when
-		 * we notice there is no owning_proc and we have nothing to do
-		 * (smp_idle, restartcore, etc). */
-		arch_finalize_ctx(pcpui->cur_ctx);
-		clear_owning_proc(coreid);
+	struct proc *p = (struct proc*)a0;
+
+	assert(p);
+	if (p != pcpui->owning_proc) {
+		/* Older versions of Akaros thought it was OK to have a __death hit a
+		 * core that no longer had a process.  I think it's a bug now. */
+		panic("__death arrived for a process (%p) that was not owning (%p)!",
+		      p, pcpui->owning_proc);
 	}
+	vcoreid = pcpui->owning_vcoreid;
+	printd("[kernel] death on physical core %d for process %d's vcore %d\n",
+	       coreid, p->pid, vcoreid);
+	vcore_account_offline(p, vcoreid);	/* in case anyone is counting */
+	/* We won't restart the process later.  current gets cleared later when
+	 * we notice there is no owning_proc and we have nothing to do
+	 * (smp_idle, restartcore, etc). */
+	arch_finalize_ctx(pcpui->cur_ctx);
+	clear_owning_proc(coreid);
 }
 
 /* Kernel message handler, usually sent IMMEDIATE, to shoot down virtual
