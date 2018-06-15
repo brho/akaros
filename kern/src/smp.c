@@ -69,10 +69,13 @@ static void __attribute__((noreturn)) __smp_idle(void *arg)
 	enable_irq();	/* one-shot change to get any IRQs before we halt later */
 	disable_irq();
 	while (1) {
+		/* This might wake a kthread (the gp ktask), so be sure to run PRKM
+		 * after reporting the quiescent state.  Note that after each RKM
+		 * finishes, we'll also rerun rcu_report_qs(). */
+		rcu_report_qs();
 		process_routine_kmsg();
 		try_run_proc();
 		cpu_bored();		/* call out to the ksched */
-		rcu_report_qs();
 		/* cpu_halt() atomically turns on interrupts and halts the core.
 		 * Important to do this, since we could have a RKM come in via an
 		 * interrupt right while PRKM is returning, and we wouldn't catch
