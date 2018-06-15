@@ -5,7 +5,7 @@
  * alarm: basic functionality test for the #alarm device */
 
 #include <stdlib.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <parlib/parlib.h>
 #include <unistd.h>
 #include <parlib/event.h>

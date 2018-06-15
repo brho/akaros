@@ -156,7 +156,7 @@ void __trigger_tchain(struct timer_chain *tchain, struct hw_trapframe *hw_tf)
 {
 	struct alarm_waiter *i, *temp;
 	uint64_t now = read_tsc();
-	bool changed_list = FALSE;
+
 	/* why do we disable irqs here?  the lock is irqsave, but we (think we) know
 	 * the timer IRQ for this tchain won't fire again.  disabling irqs is nice
 	 * for the lock debugger.  i don't want to disable the debugger completely,
@@ -168,9 +168,11 @@ void __trigger_tchain(struct timer_chain *tchain, struct hw_trapframe *hw_tf)
 		       i, i->wake_up_time, now);
 		/* TODO: Could also do something in cases where we're close to now */
 		if (i->wake_up_time <= now) {
-			changed_list = TRUE;
 			i->on_tchain = FALSE;
 			TAILQ_REMOVE(&tchain->waiters, i, next);
+			/* Need to reset after each removal, in case the handler sets the
+			 * alarm again and the earliest/latest times are wrong. */
+			reset_tchain_times(tchain);
 			cmb();	/* enforce waking after removal */
 			/* Don't touch the waiter after waking it, since it could be in use
 			 * on another core (and the waiter can be clobbered as the kthread
@@ -179,9 +181,6 @@ void __trigger_tchain(struct timer_chain *tchain, struct hw_trapframe *hw_tf)
 		} else {
 			break;
 		}
-	}
-	if (changed_list) {
-		reset_tchain_times(tchain);
 	}
 	/* Need to reset the interrupt no matter what */
 	reset_tchain_interrupt(tchain);
