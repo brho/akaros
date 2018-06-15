@@ -153,17 +153,14 @@ static void __prep_sighandler(struct uthread *uthread,
 
 	if (uthread->flags & UTHREAD_SAVED) {
 		ctx = &uthread->u_ctx;
-		stack = get_user_ctx_sp(ctx) - sizeof(struct sigdata);
-		assert(stack_ptr_is_sane(stack));
-		uthread->sigstate.data = (struct sigdata*)stack;
 	} else {
 		assert(current_uthread == uthread);
 		ctx = &vcpd_of(vcore_id())->uthread_ctx;
-		stack = get_user_ctx_sp(ctx) - sizeof(struct sigdata);
-		stack = ROUNDDOWN(stack, __alignof__(struct sigdata));
-		assert(stack_ptr_is_sane(stack));
-		uthread->sigstate.data = (struct sigdata*)stack;
 	}
+	stack = get_user_ctx_sp(ctx) - sizeof(struct sigdata);
+	stack = ROUNDDOWN(stack, __alignof__(struct sigdata));
+	assert(stack_ptr_is_sane(stack));
+	uthread->sigstate.data = (struct sigdata*)stack;
 	/* Parlib aggressively saves the FP state for HW and VM ctxs.  SW ctxs
 	 * should not have FP state saved. */
 	switch (uthread->u_ctx.type) {
