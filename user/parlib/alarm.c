@@ -478,7 +478,7 @@ void alarm_abort_sysc(struct alarm_waiter *awaiter)
 		 * unblocking, or even has returned, but hasn't cancelled the alarm.
 		 * regardless, we request a new alarm (the uthread will cancel us one
 		 * way or another). */
-		set_awaiter_inc(awaiter, 1000000);
+		set_awaiter_rel(awaiter, 10000);
 		__set_alarm(awaiter);
 		return;
 	}
