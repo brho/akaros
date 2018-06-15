@@ -156,10 +156,6 @@ static void __prep_sighandler(struct uthread *uthread,
 		stack = get_user_ctx_sp(ctx) - sizeof(struct sigdata);
 		assert(stack_ptr_is_sane(stack));
 		uthread->sigstate.data = (struct sigdata*)stack;
-		if (uthread->flags & UTHREAD_FPSAVED) {
-			uthread->sigstate.data->as = uthread->as;
-			uthread->flags &= ~UTHREAD_FPSAVED;
-		}
 	} else {
 		assert(current_uthread == uthread);
 		ctx = &vcpd_of(vcore_id())->uthread_ctx;
@@ -167,12 +163,37 @@ static void __prep_sighandler(struct uthread *uthread,
 		stack = ROUNDDOWN(stack, __alignof__(struct sigdata));
 		assert(stack_ptr_is_sane(stack));
 		uthread->sigstate.data = (struct sigdata*)stack;
-		save_fp_state(&uthread->sigstate.data->as);
 	}
+	/* Parlib aggressively saves the FP state for HW and VM ctxs.  SW ctxs
+	 * should not have FP state saved. */
+	switch (uthread->u_ctx.type) {
+	case ROS_HW_CTX:
+	case ROS_VM_CTX:
+		assert(uthread->flags & UTHREAD_FPSAVED);
+		/* We need to save the already-saved FP state into the sigstate space.
+		 * The sig handler is taking over the uthread and its GP and FP spaces.
+		 *
+		 * If we ever go back to not aggressively saving the FP state, then for
+		 * HW and VM ctxs, the state is in hardware.  Regardless, we still need
+		 * to save it in ->as, with something like:
+		 *			save_fp_state(&uthread->sigstate.data->as);
+		 * Either way, when we're done with this entire function, the *uthread*
+		 * will have ~UTHREAD_FPSAVED, since we will be talking about the SW
+		 * context that is running the signal handler. */
+		uthread->sigstate.data->as = uthread->as;
+		uthread->flags &= ~UTHREAD_FPSAVED;
+		break;
+	case ROS_SW_CTX:
+		assert(!(uthread->flags & UTHREAD_FPSAVED));
+		break;
+	};
 	if (info != NULL)
 		uthread->sigstate.data->info = *info;
 
 	init_user_ctx(&uthread->sigstate.data->u_ctx, (uintptr_t)entry, stack);
+	/* The uthread may or may not be UTHREAD_SAVED.  That depends on whether the
+	 * uthread was in that state initially.  We're swapping into the location of
+	 * 'ctx', which is either in VCPD or the uth itself. */
 	swap_user_contexts(ctx, &uthread->sigstate.data->u_ctx);
 }
 
