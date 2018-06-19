@@ -177,7 +177,27 @@ int sysfchdir(int fd)
 	}
 	c = fdtochan(&current->open_files, fd, -1, 0, 1);
 	poperror();
-	set_dot(c);
+
+	/* This is a little hokey.  Ideally, we'd only allow O_PATH fds to be
+	 * fchdir'd.  Linux/POSIX lets you do arbitrary FDs.  Luckily, we stored the
+	 * name when we walked (__namec_from), so we should be able to recreate the
+	 * chan.  Using namec() with channame() is a more heavy-weight cclone(), but
+	 * also might have issues if the chan has since been removed or the
+	 * namespace is otherwise different from when the original fd/chan was first
+	 * created. */
+	if (c->flag & O_PATH) {
+		set_dot(c);
+		return 0;
+	}
+	if (waserror()) {
+		cclose(c);
+		poperror();
+		return -1;
+	}
+	syschdir(channame(c));
+	cclose(c);
+	poperror();
+
 	return 0;
 }
 
