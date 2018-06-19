@@ -163,7 +163,7 @@ static void __prep_sighandler(struct uthread *uthread,
 	uthread->sigstate.data = (struct sigdata*)stack;
 	/* Parlib aggressively saves the FP state for HW and VM ctxs.  SW ctxs
 	 * should not have FP state saved. */
-	switch (uthread->u_ctx.type) {
+	switch (ctx->type) {
 	case ROS_HW_CTX:
 	case ROS_VM_CTX:
 		assert(uthread->flags & UTHREAD_FPSAVED);
