@@ -522,10 +522,13 @@ static bool gtfs_tf_has_children(struct tree_file *parent)
 {
 	struct dir dir[1];
 
-	assert(!tree_file_is_dir(parent));	/* TF bug */
-	/* any read should work, but there might be issues asking for something
-	 * smaller than a dir. */
-	return gtfs_fsf_read(&parent->file, dir, sizeof(struct dir), 0) > 0;
+	assert(tree_file_is_dir(parent));	/* TF bug */
+	/* Any read should work, but there might be issues asking for something
+	 * smaller than a dir.
+	 *
+	 * Note we use the unlocked read here.  The fs_file's qlock is held by our
+	 * caller, and we reuse that qlock for the sync for reading/writing. */
+	return __gtfs_fsf_read(&parent->file, dir, sizeof(struct dir), 0) > 0;
 }
 
 struct tree_file_ops gtfs_tf_ops = {
