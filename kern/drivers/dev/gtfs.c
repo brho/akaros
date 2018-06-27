@@ -187,9 +187,9 @@ static void purge_cb(struct tree_file *tf)
 	poperror();
 }
 
-static void gtfs_release(struct kref *kref)
+static void __gtfs_destroy(uint32_t srcid, long a0, long a1, long a2)
 {
-	struct gtfs *gtfs = container_of(kref, struct gtfs, users);
+	struct gtfs *gtfs = (struct gtfs*)a0;
 
 	tfs_frontend_purge(&gtfs->tfs, purge_cb);
 	/* this is the ref from attach */
@@ -199,6 +199,18 @@ static void gtfs_release(struct kref *kref)
 	rcu_barrier();
 	tfs_destroy(&gtfs->tfs);
 	kfree(gtfs);
+}
+
+static void gtfs_release(struct kref *kref)
+{
+	struct gtfs *gtfs = container_of(kref, struct gtfs, users);
+
+	/* We can't use RCU within an RCU callback, and release methods are often
+	 * called from within callbacks.  We can use a kernel message, which can
+	 * block and do whatever else it wants.  In essence, we break the connection
+	 * to our current context (the rcu_mgmt_ktask) by using a kmsg. */
+	send_kernel_message(core_id(), __gtfs_destroy, (long)gtfs, 0, 0,
+	                    KMSG_ROUTINE);
 }
 
 static struct gtfs *chan_to_gtfs(struct chan *c)
