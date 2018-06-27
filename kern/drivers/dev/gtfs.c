@@ -517,6 +517,15 @@ static void gtfs_tf_create(struct tree_file *parent, struct tree_file *child,
 	poperror();
 }
 
+static void gtfs_wstat_rename(struct fs_file *f, const char *name)
+{
+	struct dir dir;
+
+	init_empty_dir(&dir);
+	dir.name = (char*)name;
+	wstat_dir(f, &dir);
+}
+
 static void gtfs_tf_rename(struct tree_file *tf, struct tree_file *old_parent,
                            struct tree_file *new_parent, const char *name,
                            int flags)
@@ -524,9 +533,16 @@ static void gtfs_tf_rename(struct tree_file *tf, struct tree_file *old_parent,
 	struct chan *tf_c = tf_to_gtfs_priv(tf)->be_walk;
 	struct chan *np_c = tf_to_gtfs_priv(new_parent)->be_walk;
 
-	if (!devtab[tf_c->type].rename)
+	if (!devtab[tf_c->type].rename) {
+		/* 9p can handle intra-directory renames, though some Akaros #devices
+		 * might throw. */
+		if (old_parent == new_parent) {
+			gtfs_wstat_rename(&tf->file, name);
+			return;
+		}
 		error(EXDEV, "%s: %s doesn't support rename", devname(),
 		      devtab[tf_c->type].name);
+	}
 	devtab[tf_c->type].rename(tf_c, np_c, name, flags);
 }
 
@@ -858,6 +874,7 @@ struct dev gtfs_devtab __devtab = {
 	.write = tree_chan_write,
 	.bwrite = devbwrite,
 	.remove = gtfs_remove,
+	.rename = tree_chan_rename,
 	.wstat = gtfs_wstat,
 	.power = devpower,
 	.chaninfo = devchaninfo,
