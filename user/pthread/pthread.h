@@ -41,6 +41,7 @@ struct pthread_tcb {
 	TAILQ_ENTRY(pthread_tcb) tq_next;
 	int state;
 	uint32_t id;
+	uint64_t fork_generation;
 	uint32_t stacksize;
 	void *stacktop;
 	void *(*start_routine)(void*);

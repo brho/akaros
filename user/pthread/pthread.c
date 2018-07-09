@@ -39,7 +39,8 @@ int threads_ready = 0;
 int threads_active = 0;
 atomic_t threads_total;
 bool need_tls = TRUE;
-static bool skip_non_thread0;
+static uint64_t fork_generation;
+#define INIT_FORK_GENERATION 1
 
 /* Array of per-vcore structs to manage waiting on syscalls and handling
  * overflow.  Init'd in pth_init(). */
@@ -110,8 +111,7 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 		__check_preempt_pending(vcoreid);
 		mcs_pdr_lock(&queue_lock);
 		TAILQ_FOREACH(new_thread, &ready_queue, tq_next) {
-			if (skip_non_thread0 &&
-			    !uthread_is_thread0((struct uthread*)new_thread))
+			if (new_thread->fork_generation < fork_generation)
 				continue;
 			break;
 		}
@@ -514,22 +514,34 @@ int pthread_getattr_np(pthread_t __th, pthread_attr_t *__attr)
 	return 0;
 }
 
-/* All threading is suspended during a fork.  Parents will continue threading
- * after the fork.  Children will never thread again.  If they fork, but don't
- * exec, then their threading will be broken.  Oh well - stop using fork. */
+/* All multi-threading is suspended during a fork.  Thread0 will continue to
+ * run, which could come up if SYS_fork blocks or we get interrupted.  Parents
+ * will continue threading after the fork, like normal.  Old threads in the
+ * child will never run again.  New threads in the child will run. */
 static void pth_pre_fork(void)
 {
+	struct pthread_tcb *pth_0 = (struct pthread_tcb*)current_uthread;
+
 	if (!uthread_is_thread0(current_uthread))
 		panic("Tried to fork from a non-thread0 thread!");
 	if (in_multi_mode())
 		panic("Tried to fork from an MCP!");
-	skip_non_thread0 = true;
+	pth_0->fork_generation = fork_generation + 1;
+	cmb();	/* in case we get interrupted after incrementing the global gen */
+	/* We're single-core and thread0 here, so we can modify fork_generation */
+	fork_generation++;
+	/* At this point, whether we come back as the child or the parent, no old
+	 * thread (from the previous generation) will run. */
 }
 
 static void pth_post_fork(pid_t ret)
 {
-	if (ret)
-		skip_non_thread0 = false;
+	struct pthread_tcb *pth_0 = (struct pthread_tcb*)current_uthread;
+
+	if (ret) {
+		fork_generation--;
+		pth_0->fork_generation = fork_generation;
+	}
 }
 
 /* Do whatever init you want.  At some point call uthread_2ls_init() and pass it
@@ -541,12 +553,14 @@ void pth_sched_init(void)
 	int ret;
 
 	mcs_pdr_init(&queue_lock);
+	fork_generation = INIT_FORK_GENERATION;
 	/* Create a pthread_tcb for the main thread */
 	ret = posix_memalign((void**)&t, __alignof__(struct pthread_tcb),
 	                     sizeof(struct pthread_tcb));
 	assert(!ret);
 	memset(t, 0, sizeof(struct pthread_tcb));	/* aggressively 0 for bugs */
 	t->id = get_next_pid();
+	t->fork_generation = fork_generation;
 	t->stacksize = USTACK_NUM_PAGES * PGSIZE;
 	t->stacktop = (void*)USTACKTOP;
 	t->state = PTH_RUNNING;
@@ -649,6 +663,7 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
 	pthread->state = PTH_CREATED;
 	pthread->id = get_next_pid();
+	pthread->fork_generation = fork_generation;
 	SLIST_INIT(&pthread->cr_stack);
 	/* Respect the attributes */
 	if (attr) {
