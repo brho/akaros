@@ -228,6 +228,15 @@ static int run_init_script(void)
 }
 #endif
 
+/* Multiple cores can panic concurrently.  We could also panic recursively,
+ * which would deadlock.  We also only want to automatically backtrace the first
+ * time through, since BTs are often the source of panics.  Finally, we want to
+ * know when the other panicking cores are done (or likely to be done) before
+ * entering the monitor. */
+static spinlock_t panic_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+static bool panic_printing;
+static DEFINE_PERCPU(int, panic_depth);
+
 /*
  * Panic is called on unresolvable fatal errors.
  * It prints "panic: mesg", and then enters the kernel monitor.
@@ -236,17 +245,44 @@ void _panic(const char *file, int line, const char *fmt,...)
 {
 	va_list ap;
 	struct per_cpu_info *pcpui;
+
 	/* We're panicing, possibly in a place that can't handle the lock checker */
 	pcpui = &per_cpu_info[core_id_early()];
 	pcpui->__lock_checking_enabled--;
+
+	if (!PERCPU_VAR(panic_depth)) {
+		spin_lock_irqsave(&panic_lock);
+		panic_printing = true;
+	}
+	PERCPU_VAR(panic_depth)++;
+
 	va_start(ap, fmt);
 	printk("kernel panic at %s:%d, from core %d: ", file, line,
 	       core_id_early());
 	vcprintf(fmt, ap);
-	cprintf("\n");
+	printk("\n");
 	va_end(ap);
+	if (PERCPU_VAR(panic_depth) == 1)
+		backtrace();
+	else
+		printk("\tRecursive kernel panic on core %d (depth %d)\n",
+		       core_id_early(), PERCPU_VAR(panic_depth));
+	printk("\n");
 
+	PERCPU_VAR(panic_depth)--;
+	if (!PERCPU_VAR(panic_depth)) {
+		panic_printing = false;
+		spin_unlock_irqsave(&panic_lock);
+	}
+
+	/* Let's wait long enough for other printers to finish before entering the
+	 * monitor. */
+	do {
+		udelay(500000);
+		cmb();
+	} while (panic_printing);
 	monitor(NULL);
+
 	if (pcpui->cur_proc) {
 		printk("panic killing proc %d\n", pcpui->cur_proc->pid);
 		proc_destroy(pcpui->cur_proc);
