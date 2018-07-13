@@ -7,7 +7,7 @@
 /* for includes */ struct proc;
 
 struct symtab_entry {
-	char *name;
+	const char *name;
 	uintptr_t addr;
 };
 
@@ -49,8 +49,8 @@ void gen_backtrace(void (*pfunc)(void *, const char *), void *opaque);
 static inline uintptr_t get_caller_pc(void);
 
 /* Returns a null-terminated string with the function name for a given PC /
- * instruction pointer.  kfree() the result. */
-char *get_fn_name(uintptr_t pc);
+ * instruction pointer.  Returns NULL on failure. */
+const char *get_fn_name(uintptr_t pc);
 
 /* Returns the address of sym, or 0 if it does not exist */
 uintptr_t get_symbol_addr(char *sym);

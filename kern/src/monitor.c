@@ -680,16 +680,12 @@ static DEFINE_PERCPU(bool, mon_nmi_trace);
 
 static void emit_hwtf_backtrace(struct hw_trapframe *hw_tf)
 {
-	char *fn_name;
-
 	if (mon_verbose_trace) {
 		print_trapframe(hw_tf);
 		backtrace_hwtf(hw_tf);
 	}
-	fn_name = get_fn_name(get_hwtf_pc(hw_tf));
 	printk("Core %d is at %p (%s)\n", core_id(), get_hwtf_pc(hw_tf),
-	       fn_name);
-	kfree(fn_name);
+	       get_fn_name(get_hwtf_pc(hw_tf)));
 }
 
 static void emit_vmtf_backtrace(struct vm_trapframe *vm_tf)

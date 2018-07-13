@@ -175,19 +175,18 @@ void reset_cpu_state_ticks(int coreid)
 static void pcpui_trace_kmsg_handler(void *event, void *data)
 {
 	struct pcpu_trace_event *te = (struct pcpu_trace_event*)event;
-	char *func_name;
 	uintptr_t addr;
+
 	addr = te->arg1;
-	func_name = get_fn_name(addr);
-	printk("\tKMSG %p: %s\n", addr, func_name);
-	kfree(func_name);
+	printk("\tKMSG %p: %s\n", addr, get_fn_name(addr));
 }
 
 static void pcpui_trace_locks_handler(void *event, void *data)
 {
 	struct pcpu_trace_event *te = (struct pcpu_trace_event*)event;
-	char *func_name;
+	const char *func_name;
 	uintptr_t lock_addr = te->arg1;
+
 	if (lock_addr > KERN_LOAD_ADDR)
 		func_name = get_fn_name(lock_addr);
 	else
@@ -195,8 +194,6 @@ static void pcpui_trace_locks_handler(void *event, void *data)
 	printk("Time %uus, lock %p (%s)\n", te->arg0, lock_addr, func_name);
 	printk("\t");
 	spinlock_debug((spinlock_t*)lock_addr);
-	if (lock_addr > KERN_LOAD_ADDR)
-		kfree(func_name);
 }
 
 /* Add specific trace handlers here: */

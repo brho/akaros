@@ -460,16 +460,13 @@ void print_chain(struct timer_chain *tchain)
 	       tchain->latest_time);
 	TAILQ_FOREACH(i, &tchain->waiters, next) {
 		uintptr_t f;
-		char *f_name;
 
 		if (i->irq_ok)
 			f = (uintptr_t)i->func_irq;
 		else
 			f = (uintptr_t)i->func;
-		f_name = get_fn_name(f);
 		printk("\tWaiter %p, time %llu, func %p (%s)\n", i,
-		       i->wake_up_time, f, f_name);
-		kfree(f_name);
+		       i->wake_up_time, f, get_fn_name(f));
 	}
 	spin_unlock_irqsave(&tchain->lock);
 }

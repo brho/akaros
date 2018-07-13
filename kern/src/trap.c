@@ -268,14 +268,13 @@ void print_kmsgs(uint32_t coreid)
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	void __print_kmsgs(struct kernel_msg_list *list, char *type)
 	{
-		char *fn_name;
 		struct kernel_message *kmsg_i;
+
 		STAILQ_FOREACH(kmsg_i, list, link) {
-			fn_name = get_fn_name((long)kmsg_i->pc);
 			printk("%s KMSG on %d from %d to run %p(%s)(%p, %p, %p)\n", type,
-			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc, fn_name,
+			       kmsg_i->dstid, kmsg_i->srcid, kmsg_i->pc,
+			       get_fn_name((long)kmsg_i->pc),
 			       kmsg_i->arg0, kmsg_i->arg1, kmsg_i->arg2);
-			kfree(fn_name);
 		}
 	}
 	__print_kmsgs(&pcpui->immed_amsgs, "Immedte");

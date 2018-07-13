@@ -102,17 +102,14 @@ void spin_unlock(spinlock_t *lock)
 void spinlock_debug(spinlock_t *lock)
 {
 	uintptr_t pc = lock->call_site;
-	char *func_name;
 
 	if (!pc) {
 		printk("Lock %p: never locked\n", lock);
 		return;
 	}
-	func_name = get_fn_name(pc);
-	printk("Lock %p: currently %slocked.  Last locked at [<%p>] in %s on "
-	       "core %d\n", lock, spin_locked(lock) ? "" : "un", pc, func_name,
+	printk("Lock %p: currently %slocked.  Last locked at [<%p>] in %s on core %d\n",
+	       lock, spin_locked(lock) ? "" : "un", pc, get_fn_name(pc),
 	       lock->calling_core);
-	kfree(func_name);
 }
 
 #endif /* CONFIG_SPINLOCK_DEBUG */

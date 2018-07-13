@@ -12,13 +12,13 @@
 
 struct symtab_entry gbl_symtab[1] __attribute__((weak)) = {{0, 0}};
 
-/* Returns a null-terminated string with the function name for a given PC /
- * instruction pointer.  kfree() the result. */
-char *get_fn_name(uintptr_t pc)
+/* Returns a null-terminated string from the reflected symbol table with the
+ * function name for a given PC / instruction pointer.  Returns NULL on
+ * failure. */
+const char *get_fn_name(uintptr_t pc)
 {
 	struct symtab_entry *i, *prev = 0, *found = 0;
-	char *buf;
-	size_t name_len;
+
 	/* Table is in ascending order.  As soon as we get to an entry greater than
 	 * us, we were in the previous one.  This is only true if we were given a
 	 * good PC.  Random addresses will just find the previous symbol. */
@@ -30,14 +30,9 @@ char *get_fn_name(uintptr_t pc)
 		prev = i;
 	}
 	if (!found)
-		return 0;
+		return NULL;
 	assert(found->name);
-	name_len = strlen(found->name) + 1;
-	buf = kmalloc(name_len, 0);
-	if (!buf)
-		return 0;
-	strlcpy(buf, found->name, name_len);
-	return buf;
+	return found->name;
 }
 
 uintptr_t get_symbol_addr(char *sym)
@@ -204,15 +199,12 @@ void debug_addr_pid(int pid, unsigned long addr)
 void print_backtrace_list(uintptr_t *pcs, size_t nr_pcs,
 						  void (*pfunc)(void *, const char *), void *opaque)
 {
-	char *func_name;
 	char bt_line[128];
 
 	for (size_t i = 0; i < nr_pcs; i++) {
-		func_name = get_fn_name(pcs[i]);
 		snprintf(bt_line, sizeof(bt_line), "#%02d [<%p>] in %s\n", i + 1,
-				 pcs[i], func_name);
+				 pcs[i], get_fn_name(pcs[i]));
 		pfunc(opaque, bt_line);
-		kfree(func_name);
 	}
 }
 
