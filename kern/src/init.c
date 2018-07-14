@@ -262,6 +262,8 @@ void _panic(const char *file, int line, const char *fmt,...)
 	vcprintf(fmt, ap);
 	printk("\n");
 	va_end(ap);
+	/* Recursive panics are usually backtrace problems.  Possibly printk.
+	 * Locking panics might recurse forever. */
 	if (PERCPU_VAR(panic_depth) == 1)
 		backtrace();
 	else
@@ -269,11 +271,14 @@ void _panic(const char *file, int line, const char *fmt,...)
 		       core_id_early(), PERCPU_VAR(panic_depth));
 	printk("\n");
 
-	PERCPU_VAR(panic_depth)--;
-	if (!PERCPU_VAR(panic_depth)) {
-		panic_printing = false;
-		spin_unlock_irqsave(&panic_lock);
-	}
+	/* If we're here, we panicked and currently hold the lock.  We might have
+	 * panicked recursively.  We must unlock unconditionally, since the initial
+	 * panic (which grabbed the lock) will never run again. */
+	panic_printing = false;
+	spin_unlock_irqsave(&panic_lock);
+	/* And we have to clear the depth, so that we lock again next time in.
+	 * Otherwise, we'd be unlocking without locking (which is another panic). */
+	PERCPU_VAR(panic_depth) = 0;
 
 	/* Let's wait long enough for other printers to finish before entering the
 	 * monitor. */
