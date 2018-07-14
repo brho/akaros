@@ -56,8 +56,6 @@
 #define KADDR_NOCHECK(pa) ((void*)(pa + KERNBASE))
 #define KBASEADDR(kla) KADDR(PADDR(kla))
 
-extern char bootstacktop[], bootstack[];
-
 extern physaddr_t max_pmem;		/* Total amount of physical memory */
 extern size_t max_nr_pages;		/* Total number of physical memory pages */
 extern physaddr_t max_paddr;	/* Maximum addressable physical address */

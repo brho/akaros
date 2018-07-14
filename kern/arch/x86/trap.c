@@ -160,7 +160,8 @@ void idt_init(void)
 	/* Set up our kernel stack when changing rings */
 	/* Note: we want 16 byte aligned kernel stack frames (AMD 2:8.9.3) */
 	x86_sysenter_init();
-	set_stack_top((uintptr_t)bootstacktop);
+	/* We will set this properly once we have a kstack from the slab. */
+	set_stack_top(0xdeadbeef);
 
 	/* Initialize the TSS field of the gdt.  The size of the TSS desc differs
 	 * between 64 and 32 bit, hence the pointer acrobatics */
