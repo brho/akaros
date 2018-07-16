@@ -46,7 +46,10 @@ struct gtfs {
  * be_{length,mode,mtime} should be what the remote server thinks they are -
  * especially for length and mode.  The invariant is that e.g. the file's length
  * == be_length, and the qlock protects that invariant.  We don't care as much
- * about mtime, since some 9p servers just change that on their own. */
+ * about mtime, since some 9p servers just change that on their own.
+ *
+ * Also note that you can't trust be_length for directories.  You'll often get
+ * 4096 or 0, depending on the 9p server you're talking to. */
 struct gtfs_priv {
 	struct chan					*be_walk;	/* never opened */
 	struct chan					*be_read;
@@ -323,10 +326,6 @@ static size_t __gtfs_fsf_read(struct fs_file *f, void *ubuf, size_t n,
 {
 	struct gtfs_priv *gp = fsf_to_gtfs_priv(f);
 
-	if (off >= gp->be_length) {
-		/* We can skip the RPC, since we know it will return zero (EOF). */
-		return 0;
-	}
 	if (!gp->be_read)
 		gp->be_read = cclone_and_open(gp->be_walk, O_READ);
 	return devtab[gp->be_read->type].read(gp->be_read, ubuf, n, off);
