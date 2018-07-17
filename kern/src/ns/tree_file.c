@@ -254,7 +254,15 @@ static struct tree_file *get_locked_and_kreffed_parent(struct tree_file *child)
 	if (!parent)
 		return NULL;
 	qlock(&parent->file.qlock);
-	if (parent != child->parent) {
+	/* Checking the parent == child->parent isn't enough here.  That works for
+	 * rename, but not removal/unlink.  Older versions of TF code cleared
+	 * child->parent, but now that's dealt with in tf_free.
+	 *
+	 * We're doing a lockless peek at child's flags.  We hold the potential
+	 * parent's lock, so if they are ours, no one will be messing with the
+	 * disconnected flag.  If they are messing with it, then parent !=
+	 * child->parent.  Also, once disconnected is set, it is never clear. */
+	if ((child->flags & TF_F_DISCONNECTED) || (parent != child->parent)) {
 		qunlock(&parent->file.qlock);
 		tf_kref_put(parent);
 		return NULL;
