@@ -31,6 +31,3 @@ extern bool booting;
  */
 const char *get_boot_option(const char *base, const char *option, char *param,
 							size_t max_param);
-
-void _panic(const char *file, int line, const char *fmt, ...);
-void _warn(const char *file, int line, const char *fmt, ...);

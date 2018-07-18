@@ -241,7 +241,8 @@ static DEFINE_PERCPU(int, panic_depth);
  * Panic is called on unresolvable fatal errors.
  * It prints "panic: mesg", and then enters the kernel monitor.
  */
-void _panic(const char *file, int line, const char *fmt,...)
+void _panic(struct hw_trapframe *hw_tf, const char *file, int line,
+            const char *fmt, ...)
 {
 	va_list ap;
 	struct per_cpu_info *pcpui;
@@ -264,11 +265,17 @@ void _panic(const char *file, int line, const char *fmt,...)
 	va_end(ap);
 	/* Recursive panics are usually backtrace problems.  Possibly printk.
 	 * Locking panics might recurse forever. */
-	if (PERCPU_VAR(panic_depth) == 1)
-		backtrace();
-	else
+	if (PERCPU_VAR(panic_depth) == 1) {
+		if (hw_tf) {
+			print_trapframe(hw_tf);
+			backtrace_hwtf(hw_tf);
+		} else {
+			backtrace();
+		}
+	} else {
 		printk("\tRecursive kernel panic on core %d (depth %d)\n",
 		       core_id_early(), PERCPU_VAR(panic_depth));
+	}
 	printk("\n");
 
 	/* If we're here, we panicked and currently hold the lock.  We might have

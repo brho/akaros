@@ -273,9 +273,8 @@ static bool __handler_kernel_page_fault(struct hw_trapframe *hw_tf,
 		/* This only runs from test_uaccess(), where it is expected to fail. */
 		if (try_handle_exception_fixup(hw_tf))
 			return TRUE;
-		print_trapframe(hw_tf);
-		backtrace_hwtf(hw_tf);
-		panic("Proc-less Page Fault in the Kernel at %p!", fault_va);
+		panic_hwtf(hw_tf, "Proc-less Page Fault in the Kernel at %p!",
+		           fault_va);
 	}
 	/* TODO - handle kernel page faults.  This is dangerous, since we might be
 	 * holding locks in the kernel and could deadlock when we HPF.  For now, I'm
@@ -300,8 +299,6 @@ static bool __handler_kernel_page_fault(struct hw_trapframe *hw_tf,
 	if (err) {
 		if (try_handle_exception_fixup(hw_tf))
 			return TRUE;
-		print_trapframe(hw_tf);
-		backtrace_hwtf(hw_tf);
 		/* Turn this on to help debug bad function pointers */
 		printd("rsp %p\n\t 0(rsp): %p\n\t 8(rsp): %p\n\t 16(rsp): %p\n"
 		       "\t24(rsp): %p\n", hw_tf->tf_rsp,
@@ -309,7 +306,7 @@ static bool __handler_kernel_page_fault(struct hw_trapframe *hw_tf,
 		       *(uintptr_t*)(hw_tf->tf_rsp +  8),
 		       *(uintptr_t*)(hw_tf->tf_rsp + 16),
 		       *(uintptr_t*)(hw_tf->tf_rsp + 24));
-		panic("Proc-ful Page Fault in the Kernel at %p!", fault_va);
+		panic_hwtf(hw_tf, "Proc-ful Page Fault in the Kernel at %p!", fault_va);
 		/* if we want to do something like kill a process or other code, be
 		 * aware we are in a sort of irq-like context, meaning the main
 		 * kernel code we 'interrupted' could be holding locks - even
@@ -537,9 +534,7 @@ void handle_nmi(struct hw_trapframe *hw_tf)
 
 void handle_double_fault(struct hw_trapframe *hw_tf)
 {
-	print_trapframe(hw_tf);
-	backtrace_hwtf(hw_tf);
-	panic("Double fault!  Check the kernel stack pointer; you likely ran off the end of the stack.");
+	panic_hwtf(hw_tf, "Double fault!  Check the kernel stack pointer; you likely ran off the end of the stack.");
 }
 
 /* Certain traps want IRQs enabled, such as the syscall.  Others can't handle
@@ -608,10 +603,8 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 	}
 
 	if (!handled) {
-		if (in_kernel(hw_tf)) {
-			print_trapframe(hw_tf);
-			panic("Damn Damn!  Unhandled trap in the kernel!");
-		}
+		if (in_kernel(hw_tf))
+			panic_hwtf(hw_tf, "Damn Damn!  Unhandled trap in the kernel!");
 		reflect_unhandled_trap(hw_tf->tf_trapno, hw_tf->tf_err, aux);
 	}
 }
@@ -668,10 +661,8 @@ void trap(struct hw_trapframe *hw_tf)
 	}
 	printd("Incoming TRAP %d on core %d, TF at %p\n", hw_tf->tf_trapno,
 	       core_id(), hw_tf);
-	if ((hw_tf->tf_cs & ~3) != GD_UT && (hw_tf->tf_cs & ~3) != GD_KT) {
-		print_trapframe(hw_tf);
-		panic("Trapframe with invalid CS!");
-	}
+	if ((hw_tf->tf_cs & ~3) != GD_UT && (hw_tf->tf_cs & ~3) != GD_KT)
+		panic_hwtf(hw_tf, "Trapframe with invalid CS!");
 	trap_dispatch(hw_tf);
 	/* Return to the current process, which should be runnable.  If we're the
 	 * kernel, we should just return naturally.  Note that current and tf need

@@ -4,16 +4,18 @@
 
 #include <compiler.h>
 
-void ( _warn)(const char *, int, const char *, ...);
-void ( _panic)(const char *, int, const char *, ...)
+void _warn(const char *, int, const char *, ...);
+struct hw_trapframe;
+void _panic(struct hw_trapframe *, const char *, int, const char *, ...)
 	__attribute__((noreturn));
 
 #define warn(...) _warn(__FILE__, __LINE__, __VA_ARGS__)
 #define warn_once(...) run_once_racy(warn(__VA_ARGS__))
 #define warn_on(x) do { if (x) warn(#x);} while (0)
 #define warn_on_once(x) do { if (x) warn_once(#x);} while (0)
-#define panic(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
-#define exhausted(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
+#define panic(...) _panic(NULL, __FILE__, __LINE__, __VA_ARGS__)
+#define panic_hwtf(x, ...) _panic(x, __FILE__, __LINE__, __VA_ARGS__)
+#define exhausted(...) _panic(NULL, __FILE__, __LINE__, __VA_ARGS__)
 
 #define assert(x)		\
 	do { if (unlikely(!(x))) panic("assertion failed: %s", #x); } while (0)
