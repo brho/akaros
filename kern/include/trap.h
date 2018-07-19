@@ -160,7 +160,8 @@ void print_kmsgs(uint32_t coreid);
 #define __CTX_IRQ_D_MASK			((1 << 8) - 1)
 #define __CTX_KTRAP_D_MASK			((1 << 8) - 1)
 #define __CTX_NESTED_CTX_MASK		((1 << 16) - 1)
-#define __CTX_EARLY_RKM 			(1 << __CTX_FLAG_SHIFT)
+#define __CTX_EARLY_RKM				(1 << (__CTX_FLAG_SHIFT + 0))
+#define __CTX_RCU_CB				(1 << (__CTX_FLAG_SHIFT + 1))
 
 /* Basic functions to get or change depths */
 
@@ -188,6 +189,12 @@ void print_kmsgs(uint32_t coreid);
 #define clear_rkmsg(pcpui)                                                     \
 	((pcpui)->__ctx_depth &= ~__CTX_EARLY_RKM)
 
+#define set_rcu_cb(pcpui)                                                      \
+	((pcpui)->__ctx_depth |= __CTX_RCU_CB)
+
+#define clear_rcu_cb(pcpui)                                                    \
+	((pcpui)->__ctx_depth &= ~__CTX_RCU_CB)
+
 /* Functions to query the kernel context depth/state.  I haven't fully decided
  * on whether or not 'default' context includes RKMs or not.  Will depend on
  * how we use it.  Check the code below to see what the latest is. */
@@ -198,14 +205,17 @@ void print_kmsgs(uint32_t coreid);
 #define in_early_rkmsg_ctx(pcpui)                                              \
 	((pcpui)->__ctx_depth & __CTX_EARLY_RKM)
 
+#define in_rcu_cb_ctx(pcpui)                                                   \
+	((pcpui)->__ctx_depth & __CTX_RCU_CB)
+
 /* Right now, anything (KTRAP, IRQ, or RKM) makes us not 'default' */
 #define in_default_ctx(pcpui)                                                  \
 	(!(pcpui)->__ctx_depth)
 
 /* Can block only if we have no nested contexts (ktraps or irqs, (which are
- * potentially nested contexts)) */
+ * potentially nested contexts)) and not in an RCU CB*/
 #define can_block(pcpui)                                                       \
-	(!((pcpui)->__ctx_depth & __CTX_NESTED_CTX_MASK))
+	(!((pcpui)->__ctx_depth & (__CTX_NESTED_CTX_MASK | __CTX_RCU_CB)))
 
 /* TRUE if we are allowed to spin, given that the 'lock' was declared as not
  * grabbable from IRQ context.  Meaning, we can't grab the lock from any nested

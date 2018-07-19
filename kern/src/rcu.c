@@ -116,8 +116,10 @@ void synchronize_rcu(void)
 	struct sync_cb_blob b[1];
 	struct semaphore sem[1];
 
-	if (is_rcu_ktask(current_kthread))
+	if (in_rcu_cb_ctx(this_pcpui_ptr()))
 		panic("Attempted synchronize_rcu() from an RCU callback!");
+	if (is_rcu_ktask(current_kthread))
+		panic("Attempted synchronize_rcu() from an RCU thread!");
 	sem_init(sem, 0);
 	init_rcu_head_on_stack(&b->h);
 	b->sem = sem;
@@ -229,8 +231,10 @@ void rcu_barrier(void)
 	struct sync_cb_blob *b;
 	int nr_sent = 0;
 
-	if (is_rcu_ktask(current_kthread))
+	if (in_rcu_cb_ctx(this_pcpui_ptr()))
 		panic("Attempted rcu_barrier() from an RCU callback!");
+	if (is_rcu_ktask(current_kthread))
+		panic("Attempted rcu_barrier() from an RCU thread!");
 	/* TODO: if we have concurrent rcu_barriers, we might be able to share the
 	 * CBs.  Say we have 1 CB on a core, then N rcu_barriers.  We'll have N
 	 * call_rcus in flight, though we could share.  Linux does this with a mtx
@@ -514,10 +518,16 @@ static void run_rcu_cbs(struct rcu_state *rsp, int coreid)
 		assert(list_empty(&work));
 		return;
 	}
+	/* When we're in an RCU callback, we can't block.  In our non-preemptive
+	 * world, not blocking also means our kthread won't migrate from this core,
+	 * such that the pcpui pointer (and thus the specific __ctx_depth) won't
+	 * change. */
+	set_rcu_cb(this_pcpui_ptr());
 	list_for_each_entry_safe(head, temp, &work, link) {
 		list_del(&head->link);
 		rcu_exec_cb(head);
 	}
+	clear_rcu_cb(this_pcpui_ptr());
 
 	/* We kept nr_cbs in place until the CBs, which could block, completed.
 	 * This allows other readers (rcu_barrier()) of our pcpui to tell if we have
