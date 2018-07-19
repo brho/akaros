@@ -39,7 +39,7 @@ static bool can_trace(spinlock_t *lock)
 }
 
 /* spinlock and trylock call this after locking */
-static void post_lock(spinlock_t *lock, uint32_t coreid)
+static __always_inline void post_lock(spinlock_t *lock, uint32_t coreid)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	if ((pcpui->__lock_checking_enabled == 1) && can_trace(lock))
