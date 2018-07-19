@@ -120,8 +120,10 @@ static int __backtrace(int argc, char **argv, struct hw_trapframe *hw_tf)
 	}
 	pc = strtol(argv[1], 0, 16);
 	fp = strtol(argv[2], 0, 16);
+	print_lock();
 	printk("Backtrace from instruction %p, with frame pointer %p\n", pc, fp);
 	backtrace_frame(pc, fp);
+	print_unlock();
 	return 0;
 }
 
@@ -187,13 +189,11 @@ int mon_sm(int argc, char **argv, struct hw_trapframe *hw_tf)
 	return __showmapping(argc, argv, hw_tf);
 }
 
-static spinlock_t print_info_lock = SPINLOCK_INITIALIZER_IRQSAVE;
-
 static void print_info_handler(struct hw_trapframe *hw_tf, void *data)
 {
 	uint64_t tsc = read_tsc();
 
-	spin_lock_irqsave(&print_info_lock);
+	print_lock();
 	cprintf("----------------------------\n");
 	cprintf("This is Core %d\n", core_id());
 	cprintf("Timestamp = %lld\n", tsc);
@@ -218,7 +218,7 @@ static void print_info_handler(struct hw_trapframe *hw_tf, void *data)
 	        read_msr(0x20e), read_msr(0x20f));
 #endif // CONFIG_X86
 	cprintf("----------------------------\n");
-	spin_unlock_irqsave(&print_info_lock);
+	print_unlock();
 }
 
 static bool print_all_info(void)
@@ -254,6 +254,7 @@ int mon_nanwan(int argc, char **argv, struct hw_trapframe *hw_tf)
 	/* Borrowed with love from http://www.geocities.com/SoHo/7373/zoo.htm
 	 * (http://www.ascii-art.com/).  Slightly modified to make it 25 lines tall.
 	 */
+	print_lock();
 	printk("\n");
 	printk("             .-.  .-.\n");
 	printk("             |  \\/  |\n");
@@ -278,6 +279,7 @@ int mon_nanwan(int argc, char **argv, struct hw_trapframe *hw_tf)
 	printk("                                \\'   .\\#\n");
 	printk("                             jgs \\   ::\\#\n");
 	printk("                                  \\      \n");
+	print_unlock();
 	return 0;
 }
 
@@ -681,6 +683,7 @@ static DEFINE_PERCPU(bool, mon_nmi_trace);
 static void emit_hwtf_backtrace(struct hw_trapframe *hw_tf)
 {
 	if (mon_verbose_trace) {
+		printk("\n");
 		print_trapframe(hw_tf);
 		backtrace_hwtf(hw_tf);
 	}
@@ -690,8 +693,10 @@ static void emit_hwtf_backtrace(struct hw_trapframe *hw_tf)
 
 static void emit_vmtf_backtrace(struct vm_trapframe *vm_tf)
 {
-	if (mon_verbose_trace)
+	if (mon_verbose_trace) {
+		printk("\n");
 		print_vmtrapframe(vm_tf);
+	}
 	printk("Core %d is at %p\n", core_id(), get_vmtf_pc(vm_tf));
 }
 
@@ -700,22 +705,18 @@ static void emit_vmtf_backtrace(struct vm_trapframe *vm_tf)
  * doesn't deal in contexts (yet) */
 void emit_monitor_backtrace(int type, void *tf)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-
 	if (!PERCPU_VAR(mon_nmi_trace))
 		return;
 	/* To prevent a spew of output during a lot of perf NMIs, we'll turn off the
 	 * monitor output as soon as any NMI hits our core. */
 	PERCPU_VAR(mon_nmi_trace) = FALSE;
-	/* Temporarily disable deadlock detection when we print.  We could
-	 * deadlock if we were printing when we NMIed. */
-	pcpui->__lock_checking_enabled--;
+	print_lock();
 	if (type == ROS_HW_CTX)
 		emit_hwtf_backtrace((struct hw_trapframe*)tf);
 	else
 		emit_vmtf_backtrace((struct vm_trapframe*)tf);
 	print_kmsgs(core_id());
-	pcpui->__lock_checking_enabled++;
+	print_unlock();
 }
 
 

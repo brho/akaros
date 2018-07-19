@@ -312,6 +312,7 @@ void printblock(struct block *b)
 		return;
 	}
 
+	print_lock();
 	printk("block of BLEN = %d, with %d header and %d data in %d extras\n",
 	       BLEN(b), BHLEN(b), b->extra_len, b->nr_extra_bufs);
 
@@ -345,4 +346,5 @@ void printblock(struct block *b)
 		}
 	}
 	printk("\n");
+	print_unlock();
 }

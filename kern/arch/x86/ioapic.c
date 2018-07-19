@@ -450,14 +450,14 @@ static struct Rdt *ioapic_vector2rdt(int apic_vector)
 {
 	struct Rdt *rdt;
 	if (apic_vector < IdtIOAPIC || apic_vector > MaxIdtIOAPIC) {
-		printk("ioapic vector %d out of range", apic_vector);
+		warn("ioapic vector %d out of range", apic_vector);
 		return 0;
 	}
 	/* Fortunately rdtvecno[vecno] is static once assigned. o/w, we'll need some
 	 * global sync for the callers, both for lookup and keeping rdt valid. */
 	rdt = rdtvecno[apic_vector];
 	if (!rdt) {
-		printk("vector %d has no RDT! (did you enable it?)", apic_vector);
+		warn("vector %d has no RDT! (did you enable it?)", apic_vector);
 		return 0;
 	}
 	return rdt;
@@ -588,7 +588,7 @@ int bus_irq_setup(struct irq_handler *irq_h)
 		case BusPCI:
 			pcidev = pci_match_tbdf(irq_h->tbdf);
 			if (!pcidev) {
-				printk("No PCI dev for tbdf %p!", irq_h->tbdf);
+				warn("No PCI dev for tbdf %p!", irq_h->tbdf);
 				return -1;
 			}
 			if ((vecno = msi_irq_enable(irq_h, pcidev)) != -1)

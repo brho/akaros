@@ -191,9 +191,11 @@ static void pcpui_trace_locks_handler(void *event, void *data)
 		func_name = get_fn_name(lock_addr);
 	else
 		func_name = "Dynamic lock";
+	print_lock();
 	printk("Time %uus, lock %p (%s)\n", te->arg0, lock_addr, func_name);
 	printk("\t");
 	spinlock_debug((spinlock_t*)lock_addr);
+	print_unlock();
 }
 
 /* Add specific trace handlers here: */

@@ -270,7 +270,7 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 
 
 	if (err) {
-		printk("Error restoring fp state!");
+		printk("Error restoring fp state!\n");
 		printk("Likely a bad ancillary_state argument.\n");
 		printk("Re-initializing fp state to default due to error.\n");
 		init_fp_state();

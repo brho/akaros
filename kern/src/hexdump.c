@@ -39,6 +39,7 @@ void hexdump(void *v, int length)
 	uintptr_t memory = (uintptr_t) v;
 	int all_zero = 0;
 
+	print_lock();
 	for (i = 0; i < length; i += 16) {
 		int j;
 
@@ -62,6 +63,7 @@ void hexdump(void *v, int length)
 			printk("...\n");
 		}
 	}
+	print_unlock();
 }
 
 /* easier in monitor */

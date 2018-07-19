@@ -1393,6 +1393,7 @@ void print_chaninfo(struct chan *c)
 	bool has_dev = c->type != -1;
 	bool has_chaninfo = has_dev && devtab[c->type].chaninfo;
 
+	print_lock();
 	printk("Chan flags: %p, pathname: %s, ref: %d, Dev: %s, Devinfo: %s",
 		   c->flag,
 		   c->name ? c->name->s : "no cname",
@@ -1402,6 +1403,7 @@ void print_chaninfo(struct chan *c)
 	if (!has_chaninfo)
 		printk("qid.path: %p\n", c->qid.path);
 	printk("\n");
+	print_unlock();
 }
 
 /* TODO: 9ns ns inheritance flags: Shared, copied, or empty.  The old fgrp is

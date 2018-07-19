@@ -91,6 +91,7 @@ static inline bool BITMASK_IS_FULL(volatile uint8_t *map, size_t size)
 #define PRINT_BITMASK(name, size) { \
 	int i;	\
 	int _size = size; \
+	print_lock(); \
 	for (i = 0; i < BYTES_FOR_BITMASK(size); i++) { \
 		int j;	\
 		for (j = 0; j < MIN(8, _size); j++) { \
@@ -99,4 +100,5 @@ static inline bool BITMASK_IS_FULL(volatile uint8_t *map, size_t size)
 		} \
 	} \
 	printk("\n"); \
+	print_unlock(); \
 }

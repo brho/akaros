@@ -249,6 +249,7 @@ void rcu_dump_rcu_node_tree(struct rcu_state *rsp)
 	int level = 0;
 	struct rcu_node *rnp;
 
+	print_lock();
 	printk("rcu_node tree layout dump\n");
 	printk(" ");
 	rcu_for_each_node_breadth_first(rsp, rnp) {
@@ -260,4 +261,5 @@ void rcu_dump_rcu_node_tree(struct rcu_state *rsp)
 		printk("%d:%d ^%d ", rnp->grplo, rnp->grphi, rnp->grpnum);
 	}
 	printk("\n");
+	print_unlock();
 }

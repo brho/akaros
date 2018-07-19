@@ -48,10 +48,8 @@ int statcheck(uint8_t * buf, unsigned int nbuf)
 	ebuf = buf + nbuf;
 
 	if (nbuf < STAT_FIX_LEN_9P || nbuf != BIT16SZ + GBIT16(buf)) {
-		printk("nbuf %d, STAT_FIX_LEN_9P %d ", nbuf, STAT_FIX_LEN_9P);
-		printk("BIT16SZ %d, GBIT16(buf) %d ",
-			BIT16SZ, GBIT16(buf));
-		printk("This is bad!\n");
+		warn("nbuf %d, STAT_FIX_LEN_9P %d BIT16SZ %d, GBIT16(buf) %d ",
+		     nbuf, STAT_FIX_LEN_9P, BIT16SZ, GBIT16(buf));
 		return -1;
 	}
 

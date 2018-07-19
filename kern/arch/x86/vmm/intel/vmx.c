@@ -212,6 +212,8 @@ show_cr_access(uint64_t val)
 	int crnr = val & 0xf;
 	int type = (val >> 4) & 3;
 	int reg = (val >> 11) & 0xf;
+
+	print_lock();
 	printk("%s: %d: ", cr_access_type[type], crnr);
 	if (type < 2) {
 		printk("%s", cr_gpr[reg]);
@@ -220,6 +222,7 @@ show_cr_access(uint64_t val)
 		}
 	}
 	printk("\n");
+	print_unlock();
 }
 
 void

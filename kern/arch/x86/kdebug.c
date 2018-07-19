@@ -400,6 +400,7 @@ size_t backtrace_user_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 /* Assumes 32-bit header */
 void print_fpu_state(struct ancillary_state *fpu)
 {
+	print_lock();
 	printk("fcw:        0x%04x\n", fpu->fp_head_n64.fcw);
 	printk("fsw:        0x%04x\n", fpu->fp_head_n64.fsw);
 	printk("ftw:          0x%02x\n", fpu->fp_head_n64.ftw);
@@ -417,4 +418,5 @@ void print_fpu_state(struct ancillary_state *fpu)
 		printk("%02x ", *((uint8_t*)fpu + i));
 	}
 	printk("\n");
+	print_unlock();
 }

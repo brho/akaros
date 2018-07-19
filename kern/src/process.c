@@ -2390,6 +2390,7 @@ void print_proc_info(pid_t pid, int verbosity)
 		return;
 	}
 	vcpd = &p->procdata->vcore_preempt_data[0];
+	print_lock();
 	spinlock_debug(&p->proc_lock);
 	//spin_lock(&p->proc_lock); // No locking!!
 	printk("struct proc: %p\n", p);
@@ -2441,6 +2442,7 @@ void print_proc_info(pid_t pid, int verbosity)
 	if (spin_locked(&files->lock)) {
 		spinlock_debug(&files->lock);
 		printk("FILE LOCK HELD, ABORTING\n");
+		print_unlock();
 		proc_decref(p);
 		return;
 	}
@@ -2456,6 +2458,7 @@ void print_proc_info(pid_t pid, int verbosity)
 	printk("Children: (PID (struct proc *))\n");
 	TAILQ_FOREACH(child, &p->children, sibling_link)
 		printk("\t%d (%p)\n", child->pid, child);
+	print_unlock();
 	/* no locking / unlocking or refcnting */
 	// spin_unlock(&p->proc_lock);
 	proc_decref(p);

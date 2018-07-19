@@ -95,8 +95,6 @@ void reset_print_func_depth(void)
 	tab_depth = 0;
 }
 
-static spinlock_t lock = SPINLOCK_INITIALIZER_IRQSAVE;
-
 static void __print_hdr(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
@@ -117,14 +115,15 @@ void __print_func_entry(const char *func, const char *file)
 {
 	char tentabs[] = "\t\t\t\t\t\t\t\t\t\t"; // ten tabs and a \0
 	char *ourtabs = &tentabs[10 - MIN(tab_depth, 10)];
+
 	if (!printx_on)
 		return;
 	if (is_blacklisted(func))
 		return;
-	spin_lock_irqsave(&lock);
+	print_lock();
 	__print_hdr();
 	printk("%s%s() in %s\n", ourtabs, func, file);
-	spin_unlock_irqsave(&lock);
+	print_unlock();
 	tab_depth++;
 }
 
@@ -132,16 +131,17 @@ void __print_func_exit(const char *func, const char *file)
 {
 	char tentabs[] = "\t\t\t\t\t\t\t\t\t\t"; // ten tabs and a \0
 	char *ourtabs;
+
 	if (!printx_on)
 		return;
 	if (is_blacklisted(func))
 		return;
 	tab_depth--;
 	ourtabs = &tentabs[10 - MIN(tab_depth, 10)];
-	spin_lock_irqsave(&lock);
+	print_lock();
 	__print_hdr();
 	printk("%s---- %s()\n", ourtabs, func);
-	spin_unlock_irqsave(&lock);
+	print_unlock();
 }
 
 bool printx_on = FALSE;
@@ -215,8 +215,10 @@ static void printk_func(void *opaque, const char *str)
 
 void backtrace(void)
 {
+	print_lock();
 	printk("Stack Backtrace on Core %d:\n", core_id());
 	gen_backtrace(&printk_func, NULL);
+	print_unlock();
 }
 
 void backtrace_frame(uintptr_t eip, uintptr_t ebp)
@@ -224,8 +226,10 @@ void backtrace_frame(uintptr_t eip, uintptr_t ebp)
 	uintptr_t pcs[MAX_BT_DEPTH];
 	size_t nr_pcs = backtrace_list(eip, ebp, pcs, MAX_BT_DEPTH);
 
+	print_lock();
 	printk("\nBacktrace of kernel context on Core %d:\n", core_id());
 	print_backtrace_list(pcs, nr_pcs, &printk_func, NULL);
+	print_unlock();
 }
 
 /* TODO: change debug_addr_proc() to allow print redirection like
@@ -233,8 +237,10 @@ void backtrace_frame(uintptr_t eip, uintptr_t ebp)
 void backtrace_user_frame(uintptr_t eip, uintptr_t ebp)
 {
 	uintptr_t pcs[MAX_BT_DEPTH];
+	/* TODO: this assumes we have the user's address space loaded (current). */
 	size_t nr_pcs = backtrace_user_list(eip, ebp, pcs, MAX_BT_DEPTH);
 
+	print_lock();
 	printk("\nBacktrace of user context on Core %d:\n", core_id());
 	printk("\tOffsets only matter for shared libraries\n");
 	/* This formatting is consumed by scripts/bt-akaros.sh. */
@@ -243,23 +249,19 @@ void backtrace_user_frame(uintptr_t eip, uintptr_t ebp)
 		/* TODO: user backtraces all assume we're working on 'current' */
 		debug_addr_proc(current, pcs[i]);
 	}
+	print_unlock();
 }
 
 void backtrace_hwtf(struct hw_trapframe *hw_tf)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-
-	pcpui->__lock_checking_enabled--;
 	if (in_kernel(hw_tf))
 		backtrace_frame(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
 	else
 		backtrace_user_frame(get_hwtf_pc(hw_tf), get_hwtf_fp(hw_tf));
-	pcpui->__lock_checking_enabled++;
 }
 
 void backtrace_user_ctx(struct proc *p, struct user_context *ctx)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	uintptr_t st_save;
 
 	if (!ctx) {
@@ -267,9 +269,7 @@ void backtrace_user_ctx(struct proc *p, struct user_context *ctx)
 		return;
 	}
 	st_save = switch_to(p);
-	pcpui->__lock_checking_enabled--;
 	backtrace_user_frame(get_user_ctx_pc(ctx), get_user_ctx_fp(ctx));
-	pcpui->__lock_checking_enabled++;
 	switch_back(p, st_save);
 }
 

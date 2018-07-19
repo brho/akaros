@@ -602,6 +602,8 @@ void print_vmrs(struct proc *p)
 {
 	int count = 0;
 	struct vm_region *vmr;
+
+	print_lock();
 	printk("VM Regions for proc %d\n", p->pid);
 	printk("NR:"
 	       "                                     Range:"
@@ -613,6 +615,7 @@ void print_vmrs(struct proc *p)
 		printk("%02d: (%p - %p): 0x%08x, 0x%08x, %p, %p\n", count++,
 		       vmr->vm_base, vmr->vm_end, vmr->vm_prot, vmr->vm_flags,
 		       foc_pointer(vmr->__vm_foc), vmr->vm_foff);
+	print_unlock();
 }
 
 void enumerate_vmrs(struct proc *p,

@@ -561,7 +561,7 @@ static kpte_t __guest_pml_walk(struct proc *p, kpte_t *u_pml, uintptr_t gva,
 
 	if (memcpy_from_user(p, &pte, &u_pml[PMLx(gva, pml_shift)],
 	                     sizeof(kpte_t))) {
-		printk("Buggy pml %p, tried %p\n", u_pml, &u_pml[PMLx(gva, pml_shift)]);
+		warn("Buggy pml %p, tried %p\n", u_pml, &u_pml[PMLx(gva, pml_shift)]);
 		return 0;
 	}
 	if (walk_is_complete(&pte, pml_shift, flags))
@@ -721,6 +721,7 @@ static int print_pte(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
 {
 	if (kpte_is_unmapped(kpte))
 		return 0;
+	print_lock();
 	switch (shift) {
 		case (PML1_SHIFT):
 			printk("\t");
@@ -733,6 +734,7 @@ static int print_pte(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
 	}
 	printk("KVA: %p, PTE val %p, shift %d, visit %d%s\n", kva, *kpte, shift,
 	       visited_subs, (*kpte & PTE_PS ? " (jumbo)" : ""));
+	print_unlock();
 	return 0;
 }
 

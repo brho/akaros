@@ -224,8 +224,8 @@ static int add_kfs_entry(struct cpio_bin_hdr *c_bhdr, void *cb_arg)
 		break;
 	default:
 		cclose(c);
-		printk("Unknown file type %d in the CPIO!",
-		       c_bhdr->c_mode & CPIO_FILE_MASK);
+		warn("Unknown file type %d in the CPIO!",
+		     c_bhdr->c_mode & CPIO_FILE_MASK);
 		return -1;
 	}
 	if (!c)

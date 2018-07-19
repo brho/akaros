@@ -209,9 +209,11 @@ static void print_fperr(struct hw_trapframe *hw_tf)
 {
 	uint16_t fpcw, fpsw;
 	uint32_t mxcsr;
+
 	asm volatile ("fnstcw %0" : "=m"(fpcw));
 	asm volatile ("fnstsw %0" : "=m"(fpsw));
 	asm volatile ("stmxcsr %0" : "=m"(mxcsr));
+	print_lock();
 	print_trapframe(hw_tf);
 	printk("Core %d: FP ERR, CW: 0x%04x, SW: 0x%04x, MXCSR 0x%08x\n", core_id(),
 	       fpcw, fpsw, mxcsr);
@@ -237,6 +239,7 @@ static void print_fperr(struct hw_trapframe *hw_tf)
 		printk("\tNumeric Underflow\n");
 	if (fpsw & ~fpcw & FP_EXCP_PE)
 		printk("\tInexact result (precision)\n");
+	print_unlock();
 }
 
 static bool __handler_user_page_fault(struct hw_trapframe *hw_tf,

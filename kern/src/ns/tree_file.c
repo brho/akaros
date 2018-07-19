@@ -1176,6 +1176,7 @@ static void dump_tf(struct tree_file *tf, int tabs)
 	    !!(tf->file.dir.qid.type & QTSYMLINK))
 		warn("%s has differing symlink bits", tree_file_to_name(tf));
 
+	print_lock();
 	for (int i = 0; i < tabs; i++)
 		printk("    ");
 	print_tf(tf);
@@ -1186,6 +1187,7 @@ static void dump_tf(struct tree_file *tf, int tabs)
 		list_for_each_entry(child, &tf->children, siblings)
 			dump_tf(child, tabs + 1);
 	}
+	print_unlock();
 }
 
 void __tfs_dump(struct tree_filesystem *tfs)

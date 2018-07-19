@@ -8664,7 +8664,7 @@ static void rtl8169_attach(struct ether *edev)
 	spin_unlock(&rtl_9ns_lock);
 
 	if (rtl_open(edev)) {
-		printk("Unable to attach rtl8169!");
+		warn("Unable to attach rtl8169!");
 		return;
 	}
 	/* If we want an rproc, nows the time to ktask it */

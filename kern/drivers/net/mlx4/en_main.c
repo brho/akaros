@@ -95,6 +95,7 @@ void en_print(const char *level, const struct mlx4_en_priv *priv,
 #else
 	va_list args;
 
+	print_lock();
 	va_start(args, format);
 	if (priv->registered)
 		printk("%s%s: %s: ", level, DRV_NAME, priv->dev->name);
@@ -103,6 +104,7 @@ void en_print(const char *level, const struct mlx4_en_priv *priv,
 		       dev_name(&priv->mdev->pdev->dev), priv->port);
 	vcprintf(format, args);
 	va_end(args);
+	print_unlock();
 #endif
 }
 

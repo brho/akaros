@@ -2534,7 +2534,7 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 		       sc_num, syscall_table[sc_num].name, a0, a1, a2, a3,
 		       a4, a5, p->pid);
 		if (sc_num != SYS_fork)
-			printk("YOU SHOULD PANIC: errstack mismatch");
+			panic("errstack mismatch");
 	}
 	return ret;
 }
