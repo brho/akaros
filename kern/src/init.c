@@ -229,11 +229,12 @@ static int run_init_script(void)
 #endif
 
 /* Multiple cores can panic concurrently.  We could also panic recursively,
- * which would deadlock.  We also only want to automatically backtrace the first
+ * which could deadlock.  We also only want to automatically backtrace the first
  * time through, since BTs are often the source of panics.  Finally, we want to
  * know when the other panicking cores are done (or likely to be done) before
- * entering the monitor. */
-static spinlock_t panic_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+ * entering the monitor.
+ *
+ * We'll use the print_lock(), which is recursive, to protect panic_printing. */
 static bool panic_printing;
 static DEFINE_PERCPU(int, panic_depth);
 
@@ -244,17 +245,11 @@ static DEFINE_PERCPU(int, panic_depth);
 void _panic(struct hw_trapframe *hw_tf, const char *file, int line,
             const char *fmt, ...)
 {
+	struct per_cpu_info *pcpui = &per_cpu_info[core_id_early()];
 	va_list ap;
-	struct per_cpu_info *pcpui;
 
-	/* We're panicing, possibly in a place that can't handle the lock checker */
-	pcpui = &per_cpu_info[core_id_early()];
-	pcpui->__lock_checking_enabled--;
-
-	if (!PERCPU_VAR(panic_depth)) {
-		spin_lock_irqsave(&panic_lock);
-		panic_printing = true;
-	}
+	print_lock();
+	panic_printing = true;
 	PERCPU_VAR(panic_depth)++;
 
 	va_start(ap, fmt);
@@ -278,11 +273,11 @@ void _panic(struct hw_trapframe *hw_tf, const char *file, int line,
 	}
 	printk("\n");
 
-	/* If we're here, we panicked and currently hold the lock.  We might have
-	 * panicked recursively.  We must unlock unconditionally, since the initial
-	 * panic (which grabbed the lock) will never run again. */
+	/* If we're here, we panicked and currently hold the print_lock.  We might
+	 * have panicked recursively.  We must unlock unconditionally, since the
+	 * initial panic (which grabbed the lock) will never run again. */
 	panic_printing = false;
-	spin_unlock_irqsave(&panic_lock);
+	print_unlock_force();
 	/* And we have to clear the depth, so that we lock again next time in.
 	 * Otherwise, we'd be unlocking without locking (which is another panic). */
 	PERCPU_VAR(panic_depth) = 0;
@@ -293,34 +288,39 @@ void _panic(struct hw_trapframe *hw_tf, const char *file, int line,
 		udelay(500000);
 		cmb();
 	} while (panic_printing);
-	monitor(NULL);
 
-	if (pcpui->cur_proc) {
-		printk("panic killing proc %d\n", pcpui->cur_proc->pid);
-		proc_destroy(pcpui->cur_proc);
-	}
 	/* Yikes!  We're claiming to be not in IRQ/trap ctx and not holding any
 	 * locks.  Obviously we could be wrong, and could easily deadlock.  We could
 	 * be in an IRQ handler, an unhandled kernel fault, or just a 'normal' panic
 	 * in a syscall - any of which can involve unrestore invariants. */
 	pcpui->__ctx_depth = 0;
 	pcpui->lock_depth = 0;
+	/* And keep this off, for good measure. */
+	pcpui->__lock_checking_enabled--;
+
+	monitor(NULL);
+
+	if (pcpui->cur_proc) {
+		printk("panic killing proc %d\n", pcpui->cur_proc->pid);
+		proc_destroy(pcpui->cur_proc);
+	}
 	if (pcpui->cur_kthread)
 		kth_panic_sysc(pcpui->cur_kthread);
 	smp_idle();
 }
 
-/* like panic, but don't */
 void _warn(const char *file, int line, const char *fmt,...)
 {
 	va_list ap;
 
+	print_lock();
 	va_start(ap, fmt);
 	printk("kernel warning at %s:%d, from core %d: ", file, line,
 	       core_id_early());
 	vcprintf(fmt, ap);
 	cprintf("\n");
 	va_end(ap);
+	print_unlock();
 }
 
 static void run_links(linker_func_t *linkstart, linker_func_t *linkend)

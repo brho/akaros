@@ -11,7 +11,42 @@
 #include <kprof.h>
 #include <init.h>
 
-spinlock_t output_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+/* Recursive lock.  Would like to avoid spreading these in the kernel. */
+static spinlock_t output_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+static int output_lock_holder = -1;	/* core_id. */
+static int output_lock_count;
+
+void print_lock(void)
+{
+	if (output_lock_holder == core_id_early()) {
+		output_lock_count++;
+		return;
+	}
+	pcpui_var(core_id_early(), __lock_checking_enabled)--;
+	spin_lock_irqsave(&output_lock);
+	output_lock_holder = core_id_early();
+	output_lock_count = 1;
+}
+
+void print_unlock(void)
+{
+	output_lock_count--;
+	if (output_lock_count)
+		return;
+	output_lock_holder = -1;
+	spin_unlock_irqsave(&output_lock);
+	pcpui_var(core_id_early(), __lock_checking_enabled)++;
+}
+
+/* Regardless of where we are, unlock.  This is dangerous, and only used when
+ * you know you will never unwind your stack, such as for a panic. */
+void print_unlock_force(void)
+{
+	output_lock_holder = -1;
+	output_lock_count = 0;
+	spin_unlock_irqsave(&output_lock);
+	pcpui_var(core_id_early(), __lock_checking_enabled)++;
+}
 
 void putch(int ch, int **cnt)
 {
@@ -43,35 +78,16 @@ void buffered_putch(int ch, int **cnt)
 
 int vcprintf(const char *fmt, va_list ap)
 {
-	struct per_cpu_info *pcpui;
 	int cnt = 0;
 	int *cntp = &cnt;
 	volatile int i;
-	int8_t irq_state = 0;
 	va_list args;
+
+	print_lock();
 
 	va_copy(args, ap);
 	trace_vprintk(fmt, args);
 	va_end(args);
-
-	/* this ktrap depth stuff is in case the kernel faults in a printfmt call.
-	 * we disable the locking if we're in a fault handler so that we don't
-	 * deadlock. */
-	if (booting)
-		pcpui = &per_cpu_info[0];
-	else
-		pcpui = &per_cpu_info[core_id()];
-	/* lock all output.  this will catch any printfs at line granularity.  when
-	 * tracing, we short-circuit the main lock call, so as not to clobber the
-	 * results as we print. */
-	if (!ktrap_depth(pcpui)) {
-		#ifdef CONFIG_TRACE_LOCKS
-		disable_irqsave(&irq_state);
-		__spin_lock(&output_lock);
-		#else
-		spin_lock_irqsave(&output_lock);
-		#endif
-	}
 
 	// do the buffered printf
 	vprintfmt((void*)buffered_putch, (void*)&cntp, fmt, ap);
@@ -79,14 +95,7 @@ int vcprintf(const char *fmt, va_list ap)
 	// write out remaining chars in the buffer
 	buffered_putch(-1,&cntp);
 
-	if (!ktrap_depth(pcpui)) {
-		#ifdef CONFIG_TRACE_LOCKS
-		__spin_unlock(&output_lock);
-		enable_irqsave(&irq_state);
-		#else
-		spin_unlock_irqsave(&output_lock);
-		#endif
-	}
+	print_unlock();
 
 	return cnt;
 }
