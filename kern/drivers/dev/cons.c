@@ -1217,9 +1217,9 @@ static size_t conswrite(struct chan *c, void *va, size_t n, off64_t off)
 
 		case Qstdout:
 		case Qstderr:
-			px_lock();
+			print_lock();
 			if (waserror()) {
-				px_unlock();
+				print_unlock();
 				nexterror();
 			}
 			/* TODO: tty hack.  they are sending us an escape sequence, and the
@@ -1231,7 +1231,7 @@ static size_t conswrite(struct chan *c, void *va, size_t n, off64_t off)
 				cputbuf(va, n);
 			}
 			poperror();
-			px_unlock();
+			print_unlock();
 			return n;
 		case Qsysname:
 			/* TODO: this is racy */

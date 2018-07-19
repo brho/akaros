@@ -253,7 +253,7 @@ void _panic(struct hw_trapframe *hw_tf, const char *file, int line,
 	PERCPU_VAR(panic_depth)++;
 
 	va_start(ap, fmt);
-	printk("kernel panic at %s:%d, from core %d: ", file, line,
+	printk("\nkernel panic at %s:%d, from core %d: ", file, line,
 	       core_id_early());
 	vcprintf(fmt, ap);
 	printk("\n");
@@ -315,7 +315,7 @@ void _warn(const char *file, int line, const char *fmt,...)
 
 	print_lock();
 	va_start(ap, fmt);
-	printk("kernel warning at %s:%d, from core %d: ", file, line,
+	printk("\nkernel warning at %s:%d, from core %d: ", file, line,
 	       core_id_early());
 	vcprintf(fmt, ap);
 	cprintf("\n");

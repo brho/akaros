@@ -79,6 +79,3 @@ void set_printx(int mode);
 
 void debug_addr_proc(struct proc *p, unsigned long addr);
 void debug_addr_pid(int pid, unsigned long addr);
-
-void px_lock(void);
-void px_unlock(void);

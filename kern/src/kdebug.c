@@ -278,15 +278,3 @@ void backtrace_current_ctx(void)
 	if (current)
 		backtrace_user_ctx(current, current_ctx);
 }
-
-static spinlock_t __px_lock = SPINLOCK_INITIALIZER_IRQSAVE;
-void px_lock(void)
-{
-	if (printx_on)
-		spin_lock_irqsave(&__px_lock);
-}
-void px_unlock(void)
-{
-	if (printx_on)
-		spin_unlock_irqsave(&__px_lock);
-}
