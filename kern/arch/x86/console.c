@@ -652,13 +652,8 @@ int cons_get_any_char(void)
 void cons_putc(int c)
 {
 	void logbuf(int c);
-	#ifdef CONFIG_TRACE_LOCKS
-	int8_t irq_state = 0;
-	disable_irqsave(&irq_state);
-	__spin_lock(&console_lock);
-	#else
+
 	spin_lock_irqsave(&console_lock);
-	#endif
 
 	#ifndef CONFIG_SERIAL_IO
 		serial_spam_char(c);
@@ -667,12 +662,7 @@ void cons_putc(int c)
 	cga_putc(c);
 	logbuf(c);
 
-	#ifdef CONFIG_TRACE_LOCKS
-	__spin_unlock(&console_lock);
-	enable_irqsave(&irq_state);
-	#else
 	spin_unlock_irqsave(&console_lock);
-	#endif
 }
 
 // `High'-level console I/O.  Used by readline and cprintf.
