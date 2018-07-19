@@ -22,6 +22,8 @@ void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg)
 {
 	int8_t irq_state = 0;
 	struct cv_lookup_elm cle;
+
+	assert(can_block(this_pcpui_ptr()));
 	/* Do a quick check before registering and sleeping.  this is the 'check,
 	 * signal, check again' pattern, where the first check is an optimization.
 	 * Many rendezes will already be satisfied, so we want to avoid excessive
@@ -69,6 +71,7 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	struct cv_lookup_elm cle;
 	struct timer_chain *pcpui_tchain = &per_cpu_info[core_id()].tchain;
 
+	assert(can_block(this_pcpui_ptr()));
 	if (!usec)
 		return;
 	/* Doing this cond check early, but then unlocking again.  Mostly just to
