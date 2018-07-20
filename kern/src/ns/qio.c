@@ -1284,8 +1284,8 @@ static size_t read_from_block(struct block *b, uint8_t *to, size_t amt)
 
 	copy_amt = MIN(BHLEN(b), amt);
 	memcpy(to, b->rp, copy_amt);
-	/* advance the rp, since this block not be completely consumed and future
-	 * reads need to know where to pick up from */
+	/* advance the rp, since this block might not be completely consumed and
+	 * future reads need to know where to pick up from */
 	b->rp += copy_amt;
 	to += copy_amt;
 	amt -= copy_amt;
@@ -1352,12 +1352,11 @@ static size_t read_all_blocks(struct block *b, void *va, size_t len)
 	struct block *next;
 
 	do {
-		/* We should be draining every block completely. */
-		assert(BLEN(b) <= len - sofar);
 		assert(va);
-		assert(va + sofar);
 		assert(b->rp);
 		sofar += read_from_block(b, va + sofar, len - sofar);
+		if (BLEN(b) && b->next)
+			panic("Failed to drain entire block (Qmsg?) but had a next!");
 		next = b->next;
 		freeb(b);
 		b = next;
