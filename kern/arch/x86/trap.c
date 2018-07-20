@@ -552,6 +552,7 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 	// Handle processor exceptions.
 	switch(hw_tf->tf_trapno) {
 		case T_BRKPT:
+			// XXX consider finalizing, since the BT / mon lacks fsbase
 			if (!in_kernel(hw_tf))
 				backtrace_user_ctx(current, current_ctx);
 			else

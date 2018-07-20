@@ -46,7 +46,7 @@ int rcu_num_nodes = NUM_RCU_NODES; /* Total # rcu_nodes in use. */
 /* Number of cores RCU thinks exist.  Set to 0 or nothing to use 'num_cores'.
  * The extra cores are called 'fake cores' in rcu.c, and are used for testing
  * the tree. */
-int rcu_num_cores;
+int rcu_num_cores = 78;
 
 /* in rcu.c */
 extern struct rcu_state rcu_state;

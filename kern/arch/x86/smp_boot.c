@@ -101,7 +101,7 @@ void smp_final_core_init(void)
 }
 
 // this needs to be set in smp_entry too...
-#define trampoline_pg 0x00001000UL
+#define trampoline_pg KADDR(0x00001000UL)
 extern char smp_entry[];
 extern char smp_entry_end[];
 extern char smp_boot_lock[];
@@ -128,11 +128,12 @@ void smp_boot(void)
 	struct per_cpu_info *pcpui0 = &per_cpu_info[0];
 	page_t *smp_stack;
 
+	//XXX
+	//x86_cleanup_bootmem();
 	// NEED TO GRAB A LOWMEM FREE PAGE FOR AP BOOTUP CODE
 	// page1 (2nd page) is reserved, hardcoded in pmap.c
-	memset(KADDR(trampoline_pg), 0, PGSIZE);
-	memcpy(KADDR(trampoline_pg), (void *)smp_entry,
-           smp_entry_end - smp_entry);
+	memset(trampoline_pg, 0, PGSIZE);
+	memcpy(trampoline_pg, smp_entry, smp_entry_end - smp_entry);
 
 	/* Make sure the trampoline page is mapped.  64 bit already has the tramp pg
 	 * mapped (1 GB of lowmem), so this is a nop. */
@@ -183,6 +184,7 @@ void smp_boot(void)
 #endif /* CONFIG_DISABLE_SMT */
 
 	/* cleans up the trampoline page, and any other low boot mem mappings */
+	//XXX
 	x86_cleanup_bootmem();
 	/* trampoline_pg had a refcount of 2 earlier, so we need to dec once more to
 	 * free it but only if all cores are in (or we reset / reinit those that

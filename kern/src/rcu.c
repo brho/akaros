@@ -91,7 +91,7 @@ extern int rcu_num_cores;
 extern int rcu_num_lvls;
 
 /* Controls whether we skip cores when we expedite, which forces tardy cores. */
-static bool rcu_debug_tardy;
+static bool rcu_debug_tardy = true;
 
 /* Externed in rcu_tree_helper.c */
 struct rcu_state rcu_state;
@@ -608,5 +608,57 @@ void rcu_init(void)
 	for_each_core(i) {
 		rpi = _PERCPU_VARPTR(rcu_pcpui, i);
 		rpi->booted = true;
+	}
+}
+
+// XXX
+struct bar {
+	int x;
+	struct rcu_head h;
+};
+
+void foo()
+{
+	rcu_dump_rcu_node_tree(&rcu_state);
+	printk("gp num %d, completed %d\n", rcu_state.gpnum, rcu_state.completed);
+	struct bar *bar = kmalloc(sizeof(struct bar), MEM_WAIT);
+
+	kfree_rcu(bar, h);
+}
+
+
+static void increment(struct rcu_head *head)
+{
+	struct bar *b = container_of(head, struct bar, h);
+
+	WRITE_ONCE(b->x, b->x + 1);
+}
+
+static void __torture(uint32_t srcid, long a0, long a1, long a2)
+{
+	struct bar *bars = kzmalloc(sizeof(struct bar) * 1000, MEM_WAIT);
+
+	#define NR_CBS 50
+
+	for (int i = 0; i < NR_CBS; i++) {
+		bars[i].x = i;
+		call_rcu(&bars[i].h, increment);
+	}
+	udelay(1000);
+	/* We know the CBs have not run yet, since this CPU hasn't had a QS */
+	for (int i = 0; i < NR_CBS; i++)
+		assert(bars[i].x == i);
+	rcu_barrier();	/* might hurt.  could imagine a local barrier */
+	for (int i = 0; i < NR_CBS; i++)
+		assert(bars[i].x == i + 1);
+	kfree(bars);
+}
+
+void torture(void)
+{
+	/* Most all of this time is spent on core 0 (mpstat) */
+	for_each_core(i) {
+		for (int j = 0; j < 20; j++)
+			send_kernel_message(i, __torture, 0, 0, 0, KMSG_ROUTINE);
 	}
 }

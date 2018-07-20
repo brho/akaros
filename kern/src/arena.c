@@ -1060,6 +1060,9 @@ static void __coalesce_free_seg(struct arena *arena, struct btag *bt,
 	struct rb_node *rb_p, *rb_n;
 	struct btag *bt_p, *bt_n;
 
+	// XXX this could merge more.  if we succeed on a merge, then we might move
+	// to a higher list, and then be able to merge again with both left and
+	// right
 	rb_n = rb_next(&bt->all_link);
 	if (rb_n) {
 		bt_n = container_of(rb_n, struct btag, all_link);

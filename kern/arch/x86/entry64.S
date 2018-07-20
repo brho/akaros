@@ -287,7 +287,8 @@ insert_pml2:
 _start:
 	movl	$stack32top, %esp
 	push	%ebx					# save mulitboot info
-	movw	$0x1234,0x472			# warm boot
+	#movw	$0x1234,0x472			# warm boot
+	movw	$0x4321,0x472			# preserve ram...
 	movl	$0x80000001, %eax
 	# some machines / VMs might not support long mode
 	cpuid

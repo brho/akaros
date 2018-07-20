@@ -28,6 +28,9 @@ struct gtfs {
 	struct kref					users;
 };
 
+// XXX
+static struct gtfs *recent;
+
 /* Blob hanging off the fs_file->priv.  The backend chans are only accessed,
  * (changed or used) with the corresponding fs_file qlock held.  That's the
  * primary use of the qlock - we might be able to avoid qlocking with increfs
@@ -752,6 +755,8 @@ static struct chan *gtfs_attach(char *arg)
 		nexterror();
 	}
 	gtfs = kzmalloc(sizeof(struct gtfs), MEM_WAIT);
+// XXX
+recent = gtfs;
 	/* This 'users' kref is the one that every distinct frontend chan has.
 	 * These come from attaches and successful, 'moving' walks. */
 	kref_init(&gtfs->users, gtfs_release, 1);
@@ -766,6 +771,8 @@ static struct chan *gtfs_attach(char *arg)
 		tf_kref_put(tfs->root);
 		tfs_destroy(tfs);
 		kfree(gtfs);
+		// XXX
+		recent = NULL;
 		nexterror();
 	}
 	/* stores the ref for 'backend' inside tfs->root */
@@ -880,3 +887,51 @@ struct dev gtfs_devtab __devtab = {
 	.mmap = tree_chan_mmap,
 	.chan_ctl = gtfs_chan_ctl,
 };
+
+// XXX
+int xme(int op)
+{
+	if (!recent)
+		return -1;
+	switch (op) {
+	case 1:
+		printk("dumping GTFS (Qidpath, Ref)\n-----------------\n");
+		__tfs_dump(&recent->tfs);
+		break;
+	case 3:
+		gtfs_free_memory(recent);
+		break;
+	default:
+		printk("give me an op\n");
+		return -1;
+	}
+	return 0;
+}
+
+// XXX
+//
+//	would like some torture tests
+//
+//ktask changes:
+//	maybe better framework for ktasks and rendez.
+//			and ktask names
+// 			also, would like a better kthread interface regarding the string.
+// 				like an snprintf or something.
+//
+// 			either that, or just have the ktask code malloc and free its own
+// 			copy of the name.  so we don't have different behavior for each.
+// 				probably this
+// 		also, this kth might be on another core.  same as the mgmt kth,
+// 		since we don't have kthread affinity.
+// 				right now, whoever does the wakeup hosts the core, right?
+// 				maybe have ktasks head to core 0 or some affinity
+//		enum / #define for the gp_ktask_ctl states
+//		there's some element of post-and-poke to it, esp regarding rcu_barrier
+//			also, we now care if a ktask is running or not, more like
+//			schedulable entities.  no one ever had a pointer to a ktask before
+// for_each_mgmt_core, is_mgmt_core()
+// 		dynamically changing this is harder?
+//
+// cache-align fields in rcu_state
+// 		actually, probably should have a ktask struct, and a pointer hangs off
+// 		rcu_state

@@ -9,6 +9,9 @@
 #include <multiboot.h>
 #include <arena.h>
 
+physaddr_t mefs_start;
+size_t mefs_size;
+
 /* Helper.  Adds free entries to the base arena.  Most entries are page aligned,
  * though on some machines below EXTPHYSMEM we may have some that aren't. */
 static void parse_mboot_region(struct multiboot_mmap_entry *entry, void *data)
@@ -17,6 +20,14 @@ static void parse_mboot_region(struct multiboot_mmap_entry *entry, void *data)
 	physaddr_t start = entry->addr;
 	size_t len = entry->len;
 	extern char end[];
+
+// XXX
+if (start == 0x0000000100000000) {
+	mefs_start = (uintptr_t)KADDR(start);
+	mefs_size = len;
+	return;
+}
+
 
 	if (entry->type != MULTIBOOT_MEMORY_AVAILABLE)
 		return;

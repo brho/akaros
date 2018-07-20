@@ -87,6 +87,11 @@ static void __tf_free(struct tree_file *tf)
 	struct tree_filesystem *tfs = tf->tfs;
 
 	tf->tfs->tf_ops.free(tf);
+
+	// XXX 
+	printk("FREEING %s\n", tree_file_to_name(tf));
+
+	
 	if (tf->flags & TF_F_IS_ROOT) {
 		assert(tfs->root == tf);
 		assert(!parent);
