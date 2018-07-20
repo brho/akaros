@@ -160,19 +160,13 @@ static void rcu_exec_cb(struct rcu_head *head)
 		head->func(head);
 }
 
-static void __early_call_rcu_kmsg(uint32_t srcid, long a0, long a1, long a2)
-{
-	rcu_exec_cb((struct rcu_head*)a0);
-}
-
 void __early_call_rcu(struct rcu_head *head)
 {
 	extern bool booting;
 
 	assert(booting);
 	assert(core_id() == 0);
-	send_kernel_message(0, __early_call_rcu_kmsg, (long)head, 0, 0,
-	                    KMSG_ROUTINE);
+	run_as_rkm(rcu_exec_cb, head);
 }
 
 /* This could be called from a remote core, e.g. rcu_barrier().  Returns the

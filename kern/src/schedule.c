@@ -79,12 +79,6 @@ static void set_ksched_alarm(void)
 	set_alarm(&per_cpu_info[core_id()].tchain, &ksched_waiter);
 }
 
-/* Need a kmsg to just run the sched, but not to rearm */
-static void __just_sched(uint32_t srcid, long a0, long a1, long a2)
-{
-	run_scheduler();
-}
-
 /* RKM alarm, to run the scheduler tick (not in interrupt context) and reset the
  * alarm.  Note that interrupts will be disabled, but this is not the same as
  * interrupt context.  We're a routine kmsg, which means the core is in a
@@ -301,8 +295,7 @@ static bool __schedule_scp(void)
 			/* process might be dying, with a KMSG to clean it up waiting on
 			 * this core.  can't do much, so we'll attempt to restart */
 			if (proc_is_dying(pcpui->owning_proc)) {
-				send_kernel_message(core_id(), __just_sched, 0, 0, 0,
-				                    KMSG_ROUTINE);
+				run_as_rkm(run_scheduler);
 				spin_unlock(&pcpui->owning_proc->proc_lock);
 				return FALSE;
 			}

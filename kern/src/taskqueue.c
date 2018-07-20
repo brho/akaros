@@ -11,20 +11,11 @@
 #include <kthread.h>
 
 /* BSD Taskqueue wrappers. */
-static void __tq_wrapper(uint32_t srcid, long a0, long a1, long a2)
-{
-	task_fn_t tq_fn = (task_fn_t)a0;
-	void *tq_arg = (void*)a1;
-	tq_fn(tq_arg, 0);
-}
-
 int taskqueue_enqueue(struct taskqueue *queue, struct task *task)
 {
-	send_kernel_message(core_id(), __tq_wrapper, (long)task->ta_func,
-	                    (long)task->ta_context, 0, KMSG_ROUTINE);
+	run_as_rkm(task->ta_func, task->ta_context, 0);
 	return 0;
 }
-
 
 /* Linux workqueue wrappers */
 void flush_workqueue(struct workqueue_struct *wq)
