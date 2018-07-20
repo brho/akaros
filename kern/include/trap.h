@@ -119,6 +119,25 @@ bool has_routine_kmsg(void);
 void process_routine_kmsg(void);
 void print_kmsgs(uint32_t coreid);
 
+/* Runs a function with up to two arguments as a routine kernel message.  Kernel
+ * messages can have three arguments, but the deferred function pointer counts
+ * as one.  Note the arguments to the function will be treated as longs. */
+#define run_as_rkm(f, ...) do {                                                \
+	static_assert(MACRO_NR_ARGS(__VA_ARGS__) <= 2);                            \
+	PASTE(__run_as_rkm_, MACRO_NR_ARGS(__VA_ARGS__))(f, ##__VA_ARGS__);        \
+} while (0)
+
+#define __run_as_rkm_0(f) \
+	send_kernel_message(core_id(), __kmsg_trampoline, (long)f, 0xcafebabe, \
+	                    0xcafebabe, KMSG_ROUTINE)
+#define __run_as_rkm_1(f, a1) \
+	send_kernel_message(core_id(), __kmsg_trampoline, (long)f, (long)a1, \
+	                    0xcafebabe, KMSG_ROUTINE)
+#define __run_as_rkm_2(f, a1, a2) \
+	send_kernel_message(core_id(), __kmsg_trampoline, (long)f, (long)a1, \
+	                    (long)a2, KMSG_ROUTINE)
+void __kmsg_trampoline(uint32_t srcid, long a0, long a1, long a2);
+
 /* Kernel context depths.  IRQ depth is how many nested IRQ stacks/contexts we
  * are working on.  Kernel trap depth is how many nested kernel traps (not
  * user-space traps) we have.

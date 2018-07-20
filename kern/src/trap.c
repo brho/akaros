@@ -281,6 +281,11 @@ void print_kmsgs(uint32_t coreid)
 	__print_kmsgs(&pcpui->routine_amsgs, "Routine");
 }
 
+void __kmsg_trampoline(uint32_t srcid, long a0, long a1, long a2)
+{
+	((void (*)(long arg0, long arg1))a0)(a1, a2);
+}
+
 /* Debugging stuff */
 void kmsg_queue_stat(void)
 {
