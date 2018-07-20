@@ -20,6 +20,7 @@ struct sigstate {
 	sigset_t mask;
 	sigset_t pending;
 	struct sigdata *data;
+	uintptr_t sigalt_stacktop;
 };
 
 /* A set of functions related to handling posix signals on akaros. The
