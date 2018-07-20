@@ -158,6 +158,13 @@ static void chan_release(struct kref *kref)
 {
 	struct chan *c = container_of(kref, struct chan, ref);
 	ERRSTACK(1);
+
+	/* We can be called from RCU callbacks, but close methods can block.  In
+	 * those cases, we need to defer our work to a kernel message. */
+	if (in_rcu_cb_ctx(this_pcpui_ptr())) {
+		run_as_rkm(chan_release, kref);
+		return;
+	}
 	/* this style discards the error from close().  picture it as
 	 * if (waserror()) { } else { close(); } chanfree_no_matter_what();  */
 	if (!waserror()) {
