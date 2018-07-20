@@ -187,6 +187,9 @@ static void __prep_sighandler(struct uthread *uthread,
 	if (info != NULL)
 		uthread->sigstate.data->info = *info;
 
+	if (uthread->sigstate.sigalt_stacktop != 0)
+		stack = uthread->sigstate.sigalt_stacktop;
+
 	init_user_ctx(&uthread->sigstate.data->u_ctx, (uintptr_t)entry, stack);
 	/* The uthread may or may not be UTHREAD_SAVED.  That depends on whether the
 	 * uthread was in that state initially.  We're swapping into the location of
@@ -300,6 +303,21 @@ void uthread_prep_signal_from_fault(struct uthread *uthread,
 static int __sigaltstack(__const struct sigaltstack *__restrict __ss,
                          struct sigaltstack *__restrict __oss)
 {
+	if (__ss->ss_flags != 0) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (__oss != NULL) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (__ss->ss_size < MINSIGSTKSZ) {
+		errno = ENOMEM;
+		return -1;
+	}
+	uintptr_t stack_top = (uintptr_t) __ss->ss_sp + __ss->ss_size;
+
+	current_uthread->sigstate.sigalt_stacktop = stack_top;
 	return 0;
 }
 
