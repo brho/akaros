@@ -19,3 +19,10 @@
  * nothing or to some attribute.  We use it for the name of the pcpu variables
  * .section, so need it to not be #defined yet. */
 #undef __percpu
+
+/* If __VA_ARGS__ is empty, the ## will eat the comma to the left, so we call
+ * __MACRO_NARG with 1 + NR_ARGS arguments, then the 6, 5, 4, etc.  __MACRO_NARG
+ * will strip the 0 (the _0), then the args (if any), and then return the Nth
+ * integer passed in, which will be the number of original args. */
+#define __MACRO_NARG(_0, _1, _2, _3, _4, _5, _6, x, ...) x
+#define MACRO_NR_ARGS(...) __MACRO_NARG(0, ##__VA_ARGS__, 6, 5, 4, 3, 2, 1, 0)
