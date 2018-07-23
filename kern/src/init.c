@@ -318,8 +318,10 @@ void _warn(const char *file, int line, const char *fmt,...)
 	printk("\nkernel warning at %s:%d, from core %d: ", file, line,
 	       core_id_early());
 	vcprintf(fmt, ap);
-	cprintf("\n");
+	printk("\n");
 	va_end(ap);
+	backtrace();
+	printk("\n");
 	print_unlock();
 }
 
