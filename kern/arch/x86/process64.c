@@ -199,14 +199,13 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	 * like launching instead of resuming, not having a VMCS loaded, failing a
 	 * host-state area check, etc.  Those are kernel problems.
 	 *
-	 * The user also might be able to trigger some of these failures.  For
-	 * instance, rflags could be bad, or the trap_injection could be
-	 * misformatted.  We might catch that in secure_tf, or we could reflect
-	 * those to the user.  Detecting btw the kernel and user mistakes might be
-	 * a pain.
+	 * The user should not be able to trigger these problems.  The user could
+	 * trigger a problem loading the guest-state area, such as a non-canonical
+	 * address for RIP.  Those sorts of errors should appear to be a normal
+	 * vmexit with some flags set.
 	 *
-	 * For now, the plan is to just reflect everything back to the user and
-	 * whitelist errors that are known to be kernel bugs.
+	 * Any failed vmlaunch/resume is likely a kernel bug, but we'll still
+	 * reflect it to the user for debugability.
 	 *
 	 * Also we should always have a non-shadow VMCS, so ZF should be 1 and we
 	 * can read the error register. */
@@ -214,6 +213,7 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	tf->tf_exit_reason = EXIT_REASON_VMENTER_FAILED;
 	tf->tf_exit_qual = vmcs_read(VM_INSTRUCTION_ERROR);
 	tf->tf_flags |= VMCTX_FL_PARTIAL;
+	warn("vmlaunch / vmresume failed!, check userspace's reflected fault");
 	handle_bad_vm_tf(tf);
 }
 
@@ -275,6 +275,8 @@ static void proc_secure_hwtf(struct hw_trapframe *tf)
 {
 	enforce_user_canon(&tf->tf_gsbase);
 	enforce_user_canon(&tf->tf_fsbase);
+	enforce_user_canon(&tf->tf_rip);
+	enforce_user_canon(&tf->tf_rsp);
 	/* GD_UD is the user data segment selector in the GDT, and
 	 * GD_UT is the user text segment selector (see inc/memlayout.h).
 	 * The low 2 bits of each segment register contains the
@@ -288,6 +290,8 @@ static void proc_secure_hwtf(struct hw_trapframe *tf)
 	 * are also virtual-8086 mode stuff.  Supposedly NT is settable by
 	 * userspace, but there's no good reason for it.  Rather be paranoid. */
 	tf->tf_rflags &= ~(FL_IOPL_MASK | FL_VM | FL_NT | FL_VIF | FL_VIP);
+	tf->tf_rflags |= FL_RSVD_1;
+	tf->tf_rflags &= FL_RSVD_0;
 	x86_hwtf_clear_partial(tf);
 }
 
@@ -296,16 +300,30 @@ static void proc_secure_swtf(struct sw_trapframe *tf)
 	enforce_user_canon(&tf->tf_gsbase);
 	enforce_user_canon(&tf->tf_fsbase);
 	enforce_user_canon(&tf->tf_rip);
+	enforce_user_canon(&tf->tf_rsp);
+	/* The kernel doesn't actually load the mxcsr or the fpucw, but we can still
+	 * sanitize it in case we ever do load it. */
+	tf->tf_mxcsr &= MXCSR_RSVD_0;
 	x86_swtf_clear_partial(tf);
 }
 
 static void proc_secure_vmtf(struct vm_trapframe *tf)
 {
-	/* The user can say whatever it wants for the bulk of the TF, but the only
-	 * thing it can't fake is whether or not it is a partial context, which
-	 * other parts of the kernel rely on. */
-	tf->tf_rflags |= FL_RSVD_1;
-	tf->tf_rflags &= FL_RSVD_0;
+	/* The user can say whatever it wants for the bulk of the TF.  If they mess
+	 * up something in the guest-area, it'll be treated like a vmexit.  There
+	 * are a few things in the TF that we use on the kernel side.
+	 *
+	 * If guest_pcoreid is bad (not a guest_pcore), we'll fail to load the GPC
+	 * and reflect the fault to userspace.
+	 *
+	 * Regarding tf_flags, some are informational for the user, some are used
+	 * for our own use in the kernel.
+	 * - VMCTX_FL_PARTIAL: We clear this below
+	 * - VMCTX_FL_VMRESUME: Used to temporarily carry a bool in pop_vmtf, but we
+	 *   never trust the value in the VM TF.
+	 * These are write-only from the kernel and passed to the user:
+	 * - VMCTX_FL_HAS_FAULT
+	 * - VMCTX_FL_EPT_VMR_BACKED */
 	x86_vmtf_clear_partial(tf);
 }
 

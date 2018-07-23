@@ -55,6 +55,8 @@ struct sw_trapframe {
 	uint16_t tf_padding0;		/* used for partial contexts */
 };
 
+#define MXCSR_RSVD_0	0xffff	// These 0s must be 0, mxcsr &= this
+
 /* The context is both what we want to run and its current state.  For VMs, that
  * includes status bits from the VMCS for reflected vmexits/hypercalls.  This is
  * not particularly different than how hardware contexts contain info on
@@ -63,7 +65,10 @@ struct sw_trapframe {
  * The VM context also consists of a mountain of state in the VMCS, referenced
  * only in here by guest pcoreid.  Those bits are set once by Akaros to sensible
  * defaults and then are changed during execution of the VM.  The parts of that
- * state that are exposed to the user-VMM are the contents of the trapframe. */
+ * state that are exposed to the user-VMM are the contents of the trapframe.
+ *
+ * Before adding any new flags, consider whether or not they need to be checked
+ * in proc_secure_vmtf(). */
 
 #define VMCTX_FL_PARTIAL		(1 << 0)
 #define VMCTX_FL_HAS_FAULT		(1 << 1)

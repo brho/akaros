@@ -178,9 +178,11 @@ struct guest_pcore *lookup_guest_pcore(struct proc *p, int guest_pcoreid)
 	struct guest_pcore **array;
 	struct guest_pcore *ret;
 
+	if (guest_pcoreid < 0)
+		return NULL;
 	/* nr_guest_pcores is written once at setup and never changed */
 	if (guest_pcoreid >= p->vmm.nr_guest_pcores)
-		return 0;
+		return NULL;
 	/* TODO: (RCU) Synchronizing with __vmm_grow_gpc_array() */
 	do {
 		array = ACCESS_ONCE(p->vmm.guest_pcores);
