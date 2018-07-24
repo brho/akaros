@@ -696,6 +696,7 @@ int main(int argc, char **argv)
 	vm_tf->tf_rip = entry;
 	vm_tf->tf_rsp = 0xe0000;
 	vm_tf->tf_rsi = (uint64_t) bp;
+	vm_tf->tf_rflags = FL_RSVD_1;
 	vm->up_gpcs = 1;
 	fprintf(stderr, "Start guest: cr3 %p rip %p\n", vm_tf->tf_cr3, entry);
 	start_guest_thread(gpcid_to_gth(vm, 0));
