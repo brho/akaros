@@ -179,8 +179,7 @@ void __kmsg_trampoline(uint32_t srcid, long a0, long a1, long a2);
 #define __CTX_IRQ_D_MASK			((1 << 8) - 1)
 #define __CTX_KTRAP_D_MASK			((1 << 8) - 1)
 #define __CTX_NESTED_CTX_MASK		((1 << 16) - 1)
-#define __CTX_EARLY_RKM				(1 << (__CTX_FLAG_SHIFT + 0))
-#define __CTX_RCU_CB				(1 << (__CTX_FLAG_SHIFT + 1))
+#define __CTX_RCU_CB				(1 << (__CTX_FLAG_SHIFT + 0))
 
 /* Basic functions to get or change depths */
 
@@ -202,12 +201,6 @@ void __kmsg_trampoline(uint32_t srcid, long a0, long a1, long a2);
 #define dec_ktrap_depth(pcpui)                                                 \
 	((pcpui)->__ctx_depth -= 1 << __CTX_KTRAP_D_SHIFT)
 
-#define set_rkmsg(pcpui)                                                       \
-	((pcpui)->__ctx_depth |= __CTX_EARLY_RKM)
-
-#define clear_rkmsg(pcpui)                                                     \
-	((pcpui)->__ctx_depth &= ~__CTX_EARLY_RKM)
-
 #define set_rcu_cb(pcpui)                                                      \
 	((pcpui)->__ctx_depth |= __CTX_RCU_CB)
 
@@ -220,9 +213,6 @@ void __kmsg_trampoline(uint32_t srcid, long a0, long a1, long a2);
 
 #define in_irq_ctx(pcpui)                                                      \
 	(irq_depth(pcpui))
-
-#define in_early_rkmsg_ctx(pcpui)                                              \
-	((pcpui)->__ctx_depth & __CTX_EARLY_RKM)
 
 #define in_rcu_cb_ctx(pcpui)                                                   \
 	((pcpui)->__ctx_depth & __CTX_RCU_CB)

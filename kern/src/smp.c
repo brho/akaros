@@ -63,16 +63,12 @@ static void __attribute__((noreturn)) __smp_idle(void *arg)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
-	disable_irq();	/* might not be needed - need to look at KMSGs closely */
-	clear_rkmsg(pcpui);
 	pcpui->cur_kthread->flags = KTH_DEFAULT_FLAGS;
-	enable_irq();	/* one-shot change to get any IRQs before we halt later */
-	disable_irq();
 	while (1) {
 		/* This might wake a kthread (the gp ktask), so be sure to run PRKM
-		 * after reporting the quiescent state.  Note that after each RKM
-		 * finishes, we'll also rerun rcu_report_qs(). */
+		 * after reporting the quiescent state. */
 		rcu_report_qs();
+		/* If this runs an RKM, we'll call smp_idle from the top. */
 		process_routine_kmsg();
 		try_run_proc();
 		cpu_bored();		/* call out to the ksched */
@@ -89,6 +85,7 @@ static void __attribute__((noreturn)) __smp_idle(void *arg)
 
 void smp_idle(void)
 {
+	disable_irq();
 	__reset_stack_pointer(0, get_stack_top(), __smp_idle);
 }
 

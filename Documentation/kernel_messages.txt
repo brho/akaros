@@ -78,12 +78,6 @@ probably receive a timestamp field, among other things.  Routine messages also
 will replace the old workqueue, which hasn't really been used in 40 months or
 so.
 
-Blocking:
---------------------------------
-If a routine kernel message blocks (or has a chance to block), it must
-smp_idle() at the end.  If it were to return to PRKM(), it could be on a new
-core, due to kthread migration.  We might have a way to enforce this later.
-
 To Return or Not:
 --------------------------------
 Routine k_msgs do not have to return.  Immediate messages must.  The distinction

@@ -203,62 +203,36 @@ static kernel_message_t *get_next_rkmsg(struct per_cpu_info *pcpui)
 	return kmsg;
 }
 
-/* Runs routine kernel messages.  This might not return.  In the past, this
- * would also run immediate messages, but this is unnecessary.  Immediates will
- * run whenever we reenable IRQs.  We could have some sort of ordering or
- * guarantees between KMSG classes, but that's not particularly useful at this
- * point.
+/* Runs a routine kernel message.  If we execute a message, this does not
+ * return, but instead will call smp_idle().
  *
- * Note this runs from normal context, with interruptes disabled.  However, a
- * particular RKM could enable interrupts - for instance __launch_kthread() will
- * restore an old kthread that may have had IRQs on. */
+ * Note that routine messages do not have to return, but almost all of them do.
+ * If you're thinking of changing this, take a look at __launch_kthread. */
 void process_routine_kmsg(void)
 {
 	uint32_t pcoreid = core_id();
 	struct per_cpu_info *pcpui = &per_cpu_info[pcoreid];
 	struct kernel_message msg_cp, *kmsg;
 
-	/* Important that callers have IRQs disabled.  When sending cross-core RKMs,
-	 * the IPI is used to keep the core from going to sleep - even though RKMs
-	 * aren't handled in the kmsg handler.  Check smp_idle() for more info. */
+	/* Important that callers have IRQs disabled when checking for RKMs.  When
+	 * sending cross-core RKMs, the IPI is used to keep the core from going to
+	 * sleep - even though RKMs aren't handled in the kmsg handler. */
 	assert(!irq_is_enabled());
-	while ((kmsg = get_next_rkmsg(pcpui))) {
-		/* Copy in, and then free, in case we don't return */
-		msg_cp = *kmsg;
-		kmem_cache_free(kernel_msg_cache, (void*)kmsg);
-		assert(msg_cp.dstid == pcoreid);	/* caught a brutal bug with this */
-		set_rkmsg(pcpui);					/* we're now in early RKM ctx */
-		/* The kmsg could block.  If it does, we want the kthread code to know
-		 * it's not running on behalf of a process, and we're actually spawning
-		 * a kernel task.  While we do have a syscall that does work in an RKM
-		 * (change_to), it's not really the rest of the syscall context. */
-		pcpui->cur_kthread->flags = KTH_KTASK_FLAGS;
-		pcpui_trace_kmsg(pcpui, (uintptr_t)msg_cp.pc);
-		msg_cp.pc(msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
-		/* And if we make it back, be sure to restore the default flags.  If we
-		 * never return, but the kthread exits via some other way (smp_idle()),
-		 * then smp_idle() will deal with the flags.  The default state includes
-		 * 'not a ktask'. */
-		pcpui->cur_kthread->flags = KTH_DEFAULT_FLAGS;
-		/* PRKM is like a cooperative ksched, and our 'thread' just yielded.  If
-		 * this is too much, we can do something more limited, e.g. wait for
-		 * idle, check a pcpui bit that means 'check in', etc. */
-		rcu_report_qs();
-		/* If we aren't still in early RKM, it is because the KMSG blocked
-		 * (thus leaving early RKM, finishing in default context) and then
-		 * returned.  This is a 'detached' RKM.  Must idle in this scenario,
-		 * since we might have migrated or otherwise weren't meant to PRKM
-		 * (can't return twice).  Also note that this may involve a core
-		 * migration, so we need to reread pcpui.*/
-		cmb();
-		pcpui = &per_cpu_info[core_id()];
-		if (!in_early_rkmsg_ctx(pcpui))
-			smp_idle();
-		clear_rkmsg(pcpui);
-		/* Some RKMs might turn on interrupts (perhaps in the future) and then
-		 * return. */
-		disable_irq();
-	}
+	kmsg = get_next_rkmsg(pcpui);
+	if (!kmsg)
+		return;
+	msg_cp = *kmsg;
+	kmem_cache_free(kernel_msg_cache, kmsg);
+	assert(msg_cp.dstid == pcoreid);
+	/* The kmsg could block.  If it does, we want the kthread code to know it's
+	 * not running on behalf of a process, and we're actually spawning a kernel
+	 * task.  While we do have a syscall that does work in an RKM (change_to),
+	 * it's not really the rest of the syscall context.  When we return or
+	 * otherwise call smp_idle, smp_idle will reset these flags. */
+	pcpui->cur_kthread->flags = KTH_KTASK_FLAGS;
+	pcpui_trace_kmsg(pcpui, (uintptr_t)msg_cp.pc);
+	msg_cp.pc(msg_cp.srcid, msg_cp.arg0, msg_cp.arg1, msg_cp.arg2);
+	smp_idle();
 }
 
 /* extremely dangerous and racy: prints out the immed and routine kmsgs for a
