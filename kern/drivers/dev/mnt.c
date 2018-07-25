@@ -321,6 +321,10 @@ struct chan *mntauth(struct chan *c, char *spec)
 
 	r->request.type = Tauth;
 	r->request.afid = c->fid;
+	/* This assumes we're called from a syscall, which should always be true. */
+	if (!current_kthread->sysc)
+		warn("Kthread %s didn't have a syscall, current is %s",
+		     current_kthread->name, current ? current->progname : NULL);
 	r->request.uname = current->user.name;
 	r->request.aname = spec;
 	mountrpc(m, r);
@@ -381,6 +385,10 @@ static struct chan *mntattach(char *muxattach)
 		r->request.afid = NOFID;
 	else
 		r->request.afid = params->authchan->fid;
+	/* This assumes we're called from a syscall, which should always be true. */
+	if (!current_kthread->sysc)
+		warn("Kthread %s didn't have a syscall, current is %s",
+		     current_kthread->name, current ? current->progname : NULL);
 	r->request.uname = current->user.name;
 	r->request.aname = params->spec;
 	mountrpc(m, r);
@@ -798,12 +806,16 @@ void mountrpc(struct mnt *m, struct mntrpc *r)
 			cn = "?";
 			if (r->c != NULL && r->c->name != NULL)
 				cn = r->c->name->s;
-			printk
-				("mnt: proc %s %lu: mismatch from %s %s rep 0x%p tag %d fid %d T%d R%d rp %d\n",
-				 "current->text", "current->pid", sn, cn, r, r->request.tag,
+			warn("mnt: mismatch from %s %s rep %p tag %d fid %d T%d R%d rp %d\n",
+				 sn, cn, r, r->request.tag,
 				 r->request.fid, r->request.type, r->reply.type, r->reply.tag);
 			error(EPROTO, ERROR_FIXME);
 	}
+}
+
+static bool kth_proc_is_dying(struct kthread *kth)
+{
+	return kth->proc ? proc_is_dying(kth->proc) : false;
 }
 
 void mountio(struct mnt *m, struct mntrpc *r)
@@ -812,17 +824,19 @@ void mountio(struct mnt *m, struct mntrpc *r)
 	int n;
 
 	while (waserror()) {
-		if (m->rip == current)
+		if (m->rip == current_kthread)
 			mntgate(m);
 		/* Syscall aborts are like Plan 9 Eintr.  For those, we need to change
-		 * the old request to a flsh (mntflushalloc) and try again.  We'll
+		 * the old request to a flush (mntflushalloc) and try again.  We'll
 		 * always try to flush, and you can't get out until the flush either
 		 * succeeds or errors out with a non-abort/Eintr error.
 		 *
 		 * This all means that regular aborts cannot break us out of here!  We
 		 * can consider that policy in the future, if we need to.  Regardless,
-		 * if the process is dying, we really do need to abort. */
-		if ((get_errno() != EINTR) || proc_is_dying(current)) {
+		 * if the process is dying, we really do need to abort.  We might not
+		 * always have a process (RKM chan_release), but in that case we're fine
+		 * - we're not preventing a process from dying. */
+		if ((get_errno() != EINTR) || kth_proc_is_dying(current_kthread)) {
 			/* all other errors or dying, bail out! */
 			mntflushfree(m, r);
 			nexterror();
@@ -863,7 +877,7 @@ void mountio(struct mnt *m, struct mntrpc *r)
 			return;
 		}
 	}
-	m->rip = current;
+	m->rip = current_kthread;
 	spin_unlock(&m->lock);
 	while (r->done == 0) {
 		if (mntrpcread(m, r) < 0)

@@ -593,7 +593,7 @@ struct mnt {
 	spinlock_t lock;
 	/* references are counted using c->ref; channels on this mount point incref(c->mchan) == Mnt.c */
 	struct chan *c;				/* Channel to file service */
-	struct proc *rip;			/* Reader in progress */
+	struct kthread *rip;		/* Reader in progress */
 	struct mntrpc *queue;		/* Queue of pending requests on this channel */
 	uint32_t id;				/* Multiplexer id for channel check */
 	struct mnt *list;			/* Free list */
