@@ -341,6 +341,26 @@ static void __link_child(struct tree_file *parent, struct tree_file *child)
 	wc_insert_child(parent, child);
 }
 
+/* Hold the dir's qlock.  This probably works with any directory, though we only
+ * use it when we remove a directory.  The normal way to drop negative entries
+ * involves working directly with the WC (tfs_lru_prune_neg). */
+static void __prune_dir_negatives(struct tree_file *dir)
+{
+	struct tree_file *child, *temp;
+
+	list_for_each_entry_safe(child, temp, &dir->children, siblings) {
+		if (!tree_file_is_negative(child))
+			continue;
+		spin_lock(&child->lifetime);
+		assert(kref_refcnt(&child->kref) == 0);
+		/* This mark prevents new lookups.  We'll disconnect it shortly. */
+		child->flags |= TF_F_DISCONNECTED;
+		spin_unlock(&child->lifetime);
+		assert(child->parent == dir);
+		__disconnect_child(dir, child);
+	}
+}
+
 static void neuter_directory(struct tree_file *dir)
 {
 	qlock(&dir->file.qlock);
@@ -349,6 +369,9 @@ static void neuter_directory(struct tree_file *dir)
 		error(ENOTEMPTY, "can't remove dir with children");
 	}
 	dir->can_have_children = false;
+	/* Even if we don't have real children, we might have some negatives.  Those
+	 * aren't a reason to abort an rmdir, we just need to drop them. */
+	__prune_dir_negatives(dir);
 	qunlock(&dir->file.qlock);
 }
 
