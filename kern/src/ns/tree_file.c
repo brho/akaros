@@ -343,15 +343,13 @@ static void __link_child(struct tree_file *parent, struct tree_file *child)
 
 static void neuter_directory(struct tree_file *dir)
 {
-	bool throw = false;
-
 	qlock(&dir->file.qlock);
-	if (dir->tfs->tf_ops.has_children(dir))
-		throw = true;
+	if (dir->tfs->tf_ops.has_children(dir)) {
+		qunlock(&dir->file.qlock);
+		error(ENOTEMPTY, "can't remove dir with children");
+	}
 	dir->can_have_children = false;
 	qunlock(&dir->file.qlock);
-	if (throw)
-		error(ENOTEMPTY, "can't remove dir with children");
 }
 
 /* Unlink a child from the tree.  Last ref will clean it up, which will not be
@@ -398,6 +396,10 @@ static struct tree_file *lookup_child_entry(struct tree_file *parent,
 		rcu_read_lock();
 		qunlock(&parent->file.qlock);
 		return child;
+	}
+	if (!parent->can_have_children) {
+		qunlock(&parent->file.qlock);
+		error(ENOENT, "lookup failed, parent dir being removed");
 	}
 	child = tree_file_alloc(parent->tfs, parent, name);
 	if (waserror()) {
@@ -635,6 +637,8 @@ struct tree_file *tree_file_create(struct tree_file *parent, const char *name,
 	}
 	if (!caller_has_tf_perms(parent, O_WRITE))
 		error(EACCES, "missing create permission on dir");
+	if (!parent->can_have_children)
+		error(ENOENT, "create failed, parent dir being removed");
 	child = wc_lookup_child(parent, name);
 	if (child) {
 		/* The create(5) message fails if the file exists, which differs from
