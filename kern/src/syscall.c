@@ -251,7 +251,6 @@ static bool systrace_has_error(struct systrace_record *trace)
 	case SYS_symlink:
 	case SYS_chdir:
 	case SYS_fchdir:
-	case SYS_getcwd:
 	case SYS_mkdir:
 	case SYS_rmdir:
 	case SYS_tcgetattr:
@@ -276,6 +275,7 @@ static bool systrace_has_error(struct systrace_record *trace)
 	case SYS_openat:
 	case SYS_fcntl:
 	case SYS_readlink:
+	case SYS_getcwd:
 	case SYS_nbind:
 	case SYS_nmount:
 	case SYS_wstat:
@@ -430,6 +430,11 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 			if (retval <= 0)
 				break;
 			copy_tracedata_from_user(trace, trace->arg1, retval);
+			break;
+		case SYS_getcwd:
+			if (retval < 0)
+				break;
+			copy_tracedata_from_user(trace, trace->arg0, retval);
 			break;
 		case SYS_readlink:
 			if (retval <= 0)
@@ -2081,10 +2086,14 @@ static intreg_t sys_fchdir(struct proc *p, pid_t pid, int fd)
 	return retval;
 }
 
-/* Note cwd_l is not a strlen, it's an absolute size */
+/* Note cwd_l is not a strlen, it's an absolute size.
+ * Same as with readlink, we give them a null-terminated string, and we return
+ * strlen, which doesn't include the \0.  If we can't give them the \0, we'll
+ * error out.  Our readlink also does that, which is not POSIX-like. */
 intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 {
-	int retval = 0;
+	ssize_t retval = -1;
+	size_t copy_amt;
 	char *k_cwd;
 
 	k_cwd = sysgetcwd();
@@ -2092,13 +2101,13 @@ intreg_t sys_getcwd(struct proc *p, char *u_cwd, size_t cwd_l)
 		set_error(EINVAL, "unable to getcwd");
 		return -1;
 	}
-	if (strlen(k_cwd) + 1 > cwd_l) {
-		set_error(ERANGE, "getcwd buf too small, needed %d", strlen(k_cwd) + 1);
-		retval = -1;
+	copy_amt = strlen(k_cwd) + 1;
+	if (copy_amt > cwd_l) {
+		set_error(ERANGE, "getcwd buf too small, needed %d", copy_amt);
 		goto out;
 	}
-	if (memcpy_to_user_errno(p, u_cwd, k_cwd, strlen(k_cwd) + 1))
-		retval = -1;
+	if (!memcpy_to_user_errno(p, u_cwd, k_cwd, copy_amt))
+		retval = copy_amt - 1;
 out:
 	kfree(k_cwd);
 	return retval;
