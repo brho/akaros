@@ -563,9 +563,12 @@ struct walkqid *tree_file_walk(struct tree_file *from, char **name,
 			if (!tf_kref_get(at)) {
 				if (i == 0)
 					error(ENOENT, "file was removed during lookup");
-				/* WQ has a qid for 'at' from a previous loop, but since we
-				 * can't walk to it, we should unwind it. */
-				wq->nqid--;
+				/* WQ has a qid for 'at' from a previous loop.  We can't grab a
+				 * ref, so it's being removed/renamed.  Yet it's still OK to
+				 * report this as part of the wq, since we could fail for other
+				 * reasons (thus not getting nnames) and have the same race,
+				 * which we handle below (i.e. we only get a ref when it was the
+				 * last name).  Here we're just *noticing* the race. */
 				break;
 			}
 			rcu_read_unlock();
@@ -573,14 +576,16 @@ struct walkqid *tree_file_walk(struct tree_file *from, char **name,
 			 * 'else' case, and run the poperror case for non-errors and
 			 * non-name=0-errors. */
 			if (waserror()) {
-				if (i == 0) {
-					tf_kref_put(at);
+				tf_kref_put(at);
+				if (i == 0)
 					nexterror();
-				}
-			} else {
-				/* This returns with an rcu_read_lock protecting 'next' */
-				next = lookup_child_entry(at, name[i]);
+				/* In this case, we're discarding the waserror, same as in the
+				 * other i != 0 cases. */
+				poperror();
+				break;
 			}
+			/* This returns with an rcu_read_lock protecting 'next' */
+			next = lookup_child_entry(at, name[i]);
 			tf_kref_put(at);
 			poperror();
 			assert(next);
