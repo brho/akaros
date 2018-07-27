@@ -151,6 +151,8 @@ long __ros_syscall_errno(unsigned int _num, long _a0, long _a1, long _a2,
 {
 	struct syscall sysc = __ros_syscall_inline(_num, _a0, _a1, _a2, _a3,
 	                                           _a4, _a5);
+
+	/* Consider calling syscall_retval_is_error() */
 	if (__builtin_expect(sysc.err, 0)) {
 		errno = sysc.err;
 		memcpy(errstr(), sysc.errstr, MAX_ERRSTR_LEN);
