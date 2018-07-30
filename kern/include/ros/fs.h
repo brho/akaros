@@ -80,6 +80,7 @@ struct kstat {
  * don't (yet) have the Unix struct file. */
 #define CCTL_SET_FL				(F_CHANCTL_BASE + 0)
 #define CCTL_SYNC				(F_CHANCTL_BASE + 1)
+#define CCTL_DEBUG				(F_CHANCTL_BASE + 2)
 
 /* For F_[GET|SET]FD */
 #define FD_CLOEXEC	1

@@ -278,6 +278,7 @@ void tfs_frontend_for_each(struct tree_filesystem *tfs,
 void tfs_frontend_purge(struct tree_filesystem *tfs,
                         void (*cb)(struct tree_file *tf));
 void __tfs_dump(struct tree_filesystem *tfs);
+void __tfs_dump_tf(struct tree_file *tf);
 
 void tfs_lru_for_each(struct tree_filesystem *tfs, bool cb(struct tree_file *),
                       size_t max_tfs);

@@ -1049,6 +1049,13 @@ unsigned long tree_chan_ctl(struct chan *c, int op, unsigned long a1,
                             unsigned long a4)
 {
 	switch (op) {
+	case CCTL_DEBUG:
+		print_lock();
+		printk("Dumping tree_file info (frontend), dev %s, chan %s:\n\n",
+		       chan_dev_name(c), channame(c));
+		__tfs_dump_tf(chan_to_tree_file(c));
+		print_unlock();
+		return 0;
 	default:
 		error(EINVAL, "%s does not support chanctl %d", chan_dev_name(c), op);
 	}
@@ -1235,6 +1242,11 @@ static void dump_tf(struct tree_file *tf, int tabs)
 void __tfs_dump(struct tree_filesystem *tfs)
 {
 	dump_tf(tfs->root, 0);
+}
+
+void __tfs_dump_tf(struct tree_file *tf)
+{
+	dump_tf(tf, 0);
 }
 
 /* Runs a callback on every non-negative TF on the LRU list, for a given
