@@ -221,6 +221,34 @@ void backtrace(void)
 	print_unlock();
 }
 
+static void trace_printk_func(void *opaque, const char *str)
+{
+	trace_printk("%s", str);
+}
+
+void backtrace_trace(void)
+{
+	/* Don't need this strictly, but it helps serialize to the trace buf */
+	print_lock();
+	trace_printk("Stack Backtrace on Core %d:\n", core_id());
+	gen_backtrace(&trace_printk_func, NULL);
+	print_unlock();
+}
+
+static void trace_printx_func(void *opaque, const char *str)
+{
+	trace_printx("%s", str);
+}
+
+void backtrace_trace_printx(void)
+{
+	/* Don't need this strictly, but it helps serialize to the trace buf */
+	print_lock();
+	trace_printx("Stack Backtrace on Core %d:\n", core_id());
+	gen_backtrace(&trace_printk_func, NULL);
+	print_unlock();
+}
+
 void backtrace_frame(uintptr_t eip, uintptr_t ebp)
 {
 	uintptr_t pcs[MAX_BT_DEPTH];
@@ -277,4 +305,10 @@ void backtrace_current_ctx(void)
 {
 	if (current)
 		backtrace_user_ctx(current, current_ctx);
+}
+
+void backtrace_kthread(struct kthread *kth)
+{
+	backtrace_frame(jmpbuf_get_pc(&kth->context),
+	                jmpbuf_get_fp(&kth->context));
 }

@@ -4,7 +4,9 @@
 #include <ros/trapframe.h>
 #include <arch/kdebug.h>
 #include <profiler.h>
-/* for includes */ struct proc;
+/* for includes */
+struct proc;
+struct kthread;
 
 struct symtab_entry {
 	const char *name;
@@ -19,6 +21,8 @@ struct symtab_entry {
 /*** Printk Backtraces, usually used for debugging or from the monitor */
 /* Backtraces the calling kernel context */
 void backtrace(void);
+void backtrace_trace(void);
+void backtrace_trace_printx(void);
 /* Backtraces a PC/FP, with no protections */
 void backtrace_frame(uintptr_t pc, uintptr_t fp);
 /* Backtraces a user PC/FP */
@@ -29,6 +33,7 @@ void backtrace_hwtf(struct hw_trapframe *hw_tf);
 void backtrace_user_ctx(struct proc *p, struct user_context *ctx);
 /* Backtraces the current user context, if there is one */
 void backtrace_current_ctx(void);
+void backtrace_kthread(struct kthread *kth);
 
 /*** Programmatic Backtraces */
 /* Backtraces a PC/FP, stores results in *pcs, with no protections */
