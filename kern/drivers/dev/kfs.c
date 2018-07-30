@@ -310,7 +310,7 @@ static unsigned long kfs_chan_ctl(struct chan *c, int op, unsigned long a1,
 	case CCTL_SYNC:
 		return 0;
 	default:
-		error(EINVAL, "%s does not support %d", __func__, op);
+		return tree_chan_ctl(c, op, a1, a2, a3, a4);
 	}
 }
 

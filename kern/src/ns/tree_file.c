@@ -1044,6 +1044,16 @@ struct fs_file *tree_chan_mmap(struct chan *c, struct vm_region *vmr, int prot,
 	return f;
 }
 
+unsigned long tree_chan_ctl(struct chan *c, int op, unsigned long a1,
+                            unsigned long a2, unsigned long a3,
+                            unsigned long a4)
+{
+	switch (op) {
+	default:
+		error(EINVAL, "%s does not support chanctl %d", chan_dev_name(c), op);
+	}
+}
+
 /* Given a tree file, construct a chan that points to the TF for the given
  * device.  Careful with this - it's for bootstrapping. */
 struct chan *tree_file_alloc_chan(struct tree_file *tf, struct dev *dev,

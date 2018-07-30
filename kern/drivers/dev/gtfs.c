@@ -817,7 +817,6 @@ static void gtfs_sync_gtfs(struct gtfs *gtfs)
 	tfs_frontend_for_each(&gtfs->tfs, gtfs_sync_tf);
 }
 
-/* chan_ctl or something can hook into these functions */
 static void gtfs_sync_chan(struct chan *c)
 {
 	gtfs_sync_tf(chan_to_tree_file(c));
@@ -840,7 +839,7 @@ static unsigned long gtfs_chan_ctl(struct chan *c, int op, unsigned long a1,
 			gtfs_sync_chan(c);
 		return 0;
 	default:
-		error(EINVAL, "%s does not support %d", __func__, op);
+		return tree_chan_ctl(c, op, a1, a2, a3, a4);
 	}
 }
 
