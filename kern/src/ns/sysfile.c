@@ -1508,21 +1508,10 @@ static bool cexternal_flags_differ(int set1, int set2, int flags)
 	return (set1 & flags) ^ (set2 & flags);
 }
 
-int fd_setfl(int fd, int flags)
+static int chan_setfl(struct chan *c, int flags)
 {
-	ERRSTACK(2);
-	struct chan *c;
-	int ret = 0;
+	int ret;
 
-	if (waserror()) {
-		poperror();
-		return -1;
-	}
-	c = fdtochan(&current->open_files, fd, -1, 0, 1);
-	if (waserror()) {
-		cclose(c);
-		nexterror();
-	}
 	if (cexternal_flags_differ(flags, c->flag, O_CLOEXEC)) {
 		/* TODO: The whole CCEXEC / O_CLOEXEC on 9ns needs work */
 		error(EINVAL, "can't toggle O_CLOEXEC with setfl");
@@ -1531,22 +1520,18 @@ int fd_setfl(int fd, int flags)
 		error(EINVAL, "can't toggle O_REMCLO with setfl");
 	if (cexternal_flags_differ(flags, c->flag, O_PATH))
 		error(EINVAL, "can't toggle O_PATH with setfl");
-	if (!devtab[c->type].chan_ctl)
-		error(EINVAL, "can't setfl, %s has no chan_ctl", chan_dev_name(c));
 	ret = devtab[c->type].chan_ctl(c, CCTL_SET_FL, flags & CEXTERNAL_FLAGS,
 	                               0, 0, 0);
 	c->flag = (c->flag & ~CEXTERNAL_FLAGS) | (flags & CEXTERNAL_FLAGS);
-	poperror();
-	cclose(c);
-	poperror();
 	return ret;
 }
 
-int fd_sync(int fd)
+int fd_chan_ctl(int fd, int cmd, unsigned long arg1, unsigned long arg2,
+                unsigned long arg3, unsigned long arg4)
 {
 	ERRSTACK(2);
 	struct chan *c;
-	int ret = 0;
+	int ret;
 
 	if (waserror()) {
 		poperror();
@@ -1557,9 +1542,20 @@ int fd_sync(int fd)
 		cclose(c);
 		nexterror();
 	}
+
 	if (!devtab[c->type].chan_ctl)
-		error(EINVAL, "can't fsync, %s has no chan_ctl", chan_dev_name(c));
-	ret = devtab[c->type].chan_ctl(c, CCTL_SYNC, 0, 0, 0, 0);
+		error(EINVAL, "%s has no chan_ctl, can't %d", chan_dev_name(c), cmd);
+
+	/* Some commands require 9ns support in addition to the device ctl. */
+	switch (cmd) {
+	case CCTL_SET_FL:
+		ret = chan_setfl(c, arg1);
+		break;
+	default:
+		ret = devtab[c->type].chan_ctl(c, cmd, arg1, arg2, arg3, arg4);
+		break;
+	}
+
 	poperror();
 	cclose(c);
 	poperror();

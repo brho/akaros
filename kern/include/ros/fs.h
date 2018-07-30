@@ -73,6 +73,13 @@ struct kstat {
 #define F_SETFL		4	/* Set file status flags */
 #define F_SYNC		101	/* fsync() */
 #define F_ADVISE	102	/* posix_fadvise{,64}() */
+#define F_CHANCTL_BASE			1000
+
+/* We don't need a GET_FL.  The caller has the chan / FID.  If you have the
+ * chan, you already have the flags.  It's not like when you have an FD and
+ * don't (yet) have the Unix struct file. */
+#define CCTL_SET_FL				(F_CHANCTL_BASE + 0)
+#define CCTL_SYNC				(F_CHANCTL_BASE + 1)
 
 /* For F_[GET|SET]FD */
 #define FD_CLOEXEC	1

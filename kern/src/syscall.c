@@ -1840,14 +1840,18 @@ intreg_t sys_fcntl(struct proc *p, int fd, int cmd, unsigned long arg1,
 		}
 		return fd_set_fd_flags(&p->open_files, fd, arg1);
 	case (F_SYNC):
-		return fd_sync(fd);
+		return fd_chan_ctl(fd, CCTL_SYNC, 0, 0, 0, 0);
 	case (F_GETFL):
 		return fd_getfl(fd);
 	case (F_SETFL):
-		return fd_setfl(fd, arg1);
+		return fd_chan_ctl(fd, CCTL_SET_FL, arg1, 0, 0, 0);
+	default:
+		/* chanctl and fcntl share flags */
+		if (cmd >= F_CHANCTL_BASE)
+			return fd_chan_ctl(fd, cmd, arg1, arg2, arg3, arg4);
+		set_error(EINVAL, "Unsupported fcntl cmd %d", cmd);
+		return -1;
 	}
-	set_error(EINVAL, "Unsupported fcntl cmd %d", cmd);
-	return -1;
 }
 
 static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,

@@ -20,6 +20,8 @@ int __vfcntl(int fd, int cmd, va_list vl)
 {
 	int ret, arg, advise;
 	__off64_t offset, len;
+	long a1, a2, a3, a4;
+
 	switch (cmd) {
 		case F_GETFD:
 		case F_SYNC:
@@ -46,8 +48,15 @@ int __vfcntl(int fd, int cmd, va_list vl)
 			ret = ros_syscall(SYS_fcntl, fd, cmd, offset, len, advise, 0);
 			break;
 		default:
-			errno = ENOSYS;
-			ret = -1;
+			/* We don't know the number of arguments for generic calls.  We'll
+			 * just yank whatever arguments there could be from the ABI and
+			 * send them along. */
+			a1 = va_arg(vl, long);
+			a2 = va_arg(vl, long);
+			a3 = va_arg(vl, long);
+			a4 = va_arg(vl, long);
+			ret = ros_syscall(SYS_fcntl, fd, cmd, a1, a2, a3, a4);
+			break;
 	}
 	return ret;
 }

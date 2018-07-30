@@ -130,12 +130,6 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 #define DMMODE_BITS (DMDIR | DMAPPEND | DMEXCL | DMMOUNT | DMWRITABLE \
                      | DMREADABLE | DMSYMLINK)
 
-/* We don't need a GET_FL.  The caller has the chan / FID.  If you have the
- * chan, you already have the flags.  It's not like when you have an FD and
- * don't (yet) have the Unix struct file. */
-#define CCTL_SET_FL				1
-#define CCTL_SYNC				2
-
 struct qid {
 	uint64_t path;
 	uint32_t vers;
@@ -1122,8 +1116,8 @@ void print_chaninfo(struct chan *ch);
 int plan9setup(struct proc *new_proc, struct proc *parent, int flags);
 int iseve(void);
 int fd_getfl(int fd);
-int fd_setfl(int fd, int flags);
-int fd_sync(int fd);
+int fd_chan_ctl(int fd, int cmd, unsigned long arg1, unsigned long arg2,
+                unsigned long arg3, unsigned long arg4);
 int fd_get_fd_flags(struct fd_table *fdt, int fd);
 int fd_set_fd_flags(struct fd_table *fdt, int fd, int new_fl);
 
