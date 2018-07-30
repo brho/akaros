@@ -1810,16 +1810,21 @@ void __unmap_vcore(struct proc *p, uint32_t vcoreid)
  * Note this leaves no trace of what was running. This "leaves the process's
  * context.
  *
- * This does not clear the owning proc.  Use the other helper for that. */
-void abandon_core(void)
+ * This does not clear the owning proc.  Use the other helper for that.
+ *
+ * Returns whether or not there was a process present. */
+bool abandon_core(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	/* Syscalls that don't return will ultimately call abadon_core(), so we need
 	 * to make sure we don't think we are still working on a syscall. */
 	pcpui->cur_kthread->sysc = 0;
 	pcpui->cur_kthread->errbuf = 0;	/* just in case */
-	if (pcpui->cur_proc)
+	if (pcpui->cur_proc) {
 		__abandon_core();
+		return true;
+	}
+	return false;
 }
 
 /* Helper to clear the core's owning processor and manage refcnting.  Pass in

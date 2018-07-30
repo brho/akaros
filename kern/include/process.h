@@ -159,7 +159,7 @@ void proc_preempt_all(struct proc *p, uint64_t usec);
 /* Current / cr3 / context management */
 uintptr_t switch_to(struct proc *new_p);
 void switch_back(struct proc *new_p, uintptr_t old_ret);
-void abandon_core(void);
+bool abandon_core(void);
 void clear_owning_proc(uint32_t coreid);
 void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end);
 

@@ -46,8 +46,13 @@ static void try_run_proc(void)
 		assert(0);
 	} else {
 		/* Make sure we have abandoned core.  It's possible to have an owner
-		 * without a current (smp_idle, __startcore, __death). */
-		abandon_core();
+		 * without a current (smp_idle, __startcore, __death).
+		 *
+		 * If we had a current process, we might trigger __proc_free, which
+		 * could send us a KMSG.  Since we're called after PRKM, let's just
+		 * restart the idle loop. */
+		if (abandon_core())
+			smp_idle();
 	}
 }
 
