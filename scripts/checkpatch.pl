@@ -23,6 +23,7 @@
 # - Don't prod about updating MAINTAINERS
 # - Allow C99 comments
 # - Allow Gerrit change-ids
+# - Don't check for the SPDX header
 
 use strict;
 use warnings;
@@ -2960,29 +2961,29 @@ sub process {
 			}
 		}
 
-# check for using SPDX license tag at beginning of files
-		if ($realline == $checklicenseline) {
-			if ($rawline =~ /^[ \+]\s*\#\!\s*\//) {
-				$checklicenseline = 2;
-			} elsif ($rawline =~ /^\+/) {
-				my $comment = "";
-				if ($realfile =~ /\.(h|s|S)$/) {
-					$comment = '/*';
-				} elsif ($realfile =~ /\.(c|dts|dtsi)$/) {
-					$comment = '//';
-				} elsif (($checklicenseline == 2) || $realfile =~ /\.(sh|pl|py|awk|tc)$/) {
-					$comment = '#';
-				} elsif ($realfile =~ /\.rst$/) {
-					$comment = '..';
-				}
-
-				if ($comment !~ /^$/ &&
-				    $rawline !~ /^\+\Q$comment\E SPDX-License-Identifier: /) {
-					WARN("SPDX_LICENSE_TAG",
-					     "Missing or malformed SPDX-License-Identifier tag in line $checklicenseline\n" . $herecurr);
-				}
-			}
-		}
+## check for using SPDX license tag at beginning of files
+#		if ($realline == $checklicenseline) {
+#			if ($rawline =~ /^[ \+]\s*\#\!\s*\//) {
+#				$checklicenseline = 2;
+#			} elsif ($rawline =~ /^\+/) {
+#				my $comment = "";
+#				if ($realfile =~ /\.(h|s|S)$/) {
+#					$comment = '/*';
+#				} elsif ($realfile =~ /\.(c|dts|dtsi)$/) {
+#					$comment = '//';
+#				} elsif (($checklicenseline == 2) || $realfile =~ /\.(sh|pl|py|awk|tc)$/) {
+#					$comment = '#';
+#				} elsif ($realfile =~ /\.rst$/) {
+#					$comment = '..';
+#				}
+#
+#				if ($comment !~ /^$/ &&
+#				    $rawline !~ /^\+\Q$comment\E SPDX-License-Identifier: /) {
+#					WARN("SPDX_LICENSE_TAG",
+#					     "Missing or malformed SPDX-License-Identifier tag in line $checklicenseline\n" . $herecurr);
+#				}
+#			}
+#		}
 
 # check we are in a valid source file if not then ignore this hunk
 		next if ($realfile !~ /\.(h|c|s|S|sh|dtsi|dts)$/);
