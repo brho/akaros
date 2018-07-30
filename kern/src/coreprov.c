@@ -70,6 +70,7 @@ void print_proc_coreprov(struct proc *p)
 
 	if (!p)
 		return;
+	print_lock();
 	printk("Prov cores alloced to proc %d (%p)\n----------\n", p->pid, p);
 	TAILQ_FOREACH(spc_i, &p->ksched_data.crd.prov_alloc_me, prov_next)
 		printk("Pcore %d\n", spc2pcoreid(spc_i));
@@ -78,13 +79,17 @@ void print_proc_coreprov(struct proc *p)
 		printk("Pcore %d (alloced to %d (%p))\n", spc2pcoreid(spc_i),
 		       spc_i->alloc_proc ? spc_i->alloc_proc->pid : 0,
 		       spc_i->alloc_proc);
+	print_unlock();
 }
 
 /* Print the processes attached to each provisioned core. */
 void print_coreprov_map(void)
 {
 	struct sched_pcore *spc_i;
-	/* Doing this unlocked, which is dangerous, but won't deadlock */
+
+	/* Doing this without a scheduler lock, which is dangerous, but won't
+	 * deadlock */
+	print_lock();
 	printk("Which cores are provisioned to which procs:\n------------------\n");
 	for (int i = 0; i < num_cores; i++) {
 		spc_i = pcoreid2spc(i);
@@ -93,4 +98,5 @@ void print_coreprov_map(void)
 		       spc_i->alloc_proc ? spc_i->alloc_proc->pid : 0,
 		       spc_i->alloc_proc);
 	}
+	print_unlock();
 }
