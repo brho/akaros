@@ -56,8 +56,8 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
 	if (entry) {
 		len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
 		      "E [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
-		      "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: --- proc: %d core: %d "
-		      "vcore: %d errno: --- data: ",
+		      "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: --- proc: %d core: %2d "
+		      "vcore: %2d errno: --- data: ",
 		               ts_start.tv_sec,
 		               ts_start.tv_nsec,
 		               ts_end.tv_sec,
@@ -76,8 +76,8 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
 	} else {
 		len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
 		      "X [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
-		      "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: 0x%llx proc: %d core: %d "
-		      "vcore: %d errno: %3d data: ",
+		      "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: 0x%llx proc: %d core: %2d "
+		      "vcore: -- errno: %3d data: ",
 		               ts_start.tv_sec,
 		               ts_start.tv_nsec,
 		               ts_end.tv_sec,
@@ -93,7 +93,6 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
 		               trace->retval,
 		               trace->pid,
 		               trace->coreid,
-		               trace->vcoreid,
 		               trace->errno);
 	}
 	len += printdump(trace->pretty_buf + len, trace->datalen,
@@ -418,6 +417,9 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 	trace = kthread->strace;
 	trace->end_timestamp = read_tsc();
 	trace->retval = retval;
+	trace->coreid = core_id();
+	/* Can't trust the vcoreid of an exit record.  This'll be ignored later. */
+	trace->vcoreid = -1;
 	trace->errno = get_errno();
 	trace->datalen = 0;
 
