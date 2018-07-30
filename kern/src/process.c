@@ -784,28 +784,18 @@ void __proc_startcore(struct proc *p, struct user_context *ctx)
 }
 
 /* Restarts/runs the current_ctx, which must be for the current process, on the
- * core this code executes on.  Calls an internal function to do the work.
+ * core this code executes on.
  *
- * In case there are pending routine messages, like __death, __preempt, or
- * __notify, we need to run them.  Alternatively, if there are any, we could
- * self_ipi, and run the messages immediately after popping back to userspace,
- * but that would have crappy overhead. */
+ * For now, we just smp_idle.  We used to do something similar, but customized
+ * for expecting to return to the process.  But it was a source of bugs.  If we
+ * want to optimize for the case where we know we had a process current, then we
+ * can do so here.
+ *
+ * Note that PRKM currently calls smp_idle() if it ever has a message, so the
+ * value of optimizing may depend on the semantics of PRKM. */
 void proc_restartcore(void)
 {
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-
-	assert(!pcpui->cur_kthread->sysc);
-	process_routine_kmsg();
-	/* If there is no owning process, just idle, since we don't know what to do.
-	 * This could be because the process had been restarted a long time ago and
-	 * has since left the core, or due to a KMSG like __preempt or __death. */
-	if (!pcpui->owning_proc) {
-		abandon_core();
-		smp_idle();
-	}
-	assert(pcpui->cur_ctx);
-	rcu_report_qs();
-	__proc_startcore(pcpui->owning_proc, pcpui->cur_ctx);
+	smp_idle();
 }
 
 /* Helper for proc_destroy.  Disowns any children. */
