@@ -264,6 +264,7 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 		copy_tracedata_from_user(trace, sysc->arg1, sysc->arg2);
 		break;
 	case SYS_openat:
+	case SYS_chdir:
 	case SYS_nmount:
 		copy_tracedata_from_user(trace, sysc->arg1, sysc->arg2);
 		break;
@@ -271,7 +272,6 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 	case SYS_lstat:
 	case SYS_access:
 	case SYS_unlink:
-	case SYS_chdir:
 	case SYS_mkdir:
 	case SYS_rmdir:
 	case SYS_wstat:
