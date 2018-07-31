@@ -47,6 +47,8 @@ static void uthread_init_thread0(struct uthread *uthread)
 	atomic_set(&uthread->join_ctl.state, UTH_JOIN_DETACHED);
 	/* Reset the signal state */
 	uthread->sigstate.mask = 0;
+	/* sig alt stack pointer */
+	uthread->sigstate.sigalt_stacktop = 0;
 	__sigemptyset(&uthread->sigstate.pending);
 	uthread->sigstate.data = NULL;
 	/* utf/as doesn't represent the state of the uthread (we are running) */
@@ -317,6 +319,7 @@ void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr)
 		new_thread->sigstate.mask = 0;
 	__sigemptyset(&new_thread->sigstate.pending);
 	new_thread->sigstate.data = NULL;
+	new_thread->sigstate.sigalt_stacktop = 0;
 	new_thread->flags = 0;
 	new_thread->sysc = NULL;
 	/* the utf holds the GP context of the uthread (set by the 2LS earlier).
