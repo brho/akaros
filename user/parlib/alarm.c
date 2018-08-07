@@ -472,15 +472,20 @@ void print_chain(struct timer_chain *tchain)
 void alarm_abort_sysc(struct alarm_waiter *awaiter)
 {
 	struct uthread *uth = awaiter->data;
+
 	assert(uth);
-	if (!uth->sysc) {
-		/* It's possible the sysc hasn't blocked yet or is in the process of
-		 * unblocking, or even has returned, but hasn't cancelled the alarm.
-		 * regardless, we request a new alarm (the uthread will cancel us one
-		 * way or another). */
-		set_awaiter_rel(awaiter, 10000);
-		__set_alarm(awaiter);
+	if (uth->sysc && sys_abort_sysc(uth->sysc))
 		return;
-	}
-	sys_abort_sysc(uth->sysc);
+	/* There are a bunch of reasons why we didn't abort the syscall.  The
+	 * syscall might not have been issued or blocked at all, so uth->sysc would
+	 * be NULL.  The syscall might have blocked, but at a non-abortable location
+	 * - picture blocking on a qlock, then unblocking and blocking later on a
+	 * rendez.  If you try to abort in between, abort_sysc will fail, then we'll
+	 * get blocked on the rendez until the next abort.  Finally, the syscall
+	 * might have completed, but the uthread hasn't cancelled the alarm yet.
+	 *
+	 * It's always safe to rearm the alarm - the uthread will unset it and break
+	 * us out of the rearm loop. */
+	set_awaiter_rel(awaiter, 10000);
+	__set_alarm(awaiter);
 }
