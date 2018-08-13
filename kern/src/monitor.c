@@ -24,6 +24,7 @@
 #include <trap.h>
 #include <time.h>
 #include <percpu.h>
+#include <kprof.h>
 
 #include <ros/memlayout.h>
 #include <ros/event.h>
@@ -74,6 +75,7 @@ static command_t commands[] = {
 	{ "hd", "Hexdump PID's memory (0 for kernel)", mon_hexdump},
 	{ "pahexdump", "Hexdump physical memory", mon_pahexdump},
 	{ "phd", "Hexdump physical memory", mon_pahexdump},
+	{ "dmesg", "Dump the dmesg buffer", mon_dmesg},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -1209,5 +1211,11 @@ int mon_pahexdump(int argc, char **argv, struct hw_trapframe *hw_tf)
 	start = strtoul(argv[1], 0, 0);
 	len = strtoul(argv[2], 0, 0);
 	pahexdump(start, len);
+	return 0;
+}
+
+int mon_dmesg(int argc, char **argv, struct hw_trapframe *hw_tf)
+{
+	kprof_dump_data();
 	return 0;
 }
