@@ -34,7 +34,7 @@ void _panic(const char *file, int line, const char *fmt, ...)
 	va_start(ap, fmt);
 	ret += snprintf(buf + ret, sizeof(buf) - ret,
 	                "[user] panic: PID %d, vcore %d, %s:%d: ",
-	                getpid(), vcore_id(), __FILE__, __LINE__);
+	                getpid(), vcore_id(), file, line);
 	/* ignore errors (ret < 0) by setting ret to be at least 0 */
 	ret = MAX(ret, 0);
 	ret += vsnprintf(buf + ret, sizeof(buf) - ret, fmt, ap);
