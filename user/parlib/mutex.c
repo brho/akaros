@@ -410,7 +410,8 @@ static void __cv_wait_cb(struct uthread *uth, void *arg)
 	 * sleep! (see below).  If that happens, the uthread is no longer sleeping
 	 * on the CV, and the sync_next is free.  The invariant is that a uthread
 	 * can only sleep on one sync_object at a time. */
-	uth_mutex_unlock(mtx);
+	if (mtx)
+		uth_mutex_unlock(mtx);
 }
 
 /* Caller holds mtx.  We will 'atomically' release it and wait.  On return,
@@ -455,6 +456,12 @@ static void __cv_wait_cb(struct uthread *uth, void *arg)
  *
  * The uthread CVs take a mutex, unlike the kernel CVs, to map more cleanly to
  * POSIX CVs.  Maybe one approach or the other is a bad idea; we'll see.
+ * However, we need both approaces in userspace.  To that end, we also support
+ * mutex-less CVs, where the synchronization typically provided by the mutex is
+ * provided by the CV's spinlock.  Just pass NULL for the mutex.  This is
+ * primarily useful for CVs that are signalled from event handlers in vcore
+ * context, since that code cannot block on a mutex and thus cannot use the
+ * mutex to avoid the races mentioned above.
  *
  * As far as lock ordering goes, once the sleeper holds the mutex and is on the
  * CV's list, it can unlock in any order it wants.  However, unlocking a mutex
@@ -474,11 +481,15 @@ bool uth_cond_var_timed_wait(uth_cond_var_t *cv, uth_mutex_t *mtx,
 	struct timeout_blob blob[1];
 	bool ret = TRUE;
 
-	assert_can_block();
+	/* We're holding the CV PDR lock, so we lose the ability to detect blocking
+	 * violations. */
+	if (mtx)
+		assert_can_block();
 	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
 	link.cv = cv;
 	link.mtx = mtx;
-	spin_pdr_lock(&cv->lock);
+	if (mtx)
+		spin_pdr_lock(&cv->lock);
 	if (abs_timeout) {
 		set_timeout_blob(blob, &cv->sync_obj, &cv->lock);
 		set_timeout_alarm(waiter, blob, abs_timeout);
@@ -488,7 +499,10 @@ bool uth_cond_var_timed_wait(uth_cond_var_t *cv, uth_mutex_t *mtx,
 		unset_alarm(waiter);
 		ret = blob->timed_out ? FALSE : TRUE;
 	}
-	uth_mutex_lock(mtx);
+	if (mtx)
+		uth_mutex_lock(mtx);
+	else
+		spin_pdr_lock(&cv->lock);
 	return ret;
 }
 
@@ -530,34 +544,77 @@ void uth_cond_var_wait_recurse(uth_cond_var_t *cv, uth_recurse_mutex_t *r_mtx)
 	uth_cond_var_timed_wait_recurse(cv, r_mtx, NULL);
 }
 
-void uth_cond_var_signal(uth_cond_var_t *cv)
+/* Caller holds the CV lock.  Returns a uth that needs to be woken up (or NULL),
+ * which the caller needs to do with uthread_runnable(). */
+struct uthread *__uth_cond_var_wake_one(uth_cond_var_t *cv)
 {
-	struct uthread *uth;
+	return __uth_sync_get_next(&cv->sync_obj);
+}
 
-	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
-	spin_pdr_lock(&cv->lock);
-	uth = __uth_sync_get_next(&cv->sync_obj);
+/* Caller holds the CV lock. */
+void __uth_cond_var_signal_and_unlock(uth_cond_var_t *cv)
+{
+	struct uthread *uth = __uth_cond_var_wake_one(cv);
+
 	spin_pdr_unlock(&cv->lock);
 	if (uth)
 		uthread_runnable(uth);
 }
 
-void uth_cond_var_broadcast(uth_cond_var_t *cv)
+void uth_cond_var_signal(uth_cond_var_t *cv)
 {
-	uth_sync_t restartees;
-
 	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
+
 	spin_pdr_lock(&cv->lock);
-	if (__uth_sync_is_empty(&cv->sync_obj)) {
-		spin_pdr_unlock(&cv->lock);
-		return;
-	}
-	__uth_sync_init(&restartees);
-	__uth_sync_swap(&restartees, &cv->sync_obj);
-	spin_pdr_unlock(&cv->lock);
-	__uth_sync_wake_all(&restartees);
+	__uth_cond_var_signal_and_unlock(cv);
 }
 
+/* Caller holds the CV lock.  Returns true if the restartees need to be woken
+ * up, which the caller needs to do with __uth_sync_wake_all(). */
+bool __uth_cond_var_wake_all(uth_cond_var_t *cv, uth_sync_t *restartees)
+{
+	if (__uth_sync_is_empty(&cv->sync_obj))
+		return false;
+	__uth_sync_init(restartees);
+	__uth_sync_swap(restartees, &cv->sync_obj);
+	return true;
+}
+
+/* Caller holds the CV lock. */
+void __uth_cond_var_broadcast_and_unlock(uth_cond_var_t *cv)
+{
+	uth_sync_t restartees;
+	bool wake;
+
+	wake = __uth_cond_var_wake_all(cv, &restartees);
+	spin_pdr_unlock(&cv->lock);
+	if (wake)
+		__uth_sync_wake_all(&restartees);
+}
+
+void uth_cond_var_broadcast(uth_cond_var_t *cv)
+{
+	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
+
+	spin_pdr_lock(&cv->lock);
+	__uth_cond_var_broadcast_and_unlock(cv);
+}
+
+/* Similar to the kernel, we can grab the CV's spinlock directly and use that
+ * for synchronization.  This is primarily so we can signal/broadcast from vcore
+ * context, and you typically need to hold some lock when changing state before
+ * signalling. */
+void uth_cond_var_lock(uth_cond_var_t *cv)
+{
+	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
+
+	spin_pdr_lock(&cv->lock);
+}
+
+void uth_cond_var_unlock(uth_cond_var_t *cv)
+{
+	spin_pdr_unlock(&cv->lock);
+}
 
 /************** Reader-writer Sleeping Locks **************/
 

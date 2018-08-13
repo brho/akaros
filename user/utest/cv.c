@@ -150,6 +150,106 @@ bool test_broadcast(void)
 	return TRUE;
 }
 
+static void *__cv_signaller_no_mutex(void *arg)
+{
+	struct common_args *args = (struct common_args*)arg;
+
+	uthread_usleep(args->sig_sleep);
+	uth_cond_var_lock(args->cv);
+	args->flag = TRUE;
+	__uth_cond_var_signal_and_unlock(args->cv);
+	return PTH_TEST_TRUE;
+}
+
+static void *__cv_broadcaster_no_mutex(void *arg)
+{
+	struct common_args *args = (struct common_args*)arg;
+
+	uthread_usleep(args->sig_sleep);
+	uth_cond_var_lock(args->cv);
+	args->flag = TRUE;
+	__uth_cond_var_broadcast_and_unlock(args->cv);
+	return PTH_TEST_TRUE;
+}
+
+static void *__cv_waiter_no_mutex(void *arg)
+{
+	struct common_args *args = (struct common_args*)arg;
+
+	uthread_usleep(args->wait_sleep);
+	uth_cond_var_lock(args->cv);
+	while (!args->flag)
+		uth_cond_var_wait(args->cv, NULL);
+	UT_ASSERT(args->flag);
+	uth_cond_var_unlock(args->cv);
+	return PTH_TEST_TRUE;
+}
+
+bool test_signal_no_mutex(void)
+{
+	struct common_args local_a, *args = &local_a;
+	pthread_t signaller, waiter;
+	void *sig_join, *wait_join;
+	int ret;
+	static uth_cond_var_t static_cv = UTH_COND_VAR_INIT;
+
+	args->cv = &static_cv;
+	args->mtx = NULL;
+
+	for (int i = 0; i < 1000; i += 10) {
+		args->flag = FALSE;
+		args->wait_sleep = i;
+		args->sig_sleep = 1000 - i;
+
+		ret = pthread_create(&waiter, 0, __cv_waiter_no_mutex, args);
+		UT_ASSERT(!ret);
+		ret = pthread_create(&signaller, 0, __cv_signaller_no_mutex, args);
+		UT_ASSERT(!ret);
+		ret = pthread_join(waiter, &wait_join);
+		UT_ASSERT(!ret);
+		ret = pthread_join(signaller, &sig_join);
+		UT_ASSERT(!ret);
+		UT_ASSERT_M("Waiter Failed", wait_join == PTH_TEST_TRUE);
+		UT_ASSERT_M("Signaller Failed", sig_join == PTH_TEST_TRUE);
+	}
+
+	return TRUE;
+}
+
+bool test_broadcast_no_mutex(void)
+{
+	#define NR_WAITERS 20
+	struct common_args local_a, *args = &local_a;
+	pthread_t bcaster, waiters[NR_WAITERS];
+	void *bcast_join, *wait_joins[NR_WAITERS];
+	int ret;
+
+	args->cv = uth_cond_var_alloc();
+	args->mtx = NULL;
+	args->flag = FALSE;
+	args->wait_sleep = 0;
+	args->sig_sleep = 1000;
+
+	for (int i = 0; i < NR_WAITERS; i++) {
+		ret = pthread_create(&waiters[i], 0, __cv_waiter_no_mutex, args);
+		UT_ASSERT(!ret);
+	}
+	ret = pthread_create(&bcaster, 0, __cv_broadcaster_no_mutex, args);
+	UT_ASSERT(!ret);
+
+	ret = pthread_join(bcaster, &bcast_join);
+	UT_ASSERT(!ret);
+	UT_ASSERT_M("Broadcaster Failed", bcast_join == PTH_TEST_TRUE);
+	for (int i = 0; i < NR_WAITERS; i++) {
+		ret = pthread_join(waiters[i], &wait_joins[i]);
+		UT_ASSERT(!ret);
+		UT_ASSERT_M("Waiter Failed", wait_joins[i] == PTH_TEST_TRUE);
+	}
+
+	uth_cond_var_free(args->cv);
+	return TRUE;
+}
+
 static bool __test_recurse(struct uth_recurse_mutex *r_mtx)
 {
 	bool test;
@@ -337,6 +437,24 @@ bool test_cv_recurse_timeout(void)
 	return TRUE;
 }
 
+bool test_cv_timeout_no_mutex(void)
+{
+	static uth_cond_var_t cv = UTH_COND_VAR_INIT;
+	struct timespec timeout[1];
+	int ret;
+	bool was_signalled;
+
+	uth_cond_var_lock(&cv);
+	ret = clock_gettime(CLOCK_REALTIME, timeout);
+	UT_ASSERT(!ret);
+	timeout->tv_nsec += 500000000;
+	was_signalled = uth_cond_var_timed_wait(&cv, NULL, timeout);
+	UT_ASSERT(!was_signalled);
+	uth_cond_var_unlock(&cv);
+
+	return TRUE;
+}
+
 static uth_rwlock_t rwl = UTH_RWLOCK_INIT;
 static int rw_value;
 
@@ -398,12 +516,15 @@ struct utest utests[] = {
 	UTEST_REG(signal_no_wait),
 	UTEST_REG(signal),
 	UTEST_REG(broadcast),
+	UTEST_REG(signal_no_mutex),
+	UTEST_REG(broadcast_no_mutex),
 	UTEST_REG(recurse),
 	UTEST_REG(recurse_static),
 	UTEST_REG(semaphore),
 	UTEST_REG(semaphore_static),
 	UTEST_REG(semaphore_timeout),
 	UTEST_REG(cv_timeout),
+	UTEST_REG(cv_timeout_no_mutex),
 	UTEST_REG(cv_recurse_timeout),
 	UTEST_REG(rwlock),
 };

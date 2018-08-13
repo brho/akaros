@@ -321,6 +321,14 @@ void uth_cond_var_wait_recurse(uth_cond_var_t *cv, uth_recurse_mutex_t *r_mtx);
 void uth_cond_var_signal(uth_cond_var_t *cv);
 void uth_cond_var_broadcast(uth_cond_var_t *cv);
 
+/* Mutex-less cond vars: Uses the CV's spinlock for synchronization */
+void uth_cond_var_lock(uth_cond_var_t *cv);
+void uth_cond_var_unlock(uth_cond_var_t *cv);
+void __uth_cond_var_signal_and_unlock(uth_cond_var_t *cv);
+void __uth_cond_var_broadcast_and_unlock(uth_cond_var_t *cv);
+struct uthread *__uth_cond_var_wake_one(uth_cond_var_t *cv);
+bool __uth_cond_var_wake_all(uth_cond_var_t *cv, uth_sync_t *restartees);
+
 void uth_rwlock_init(uth_rwlock_t *rwl);
 void uth_rwlock_destroy(uth_rwlock_t *rwl);
 uth_rwlock_t *uth_rwlock_alloc(void);
