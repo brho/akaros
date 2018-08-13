@@ -75,11 +75,11 @@ struct alarm_waiter {
 	};
 	void						*data;
 	TAILQ_ENTRY(alarm_waiter)	next;
-	bool						on_tchain;
 	bool						irq_ok;
-	bool						holds_tchain_lock;
-	bool						rkm_pending;
-	struct cond_var				rkm_cv;
+	bool						on_tchain;
+	bool						is_running;
+	bool						no_rearm;
+	struct cond_var				done_cv;
 };
 TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
 
