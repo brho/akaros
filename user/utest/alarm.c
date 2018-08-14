@@ -12,7 +12,7 @@ bool test_alarm(void) {
 	{
 		__sync_fetch_and_add((int*)waiter->data, 1);
 		set_awaiter_inc(waiter, INTERVAL);
-		__set_alarm(waiter);
+		set_alarm(waiter);
 	}
 
 	int count = 0;
@@ -27,7 +27,7 @@ bool test_alarm(void) {
 		cpu_relax();
 	then = tsc2usec(read_tsc());
 	unset_alarm(&waiter);
-	UT_ASSERT_M("Alarms finished too soon", then > (now + INTERVAL*count));
+	UT_ASSERT_M("Alarms finished too soon", then >= (now + INTERVAL*count));
 	UT_ASSERT_M("Alarms finished too late", then < (now + 2*INTERVAL*count));
 	return true;
 }

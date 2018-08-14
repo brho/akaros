@@ -107,13 +107,11 @@ int devalarm_disable(int timerfd)
 }
 
 /* Helpers, basically renamed kernel interfaces, with the *tchain. */
-static void __tc_locked_set_alarm(struct timer_chain *tchain,
-                                  struct alarm_waiter *waiter);
 static void __tc_set_alarm(struct timer_chain *tchain,
                            struct alarm_waiter *waiter);
 static bool __tc_unset_alarm(struct timer_chain *tchain,
                              struct alarm_waiter *waiter);
-static void __tc_reset_alarm_abs(struct timer_chain *tchain,
+static bool __tc_reset_alarm_abs(struct timer_chain *tchain,
                                  struct alarm_waiter *waiter,
                                  uint64_t abs_time);
 static void handle_user_alarm(struct event_msg *ev_msg, unsigned int ev_type,
@@ -194,7 +192,10 @@ void init_awaiter(struct alarm_waiter *waiter,
 	waiter->wake_up_time = ALARM_POISON_TIME;
 	assert(func);
 	waiter->func = func;
-	waiter->on_tchain = FALSE;
+	waiter->on_tchain = false;
+	waiter->is_running = false;
+	waiter->no_rearm = false;
+	uth_cond_var_init(&waiter->done_cv);
 }
 
 /* Give this the absolute time.  For now, abs_time is the TSC time that you want
@@ -234,11 +235,6 @@ void set_awaiter_inc(struct alarm_waiter *waiter, uint64_t usleep)
 }
 
 /* User interface to the global tchain */
-void __set_alarm(struct alarm_waiter *waiter)
-{
-	__tc_locked_set_alarm(&global_tchain, waiter);
-}
-
 void set_alarm(struct alarm_waiter *waiter)
 {
 	__tc_set_alarm(&global_tchain, waiter);
@@ -249,9 +245,9 @@ bool unset_alarm(struct alarm_waiter *waiter)
 	return __tc_unset_alarm(&global_tchain, waiter);
 }
 
-void reset_alarm_abs(struct alarm_waiter *waiter, uint64_t abs_time)
+bool reset_alarm_abs(struct alarm_waiter *waiter, uint64_t abs_time)
 {
-	__tc_reset_alarm_abs(&global_tchain, waiter, abs_time);
+	return __tc_reset_alarm_abs(&global_tchain, waiter, abs_time);
 }
 
 /* Helper, makes sure the kernel alarm is turned on at the right time. */
@@ -280,6 +276,9 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
 static void wake_awaiter(struct alarm_waiter *waiter)
 {
 	waiter->func(waiter);
+	uth_cond_var_lock(&waiter->done_cv);
+	waiter->is_running = false;
+	__uth_cond_var_broadcast_and_unlock(&waiter->done_cv);
 }
 
 /* This is called when the kernel alarm triggers a tchain, and needs to wake up
@@ -288,30 +287,33 @@ static void __trigger_tchain(struct timer_chain *tchain)
 {
 	struct alarm_waiter *i, *temp;
 	uint64_t now = read_tsc();
+	struct awaiters_tailq to_wake = TAILQ_HEAD_INITIALIZER(to_wake);
 
 	spin_pdr_lock(&tchain->lock);
 	TAILQ_FOREACH_SAFE(i, &tchain->waiters, next, temp) {
 		printd("Trying to wake up %p who is due at %llu and now is %llu\n",
 		       i, i->wake_up_time, now);
 		/* TODO: Could also do something in cases where we're close to now */
-		if (i->wake_up_time <= now) {
-			i->on_tchain = FALSE;
-			TAILQ_REMOVE(&tchain->waiters, i, next);
-			/* Need to reset after each removal, in case the handler sets the
-			 * alarm again and the earliest/latest times are wrong. */
-			reset_tchain_times(tchain);
-			cmb();	/* enforce waking after removal */
-			/* Don't touch the waiter after waking it, since it could be in use
-			 * on another core (and the waiter can be clobbered as the kthread
-			 * unwinds its stack).  Or it could be kfreed */
-			wake_awaiter(i);
-		} else {
+		if (i->wake_up_time > now)
 			break;
-		}
+		/* At this point, unset must wait until it has finished */
+		i->on_tchain = false;
+		i->is_running = true;
+		TAILQ_REMOVE(&tchain->waiters, i, next);
+		TAILQ_INSERT_TAIL(&to_wake, i, next);
 	}
-	/* Need to reset the interrupt no matter what */
+	reset_tchain_times(tchain);
 	reset_tchain_interrupt(tchain);
 	spin_pdr_unlock(&tchain->lock);
+
+	TAILQ_FOREACH_SAFE(i, &to_wake, next, temp) {
+		/* Don't touch the waiter after waking it, since it could be in use on
+		 * another core (and the waiter can be clobbered as the kthread unwinds
+		 * its stack).  Or it could be kfreed.  Technically, the waiter hasn't
+		 * finished until we cleared is_running and unlocked the cv lock. */
+		TAILQ_REMOVE(&to_wake, i, next);
+		wake_awaiter(i);
+	}
 }
 
 static void handle_user_alarm(struct event_msg *ev_msg, unsigned int ev_type,
@@ -328,9 +330,7 @@ static bool __insert_awaiter(struct timer_chain *tchain,
                              struct alarm_waiter *waiter)
 {
 	struct alarm_waiter *i, *temp;
-	/* This will fail if you don't set a time */
-	assert(waiter->wake_up_time != ALARM_POISON_TIME);
-	assert(!waiter->on_tchain);
+
 	waiter->on_tchain = TRUE;
 	/* Either the list is empty, or not. */
 	if (TAILQ_EMPTY(&tchain->waiters)) {
@@ -365,27 +365,22 @@ static bool __insert_awaiter(struct timer_chain *tchain,
 			return FALSE;
 		}
 	}
-	printf("Could not find a spot for awaiter %p\n", waiter);
-	assert(0);
+	panic("Could not find a spot for awaiter %p\n", waiter);
 }
 
-/* Sets the alarm.  If it is a kthread-style alarm (func == 0), sleep on it
- * later.  This version assumes you have the lock held.  That only makes sense
- * from alarm handlers, which are called with this lock held from IRQ context */
-static void __tc_locked_set_alarm(struct timer_chain *tchain,
-                                  struct alarm_waiter *waiter)
-{
-	if (__insert_awaiter(tchain, waiter))
-		reset_tchain_interrupt(tchain);
-}
-
-/* Sets the alarm.  Don't call this from an alarm handler, since you already
- * have the lock held.  Call __set_alarm() instead. */
 static void __tc_set_alarm(struct timer_chain *tchain,
                            struct alarm_waiter *waiter)
 {
+	assert(waiter->wake_up_time != ALARM_POISON_TIME);
+	assert(!waiter->on_tchain);
+
 	spin_pdr_lock(&tchain->lock);
-	__set_alarm(waiter);
+	if (waiter->no_rearm) {
+		spin_pdr_unlock(&tchain->lock);
+		return;
+	}
+	if (__insert_awaiter(tchain, waiter))
+		reset_tchain_interrupt(tchain);
 	spin_pdr_unlock(&tchain->lock);
 }
 
@@ -397,6 +392,7 @@ static bool __remove_awaiter(struct timer_chain *tchain,
 {
 	struct alarm_waiter *temp;
 	bool reset_int = FALSE;		/* whether or not to reset the interrupt */
+
 	/* Need to make sure earliest and latest are set, in case we're mucking with
 	 * the first and/or last element of the chain. */
 	if (TAILQ_FIRST(&tchain->waiters) == waiter) {
@@ -414,45 +410,60 @@ static bool __remove_awaiter(struct timer_chain *tchain,
 }
 
 /* Removes waiter from the tchain before it goes off.  Returns TRUE if we
- * disarmed before the alarm went off, FALSE if it already fired.  Also, if
- * FALSE, the alarm has already completed.  Userspace alarms are like kernel IRQ
- * alarms - they run with the tchain lock held, meaning their execution is
- * synchronized with operations like unset. */
+ * disarmed before the alarm went off, FALSE if it already fired.  May block,
+ * since the handler may be running asynchronously. */
 static bool __tc_unset_alarm(struct timer_chain *tchain,
                              struct alarm_waiter *waiter)
 {
 	spin_pdr_lock(&tchain->lock);
-	if (!waiter->on_tchain) {
-		/* the alarm has already gone off.  its not even on this tchain's list,
-		 * though the concurrent change to on_tchain (specifically, the setting
-		 * of it to FALSE), happens under the tchain's lock. */
+	if (waiter->on_tchain) {
+		if (__remove_awaiter(tchain, waiter))
+			reset_tchain_interrupt(tchain);
 		spin_pdr_unlock(&tchain->lock);
-		return FALSE;
+		return true;
 	}
-	if (__remove_awaiter(tchain, waiter))
-		reset_tchain_interrupt(tchain);
+
+	/* A common case is that it already finished.  We need the CV lock farther
+	 * below so that we don't miss the signal.  You don't need it if you can see
+	 * the signal (is_running == false) is already sent. */
+	if (!waiter->is_running) {
+		spin_pdr_unlock(&tchain->lock);
+		return false;
+	}
+
+	/* no_rearm is set and checked under the tchain lock.  It is cleared when
+	 * unset completes, outside the lock.  That is safe since we know the alarm
+	 * service is no longer aware of waiter (either the handler ran or we
+	 * stopped it). */
+	waiter->no_rearm = true;
 	spin_pdr_unlock(&tchain->lock);
-	return TRUE;
+
+	uth_cond_var_lock(&waiter->done_cv);
+	while (1) {
+		if (!waiter->is_running) {
+			uth_cond_var_unlock(&waiter->done_cv);
+			break;
+		}
+		uth_cond_var_wait(&waiter->done_cv, NULL);
+	}
+
+	waiter->no_rearm = false;
+	return false;
 }
 
 /* waiter may be on the tchain, or it might have fired already and be off the
  * tchain.  Either way, this will put the waiter on the list, set to go off at
  * abs_time.  If you know the alarm has fired, don't call this.  Just set the
  * awaiter, and then set_alarm() */
-static void __tc_reset_alarm_abs(struct timer_chain *tchain,
+static bool __tc_reset_alarm_abs(struct timer_chain *tchain,
                                  struct alarm_waiter *waiter, uint64_t abs_time)
 {
-	bool reset_int = FALSE;		/* whether or not to reset the interrupt */
-	spin_pdr_lock(&tchain->lock);
-	/* We only need to remove/unset when the alarm has not fired yet (is still
-	 * on the tchain).  If it has fired, it's like a fresh insert */
-	if (waiter->on_tchain)
-		reset_int = __remove_awaiter(tchain, waiter);
+	bool ret;
+
+	ret = __tc_unset_alarm(tchain, waiter);
 	__set_awaiter_abs(waiter, abs_time);
-	/* regardless, we need to be reinserted */
-	if (__insert_awaiter(tchain, waiter) || reset_int)
-		reset_tchain_interrupt(tchain);
-	spin_pdr_unlock(&tchain->lock);
+	__tc_set_alarm(tchain, waiter);
+	return ret;
 }
 
 /* Debug helpers */
@@ -487,5 +498,5 @@ void alarm_abort_sysc(struct alarm_waiter *awaiter)
 	 * It's always safe to rearm the alarm - the uthread will unset it and break
 	 * us out of the rearm loop. */
 	set_awaiter_rel(awaiter, 10000);
-	__set_alarm(awaiter);
+	set_alarm(awaiter);
 }

@@ -32,6 +32,7 @@
 #include <sys/queue.h>
 #include <parlib/spinlock.h>
 #include <parlib/event.h>
+#include <parlib/uthread.h>
 
 __BEGIN_DECLS
 
@@ -52,6 +53,9 @@ struct alarm_waiter {
 	void						*data;
 	TAILQ_ENTRY(alarm_waiter)	next;
 	bool						on_tchain;
+	bool						is_running;
+	bool						no_rearm;
+	struct uth_cond_var			done_cv;
 };
 TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
 
@@ -87,10 +91,9 @@ static uint64_t timespec_to_alarm_time(const struct timespec *ts)
 }
 
 /* Arms/disarms the alarm */
-void __set_alarm(struct alarm_waiter *waiter);
 void set_alarm(struct alarm_waiter *waiter);
 bool unset_alarm(struct alarm_waiter *waiter);
-void reset_alarm_abs(struct alarm_waiter *waiter, uint64_t abs_time);
+bool reset_alarm_abs(struct alarm_waiter *waiter, uint64_t abs_time);
 
 /* "parlib" alarm handlers */
 void alarm_abort_sysc(struct alarm_waiter *awaiter);

@@ -320,7 +320,7 @@ void *inject_timer(void *args)
 	return 0;
 }
 
-/* This handler must never call __set_alarm after interrupting the guest,
+/* This handler must never call set_alarm after interrupting the guest,
  * otherwise the guest could try to write to the timer msrs and cause a
  * race condition. */
 void timer_alarm_handler(struct alarm_waiter *waiter)
@@ -347,7 +347,7 @@ void timer_alarm_handler(struct alarm_waiter *waiter)
 	if (vector && initial_count && timer_mode == 0x01) {
 		/* This is periodic, we reset the alarm */
 		set_awaiter_rel(waiter, initial_count << multiplier);
-		__set_alarm(waiter);
+		set_alarm(waiter);
 	}
 
 	/* We spin up a task to inject the timer because vmm_interrupt_guest
