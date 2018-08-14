@@ -860,7 +860,6 @@ static ssize_t sys_fork(env_t* e)
 {
 	uintptr_t temp;
 	int ret;
-	struct per_cpu_info *pcpui = this_pcpui_ptr();
 
 	// TODO: right now we only support fork for single-core processes
 	if (e->state != PROC_RUNNING_S) {
@@ -880,7 +879,7 @@ static ssize_t sys_fork(env_t* e)
 		set_errno(EINVAL);
 		return -1;
 	}
-	assert(pcpui->cur_proc == pcpui->owning_proc);
+	assert(current == this_pcpui_var(owning_proc));
 	copy_current_ctx_to(&env->scp_ctx);
 
 	/* Make the new process have the same VMRs as the older.  This will copy the
@@ -896,8 +895,7 @@ static ssize_t sys_fork(env_t* e)
 	 * is cloned before we return for the original process.  If we ever do CoW
 	 * for forked memory, this will be the first place that gets CoW'd. */
 	temp = switch_to(env);
-	pcpui = this_pcpui_ptr();	/* reload in case of migration */
-	finish_sysc(pcpui->cur_kthread->sysc, env, 0);
+	finish_sysc(current_kthread->sysc, env, 0);
 	switch_back(env, temp);
 
 	/* Copy some state from the original proc into the new proc. */
