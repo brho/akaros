@@ -993,7 +993,6 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	int ret = -1;
 	char *t_path = NULL;
 	struct file_or_chan *program;
-	struct per_cpu_info *pcpui = this_pcpui_ptr();
 	int argc, envc;
 	char **argv, **envp;
 	struct argenv *kargenv;
@@ -1010,14 +1009,12 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		return -1;
 	}
 
-	if (p != pcpui->owning_proc) {
+	if (p != this_pcpui_var(owning_proc)) {
 		warn("Proc %d tried to exec and wasn't owning_proc", p->pid);
 		set_error(EAGAIN, "exec may have blocked during execution");
 		return -1;
 	}
-	/* Not sure if these can happen; I don't expect them. */
-	assert(pcpui->cur_ctx);
-	assert(pcpui->cur_proc == pcpui->owning_proc);
+	assert(current_ctx);
 	/* Before this, we shouldn't have blocked (maybe with strace, though we
 	 * explicitly don't block exec for strace).  The owning proc, cur_proc, and
 	 * cur_ctx checks should catch that.  After this, we might still block, such
@@ -1084,7 +1081,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	proc_init_procdata(p);
 	p->procinfo->program_end = 0;
 	/* When we destroy our memory regions, accessing cur_sysc would PF */
-	pcpui->cur_kthread->sysc = 0;
+	current_kthread->sysc = 0;
 	unmap_and_destroy_vmrs(p);
 	/* close the CLOEXEC ones */
 	close_fdt(&p->open_files, TRUE);
@@ -1096,7 +1093,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		foc_decref(program);
 		user_memdup_free(p, kargenv);
 		/* We finish the trace and not the sysc, since the sysc is gone. */
-		systrace_finish_trace(pcpui->cur_kthread, -1);
+		systrace_finish_trace(current_kthread, -1);
 		/* Note this is an inedible reference, but proc_destroy now returns */
 		proc_destroy(p);
 		/* We don't want to do anything else - we just need to not accidentally
@@ -1106,7 +1103,7 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	printd("[PID %d] exec %s\n", p->pid, foc_to_name(program));
 	foc_decref(program);
 	user_memdup_free(p, kargenv);
-	systrace_finish_trace(pcpui->cur_kthread, 0);
+	systrace_finish_trace(current_kthread, 0);
 	proc_wakeup(p);
 
 	goto all_out;
@@ -1126,8 +1123,8 @@ out_error:
 all_out:
 	/* This free and setting sysc = NULL may happen twice (early errors do it),
 	 * but they are idempotent. */
-	free_sysc_str(pcpui->cur_kthread);
-	pcpui->cur_kthread->sysc = NULL;
+	free_sysc_str(current_kthread);
+	current_kthread->sysc = NULL;
 	/* we can't return, since we'd write retvals to the old location of the
 	 * syscall struct (which has been freed and is in the old userspace) (or has
 	 * already been written to).*/
