@@ -21,6 +21,10 @@
 #include <parlib/stdio.h>
 #include <sys/fork_cb.h>
 
+#include <parlib/alarm.h>
+#include <futex.h>
+#include <parlib/serialize.h>
+
 /* TODO: eventually, we probably want to split this into the pthreads interface
  * and a default 2LS.  That way, apps can use the pthreads interface and use any
  * 2LS.  Here's a few blockers:
@@ -304,9 +308,84 @@ static void handle_div_by_zero(struct uthread *uthread, unsigned int err,
 	__signal_and_restart(uthread, SIGFPE, FPE_INTDIV, (void*)aux);
 }
 
+// checks that usys in go passes its arguments correctly
+// it only automatically checks with 7 arguments, print is for the rest
+int go_usys_tester(uint64_t a, uint64_t b, uint64_t c, uint64_t d, uint64_t e,
+                   uint64_t f, uint64_t g, uint64_t h, uint64_t i, uint64_t j,
+                   uint64_t k, uint64_t l)
+{
+	printf("a = %lu, b = %lu, c = %lu, d = %lu, e = %lu, f = %lu, g = %lu, h = %lu, i = %lu, j = %lu, k = %lu, l = %lu\n",
+		a, b, c, d, e, f, g, h, i, j, k, l);
+	uint64_t ret_val = 0;
+
+	ret_val |= a;
+	ret_val |= (b << 8);
+	ret_val |= (c << 16);
+	ret_val |= (d << 24);
+	ret_val |= (e << 32);
+	ret_val |= (f << 40);
+	ret_val |= (g << 48);
+	return ret_val;
+}
+
+struct alarm_waiter *abort_syscall_at_abs_unix(uint64_t deadline)
+{
+	// note the malloc of waiter instead of it going on the stack
+	struct alarm_waiter *waiter = malloc(sizeof(struct alarm_waiter));
+
+	init_awaiter(waiter, alarm_abort_sysc);
+	waiter->data = current_uthread;
+	set_awaiter_abs_unix(waiter, deadline);
+	set_alarm(waiter);
+	return waiter;
+}
+
+bool unset_alarm_with_free(struct alarm_waiter *waiter)
+{
+	// we need to free the waiter we created in abort_syscall_at_abs_unix
+	bool ret = unset_alarm(waiter);
+
+	free(waiter);
+	return ret;
+}
+
+// ros_syscall_sync, but makes sure errors are zeros if there is no error
+void go_syscall(struct syscall *sysc)
+{
+	ros_syscall_sync(sysc);
+	if (!syscall_retval_is_error(sysc->num, sysc->retval)) {
+		sysc->err = 0;
+		sysc->errstr[0] = 0;
+	}
+}
+
+static void set_up_go_table(void **table)
+{
+	table[0] = abort_syscall_at_abs_unix;
+	table[1] = unset_alarm_with_free;
+	table[2] = go_syscall;
+	table[3] = go_usys_tester;
+	table[4] = futex;
+	table[5] = serialize_argv_envp;
+	table[6] = free;
+	assert(table[7] == (void*) 0xDEADBEEF);
+}
+
 static void handle_gp_fault(struct uthread *uthread, unsigned int err,
                             unsigned long aux)
 {
+	//TODO this code is x86-64 only
+	uint64_t rax = uthread->u_ctx.tf.hw_tf.tf_rax;
+
+	// we fault with a known high 16 bits in go to set up a function pointer
+	// table, the address of the table is the low 48 bits
+	if (rax >> 48 == 0xDEAD) {
+		set_up_go_table((void **)(0xFFFFFFFFFFFFUL & rax));
+		// we jump over the call instruction which is 2 bytes
+		uthread->u_ctx.tf.hw_tf.tf_rip += 2;
+		pth_thread_runnable(uthread);
+		return;
+	}
 	__signal_and_restart(uthread, SIGSEGV, SEGV_ACCERR, (void*)aux);
 }
 
