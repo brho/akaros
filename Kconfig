@@ -156,18 +156,6 @@ config SEM_SPINWAIT_NR_LOOPS
 	help
 		How many times to poll a busy semaphore before going to sleep.
 
-config LARGE_KSTACKS
-	bool "Large (two-page) Kernel Stacks"
-	default y
-	help
-		Ideally, we'd like to use single-page stacks, which are easier on the
-		memory allocator.  Some of the Plan 9 code hogs stack space, and we may
-		run off the end of a single-page stack.
-
-		Say 'y' to play it safe and use the larger, slower stacks.  Say 'n' for
-		higher performance, and mention this setting if you have any weird
-		crashes or panics.
-
 config DISABLE_SMT
 	bool "Disables symmetric multithreading"
 	default n
