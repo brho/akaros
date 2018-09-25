@@ -39,45 +39,50 @@
 #include <net/ip.h>
 
 /* It looks like the intent of this code is to check any stat that we, the
- * kernel or our userspace, send out. */
-int statcheck(uint8_t * buf, unsigned int nbuf)
+ * kernel or our userspace, send out.
+ *
+ * Throws on error. */
+void statcheck(uint8_t *buf, size_t nbuf)
 {
 	uint8_t *ebuf;
 	int i;
 
 	ebuf = buf + nbuf;
 
-	if (nbuf < STAT_FIX_LEN_9P || nbuf != BIT16SZ + GBIT16(buf)) {
-		warn("nbuf %d, STAT_FIX_LEN_9P %d BIT16SZ %d, GBIT16(buf) %d ",
-		     nbuf, STAT_FIX_LEN_9P, BIT16SZ, GBIT16(buf));
-		return -1;
-	}
+	if (nbuf < STAT_FIX_LEN_9P)
+		error(EINVAL, "%s: legacy chunk too short (%lu < %u)", __func__,
+		      nbuf, STAT_FIX_LEN_9P);
+	if (nbuf != BIT16SZ + GBIT16(buf))
+		error(EINVAL, "%s: size mismatch (%lu != %u)", __func__, nbuf,
+		      BIT16SZ + GBIT16(buf));
 
 	buf += STAT_FIX_LEN_9P - STAT_NR_STRINGS_9P * BIT16SZ;
 
 	/* Check the legacy strings that all stats have. */
 	for (i = 0; i < STAT_NR_STRINGS_9P; i++) {
 		if (buf + BIT16SZ > ebuf)
-			return -1;
+			error(EINVAL, "%s: string %d (legacy) out of range",
+			      __func__, i);
 		buf += BIT16SZ + GBIT16(buf);
 	}
 	/* Legacy 9p stats are OK
 	 * TODO: consider removing this.  We get them from userspace, e.g. mkdir. */
 	if (buf == ebuf)
-		return 0;
+		return;
 
 	for (i = STAT_NR_STRINGS_9P; i < STAT_NR_STRINGS_AK; i++) {
 		if (buf + BIT16SZ > ebuf)
-			return -1;
+			error(EINVAL, "%s: string %d (akaros) out of range",
+			      __func__, i);
 		buf += BIT16SZ + GBIT16(buf);
 	}
 
 	if (buf + __STAT_FIX_LEN_AK_NONSTRING > ebuf)
-		return -1;
+		error(EINVAL, "%s: akaros chunk too short (%ld < %u)", __func__,
+		      ebuf - buf, __STAT_FIX_LEN_AK_NONSTRING);
 	buf += __STAT_FIX_LEN_AK_NONSTRING;
 	if (buf != ebuf)
-		return -1;
-	return 0;
+		error(EINVAL, "%s: %lu extra bytes", __func__, ebuf - buf);
 }
 
 static char nullstring[] = "";

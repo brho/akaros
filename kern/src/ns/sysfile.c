@@ -958,8 +958,7 @@ void validstat(uint8_t * s, int n, int slashok)
 	int m;
 	char buf[64];
 
-	if (statcheck(s, n) < 0)
-		error(EINVAL, ERROR_FIXME);
+	statcheck(s, n);
 	/* verify that name entry is acceptable */
 	s += STAT_FIX_LEN_9P - STAT_NR_STRINGS_9P * BIT16SZ;
 	/*
@@ -1308,14 +1307,10 @@ static long dirpackage(uint8_t * buf, long ts, struct kdirent **d)
 	n = 0;
 	for (i = 0; i < ts; i += m) {
 		m = BIT16SZ + GBIT16(&buf[i]);
-		if (statcheck(&buf[i], m) < 0)
-			break;
+		statcheck(&buf[i], m);
 		ss += m;
 		n++;
 	}
-
-	if (i != ts)
-		error(EFAIL, "bad directory format");
 
 	*d = kzmalloc(n * sizeof(**d) + ss, 0);
 	if (*d == NULL)
