@@ -127,6 +127,8 @@ void restart_kthread(struct kthread *kthread)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	uintptr_t current_stacktop;
 	struct kthread *cur_kth;
+	struct proc *old_proc;
+
 	/* Avoid messy complications.  The kthread will enable_irqsave() when it
 	 * comes back up. */
 	disable_irq();
@@ -164,11 +166,12 @@ void restart_kthread(struct kthread *kthread)
 			lcr3(kthread->proc->env_cr3);
 			/* Might have to clear out an existing current.  If they need to be
 			 * set later (like in restartcore), it'll be done on demand. */
-			if (pcpui->cur_proc)
-				proc_decref(pcpui->cur_proc);
+			old_proc = pcpui->cur_proc;
 			/* Transfer our counted ref from kthread->proc to cur_proc. */
 			pcpui->cur_proc = kthread->proc;
 			kthread->proc = 0;
+			if (old_proc)
+				proc_decref(old_proc);
 		}
 	}
 	/* Finally, restart our thread */

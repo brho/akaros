@@ -577,6 +577,8 @@ static void __set_proc_current(struct proc *p)
 	/* We use the pcpui to access 'current' to cut down on the core_id() calls,
 	 * though who know how expensive/painful they are. */
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct proc *old_proc;
+
 	/* If the process wasn't here, then we need to load its address space. */
 	if (p != pcpui->cur_proc) {
 		proc_incref(p, 1);
@@ -585,9 +587,10 @@ static void __set_proc_current(struct proc *p)
 		 * previous lcr3 unloaded the previous proc's context.  This should
 		 * rarely happen, since we usually proactively leave process context,
 		 * but this is the fallback. */
-		if (pcpui->cur_proc)
-			proc_decref(pcpui->cur_proc);
+		old_proc = pcpui->cur_proc;
 		pcpui->cur_proc = p;
+		if (old_proc)
+			proc_decref(old_proc);
 	}
 }
 
@@ -869,8 +872,8 @@ void proc_destroy(struct proc *p)
 			// here's how to do it manually
 			if (current == p) {
 				lcr3(boot_cr3);
-				proc_decref(p);		/* this decref is for the cr3 */
 				current = NULL;
+				proc_decref(p);		/* this decref is for the cr3 */
 			}
 			#endif
 			send_kernel_message(get_pcoreid(p, 0), __death, (long)p, 0, 0,

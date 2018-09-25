@@ -61,9 +61,12 @@ void proc_secure_ctx(struct user_context *ctx)
 void __abandon_core(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+	struct proc *old_proc;
+
 	lcr3(boot_cr3);
-	proc_decref(pcpui->cur_proc);
-	pcpui->cur_proc = 0;
+	old_proc = pcpui->cur_proc;
+	pcpui->cur_proc = NULL;
+	proc_decref(old_proc);
 }
 
 void __clear_owning_proc(uint32_t coreid)
