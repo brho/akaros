@@ -698,6 +698,8 @@ apps-install: $(app-dirs-install)
 	@echo perf install succeeded.
 	@$(call make_as_parent, -C tools/sys-apps/bash install) > build_logs/bash_install.log 2>&1
 	@echo bash install succeeded.
+	@$(call make_as_parent, -C tools/sys-apps/grep install) > build_logs/grep_install.log 2>&1
+	@echo grep install succeeded.
 
 PHONY += apps-clean
 apps-clean: $(app-dirs-clean)
@@ -712,6 +714,8 @@ apps-clean: $(app-dirs-clean)
 	@echo perf clean succeeded.
 	@$(call make_as_parent, -C tools/sys-apps/bash clean) > build_logs/bash_clean.log 2>&1
 	@echo bash clean succeeded.
+	@$(call make_as_parent, -C tools/sys-apps/grep clean) > build_logs/grep_clean.log 2>&1
+	@echo grep clean succeeded.
 
 # Cross Compiler
 # =========================================================================

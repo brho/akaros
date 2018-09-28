@@ -1,0 +1,26 @@
+diff -ur a/build-aux/config.guess b/build-aux/config.guess
+--- a/build-aux/config.guess	2016-01-16 12:11:09.000000000 -0500
++++ b/build-aux/config.guess	2016-05-25 13:45:03.633843452 -0400
+@@ -233,6 +233,10 @@
+ 	UNAME_MACHINE_ARCH=`arch | sed 's/Bitrig.//'`
+ 	echo ${UNAME_MACHINE_ARCH}-unknown-bitrig${UNAME_RELEASE}
+ 	exit ;;
++    *:Akaros:*:*)
++	UNAME_MACHINE_ARCH=x86_64
++	echo x86_64-ucb-akaros1.0
++	exit ;;
+     *:OpenBSD:*:*)
+ 	UNAME_MACHINE_ARCH=`arch | sed 's/OpenBSD.//'`
+ 	echo ${UNAME_MACHINE_ARCH}-unknown-openbsd${UNAME_RELEASE}
+diff -ur a/build-aux/config.sub b/build-aux/config.sub
+--- a/build-aux/config.sub	2016-01-16 12:11:09.000000000 -0500
++++ b/build-aux/config.sub	2016-05-25 13:45:28.554516328 -0400
+@@ -1378,7 +1378,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* | -cloudabi* | -sortix* \
++	      | -akaros* | -aos* | -aros* | -cloudabi* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
