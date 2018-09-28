@@ -47,8 +47,7 @@ int readnum_hex(unsigned long off, char *buf, unsigned long n,
 
 int readstr(unsigned long offset, char *buf, unsigned long n, const char *str)
 {
-	/* always include the \0 */
-	return readmem(offset, buf, n, str, strlen(str) + 1);
+	return readmem(offset, buf, n, str, strlen(str));
 }
 
 /* Helper: extracts a long from a user buffer (in text). */
