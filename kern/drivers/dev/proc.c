@@ -1040,7 +1040,7 @@ static size_t procread(struct chan *c, void *va, size_t n, off64_t off)
 			return i;
 		case Qmaps:
 			sza = c->aux;
-			i = readmem(off, va, n, sza->buf, sza->size);
+			i = readstr(off, va, n, sza->buf);
 			proc_decref(p);
 			return i;
 	}

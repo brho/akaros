@@ -424,7 +424,7 @@ static size_t mem_read(struct chan *c, void *ubuf, size_t n, off64_t offset)
 	case Qfree:
 	case Qkmemstat:
 		sza = c->synth_buf;
-		return readmem(offset, ubuf, n, sza->buf, sza->size);
+		return readstr(offset, ubuf, n, sza->buf);
 	default:
 		panic("Bad Qid %p!", c->qid.path);
 	}
