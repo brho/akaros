@@ -1,0 +1,51 @@
+diff -ur bash-4.3.30.dist/error.c bash-4.3.30/error.c
+--- bash-4.3.30.dist/error.c	2014-01-17 08:09:33.000000000 -0500
++++ bash-4.3.30/error.c	2016-05-25 13:40:26.978379551 -0400
+@@ -487,3 +487,32 @@
+ {
+   report_error (_("%s: readonly variable"), s);
+ }
++
++#if defined (USE_AKAROS_STRERROR)
++#ifndef MAX_ERRSTR_LEN
++#define MAX_ERRSTR_LEN 128
++#endif
++char *
++akaros_strerror(e)
++      int e;
++{
++  static char emsg[2*MAX_ERRSTR_LEN];
++  char ebuf[MAX_ERRSTR_LEN];
++  size_t len;
++  int serrno;
++  char *estr, *strerror_str;
++
++  serrno = errno;
++  estr = errstr ();
++  strerror_str = strerror_r (e, ebuf, sizeof (ebuf));
++  len = strlen (strerror_str);
++  if (len > (sizeof (emsg) - 1))
++    len = sizeof (emsg) - 1;
++  memmove (emsg, strerror_str, len);
++  if (e == serrno && estr && *estr)
++    snprintf (emsg + len, sizeof (emsg) - len, ", %s", estr);
++  ebuf[sizeof (ebuf) - 1] = '\0';
++
++  return emsg;
++}
++#endif
+diff -ur bash-4.3.30.dist/mksyntax.c bash-4.3.30/mksyntax.c
+--- bash-4.3.30.dist/mksyntax.c	2012-07-29 19:48:38.000000000 -0400
++++ bash-4.3.30/mksyntax.c	2016-05-25 11:59:57.560352289 -0400
+@@ -40,6 +40,10 @@
+ extern int errno;
+ #endif
+ 
++#ifdef strerror
++#undef strerror
++#endif
++
+ #ifndef HAVE_STRERROR
+ extern char *strerror();
+ #endif
+

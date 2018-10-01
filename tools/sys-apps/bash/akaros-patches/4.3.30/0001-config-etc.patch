@@ -1,0 +1,37 @@
+diff -ur bash-4.3.30.dist/configure bash-4.3.30/configure
+--- bash-4.3.30.dist/configure	2014-02-11 10:38:00.000000000 -0500
++++ bash-4.3.30/configure	2016-05-16 23:04:59.481616025 -0400
+@@ -2853,6 +2853,7 @@
+ sparc-linux*)	opt_bash_malloc=no ;;	# sparc running linux; requires ELF
+ #*-freebsd*-gnu)	opt_bash_malloc=no ;;	# there's some undetermined problem here
+ #*-freebsd*)	opt_bash_malloc=no ;;	# they claim it's better; I disagree
++*-akaros*)	opt_bash_malloc=no ;;	# they claim it needs eight-bit alignment
+ *-openbsd*)	opt_bash_malloc=no ;;	# they claim it needs eight-bit alignment
+ *-mirbsd*)	opt_bash_malloc=no ;;	# they claim it needs eight-bit alignment
+ *-aix*)		opt_bash_malloc=no ;;	# AIX machines
+diff -ur bash-4.3.30.dist/support/config.guess bash-4.3.30/support/config.guess
+--- bash-4.3.30.dist/support/config.guess	2013-12-16 16:02:33.000000000 -0500
++++ bash-4.3.30/support/config.guess	2016-05-16 23:04:12.844336864 -0400
+@@ -219,6 +219,10 @@
+ 	UNAME_MACHINE_ARCH=`arch | sed 's/Bitrig.//'`
+ 	echo ${UNAME_MACHINE_ARCH}-unknown-bitrig${UNAME_RELEASE}
+ 	exit ;;
++    *:Akaros:*:*)
++	UNAME_MACHINE_ARCH=x86_64
++	echo x86_64-ucb-akaros1.0
++	exit ;;
+     *:OpenBSD:*:*)
+ 	UNAME_MACHINE_ARCH=`arch | sed 's/OpenBSD.//'`
+ 	echo ${UNAME_MACHINE_ARCH}-unknown-openbsd${UNAME_RELEASE}
+diff -ur bash-4.3.30.dist/support/config.sub bash-4.3.30/support/config.sub
+--- bash-4.3.30.dist/support/config.sub	2013-12-17 10:49:47.000000000 -0500
++++ bash-4.3.30/support/config.sub	2016-05-16 23:05:28.906423063 -0400
+@@ -1356,7 +1356,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -akaros* | -aos* | -aros* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
