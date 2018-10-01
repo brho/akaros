@@ -139,6 +139,7 @@ const char *const _sys_errlist[] =
 	[ 135 ] = "No free pid",
 	[ 136 ] = "Unspecified",
 	[ 137 ] = "Moron",
+	[ 138 ] = "It's all Greg's fault",
 };
 
 const int _sys_nerr = sizeof (_sys_errlist) / sizeof (_sys_errlist[0]);

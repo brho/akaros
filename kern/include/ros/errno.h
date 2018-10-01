@@ -1,7 +1,7 @@
 #pragma once
 
 /* If you edit this file, be careful of tabs vs spaces.  This is processed by
- * scripts/make_errlist.c, which you need to run if you want glibc strerrno() to
+ * scripts/make_errlist.h, which you need to run if you want glibc strerrno() to
  * know about your changes.
  * Keep this header with definitions ordered ascending. */
 
@@ -154,3 +154,4 @@
 #define	ENOFREEPID		135	/* No free pid */
 #define	EUNSPECIFIED	136	/* Unspecified */
 #define	EMORON			137	/* Moron */
+#define	EPLAN9			138	/* It's all Greg's fault */
