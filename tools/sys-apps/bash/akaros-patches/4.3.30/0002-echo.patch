@@ -1,7 +1,7 @@
 diff -ur bash-4.3.30.dist/builtins/echo.def bash-4.3.30/builtins/echo.def
 --- bash-4.3.30.dist/builtins/echo.def	2011-06-29 09:55:58.000000000 -0400
 +++ bash-4.3.30/builtins/echo.def	2016-06-03 17:40:57.834915855 -0400
-@@ -108,8 +108,9 @@
+@@ -108,8 +108,10 @@
  echo_builtin (list)
       WORD_LIST *list;
  {
@@ -10,10 +10,11 @@ diff -ur bash-4.3.30.dist/builtins/echo.def bash-4.3.30/builtins/echo.def
 +  int display_return, do_v9, i, j, len, malloc_len;
 +  char *temp, *s, *m;
 +  WORD_LIST *save_list;
++  ssize_t ret;
  
    do_v9 = xpg_echo;
    display_return = 1;
-@@ -162,6 +163,30 @@
+@@ -162,6 +164,30 @@
    clearerr (stdout);	/* clear error before writing and testing success */
  
    terminate_immediately++;
@@ -44,7 +45,7 @@ diff -ur bash-4.3.30.dist/builtins/echo.def bash-4.3.30/builtins/echo.def
    while (list)
      {
        i = len = 0;
-@@ -169,19 +194,13 @@
+@@ -169,19 +195,13 @@
  		   : list->word->word;
        if (temp)
  	{
@@ -70,7 +71,7 @@ diff -ur bash-4.3.30.dist/builtins/echo.def bash-4.3.30/builtins/echo.def
        list = list->next;
        if (i)
  	{
-@@ -189,11 +208,15 @@
+@@ -189,11 +209,17 @@
  	  break;
  	}
        if (list)
@@ -81,7 +82,9 @@ diff -ur bash-4.3.30.dist/builtins/echo.def bash-4.3.30/builtins/echo.def
    if (display_return)
 -    putchar ('\n');
 +    m[j++] = '\n';
-+  write(STDOUT_FILENO, m, j);
++  ret = write(STDOUT_FILENO, m, j);
++  if (ret < j)
++    sh_wrerror();
 +  free(m);
 +#if defined (SunOS5)
 +  fflush (stdout);	/* Fix for bug in SunOS 5.5 printf(3) */
