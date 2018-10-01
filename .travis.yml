@@ -4,7 +4,6 @@ before_install:
   - sudo apt-get install -y --force-yes flex bison git qemu-kvm
 
 script:
-  - set -e
   - set +x
   - cd $AKAROS_ROOT
   - cd $AKAROS_ROOT && make ARCH=x86 defconfig
@@ -36,3 +35,11 @@ notifications:
       - akaros-travis@googlegroups.com
     on_success: never
     on_failure: always
+
+# we cat for logs in the order they are created (toolchain, then apps), so that
+# the most recent is the last one printed.  The most recent should be the one
+# that caused the error
+after_failure:
+  - echo "Build FAILED, trying to dump logs"
+  - cd $AKAROS_ROOT/tools/compilers/gcc-glibc/build_logs && cat `ls -t | head -1`
+  - cd $AKAROS_ROOT/build_logs && cat `ls -t | head -1`
