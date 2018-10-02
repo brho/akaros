@@ -72,6 +72,7 @@ endef
 define make_as_parent
 	$(clear_current_env)\
 	$(export_parent_env)\
+	unset CC; \
 	$(call export_user_variables)\
 	$(MAKE) $(NO_PRINT_DIRECTORY) -j $(MAKE_JOBS) $(1)
 endef
