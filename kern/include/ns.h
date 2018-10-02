@@ -1068,8 +1068,8 @@ struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
 long kchanio(void *vc, void *buf, int n, int mode);
 int openmode(uint32_t o);
 void fdclose(struct fd_table *fdt, int fd);
-int syschdir(char *path);
-int sysfchdir(int fd);
+int syschdir(struct proc *target, char *path);
+int sysfchdir(struct proc *target, int fd);
 int grpclose(struct fd_table *fdt, int fd);
 int sysclose(int fd);
 int syscreate(char *path, int mode, uint32_t perm);

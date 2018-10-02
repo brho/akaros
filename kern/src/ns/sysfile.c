@@ -144,14 +144,15 @@ void fdclose(struct fd_table *fdt, int fd)
 	close_fd(fdt, fd);
 }
 
-static void set_dot(struct chan *c)
+static void set_dot(struct proc *p, struct chan *c)
 {
-	c = atomic_swap_ptr((void**)&current->dot, c);
+	c = atomic_swap_ptr((void**)&p->dot, c);
 	synchronize_rcu();
 	cclose(c);
 }
 
-int syschdir(char *path)
+/* Note namec() happens in the namespace of the caller. */
+int syschdir(struct proc *target, char *path)
 {
 	ERRSTACK(1);
 	struct chan *c;
@@ -162,11 +163,12 @@ int syschdir(char *path)
 	}
 	c = namec(path, Atodir, 0, 0, NULL);
 	poperror();
-	set_dot(c);
+	set_dot(target, c);
 	return 0;
 }
 
-int sysfchdir(int fd)
+/* Note fdtochan() happens with the FDs of the caller. */
+int sysfchdir(struct proc *target, int fd)
 {
 	ERRSTACK(1);
 	struct chan *c;
@@ -186,7 +188,7 @@ int sysfchdir(int fd)
 	 * namespace is otherwise different from when the original fd/chan was first
 	 * created. */
 	if (c->flag & O_PATH) {
-		set_dot(c);
+		set_dot(target, c);
 		return 0;
 	}
 	if (waserror()) {
@@ -194,7 +196,7 @@ int sysfchdir(int fd)
 		poperror();
 		return -1;
 	}
-	syschdir(channame(c));
+	syschdir(target, channame(c));
 	cclose(c);
 	poperror();
 

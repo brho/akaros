@@ -557,11 +557,11 @@ static struct proc *get_controllable_proc(struct proc *p, pid_t pid)
 {
 	struct proc *target = pid2proc(pid);
 	if (!target) {
-		set_errno(ESRCH);
+		set_error(ESRCH, "no proc for pid %d", pid);
 		return 0;
 	}
 	if (!proc_controls(p, target)) {
-		set_errno(EPERM);
+		set_error(EPERM, "can't control pid %d", pid);
 		proc_decref(target);
 		return 0;
 	}
@@ -1981,12 +1981,17 @@ static intreg_t sys_chdir(struct proc *p, pid_t pid, const char *path,
 
 	if (!target)
 		return -1;
+	if ((target != p) && (target->state != PROC_CREATED)) {
+		proc_decref(target);
+		set_error(EINVAL, "pid %d has already started", pid);
+		return -1;
+	}
 	t_path = copy_in_path(p, path, path_l);
 	if (!t_path) {
 		proc_decref(target);
 		return -1;
 	}
-	retval = syschdir(t_path);
+	retval = syschdir(target, t_path);
 	free_path(p, t_path);
 	proc_decref(target);
 	return retval;
@@ -1999,7 +2004,12 @@ static intreg_t sys_fchdir(struct proc *p, pid_t pid, int fd)
 
 	if (!target)
 		return -1;
-	retval = sysfchdir(fd);
+	if ((target != p) && (target->state != PROC_CREATED)) {
+		proc_decref(target);
+		set_error(EINVAL, "pid %d has already started", pid);
+		return -1;
+	}
+	retval = sysfchdir(target, fd);
 	proc_decref(target);
 	return retval;
 }
