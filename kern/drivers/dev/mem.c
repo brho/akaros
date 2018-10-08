@@ -53,9 +53,8 @@ static size_t mem_stat(struct chan *c, uint8_t *db, size_t n)
 	return devstat(c, db, n, mem_dir, ARRAY_SIZE(mem_dir), devgen);
 }
 
-/* Prints arena's stats to the sza, starting at sofar.  Returns the new sofar.*/
-static size_t fetch_arena_stats(struct arena *arena, struct sized_alloc *sza,
-                                size_t sofar)
+/* Prints arena's stats to the sza, adjusting the sza's sofar. */
+static void fetch_arena_stats(struct arena *arena, struct sized_alloc *sza)
 {
 	struct btag *bt_i;
 	struct rb_node *rb_i;
@@ -70,25 +69,20 @@ static size_t fetch_arena_stats(struct arena *arena, struct sized_alloc *sza,
 	size_t empty_hash_chain = 0;
 	size_t longest_hash_chain = 0;
 
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Arena: %s (%p)\n--------------\n", arena->name, arena);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\tquantum: %d, qcache_max: %d\n", arena->quantum,
-	                  arena->qcache_max);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\tsource: %s\n",
-	                  arena->source ? arena->source->name : "none");
+	sza_printf(sza, "Arena: %s (%p)\n--------------\n", arena->name, arena);
+	sza_printf(sza, "\tquantum: %d, qcache_max: %d\n", arena->quantum,
+	           arena->qcache_max);
+	sza_printf(sza, "\tsource: %s\n",
+	           arena->source ? arena->source->name : "none");
 	spin_lock_irqsave(&arena->lock);
 	for (int i = 0; i < ARENA_NR_FREE_LISTS; i++) {
 		int j = 0;
 
 		if (!BSD_LIST_EMPTY(&arena->free_segs[i])) {
-			sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-			                  "\tList of [2^%d - 2^%d):\n", i, i + 1);
+			sza_printf(sza, "\tList of [2^%d - 2^%d):\n", i, i + 1);
 			BSD_LIST_FOREACH(bt_i, &arena->free_segs[i], misc_link)
 				j++;
-			sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-			                  "\t\tNr free segs: %d\n", j);
+			sza_printf(sza, "\t\tNr free segs: %d\n", j);
 		}
 	}
 	for (int i = 0; i < arena->hh.nr_hash_lists; i++) {
@@ -100,8 +94,7 @@ static size_t fetch_arena_stats(struct arena *arena, struct sized_alloc *sza,
 			j++;
 		longest_hash_chain = MAX(longest_hash_chain, j);
 	}
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\tSegments:\n\t--------------\n");
+	sza_printf(sza, "\tSegments:\n\t--------------\n");
 	for (rb_i = rb_first(&arena->all_segs); rb_i; rb_i = rb_next(rb_i)) {
 		bt_i = container_of(rb_i, struct btag, all_link);
 		if (bt_i->status == BTAG_SPAN) {
@@ -115,41 +108,29 @@ static size_t fetch_arena_stats(struct arena *arena, struct sized_alloc *sza,
 			amt_alloc += bt_i->size;
 		}
 	}
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\tStats:\n\t-----------------\n");
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\t\tAmt free: %llu (%p)\n", amt_free, amt_free);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\t\tAmt alloc: %llu (%p), nr allocs %d\n",
-	                  amt_alloc, amt_alloc, nr_allocs);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\t\tAmt total segs: %llu, amt alloc segs %llu\n",
-	                  arena->amt_total_segs, arena->amt_alloc_segs);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\t\tAmt imported: %llu (%p), nr imports %d\n",
-					  amt_imported, amt_imported, nr_imports);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\t\tNr hash %d, empty hash: %d, longest hash %d\n",
-	                  arena->hh.nr_hash_lists, empty_hash_chain,
-					  longest_hash_chain);
+	sza_printf(sza, "\tStats:\n\t-----------------\n");
+	sza_printf(sza, "\t\tAmt free: %llu (%p)\n", amt_free, amt_free);
+	sza_printf(sza, "\t\tAmt alloc: %llu (%p), nr allocs %d\n",
+	           amt_alloc, amt_alloc, nr_allocs);
+	sza_printf(sza, "\t\tAmt total segs: %llu, amt alloc segs %llu\n",
+	           arena->amt_total_segs, arena->amt_alloc_segs);
+	sza_printf(sza, "\t\tAmt imported: %llu (%p), nr imports %d\n",
+	           amt_imported, amt_imported, nr_imports);
+	sza_printf(sza, "\t\tNr hash %d, empty hash: %d, longest hash %d\n",
+	           arena->hh.nr_hash_lists, empty_hash_chain,
+	           longest_hash_chain);
 	spin_unlock_irqsave(&arena->lock);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\tImporting Arenas:\n\t-----------------\n");
+	sza_printf(sza, "\tImporting Arenas:\n\t-----------------\n");
 	TAILQ_FOREACH(a_i, &arena->__importing_arenas, import_link)
-		sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-		                  "\t\t%s\n", a_i->name);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\tImporting Slabs:\n\t-----------------\n");
+		sza_printf(sza, "\t\t%s\n", a_i->name);
+	sza_printf(sza, "\tImporting Slabs:\n\t-----------------\n");
 	TAILQ_FOREACH(kc_i, &arena->__importing_slabs, import_link)
-		sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-		                  "\t\t%s\n", kc_i->name);
-	return sofar;
+		sza_printf(sza, "\t\t%s\n", kc_i->name);
 }
 
 static struct sized_alloc *build_arena_stats(void)
 {
 	struct sized_alloc *sza;
-	size_t sofar = 0;
 	size_t alloc_amt = 0;
 	struct arena *a_i;
 
@@ -159,14 +140,13 @@ static struct sized_alloc *build_arena_stats(void)
 		alloc_amt += 1000;
 	sza = sized_kzmalloc(alloc_amt, MEM_WAIT);
 	TAILQ_FOREACH(a_i, &all_arenas, next)
-		sofar = fetch_arena_stats(a_i, sza, sofar);
+		fetch_arena_stats(a_i, sza);
 	qunlock(&arenas_and_slabs_lock);
 	return sza;
 }
 
-/* Prints arena's stats to the sza, starting at sofar.  Returns the new sofar.*/
-static size_t fetch_slab_stats(struct kmem_cache *kc, struct sized_alloc *sza,
-                               size_t sofar)
+/* Prints arena's stats to the sza, updating its sofar. */
+static void fetch_slab_stats(struct kmem_cache *kc, struct sized_alloc *sza)
 {
 	struct kmem_slab *s_i;
 	struct kmem_bufctl *bc_i;
@@ -176,24 +156,18 @@ static size_t fetch_slab_stats(struct kmem_cache *kc, struct sized_alloc *sza,
 	size_t longest_hash_chain = 0;
 
 	spin_lock_irqsave(&kc->cache_lock);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "\nKmem_cache: %s\n---------------------\n", kc->name);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Source: %s\n", kc->source->name);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Objsize (incl align): %d\n", kc->obj_size);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Align: %d\n", kc->align);
+	sza_printf(sza, "\nKmem_cache: %s\n---------------------\n", kc->name);
+	sza_printf(sza, "Source: %s\n", kc->source->name);
+	sza_printf(sza, "Objsize (incl align): %d\n", kc->obj_size);
+	sza_printf(sza, "Align: %d\n", kc->align);
 	TAILQ_FOREACH(s_i, &kc->empty_slab_list, link) {
 		assert(!s_i->num_busy_obj);
 		nr_unalloc_objs += s_i->num_total_obj;
 	}
 	TAILQ_FOREACH(s_i, &kc->partial_slab_list, link)
 		nr_unalloc_objs += s_i->num_total_obj - s_i->num_busy_obj;
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Nr unallocated in slab layer: %lu\n", nr_unalloc_objs);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Nr allocated from slab layer: %d\n", kc->nr_cur_alloc);
+	sza_printf(sza, "Nr unallocated in slab layer: %lu\n", nr_unalloc_objs);
+	sza_printf(sza, "Nr allocated from slab layer: %d\n", kc->nr_cur_alloc);
 	for (int i = 0; i < kc->hh.nr_hash_lists; i++) {
 		int j = 0;
 
@@ -203,26 +177,20 @@ static size_t fetch_slab_stats(struct kmem_cache *kc, struct sized_alloc *sza,
 			j++;
 		longest_hash_chain = MAX(longest_hash_chain, j);
 	}
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Nr hash %d, empty hash: %d, longest hash %d, loadlim %d\n",
-	                  kc->hh.nr_hash_lists, empty_hash_chain,
-					  longest_hash_chain, kc->hh.load_limit);
+	sza_printf(sza, "Nr hash %d, empty hash: %d, longest hash %d, loadlim %d\n",
+	           kc->hh.nr_hash_lists, empty_hash_chain,
+	           longest_hash_chain, kc->hh.load_limit);
 	spin_unlock_irqsave(&kc->cache_lock);
 	spin_lock_irqsave(&kc->depot.lock);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Depot magsize: %d\n", kc->depot.magsize);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Nr empty mags: %d\n", kc->depot.nr_empty);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Nr non-empty mags: %d\n", kc->depot.nr_not_empty);
+	sza_printf(sza, "Depot magsize: %d\n", kc->depot.magsize);
+	sza_printf(sza, "Nr empty mags: %d\n", kc->depot.nr_empty);
+	sza_printf(sza, "Nr non-empty mags: %d\n", kc->depot.nr_not_empty);
 	spin_unlock_irqsave(&kc->depot.lock);
-	return sofar;
 }
 
 static struct sized_alloc *build_slab_stats(void)
 {
 	struct sized_alloc *sza;
-	size_t sofar = 0;
 	size_t alloc_amt = 0;
 	struct kmem_cache *kc_i;
 
@@ -231,7 +199,7 @@ static struct sized_alloc *build_slab_stats(void)
 		alloc_amt += 500;
 	sza = sized_kzmalloc(alloc_amt, MEM_WAIT);
 	TAILQ_FOREACH(kc_i, &all_kmem_caches, all_kmc_link)
-		sofar = fetch_slab_stats(kc_i, sza, sofar);
+		fetch_slab_stats(kc_i, sza);
 	qunlock(&arenas_and_slabs_lock);
 	return sza;
 }
@@ -240,7 +208,6 @@ static struct sized_alloc *build_free(void)
 {
 	struct arena *a_i;
 	struct sized_alloc *sza;
-	size_t sofar = 0;
 	size_t amt_total = 0;
 	size_t amt_alloc = 0;
 
@@ -253,12 +220,9 @@ static struct sized_alloc *build_free(void)
 		amt_alloc += a_i->amt_alloc_segs;
 	}
 	qunlock(&arenas_and_slabs_lock);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Total Memory : %15llu\n", amt_total);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Used Memory  : %15llu\n", amt_alloc);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  "Free Memory  : %15llu\n", amt_total - amt_alloc);
+	sza_printf(sza, "Total Memory : %15llu\n", amt_total);
+	sza_printf(sza, "Used Memory  : %15llu\n", amt_alloc);
+	sza_printf(sza, "Free Memory  : %15llu\n", amt_total - amt_alloc);
 	return sza;
 }
 
@@ -273,24 +237,22 @@ static struct sized_alloc *build_free(void)
 const char kmemstat_fmt[]     = "%-*s: %c :%*llu:%*llu:%*llu:%*llu\n";
 const char kmemstat_hdr_fmt[] = "%-*s:Typ:%*s:%*s:%*s:%*s\n";
 
-static size_t fetch_arena_line(struct arena *arena, struct sized_alloc *sza,
-                               size_t sofar, int indent)
+static void fetch_arena_line(struct arena *arena, struct sized_alloc *sza,
+                             int indent)
 {
 	for (int i = 0; i < indent; i++)
-		sofar += snprintf(sza->buf + sofar, sza->size - sofar, "    ");
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  kmemstat_fmt,
-					  KMEMSTAT_NAME - indent * 4, arena->name,
-					  'A',
-					  KMEMSTAT_OBJSIZE, arena->quantum,
-					  KMEMSTAT_TOTAL, arena->amt_total_segs,
-					  KMEMSTAT_ALLOCED, arena->amt_alloc_segs,
-					  KMEMSTAT_NR_ALLOCS, arena->nr_allocs_ever);
-	return sofar;
+		sza_printf(sza, "    ");
+	sza_printf(sza, kmemstat_fmt,
+	           KMEMSTAT_NAME - indent * 4, arena->name,
+	           'A',
+	           KMEMSTAT_OBJSIZE, arena->quantum,
+	           KMEMSTAT_TOTAL, arena->amt_total_segs,
+	           KMEMSTAT_ALLOCED, arena->amt_alloc_segs,
+	           KMEMSTAT_NR_ALLOCS, arena->nr_allocs_ever);
 }
 
-static size_t fetch_slab_line(struct kmem_cache *kc, struct sized_alloc *sza,
-                              size_t sofar, int indent)
+static void fetch_slab_line(struct kmem_cache *kc, struct sized_alloc *sza,
+                            int indent)
 {
 	struct kmem_pcpu_cache *pcc;
 	struct kmem_slab *s_i;
@@ -311,31 +273,28 @@ static size_t fetch_slab_line(struct kmem_cache *kc, struct sized_alloc *sza,
 	}
 
 	for (int i = 0; i < indent; i++)
-		sofar += snprintf(sza->buf + sofar, sza->size - sofar, "    ");
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  kmemstat_fmt,
-					  KMEMSTAT_NAME - indent * 4, kc->name,
-					  'S',
-					  KMEMSTAT_OBJSIZE, kc->obj_size,
-					  KMEMSTAT_TOTAL, kc->obj_size * (nr_unalloc_objs +
-					                                  kc->nr_cur_alloc),
-					  KMEMSTAT_ALLOCED, kc->obj_size * kc->nr_cur_alloc,
-					  KMEMSTAT_NR_ALLOCS, nr_allocs_ever);
-	return sofar;
+		sza_printf(sza, "    ");
+	sza_printf(sza, kmemstat_fmt,
+	           KMEMSTAT_NAME - indent * 4, kc->name,
+	           'S',
+	           KMEMSTAT_OBJSIZE, kc->obj_size,
+	           KMEMSTAT_TOTAL, kc->obj_size * (nr_unalloc_objs +
+	                                           kc->nr_cur_alloc),
+	           KMEMSTAT_ALLOCED, kc->obj_size * kc->nr_cur_alloc,
+	           KMEMSTAT_NR_ALLOCS, nr_allocs_ever);
 }
 
-static size_t fetch_arena_and_kids(struct arena *arena, struct sized_alloc *sza,
-                                   size_t sofar, int indent)
+static void fetch_arena_and_kids(struct arena *arena, struct sized_alloc *sza,
+                                 int indent)
 {
 	struct arena *a_i;
 	struct kmem_cache *kc_i;
 
-	sofar = fetch_arena_line(arena, sza, sofar, indent);
+	fetch_arena_line(arena, sza, indent);
 	TAILQ_FOREACH(a_i, &arena->__importing_arenas, import_link)
-		sofar = fetch_arena_and_kids(a_i, sza, sofar, indent + 1);
+		fetch_arena_and_kids(a_i, sza, indent + 1);
 	TAILQ_FOREACH(kc_i, &arena->__importing_slabs, import_link)
-		sofar = fetch_slab_line(kc_i, sza, sofar, indent + 1);
-	return sofar;
+		fetch_slab_line(kc_i, sza, indent + 1);
 }
 
 static struct sized_alloc *build_kmemstat(void)
@@ -343,7 +302,6 @@ static struct sized_alloc *build_kmemstat(void)
 	struct arena *a_i;
 	struct kmem_cache *kc_i;
 	struct sized_alloc *sza;
-	size_t sofar = 0;
 	size_t alloc_amt = 100;
 
 	qlock(&arenas_and_slabs_lock);
@@ -352,20 +310,19 @@ static struct sized_alloc *build_kmemstat(void)
 	TAILQ_FOREACH(kc_i, &all_kmem_caches, all_kmc_link)
 		alloc_amt += 100;
 	sza = sized_kzmalloc(alloc_amt, MEM_WAIT);
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar,
-	                  kmemstat_hdr_fmt,
-					  KMEMSTAT_NAME, "Arena/Slab Name",
-					  KMEMSTAT_OBJSIZE, "Objsize",
-					  KMEMSTAT_TOTAL, "Total Amt",
-					  KMEMSTAT_ALLOCED, "Alloc Amt",
-					  KMEMSTAT_NR_ALLOCS, "Allocs Ever");
+	sza_printf(sza, kmemstat_hdr_fmt,
+	           KMEMSTAT_NAME, "Arena/Slab Name",
+	           KMEMSTAT_OBJSIZE, "Objsize",
+	           KMEMSTAT_TOTAL, "Total Amt",
+	           KMEMSTAT_ALLOCED, "Alloc Amt",
+	           KMEMSTAT_NR_ALLOCS, "Allocs Ever");
 	for (int i = 0; i < KMEMSTAT_LINE_LN; i++)
-		sofar += snprintf(sza->buf + sofar, sza->size - sofar, "-");
-	sofar += snprintf(sza->buf + sofar, sza->size - sofar, "\n");
+		sza_printf(sza, "-");
+	sza_printf(sza, "\n");
 	TAILQ_FOREACH(a_i, &all_arenas, next) {
 		if (a_i->source)
 			continue;
-		sofar = fetch_arena_and_kids(a_i, sza, sofar, 0);
+		fetch_arena_and_kids(a_i, sza, 0);
 	}
 	qunlock(&arenas_and_slabs_lock);
 	return sza;

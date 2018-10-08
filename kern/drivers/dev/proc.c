@@ -389,9 +389,8 @@ static void nonone(struct proc *p)
 }
 
 struct bm_helper {
-	void						*buf;
+	struct sized_alloc			*sza;
 	size_t						buflen;
-	size_t						sofar;
 };
 
 static void get_needed_sz_cb(struct vm_region *vmr, void *arg)
@@ -405,6 +404,7 @@ static void get_needed_sz_cb(struct vm_region *vmr, void *arg)
 static void build_maps_cb(struct vm_region *vmr, void *arg)
 {
 	struct bm_helper *bmh = (struct bm_helper*)arg;
+	struct sized_alloc *sza = bmh->sza;
 	size_t old_sofar;
 	char path_buf[MAX_FILENAME_SZ];
 	char *path;
@@ -419,39 +419,33 @@ static void build_maps_cb(struct vm_region *vmr, void *arg)
 		inode_nr = 0;
 	}
 
-	old_sofar = bmh->sofar;
-	bmh->sofar += snprintf(bmh->buf + bmh->sofar, bmh->buflen - bmh->sofar,
-	                       "%08lx-%08lx %c%c%c%c %08x %02d:%02d %d ",
-	                       vmr->vm_base, vmr->vm_end,
-	                       vmr->vm_prot & PROT_READ    ? 'r' : '-',
-	                       vmr->vm_prot & PROT_WRITE   ? 'w' : '-',
-	                       vmr->vm_prot & PROT_EXEC    ? 'x' : '-',
-	                       vmr->vm_flags & MAP_PRIVATE ? 'p' : 's',
-	                       vmr_has_file(vmr) ? vmr->vm_foff : 0,
-	                       vmr_has_file(vmr) ? 1 : 0,	/* VFS == 1 for major */
-	                       0,
-	                       inode_nr);
+	old_sofar = sza->sofar;
+	sza_printf(sza, "%08lx-%08lx %c%c%c%c %08x %02d:%02d %d ",
+	                vmr->vm_base, vmr->vm_end,
+	                vmr->vm_prot & PROT_READ    ? 'r' : '-',
+	                vmr->vm_prot & PROT_WRITE   ? 'w' : '-',
+	                vmr->vm_prot & PROT_EXEC    ? 'x' : '-',
+	                vmr->vm_flags & MAP_PRIVATE ? 'p' : 's',
+	                vmr_has_file(vmr) ? vmr->vm_foff : 0,
+	                vmr_has_file(vmr) ? 1 : 0,	/* VFS == 1 for major */
+	                0,
+	                inode_nr);
 	/* Align the filename to the 74th char, like Linux (73 chars so far) */
-	bmh->sofar += snprintf(bmh->buf + bmh->sofar, bmh->buflen - bmh->sofar,
-	                       "%*s", 73 - (bmh->sofar - old_sofar), "");
-	bmh->sofar += snprintf(bmh->buf + bmh->sofar, bmh->buflen - bmh->sofar,
-	                       "%s\n", path);
+	sza_printf(sza, "%*s", 73 - (sza->sofar - old_sofar), "");
+	sza_printf(sza, "%s\n", path);
 }
 
 static struct sized_alloc *build_maps(struct proc *p)
 {
 	struct bm_helper bmh[1];
-	struct sized_alloc *sza;
 
 	/* Try to figure out the size needed: start with extra space, then add a bit
 	 * for each VMR */
 	bmh->buflen = 150;
 	enumerate_vmrs(p, get_needed_sz_cb, bmh);
-	sza = sized_kzmalloc(bmh->buflen, MEM_WAIT);
-	bmh->buf = sza->buf;
-	bmh->sofar = 0;
+	bmh->sza = sized_kzmalloc(bmh->buflen, MEM_WAIT);
 	enumerate_vmrs(p, build_maps_cb, bmh);
-	return sza;
+	return bmh->sza;
 }
 
 static struct chan *procopen(struct chan *c, int omode)

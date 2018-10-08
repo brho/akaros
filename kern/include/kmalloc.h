@@ -65,7 +65,9 @@ struct kmalloc_tag {
 struct sized_alloc {
 	void						*buf;
 	size_t						size;
+	size_t						sofar;
 } __attribute__((aligned(KMALLOC_ALIGNMENT)));
 
 /* Allocate a sized_alloc, big enough to hold size bytes.  Free with kfree. */
 struct sized_alloc *sized_kzmalloc(size_t size, int flags);
+void sza_printf(struct sized_alloc *sza, const char *fmt, ...);

@@ -257,3 +257,13 @@ struct sized_alloc *sized_kzmalloc(size_t size, int flags)
 	sza->size = size;
 	return sza;
 }
+
+void sza_printf(struct sized_alloc *sza, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	sza->sofar += vsnprintf(sza->buf + sza->sofar, sza->size - sza->sofar,
+	                        fmt, ap);
+	va_end(ap);
+}
