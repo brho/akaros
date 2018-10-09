@@ -45,7 +45,10 @@
 /* Cache creation flags: */
 #define KMC_NOTOUCH				0x0001	/* Can't use source/object's memory */
 #define KMC_QCACHE				0x0002	/* Cache is an arena's qcache */
+#define KMC_NOTRACE				0x0004	/* Do not trace allocations */
 #define __KMC_USE_BUFCTL		0x1000	/* Internal use */
+#define __KMC_TRACED			0x2000	/* Internal use */
+#define __KMC_EVER_TRACED		0x3000	/* Internal use */
 
 struct kmem_magazine {
 	SLIST_ENTRY(kmem_magazine)	link;
@@ -98,6 +101,21 @@ struct kmem_slab {
 };
 TAILQ_HEAD(kmem_slab_list, kmem_slab);
 
+struct kmem_trace {
+	void						*obj;
+	struct hlist_node			hash;
+	size_t						nr_pcs;
+	uintptr_t					pcs[MAX_BT_DEPTH];
+	char						str[60];
+};
+
+struct kmem_trace_ht {
+	spinlock_t					lock;
+	struct hash_helper			hh;
+	struct hlist_head			*ht;
+	struct hlist_head			static_ht[HASH_INIT_SZ];
+};
+
 /* Actual cache */
 struct kmem_cache {
 	TAILQ_ENTRY(kmem_cache) all_kmc_link;
@@ -122,6 +140,7 @@ struct kmem_cache {
 	struct kmem_bufctl_list static_hash[HASH_INIT_SZ];
 	char name[KMC_NAME_SZ];
 	TAILQ_ENTRY(kmem_cache)	import_link;
+	struct kmem_trace_ht trace_ht;
 };
 
 extern struct kmem_cache_tailq all_kmem_caches;
@@ -147,3 +166,9 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
                          struct arena *source,
                          int (*ctor)(void *, void *, int),
                          void (*dtor)(void *, void *), void *priv);
+
+/* Tracing */
+int kmem_trace_start(struct kmem_cache *kc);
+void kmem_trace_stop(struct kmem_cache *kc);
+struct sized_alloc *kmem_trace_print(struct kmem_cache *kc);
+void kmem_trace_reset(struct kmem_cache *kc);

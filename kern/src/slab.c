@@ -86,6 +86,7 @@
 #include <kmalloc.h>
 #include <hash.h>
 #include <arena.h>
+#include <hashtable.h>
 
 #define SLAB_POISON ((void*)0xdead1111)
 
@@ -125,11 +126,18 @@ static bool kmem_cache_grow(struct kmem_cache *cp);
 static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags);
 static void __kmem_free_to_slab(struct kmem_cache *cp, void *buf);
 
+/* Forward declarations for trace hooks */
+static void kmem_trace_ht_init(struct kmem_trace_ht *ht);
+static void kmem_trace_free(struct kmem_cache *kc, void *obj);
+static void kmem_trace_alloc(struct kmem_cache *kc, void *obj);
+static void kmem_trace_warn_notempty(struct kmem_cache *kc);
+
 /* Cache of the kmem_cache objects, needed for bootstrapping */
 struct kmem_cache kmem_cache_cache[1];
 struct kmem_cache kmem_slab_cache[1];
 struct kmem_cache kmem_bufctl_cache[1];
 struct kmem_cache kmem_magazine_cache[1];
+struct kmem_cache kmem_trace_cache[1];
 
 static bool __use_bufctls(struct kmem_cache *cp)
 {
@@ -317,6 +325,7 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	if ((obj_size > SLAB_LARGE_CUTOFF) || (flags & KMC_NOTOUCH))
 		kc->flags |= __KMC_USE_BUFCTL;
 	depot_init(&kc->depot);
+	kmem_trace_ht_init(&kc->trace_ht);
 	/* We do this last, since this will all into the magazine cache - which we
 	 * could be creating on this call! */
 	kc->pcpu_caches = build_pcpu_caches();
@@ -339,20 +348,24 @@ void kmem_cache_init(void)
 	static_assert(sizeof(struct kmem_magazine) <= SLAB_LARGE_CUTOFF);
 	__kmem_cache_create(kmem_magazine_cache, "kmem_magazine",
 	                    sizeof(struct kmem_magazine),
-	                    __alignof__(struct kmem_magazine), 0, base_arena,
-	                    __mag_ctor, NULL, NULL);
+	                    __alignof__(struct kmem_magazine), KMC_NOTRACE,
+	                    base_arena, __mag_ctor, NULL, NULL);
 	__kmem_cache_create(kmem_cache_cache, "kmem_cache",
 	                    sizeof(struct kmem_cache),
 	                    __alignof__(struct kmem_cache), 0, base_arena,
 	                    NULL, NULL, NULL);
 	__kmem_cache_create(kmem_slab_cache, "kmem_slab",
 	                    sizeof(struct kmem_slab),
-	                    __alignof__(struct kmem_slab), 0, base_arena,
-	                    NULL, NULL, NULL);
+	                    __alignof__(struct kmem_slab), KMC_NOTRACE,
+	                    base_arena, NULL, NULL, NULL);
 	__kmem_cache_create(kmem_bufctl_cache, "kmem_bufctl",
 	                    sizeof(struct kmem_bufctl),
-	                    __alignof__(struct kmem_bufctl), 0, base_arena,
-	                    NULL, NULL, NULL);
+	                    __alignof__(struct kmem_bufctl), KMC_NOTRACE,
+	                    base_arena, NULL, NULL, NULL);
+	__kmem_cache_create(kmem_trace_cache, "kmem_trace",
+	                    sizeof(struct kmem_trace),
+	                    __alignof__(struct kmem_trace), KMC_NOTRACE,
+	                    base_arena, NULL, NULL, NULL);
 }
 
 /* Cache management */
@@ -448,6 +461,7 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 		a_slab = next;
 	}
 	spin_unlock_irqsave(&cp->cache_lock);
+	kmem_trace_warn_notempty(cp);
 	kmem_cache_free(kmem_cache_cache, cp);
 }
 
@@ -586,6 +600,7 @@ try_alloc:
 		pcc->loaded->nr_rounds--;
 		pcc->nr_allocs_ever++;
 		unlock_pcu_cache(pcc);
+		kmem_trace_alloc(kc, ret);
 		return ret;
 	}
 	if (!mag_is_empty(pcc->prev)) {
@@ -606,7 +621,9 @@ try_alloc:
 	}
 	unlock_depot(depot);
 	unlock_pcu_cache(pcc);
-	return __kmem_alloc_from_slab(kc, flags);
+	ret = __kmem_alloc_from_slab(kc, flags);
+	kmem_trace_alloc(kc, ret);
+	return ret;
 }
 
 /* Returns an object to the slab layer.  Caller must deconstruct the objects.
@@ -652,6 +669,7 @@ void kmem_cache_free(struct kmem_cache *kc, void *buf)
 	struct kmem_magazine *mag;
 
 	assert(buf);	/* catch bugs */
+	kmem_trace_free(kc, buf);
 	lock_pcu_cache(pcc);
 try_free:
 	if (pcc->loaded->nr_rounds < pcc->magsize) {
@@ -784,4 +802,191 @@ void kmem_cache_reap(struct kmem_cache *cp)
 		a_slab = next;
 	}
 	spin_unlock_irqsave(&cp->cache_lock);
+}
+
+
+/* Tracing */
+
+static void kmem_trace_ht_foreach(struct kmem_trace_ht *ht,
+                                  void (*f)(struct kmem_trace *, void *),
+                                  void *arg)
+{
+	struct kmem_trace *tr;
+	struct hlist_node *temp;
+
+	spin_lock_irqsave(&ht->lock);
+	for (int i = 0; i < ht->hh.nr_hash_lists; i++)
+		hlist_for_each_entry_safe(tr, temp, &ht->ht[i], hash)
+			f(tr, arg);
+	spin_unlock_irqsave(&ht->lock);
+}
+
+static void __kmem_trace_print(struct kmem_trace *tr, void *arg)
+{
+	struct sized_alloc *sza = arg;
+
+	sza_printf(sza, "Obj %p, from %s:\n----\n", tr->obj, tr->str);
+	sza_print_backtrace_list(sza, tr->pcs, tr->nr_pcs);
+	sza_printf(sza, "\n");
+}
+
+static void __kmem_trace_bytes_needed(struct kmem_trace *tr, void *arg)
+{
+	size_t *x = arg;
+
+	/* Just a guess of how much room we'll need, plus fudge. */
+	*x += tr->nr_pcs * 80 + 100;
+}
+
+struct sized_alloc *kmem_trace_print(struct kmem_cache *kc)
+{
+	struct sized_alloc *sza;
+	size_t amt = 100;
+
+	kmem_trace_ht_foreach(&kc->trace_ht, __kmem_trace_bytes_needed, &amt);
+	sza = sized_kzmalloc(amt, MEM_WAIT);
+	sza_printf(sza, "Dumping outstanding allocs from %s\n", kc->name);
+	sza_printf(sza, "-------------------------\n");
+	kmem_trace_ht_foreach(&kc->trace_ht, __kmem_trace_print, sza);
+	return sza;
+}
+
+static void __kmem_trace_drop(struct kmem_trace *tr, void *arg)
+{
+	hlist_del(&tr->hash);
+	kmem_cache_free(kmem_trace_cache, tr);
+}
+
+void kmem_trace_reset(struct kmem_cache *kc)
+{
+	kmem_trace_ht_foreach(&kc->trace_ht, __kmem_trace_drop, NULL);
+}
+
+/* It's a bug to ever have a left-over trace when we delete a KMC, and probably
+ * will never happen.  If it does, we can expand the debugging info. */
+static void __kmem_trace_warn_and_drop(struct kmem_trace *tr, void *arg)
+{
+	warn("KMC had an object! (%p)", tr->obj);
+	__kmem_trace_drop(tr, NULL);
+}
+
+static void kmem_trace_warn_notempty(struct kmem_cache *kc)
+{
+	kmem_trace_ht_foreach(&kc->trace_ht, __kmem_trace_warn_and_drop, NULL);
+}
+
+int kmem_trace_start(struct kmem_cache *kc)
+{
+	spin_lock_irqsave(&kc->cache_lock);
+	if (kc->flags & KMC_NOTRACE) {
+		spin_unlock_irqsave(&kc->cache_lock);
+		return -1;
+	}
+	WRITE_ONCE(kc->flags, kc->flags | __KMC_TRACED | __KMC_EVER_TRACED);
+	spin_unlock_irqsave(&kc->cache_lock);
+	return 0;
+}
+
+/* Note that the tracers locklessly-peek at the flags, and we may have an
+ * allocation complete its trace after we stop.  You could conceivably stop,
+ * reset/remove all traces, and then have a trace appear still. */
+void kmem_trace_stop(struct kmem_cache *kc)
+{
+	spin_lock_irqsave(&kc->cache_lock);
+	WRITE_ONCE(kc->flags, kc->flags & ~__KMC_TRACED);
+	spin_unlock_irqsave(&kc->cache_lock);
+}
+
+static void kmem_trace_ht_init(struct kmem_trace_ht *ht)
+{
+	spinlock_init(&ht->lock);
+	ht->ht = ht->static_ht;
+	hash_init_hh(&ht->hh);
+	for (int i = 0; i < ht->hh.nr_hash_lists; i++)
+		INIT_HLIST_HEAD(&ht->ht[i]);
+}
+
+static void kmem_trace_ht_insert(struct kmem_trace_ht *ht,
+                                 struct kmem_trace *tr)
+{
+	unsigned long hash_val = __generic_hash(tr->obj);
+	struct hlist_head *bucket;
+
+	spin_lock_irqsave(&ht->lock);
+	bucket = &ht->ht[hash_val % ht->hh.nr_hash_bits];
+	hlist_add_head(&tr->hash, bucket);
+	spin_unlock_irqsave(&ht->lock);
+}
+
+static struct kmem_trace *kmem_trace_ht_remove(struct kmem_trace_ht *ht,
+                                               void *obj)
+{
+	struct kmem_trace *tr;
+	unsigned long hash_val = __generic_hash(obj);
+	struct hlist_head *bucket;
+
+	spin_lock_irqsave(&ht->lock);
+	bucket = &ht->ht[hash_val % ht->hh.nr_hash_bits];
+	hlist_for_each_entry(tr, bucket, hash) {
+		if (tr->obj == obj) {
+			hlist_del(&tr->hash);
+			break;
+		}
+	}
+	spin_unlock_irqsave(&ht->lock);
+	return tr;
+}
+
+static void kmem_trace_free(struct kmem_cache *kc, void *obj)
+{
+	struct kmem_trace *tr;
+
+	/* Even if we turn off tracing, we still want to free traces that we may
+	 * have collected earlier.  Otherwise, those objects will never get
+	 * removed from the trace, and could lead to confusion if they are
+	 * reallocated and traced again.  Still, we don't want to pay the cost
+	 * on every free for untraced KCs. */
+	if (!(READ_ONCE(kc->flags) & __KMC_EVER_TRACED))
+		return;
+	tr = kmem_trace_ht_remove(&kc->trace_ht, obj);
+	if (tr)
+		kmem_cache_free(kmem_trace_cache, tr);
+}
+
+static void trace_context(struct kmem_trace *tr)
+{
+	if (is_ktask(current_kthread)) {
+		snprintf(tr->str, sizeof(tr->str), "ktask %s",
+		         current_kthread->name);
+	} else if (current) {
+		/* When we're handling a page fault, knowing the user PC helps
+		 * determine the source.  A backtrace is nice, but harder to do.
+		 * Since we're deep in MM code and holding locks, we can't use
+		 * copy_from_user, which uses the page-fault fixups.  If you
+		 * need to get the BT, stash it in the genbuf in
+		 * handle_page_fault(). */
+		snprintf(tr->str, sizeof(tr->str), "PID %d %s: %s, %p",
+		         current->pid, current->progname,
+		         current_kthread->name,
+		         current_ctx ? get_user_ctx_pc(current_ctx) : 0);
+	} else {
+		snprintf(tr->str, sizeof(tr->str), "(none)");
+	}
+	tr->str[sizeof(tr->str) - 1] = 0;
+}
+
+static void kmem_trace_alloc(struct kmem_cache *kc, void *obj)
+{
+	struct kmem_trace *tr;
+
+	if (!(READ_ONCE(kc->flags) & __KMC_TRACED))
+		return;
+	tr = kmem_cache_alloc(kmem_trace_cache, MEM_ATOMIC);
+	if (!tr)
+		return;
+	tr->obj = obj;
+	tr->nr_pcs = backtrace_list(get_caller_pc(), get_caller_fp(), tr->pcs,
+	                            ARRAY_SIZE(tr->pcs));
+	trace_context(tr);
+	kmem_trace_ht_insert(&kc->trace_ht, tr);
 }
