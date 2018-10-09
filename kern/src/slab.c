@@ -98,6 +98,27 @@ unsigned int resize_threshold = 1;
 struct kmem_cache_tailq all_kmem_caches =
 		TAILQ_HEAD_INITIALIZER(all_kmem_caches);
 
+static void kmc_track(struct kmem_cache *kc)
+{
+	struct kmem_cache *kc_i;
+
+	qlock(&arenas_and_slabs_lock);
+	TAILQ_FOREACH(kc_i, &all_kmem_caches, all_kmc_link) {
+		if (!strcmp(kc->name, kc_i->name))
+			warn("New KMC %s created, but one with that name exists!",
+			     kc->name);
+	}
+	TAILQ_INSERT_TAIL(&all_kmem_caches, kc, all_kmc_link);
+	qunlock(&arenas_and_slabs_lock);
+}
+
+static void kmc_untrack(struct kmem_cache *kc)
+{
+	qlock(&arenas_and_slabs_lock);
+	TAILQ_REMOVE(&all_kmem_caches, kc, all_kmc_link);
+	qunlock(&arenas_and_slabs_lock);
+}
+
 /* Backend/internal functions, defined later.  Grab the lock before calling
  * these. */
 static bool kmem_cache_grow(struct kmem_cache *cp);
@@ -300,9 +321,7 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	 * could be creating on this call! */
 	kc->pcpu_caches = build_pcpu_caches();
 	add_importing_slab(kc->source, kc);
-	qlock(&arenas_and_slabs_lock);
-	TAILQ_INSERT_TAIL(&all_kmem_caches, kc, all_kmc_link);
-	qunlock(&arenas_and_slabs_lock);
+	kmc_track(kc);
 }
 
 static int __mag_ctor(void *obj, void *priv, int flags)
@@ -412,9 +431,7 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab, *next;
 
-	qlock(&arenas_and_slabs_lock);
-	TAILQ_REMOVE(&all_kmem_caches, cp, all_kmc_link);
-	qunlock(&arenas_and_slabs_lock);
+	kmc_untrack(cp);
 	del_importing_slab(cp->source, cp);
 	drain_pcpu_caches(cp);
 	depot_destroy(cp);
