@@ -27,6 +27,7 @@ enum {
 	Qslab_stats,
 	Qfree,
 	Qkmemstat,
+	Qslab_trace,
 };
 
 static struct dirtab mem_dir[] = {
@@ -35,7 +36,11 @@ static struct dirtab mem_dir[] = {
 	{"slab_stats", {Qslab_stats, 0, QTFILE}, 0, 0444},
 	{"free", {Qfree, 0, QTFILE}, 0, 0444},
 	{"kmemstat", {Qkmemstat, 0, QTFILE}, 0, 0444},
+	{"slab_trace", {Qslab_trace, 0, QTFILE}, 0, 0444},
 };
+
+/* Protected by the arenas_and_slabs_lock */
+static struct sized_alloc *slab_trace_data;
 
 static struct chan *mem_attach(char *spec)
 {
@@ -347,6 +352,10 @@ static struct chan *mem_open(struct chan *c, int omode)
 	case Qkmemstat:
 		c->synth_buf = build_kmemstat();
 		break;
+	case Qslab_trace:
+		/* slab_trace is built on write, not on open. */
+		assert(!c->synth_buf);
+		break;
 	}
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
@@ -363,9 +372,23 @@ static void mem_close(struct chan *c)
 	case Qslab_stats:
 	case Qfree:
 	case Qkmemstat:
+	case Qslab_trace:
 		kfree(c->synth_buf);
+		c->synth_buf = NULL;
 		break;
 	}
+}
+
+static size_t slab_trace_read(struct chan *c, void *ubuf, size_t n,
+                              off64_t offset)
+{
+	size_t ret = 0;
+
+	qlock(&arenas_and_slabs_lock);
+	if (slab_trace_data)
+		ret = readstr(offset, ubuf, n, slab_trace_data->buf);
+	qunlock(&arenas_and_slabs_lock);
+	return ret;
 }
 
 static size_t mem_read(struct chan *c, void *ubuf, size_t n, off64_t offset)
@@ -382,18 +405,77 @@ static size_t mem_read(struct chan *c, void *ubuf, size_t n, off64_t offset)
 	case Qkmemstat:
 		sza = c->synth_buf;
 		return readstr(offset, ubuf, n, sza->buf);
+	case Qslab_trace:
+		return slab_trace_read(c, ubuf, n, offset);
 	default:
 		panic("Bad Qid %p!", c->qid.path);
 	}
 	return -1;
 }
 
-static size_t mem_write(struct chan *c, void *ubuf, size_t n, off64_t offset)
+/* start, then stop, then print, then read to get the trace */
+#define SLAB_TRACE_USAGE "start|stop|print|reset SLAB_NAME"
+
+static void slab_trace_cmd(struct chan *c, struct cmdbuf *cb)
 {
+	ERRSTACK(1);
+	struct sized_alloc *sza, *old_sza;
+	struct kmem_cache *kc;
+
+	if (cb->nf < 2)
+		error(EFAIL, SLAB_TRACE_USAGE);
+
+	qlock(&arenas_and_slabs_lock);
+	if (waserror()) {
+		qunlock(&arenas_and_slabs_lock);
+		nexterror();
+	}
+	TAILQ_FOREACH(kc, &all_kmem_caches, all_kmc_link)
+		if (!strcmp(kc->name, cb->f[1]))
+			break;
+	if (!kc)
+		error(ENOENT, "No such slab %s", cb->f[1]);
+	/* Note that the only time we have a real sza is when printing.
+	 * Otherwise, it's NULL.  We still want this to be the chan's sza, since
+	 * the reader should get nothing back until they ask for a print. */
+	sza = NULL;
+	if (!strcmp(cb->f[0], "start")) {
+		if (kmem_trace_start(kc))
+			error(EFAIL, "Unable to trace slab %s", kc->name);
+	} else if (!strcmp(cb->f[0], "stop")) {
+		kmem_trace_stop(kc);
+	} else if (!strcmp(cb->f[0], "print")) {
+		sza = kmem_trace_print(kc);
+	} else if (!strcmp(cb->f[0], "reset")) {
+		kmem_trace_reset(kc);
+	} else {
+		error(EFAIL, SLAB_TRACE_USAGE);
+	}
+	old_sza = slab_trace_data;
+	slab_trace_data = sza;
+	qunlock(&arenas_and_slabs_lock);
+	poperror();
+	kfree(old_sza);
+}
+
+static size_t mem_write(struct chan *c, void *ubuf, size_t n, off64_t unused)
+{
+	ERRSTACK(1);
+	struct cmdbuf *cb = parsecmd(ubuf, n);
+
+	if (waserror()) {
+		kfree(cb);
+		nexterror();
+	}
 	switch (c->qid.path) {
+	case Qslab_trace:
+		slab_trace_cmd(c, cb);
+		break;
 	default:
 		error(EFAIL, "Unable to write to %s", devname());
 	}
+	kfree(cb);
+	poperror();
 	return n;
 }
 
