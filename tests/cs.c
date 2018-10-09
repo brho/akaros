@@ -495,6 +495,7 @@ static void io(void)
 	long n;
 	uint8_t mdata[IOHDRSZ + Maxfdata];
 	struct job *job;
+	pthread_attr_t pth_attr;
 
 	/*
 	 * each request is handled via a thread. Somewhat less efficient than the
@@ -502,6 +503,8 @@ static void io(void)
 	 * cs but way cleaner.
 	 */
 
+	pthread_attr_init(&pth_attr);
+	pthread_attr_setdetachstate(&pth_attr, PTHREAD_CREATE_DETACHED);
 	for (;;) {
 		n = read9pmsg(mfd[0], mdata, sizeof(mdata));
 		if (n <= 0)
@@ -519,7 +522,7 @@ static void io(void)
 		/* stash the thread in the job so we can join them all
 		 * later if we want to.
 		 */
-		if (pthread_create(&job->thread, NULL, &job_thread, job)) {
+		if (pthread_create(&job->thread, &pth_attr, &job_thread, job)) {
 			error(1, 0, "%s: %r", "Failed to create job");
 			continue;
 		}
