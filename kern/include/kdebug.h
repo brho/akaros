@@ -7,6 +7,7 @@
 /* for includes */
 struct proc;
 struct kthread;
+struct sized_alloc;
 
 struct symtab_entry {
 	const char *name;
@@ -47,6 +48,8 @@ size_t backtrace_user_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
  * user backtrace. */
 void print_backtrace_list(uintptr_t *pcs, size_t nr_pcs,
 						  void (*pfunc)(void *, const char *), void *opaque);
+void sza_print_backtrace_list(struct sized_alloc *sza, uintptr_t *pcs,
+                              size_t nr_pcs);
 /* Backtraces the calling kernel context, using pfunc for printing */
 void gen_backtrace(void (*pfunc)(void *, const char *), void *opaque);
 

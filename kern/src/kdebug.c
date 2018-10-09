@@ -196,16 +196,25 @@ void debug_addr_pid(int pid, unsigned long addr)
 	proc_decref(p);
 }
 
+#define BT_FMT "#%02d [<%p>] in %s\n"
+
 void print_backtrace_list(uintptr_t *pcs, size_t nr_pcs,
 						  void (*pfunc)(void *, const char *), void *opaque)
 {
 	char bt_line[128];
 
 	for (size_t i = 0; i < nr_pcs; i++) {
-		snprintf(bt_line, sizeof(bt_line), "#%02d [<%p>] in %s\n", i + 1,
-				 pcs[i], get_fn_name(pcs[i]));
+		snprintf(bt_line, sizeof(bt_line), BT_FMT, i + 1, pcs[i],
+		         get_fn_name(pcs[i]));
 		pfunc(opaque, bt_line);
 	}
+}
+
+void sza_print_backtrace_list(struct sized_alloc *sza, uintptr_t *pcs,
+                              size_t nr_pcs)
+{
+	for (size_t i = 0; i < nr_pcs; i++)
+		sza_printf(sza, BT_FMT, i + 1, pcs[i], get_fn_name(pcs[i]));
 }
 
 static void printk_func(void *opaque, const char *str)
