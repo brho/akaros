@@ -38,3 +38,12 @@ static inline uintptr_t get_caller_pc(void)
 	 * retaddr (just *(ebp + 1) is not) */
 	return *(ebp + 1) - 1;
 }
+
+static inline uintptr_t get_caller_fp(void)
+{
+	unsigned long *ebp = (unsigned long*)read_bp();
+
+	if (!ebp)
+		return 0;
+	return *ebp;
+}

@@ -9,19 +9,6 @@
 
 #include <ros/memlayout.h>
 
-/* The return address is right above ebp on the stack.  We subtract an
- * additional 1 to make sure the eip we get is actually in the function
- * that called us.  I had a couple cases early on where call was the last
- * instruction in a function, and simply reading the retaddr would point
- * into another function (the next one in the object).
- */
-#define GET_FRAME_START(ebp, eip)							\
-	do {													\
-		ebp = read_bp();									\
-		eip = *(uintptr_t *) (ebp + sizeof(uintptr_t)) - 1; \
-		ebp = *(uintptr_t *) ebp;							\
-	} while (0)
-
 // Beginning of stabs table
 extern const stab_t __STAB_BEGIN__[];
 
@@ -318,12 +305,11 @@ void *debug_get_fn_addr(char *fn_name)
 
 void gen_backtrace(void (*pfunc)(void *, const char *), void *opaque)
 {
-	uintptr_t ebp, eip;
 	uintptr_t pcs[MAX_BT_DEPTH];
 	size_t nr_pcs;
 
-	GET_FRAME_START(ebp, eip);
-	nr_pcs = backtrace_list(eip, ebp, pcs, MAX_BT_DEPTH);
+	nr_pcs = backtrace_list(get_caller_pc(), get_caller_fp(), pcs,
+	                        MAX_BT_DEPTH);
 	print_backtrace_list(pcs, nr_pcs, pfunc, opaque);
 }
 

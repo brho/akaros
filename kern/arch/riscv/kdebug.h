@@ -18,3 +18,9 @@ static inline uintptr_t get_caller_pc(void)
 #warning Returning PC instead of caller pc
 	return read_pc();
 }
+
+static inline uintptr_t get_caller_fp(void)
+{
+#warning Returning FP instead of caller fp
+	return read_ebp();
+}
