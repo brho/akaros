@@ -352,10 +352,6 @@ static struct chan *mem_open(struct chan *c, int omode)
 	case Qkmemstat:
 		c->synth_buf = build_kmemstat();
 		break;
-	case Qslab_trace:
-		/* slab_trace is built on write, not on open. */
-		assert(!c->synth_buf);
-		break;
 	}
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
@@ -372,7 +368,6 @@ static void mem_close(struct chan *c)
 	case Qslab_stats:
 	case Qfree:
 	case Qkmemstat:
-	case Qslab_trace:
 		kfree(c->synth_buf);
 		c->synth_buf = NULL;
 		break;
