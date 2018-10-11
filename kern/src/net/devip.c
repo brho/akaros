@@ -772,8 +772,10 @@ static void ipclose(struct chan *c)
 				atomic_dec(&f->p[PROTO(c->qid)]->conv[CONV(c->qid)]->snoopers);
 			break;
 		case Qiproute:
-			if (c->flag & COPEN)
+			if (c->flag & COPEN) {
 				kpages_free(c->synth_buf, IPROUTE_LEN);
+				c->synth_buf = NULL;
+			}
 			break;
 	}
 	kfree(((struct IPaux *)c->aux)->owner);
