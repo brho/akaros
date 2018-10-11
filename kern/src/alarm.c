@@ -312,13 +312,9 @@ bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 	spin_unlock_irqsave(&tchain->lock);
 
 	cv_lock_irqsave(&waiter->done_cv, &irq_state);
-	while (1) {
-		if (!waiter->is_running) {
-			cv_unlock_irqsave(&waiter->done_cv, &irq_state);
-			break;
-		}
+	while (waiter->is_running)
 		cv_wait(&waiter->done_cv);
-	}
+	cv_unlock_irqsave(&waiter->done_cv, &irq_state);
 
 	waiter->no_rearm = false;
 	return false;

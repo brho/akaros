@@ -439,13 +439,9 @@ static bool __tc_unset_alarm(struct timer_chain *tchain,
 	spin_pdr_unlock(&tchain->lock);
 
 	uth_cond_var_lock(&waiter->done_cv);
-	while (1) {
-		if (!waiter->is_running) {
-			uth_cond_var_unlock(&waiter->done_cv);
-			break;
-		}
+	while (waiter->is_running)
 		uth_cond_var_wait(&waiter->done_cv, NULL);
-	}
+	uth_cond_var_unlock(&waiter->done_cv);
 
 	waiter->no_rearm = false;
 	return false;
