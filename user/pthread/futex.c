@@ -56,12 +56,6 @@ static void __futex_timeout(struct alarm_waiter *awaiter) {
     //printf("timeout: %p\n", e->uaddr);
     uthread_runnable(e->uthread);
   }
-  // Set this as the very last thing we do whether we successfully woke the
-  // thread blocked on the futex or not.  Either we set this or wake() sets
-  // this, not both.  Spin on this in the bottom-half of the wait() code to
-  // ensure there are no more references to awaiter before freeing the memory
-  // for it.
-  e->awaiter.data = NULL;
 }
 
 static void __futex_block(struct uthread *uthread, void *arg) {
@@ -112,12 +106,10 @@ static inline int futex_wait(int *uaddr, int val, uint64_t us_timeout)
     uthread_yield(TRUE, __futex_block, &e);
     // We are unlocked here!
 
-    // If this futex had a timeout, spin briefly to make sure that all
-    // references to e are gone between the wake() and the timeout() code. We
-    // use e.awaiter.data to do this.
+	// Unset ensures the timeout won't happen, and if it did, that the alarm
+	// service is done with the awaiter
     if(e.us_timeout != (uint64_t)-1)
-      while (e.awaiter.data != NULL)
-        cpu_relax();
+	  unset_alarm(&e.awaiter);
 
     // After waking, if we timed out, set the error
     // code appropriately and return
@@ -160,22 +152,6 @@ static inline int futex_wake(int *uaddr, int count)
   while(e != NULL) {
     n = TAILQ_NEXT(e, link);
     TAILQ_REMOVE(&q, e, link);
-    // Cancel the timeout if one was set
-    if(e->us_timeout != (uint64_t)-1) {
-      // Try and unset the alarm.  If this fails, then we have already
-      // started running the alarm callback.  If it succeeds, then we can
-      // set awaiter->data to NULL so that the bottom half of wake can
-      // proceed. Either we set awaiter->data to NULL or __futex_timeout
-      // does. The fact that we made it here though, means that WE are the
-      // one who removed e from the queue, so we are basically just
-      // deciding who should set awaiter->data to NULL to indicate that
-      // there are no more references to it.
-      if(unset_alarm(&e->awaiter)) {
-        //printf("timeout canceled: %p\n", e->uaddr);
-        e->awaiter.data = NULL;
-      }
-    }
-    //printf("wake: %p\n", uaddr);
     uthread_runnable(e->uthread);
     e = n;
   }
