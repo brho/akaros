@@ -96,6 +96,10 @@ static inline int futex_wake(int *uaddr, int count)
 	struct futex_element *e, *temp;
 	struct futex_queue q = TAILQ_HEAD_INITIALIZER(q);
 
+	/* The waiter spins on us with cpu_relax_any().  That code assumes the
+	 * target of the wait/spin is in vcore context, or at least has notifs
+	 * disabled. */
+	uth_disable_notifs();
 	mcs_pdr_lock(&__futex.lock);
 	TAILQ_FOREACH_SAFE(e, &__futex.queue, link, temp) {
 		if (count <= 0)
@@ -111,13 +115,13 @@ static inline int futex_wake(int *uaddr, int count)
 		}
 	}
 	mcs_pdr_unlock(&__futex.lock);
-
 	TAILQ_FOREACH_SAFE(e, &q, link, temp) {
 		TAILQ_REMOVE(&q, e, link);
 		uth_cond_var_signal(&e->cv);
 		/* Do not touch e after marking it. */
 		e->waker_using = false;
 	}
+	uth_enable_notifs();
 
 	return max - count;
 }
