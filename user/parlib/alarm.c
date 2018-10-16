@@ -423,14 +423,6 @@ static bool __tc_unset_alarm(struct timer_chain *tchain,
 		return true;
 	}
 
-	/* A common case is that it already finished.  We need the CV lock farther
-	 * below so that we don't miss the signal.  You don't need it if you can see
-	 * the signal (is_running == false) is already sent. */
-	if (!waiter->is_running) {
-		spin_pdr_unlock(&tchain->lock);
-		return false;
-	}
-
 	/* no_rearm is set and checked under the tchain lock.  It is cleared when
 	 * unset completes, outside the lock.  That is safe since we know the alarm
 	 * service is no longer aware of waiter (either the handler ran or we
