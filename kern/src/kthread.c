@@ -417,9 +417,8 @@ void sem_down(struct semaphore *sem)
 	 *
 	 * Normal kthreads need to stay in the process context, but we want the core
 	 * (which could be a vcore) to stay in the context too. */
-	if (kthread->flags & KTH_SAVE_ADDR_SPACE) {
+	if ((kthread->flags & KTH_SAVE_ADDR_SPACE) && current) {
 		kthread->proc = current;
-		assert(kthread->proc);
 		/* In the future, we could check owning_proc. If it isn't set, we could
 		 * clear current and transfer the refcnt to kthread->proc.  If so, we'll
 		 * need to reset the cr3 to something (boot_cr3 or owning_proc's cr3),
