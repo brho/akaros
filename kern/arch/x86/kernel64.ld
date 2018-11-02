@@ -38,17 +38,6 @@ SECTIONS
 		*(.rodata .rodata.* .gnu.linkonce.r.*)
 	}
 
-	/* TODO: add some debug info.  i hear stabs are 32 bit only, so we'll need
-	 * to bring in some dwarves.  for now, hack in the symbols to compile. */
-	.stab : {
-		PROVIDE(__STAB_BEGIN__ = .);
-		PROVIDE(__STAB_END__ = .);
-	}
-	.stabstr : {
-		PROVIDE(__STABSTR_BEGIN__ = .);
-		PROVIDE(__STABSTR_END__ = .);
-	}
-
 	/* Adjust the address for the data segment to the next page */
 	. = ALIGN(0x1000);
 

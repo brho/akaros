@@ -8,7 +8,6 @@
 #include <arch/topology.h>
 #include <arch/console.h>
 #include <multiboot.h>
-#include <stab.h>
 #include <smp.h>
 
 #include <time.h>

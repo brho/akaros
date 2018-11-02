@@ -1,11 +1,8 @@
-#include <stab.h>
 #include <string.h>
 #include <assert.h>
 #include <kdebug.h>
 #include <pmap.h>
 #include <process.h>
-
-#include <ros/memlayout.h>
 
 /* Here's the old backtrace, remove it once gen_backtrace is done: */
 #if 0

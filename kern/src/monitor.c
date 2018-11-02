@@ -2,7 +2,6 @@
 // controlling the kernel and exploring the system interactively.
 
 #include <arch/arch.h>
-#include <stab.h>
 #include <smp.h>
 #include <arch/console.h>
 
