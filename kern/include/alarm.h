@@ -68,14 +68,9 @@
  * Timer chains (like off a per-core timer) are made of lists/trees of these. */
 struct alarm_waiter {
 	uint64_t 					wake_up_time;	/* ugh, this is a TSC for now */
-	union {
-		void (*func) (struct alarm_waiter *waiter);
-		void (*func_irq) (struct alarm_waiter *waiter,
-		                  struct hw_trapframe *hw_tf);
-	};
+	void (*func) (struct alarm_waiter *waiter);
 	void						*data;
 	TAILQ_ENTRY(alarm_waiter)	next;
-	bool						irq_ok;
 	bool						on_tchain;
 	bool						is_running;
 	bool						no_rearm;
@@ -102,9 +97,6 @@ void init_timer_chain(struct timer_chain *tchain,
 /* For fresh alarm waiters.  func == 0 for kthreads */
 void init_awaiter(struct alarm_waiter *waiter,
                   void (*func) (struct alarm_waiter *));
-void init_awaiter_irq(struct alarm_waiter *waiter,
-                      void (*func_irq) (struct alarm_waiter *awaiter,
-                                        struct hw_trapframe *hw_tf));
 /* Sets the time an awaiter goes off */
 void set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time);
 void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep);

@@ -45,32 +45,16 @@ void init_timer_chain(struct timer_chain *tchain,
 	reset_tchain_times(tchain);
 }
 
-static void __init_awaiter(struct alarm_waiter *waiter)
+void init_awaiter(struct alarm_waiter *waiter,
+                  void (*func) (struct alarm_waiter *awaiter))
 {
+	assert(func);
+	waiter->func = func;
 	waiter->wake_up_time = ALARM_POISON_TIME;
 	waiter->on_tchain = false;
 	waiter->is_running = false;
 	waiter->no_rearm = false;
 	cv_init_irqsave(&waiter->done_cv);
-}
-
-void init_awaiter(struct alarm_waiter *waiter,
-                  void (*func) (struct alarm_waiter *awaiter))
-{
-	waiter->irq_ok = FALSE;
-	assert(func);
-	waiter->func = func;
-	__init_awaiter(waiter);
-}
-
-void init_awaiter_irq(struct alarm_waiter *waiter,
-                      void (*func_irq) (struct alarm_waiter *awaiter,
-                                        struct hw_trapframe *hw_tf))
-{
-	waiter->irq_ok = TRUE;
-	assert(func_irq);
-	waiter->func_irq = func_irq;
-	__init_awaiter(waiter);
 }
 
 /* Give this the absolute time.  For now, abs_time is the TSC time that you want
@@ -148,13 +132,8 @@ static void __run_awaiter(uint32_t srcid, long a0, long a1, long a2)
 static void wake_awaiter(struct alarm_waiter *waiter,
                          struct hw_trapframe *hw_tf)
 {
-	if (waiter->irq_ok) {
-		waiter->func_irq(waiter, hw_tf);
-		__finish_awaiter(waiter);
-	} else {
-		send_kernel_message(core_id(), __run_awaiter, (long)waiter,
-		                    0, 0, KMSG_ROUTINE);
-	}
+	send_kernel_message(core_id(), __run_awaiter, (long)waiter,
+	                    0, 0, KMSG_ROUTINE);
 }
 
 /* This is called when an interrupt triggers a tchain, and needs to wake up
@@ -402,12 +381,8 @@ void print_chain(struct timer_chain *tchain)
 	       tchain->earliest_time,
 	       tchain->latest_time);
 	TAILQ_FOREACH(i, &tchain->waiters, next) {
-		uintptr_t f;
+		uintptr_t f = (uintptr_t)i->func;
 
-		if (i->irq_ok)
-			f = (uintptr_t)i->func_irq;
-		else
-			f = (uintptr_t)i->func;
 		printk("\tWaiter %p, time %llu, func %p (%s)\n", i,
 		       i->wake_up_time, f, get_fn_name(f));
 	}
