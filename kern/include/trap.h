@@ -179,7 +179,7 @@ void __kmsg_trampoline(uint32_t srcid, long a0, long a1, long a2);
 #define __CTX_IRQ_D_MASK			((1 << 8) - 1)
 #define __CTX_KTRAP_D_MASK			((1 << 8) - 1)
 #define __CTX_NESTED_CTX_MASK		((1 << 16) - 1)
-#define __CTX_RCU_CB				(1 << (__CTX_FLAG_SHIFT + 0))
+#define __CTX_CANNOT_BLOCK			(1 << (__CTX_FLAG_SHIFT + 0))
 
 /* Basic functions to get or change depths */
 
@@ -201,11 +201,11 @@ void __kmsg_trampoline(uint32_t srcid, long a0, long a1, long a2);
 #define dec_ktrap_depth(pcpui)                                                 \
 	((pcpui)->__ctx_depth -= 1 << __CTX_KTRAP_D_SHIFT)
 
-#define set_rcu_cb(pcpui)                                                      \
-	((pcpui)->__ctx_depth |= __CTX_RCU_CB)
+#define set_cannot_block(pcpui)                                                \
+	((pcpui)->__ctx_depth |= __CTX_CANNOT_BLOCK)
 
-#define clear_rcu_cb(pcpui)                                                    \
-	((pcpui)->__ctx_depth &= ~__CTX_RCU_CB)
+#define clear_cannot_block(pcpui)                                              \
+	((pcpui)->__ctx_depth &= ~__CTX_CANNOT_BLOCK)
 
 /* Functions to query the kernel context depth/state.  I haven't fully decided
  * on whether or not 'default' context includes RKMs or not.  Will depend on
@@ -214,17 +214,14 @@ void __kmsg_trampoline(uint32_t srcid, long a0, long a1, long a2);
 #define in_irq_ctx(pcpui)                                                      \
 	(irq_depth(pcpui))
 
-#define in_rcu_cb_ctx(pcpui)                                                   \
-	((pcpui)->__ctx_depth & __CTX_RCU_CB)
-
 /* Right now, anything (KTRAP, IRQ, or RKM) makes us not 'default' */
 #define in_default_ctx(pcpui)                                                  \
 	(!(pcpui)->__ctx_depth)
 
 /* Can block only if we have no nested contexts (ktraps or irqs, (which are
- * potentially nested contexts)) and not in an RCU CB*/
+ * potentially nested contexts)) and not in an explicit CANNOT_BLOCK. */
 #define can_block(pcpui)                                                       \
-	(!((pcpui)->__ctx_depth & (__CTX_NESTED_CTX_MASK | __CTX_RCU_CB)))
+	(!((pcpui)->__ctx_depth & (__CTX_NESTED_CTX_MASK | __CTX_CANNOT_BLOCK)))
 
 /* TRUE if we are allowed to spin, given that the 'lock' was declared as not
  * grabbable from IRQ context.  Meaning, we can't grab the lock from any nested

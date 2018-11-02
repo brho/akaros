@@ -116,10 +116,10 @@ void synchronize_rcu(void)
 	struct sync_cb_blob b[1];
 	struct semaphore sem[1];
 
-	if (in_rcu_cb_ctx(this_pcpui_ptr()))
-		panic("Attempted synchronize_rcu() from an RCU callback!");
+	if (!can_block(this_pcpui_ptr()))
+		panic("Attempted %s() from an unblockable context!", __func__);
 	if (is_rcu_ktask(current_kthread))
-		panic("Attempted synchronize_rcu() from an RCU thread!");
+		panic("Attempted %s() from an RCU thread!", __func__);
 	sem_init(sem, 0);
 	init_rcu_head_on_stack(&b->h);
 	b->sem = sem;
@@ -225,15 +225,14 @@ void rcu_barrier(void)
 	struct sync_cb_blob *b;
 	int nr_sent = 0;
 
-	if (in_rcu_cb_ctx(this_pcpui_ptr()))
-		panic("Attempted rcu_barrier() from an RCU callback!");
+	if (!can_block(this_pcpui_ptr()))
+		panic("Attempted %s() from an unblockable context!", __func__);
 	if (is_rcu_ktask(current_kthread))
-		panic("Attempted rcu_barrier() from an RCU thread!");
+		panic("Attempted %s() from an RCU thread!", __func__);
 	/* TODO: if we have concurrent rcu_barriers, we might be able to share the
 	 * CBs.  Say we have 1 CB on a core, then N rcu_barriers.  We'll have N
 	 * call_rcus in flight, though we could share.  Linux does this with a mtx
 	 * and some accounting, I think. */
-
 	b = kzmalloc(sizeof(struct sync_cb_blob) * num_cores, MEM_WAIT);
 	/* Remember, you block when sem is <= 0.  We'll get nr_sent ups, and we'll
 	 * down 1 for each.  This is just like the synchronize_rcu() case; there,
@@ -516,12 +515,12 @@ static void run_rcu_cbs(struct rcu_state *rsp, int coreid)
 	 * world, not blocking also means our kthread won't migrate from this core,
 	 * such that the pcpui pointer (and thus the specific __ctx_depth) won't
 	 * change. */
-	set_rcu_cb(this_pcpui_ptr());
+	set_cannot_block(this_pcpui_ptr());
 	list_for_each_entry_safe(head, temp, &work, link) {
 		list_del(&head->link);
 		rcu_exec_cb(head);
 	}
-	clear_rcu_cb(this_pcpui_ptr());
+	clear_cannot_block(this_pcpui_ptr());
 
 	/* We kept nr_cbs in place until the CBs, which could block, completed.
 	 * This allows other readers (rcu_barrier()) of our pcpui to tell if we have
