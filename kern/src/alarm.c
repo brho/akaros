@@ -125,7 +125,9 @@ static void __run_awaiter(uint32_t srcid, long a0, long a1, long a2)
 {
 	struct alarm_waiter *waiter = (struct alarm_waiter*)a0;
 
+	set_cannot_block(this_pcpui_ptr());
 	waiter->func(waiter);
+	clear_cannot_block(this_pcpui_ptr());
 	__finish_awaiter(waiter);
 }
 
