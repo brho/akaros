@@ -21,9 +21,9 @@ struct errbuf {
 
 struct proc;
 struct kthread;
-struct semaphore;
+struct kth_db_info;
 TAILQ_HEAD(kthread_tailq, kthread);
-TAILQ_HEAD(semaphore_tailq, semaphore);
+TAILQ_HEAD(kth_db_tailq, kth_db_info);
 
 #define GENBUF_SZ 128	/* plan9 uses this as a scratch space, per syscall */
 
@@ -56,25 +56,39 @@ struct kthread {
 	struct systrace_record		*strace;
 };
 
+#define KTH_DB_SEM			1
+#define KTH_DB_CV			2
+
+struct kth_db_info {
+	TAILQ_ENTRY(kth_db_info)	link;
+	unsigned int				type;
+	bool						on_list;
+};
+
 /* Semaphore for kthreads to sleep on.  0 or less means you need to sleep */
 struct semaphore {
+#ifdef CONFIG_SEMAPHORE_DEBUG
+	struct kth_db_info			db;
+#endif
 	struct kthread_tailq		waiters;
 	int 						nr_signals;
 	spinlock_t 					lock;
 	bool						irq_okay;
-#ifdef CONFIG_SEMAPHORE_DEBUG
-	TAILQ_ENTRY(semaphore)		link;
-	bool						is_on_list;	/* would like better sys/queue.h */
-#endif
 };
 
-/* omitted elements (the sem debug stuff) are initialized to 0 */
+#ifdef CONFIG_SEMAPHORE_DEBUG
+#define KTH_DB_INIT .db         = { .type = KTH_DB_SEM },
+#else
+#define KTH_DB_INIT
+#endif
+
 #define SEMAPHORE_INITIALIZER(name, n)                                         \
 {                                                                              \
     .waiters    = TAILQ_HEAD_INITIALIZER((name).waiters),                      \
 	.nr_signals = (n),                                                         \
     .lock       = SPINLOCK_INITIALIZER,                                        \
     .irq_okay   = FALSE,                                                       \
+	KTH_DB_INIT                                                                \
 }
 
 #define SEMAPHORE_INITIALIZER_IRQSAVE(name, n)                                 \
@@ -83,9 +97,13 @@ struct semaphore {
 	.nr_signals = (n),                                                         \
     .lock       = SPINLOCK_INITIALIZER_IRQSAVE,                                \
     .irq_okay   = TRUE,                                                        \
+	KTH_DB_INIT                                                                \
 }
 
 struct cond_var {
+#ifdef CONFIG_SEMAPHORE_DEBUG
+	struct kth_db_info			db;
+#endif
 	struct kthread_tailq		waiters;
 	spinlock_t 					*lock;		/* usually points to internal_ */
 	spinlock_t 					internal_lock;

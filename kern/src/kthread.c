@@ -292,18 +292,15 @@ void ktask(char *name, void (*fn)(void*), void *arg)
 }
 
 /* Semaphores, using kthreads directly */
-static void debug_downed_sem(struct semaphore *sem);
-static void debug_upped_sem(struct semaphore *sem);
-static void debug_lock_semlist(void);
-static void debug_unlock_semlist(void);
+static void db_blocked_kth(struct kth_db_info *db);
+static void db_unblocked_kth(struct kth_db_info *db);
+static void db_init(struct kth_db_info *db, int type);
 
 static void sem_init_common(struct semaphore *sem, int signals)
 {
 	TAILQ_INIT(&sem->waiters);
 	sem->nr_signals = signals;
-#ifdef CONFIG_SEMAPHORE_DEBUG
-	sem->is_on_list = FALSE;
-#endif
+	db_init(&sem->db, KTH_DB_SEM);
 }
 
 void sem_init(struct semaphore *sem, int signals)
@@ -327,15 +324,12 @@ bool sem_trydown_bulk(struct semaphore *sem, int nr_signals)
 	/* lockless peek */
 	if (sem->nr_signals - nr_signals < 0)
 		return ret;
-	debug_lock_semlist();
 	spin_lock(&sem->lock);
 	if (sem->nr_signals - nr_signals >= 0) {
 		sem->nr_signals--;
 		ret = TRUE;
-		debug_downed_sem(sem);
 	}
 	spin_unlock(&sem->lock);
-	debug_unlock_semlist();
 	return ret;
 }
 
@@ -350,7 +344,6 @@ static void __attribute__((noreturn)) __sem_unlock_and_idle(void *arg)
 	struct semaphore *sem = (struct semaphore*)arg;
 
 	spin_unlock(&sem->lock);
-	debug_unlock_semlist();
 	smp_idle();
 }
 
@@ -465,12 +458,11 @@ void sem_down(struct semaphore *sem)
 	if (setjmp(&kthread->context))
 		goto block_return_path;
 
-	debug_lock_semlist();
 	spin_lock(&sem->lock);
 	sem->nr_signals -= 1;
 	if (sem->nr_signals < 0) {
 		TAILQ_INSERT_TAIL(&sem->waiters, kthread, link);
-		debug_downed_sem(sem);	/* need to debug after inserting */
+		db_blocked_kth(&sem->db);
 		/* At this point, we know we'll sleep and change stacks.  Once we unlock
 		 * the sem, we could have the kthread restarted (possibly on another
 		 * core), so we need to leave the old stack before unlocking.  If we
@@ -482,11 +474,7 @@ void sem_down(struct semaphore *sem)
 		                      __sem_unlock_and_idle);
 		assert(0);
 	}
-	/* We get here if we should not sleep on sem (the signal beat the sleep).
-	 * We debug_downed_sem since we actually downed it - just didn't sleep. */
-	debug_downed_sem(sem);
 	spin_unlock(&sem->lock);
-	debug_unlock_semlist();
 
 	unsave_kthread_ctx(kthread);
 
@@ -522,19 +510,17 @@ bool sem_up(struct semaphore *sem)
 {
 	struct kthread *kthread = 0;
 
-	debug_lock_semlist();
 	spin_lock(&sem->lock);
 	if (sem->nr_signals++ < 0) {
 		assert(!TAILQ_EMPTY(&sem->waiters));
 		/* could do something with 'priority' here */
 		kthread = TAILQ_FIRST(&sem->waiters);
 		TAILQ_REMOVE(&sem->waiters, kthread, link);
+		db_unblocked_kth(&sem->db);
 	} else {
 		assert(TAILQ_EMPTY(&sem->waiters));
 	}
-	debug_upped_sem(sem);
 	spin_unlock(&sem->lock);
-	debug_unlock_semlist();
 	/* Note that once we call kthread_runnable(), we cannot touch the sem again.
 	 * Some sems are on stacks.  The caller can touch sem, if it knows about the
 	 * memory/usage of the sem.  Likewise, we can't touch the kthread either. */
@@ -586,122 +572,146 @@ bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state)
 /* Sem debugging */
 
 #ifdef CONFIG_SEMAPHORE_DEBUG
-struct semaphore_tailq sems_with_waiters =
-                       TAILQ_HEAD_INITIALIZER(sems_with_waiters);
-/* The lock ordering is sems_with_waiters_lock -> any_sem_lock */
-spinlock_t sems_with_waiters_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
-static void debug_lock_semlist(void)
-{
-	spin_lock_irqsave(&sems_with_waiters_lock);
-}
+static struct kth_db_tailq objs_with_waiters =
+                       TAILQ_HEAD_INITIALIZER(objs_with_waiters);
+static spinlock_t objs_with_waiters_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 
-static void debug_unlock_semlist(void)
+static struct kthread_tailq *db_get_waiters(struct kth_db_info *db)
 {
-	spin_unlock_irqsave(&sems_with_waiters_lock);
-}
+	struct semaphore *sem;
+	struct cond_var *cv;
 
-/* this gets called any time we downed the sem, regardless of whether or not we
- * waited */
-static void debug_downed_sem(struct semaphore *sem)
-{
-	if (TAILQ_EMPTY(&sem->waiters) || sem->is_on_list)
-		return;
-	TAILQ_INSERT_HEAD(&sems_with_waiters, sem, link);
-	sem->is_on_list = TRUE;
-}
-
-/* Called when a sem is upped.  It may or may not have waiters, and it may or
- * may not be on the list. (we could up several times past 0). */
-static void debug_upped_sem(struct semaphore *sem)
-{
-	if (TAILQ_EMPTY(&sem->waiters) && sem->is_on_list) {
-		TAILQ_REMOVE(&sems_with_waiters, sem, link);
-		sem->is_on_list = FALSE;
+	switch (db->type) {
+	case KTH_DB_SEM:
+		return &container_of(db, struct semaphore, db)->waiters;
+	case KTH_DB_CV:
+		return &container_of(db, struct cond_var, db)->waiters;
 	}
+	panic("Bad type %d in db %p\n", db->type, db);
 }
 
-#else
-
-static void debug_lock_semlist(void)
+static spinlock_t *db_get_spinlock(struct kth_db_info *db)
 {
-	/* no debugging */
+	struct semaphore *sem;
+	struct cond_var *cv;
+
+	switch (db->type) {
+	case KTH_DB_SEM:
+		return &container_of(db, struct semaphore, db)->lock;
+	case KTH_DB_CV:
+		return container_of(db, struct cond_var, db)->lock;
+	}
+	panic("Bad type %d in db %p\n", db->type, db);
 }
 
-static void debug_unlock_semlist(void)
+static void db_blocked_kth(struct kth_db_info *db)
 {
-	/* no debugging */
+	spin_lock_irqsave(&objs_with_waiters_lock);
+	if (!db->on_list) {
+		TAILQ_INSERT_HEAD(&objs_with_waiters, db, link);
+		db->on_list = true;
+	}
+	spin_unlock_irqsave(&objs_with_waiters_lock);
 }
 
-static void debug_downed_sem(struct semaphore *sem)
+static void db_unblocked_kth(struct kth_db_info *db)
 {
-	/* no debugging */
+	spin_lock_irqsave(&objs_with_waiters_lock);
+	if (TAILQ_EMPTY(db_get_waiters(db))) {
+		TAILQ_REMOVE(&objs_with_waiters, db, link);
+		db->on_list = false;
+	}
+	spin_unlock_irqsave(&objs_with_waiters_lock);
 }
 
-static void debug_upped_sem(struct semaphore *sem)
+static void db_init(struct kth_db_info *db, int type)
 {
-	/* no debugging */
+	db->type = type;
+	db->on_list = false;
 }
 
-#endif /* CONFIG_SEMAPHORE_DEBUG */
-
-static bool __sem_has_pid(struct semaphore *sem, pid_t pid)
+static bool __obj_has_pid(struct kth_db_info *db, pid_t pid)
 {
 	struct kthread *kth_i;
 
 	if (pid == -1)
-		return TRUE;
-	TAILQ_FOREACH(kth_i, &sem->waiters, link) {
+		return true;
+	TAILQ_FOREACH(kth_i, db_get_waiters(db), link) {
 		if (kth_i->proc) {
 			if (kth_i->proc->pid == pid)
-				return TRUE;
+				return true;
 		} else {
 			if (pid == 0)
-				return TRUE;
+				return true;
 		}
 	}
-	return FALSE;
+	return false;
 }
 
-static void print_sem_info(struct semaphore *sem, pid_t pid)
+static void db_print_obj(struct kth_db_info *db, pid_t pid)
 {
 	struct kthread *kth_i;
 
-	/* Always safe to irqsave */
-	spin_lock_irqsave(&sem->lock);
-	if (!__sem_has_pid(sem, pid)) {
-		spin_unlock_irqsave(&sem->lock);
+	/* Always safe to irqsave.  We trylock, since the lock ordering is
+	 * obj_lock
+	 * -> list_lock. */
+	if (!spin_trylock_irqsave(db_get_spinlock(db)))
+		return;
+	if (!__obj_has_pid(db, pid)) {
+		spin_unlock_irqsave(db_get_spinlock(db));
 		return;
 	}
-	printk("Semaphore %p has %d signals (neg = waiters)\n", sem,
-	       sem->nr_signals);
-	TAILQ_FOREACH(kth_i, &sem->waiters, link)
+	printk("Object %p (%3s):\n", db, db->type == KTH_DB_SEM ? "sem" :
+	                                 db->type == KTH_DB_CV ? "cv" : "unk");
+	TAILQ_FOREACH(kth_i, db_get_waiters(db), link)
 		printk("\tKthread %p (%s), proc %d, sysc %p, pc/frame %p %p\n",
 		       kth_i, kth_i->name, kth_i->proc ? kth_i->proc->pid : 0,
 		       kth_i->sysc, jmpbuf_get_pc(&kth_i->context),
 		       jmpbuf_get_fp(&kth_i->context));
 	printk("\n");
-	spin_unlock_irqsave(&sem->lock);
+	spin_unlock_irqsave(db_get_spinlock(db));
 }
 
 void print_all_sem_info(pid_t pid)
 {
-#ifdef CONFIG_SEMAPHORE_DEBUG
-	struct semaphore *sem_i;
-	printk("All sems with waiters:\n");
-	spin_lock_irqsave(&sems_with_waiters_lock);
-	TAILQ_FOREACH(sem_i, &sems_with_waiters, link)
-		print_sem_info(sem_i, pid);
-	spin_unlock_irqsave(&sems_with_waiters_lock);
-#else
-	printk("Failed to print all sems: build with CONFIG_SEMAPHORE_DEBUG\n");
-#endif
+	struct kth_db_info *db_i;
+
+	print_lock();
+	printk("All objects with waiters:\n");
+	spin_lock_irqsave(&objs_with_waiters_lock);
+	TAILQ_FOREACH(db_i, &objs_with_waiters, link)
+		db_print_obj(db_i, pid);
+	spin_unlock_irqsave(&objs_with_waiters_lock);
+	print_unlock();
 }
+
+#else
+
+static void db_blocked_kth(struct kth_db_info *db)
+{
+}
+
+static void db_unblocked_kth(struct kth_db_info *db)
+{
+}
+
+static void db_init(struct kth_db_info *db, int type)
+{
+}
+
+void print_all_sem_info(pid_t pid)
+{
+	printk("Failed to print all sems: build with CONFIG_SEMAPHORE_DEBUG\n");
+}
+
+#endif /* CONFIG_SEMAPHORE_DEBUG */
 
 static void __cv_raw_init(struct cond_var *cv)
 {
 	TAILQ_INIT(&cv->waiters);
 	cv->nr_waiters = 0;
+	db_init(&cv->db, KTH_DB_CV);
 }
 
 /* Condition variables, using semaphores and kthreads */
@@ -788,6 +798,7 @@ void cv_wait_and_unlock(struct cond_var *cv)
 
 	TAILQ_INSERT_TAIL(&cv->waiters, kthread, link);
 	cv->nr_waiters++;
+	db_blocked_kth(&cv->db);
 
 	__reset_stack_pointer(cv, current_kthread->stacktop,
 	                      __cv_unlock_and_idle);
@@ -811,6 +822,7 @@ static void __cv_wake_one(struct cond_var *cv)
 
 	kthread = TAILQ_FIRST(&cv->waiters);
 	TAILQ_REMOVE(&cv->waiters, kthread, link);
+	db_unblocked_kth(&cv->db);
 	kthread_runnable(kthread);
 }
 
