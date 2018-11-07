@@ -86,7 +86,7 @@ struct semaphore {
 }
 
 struct cond_var {
-	struct semaphore			sem;
+	struct kthread_tailq		waiters;
 	spinlock_t 					*lock;		/* usually points to internal_ */
 	spinlock_t 					internal_lock;
 	unsigned long				nr_waiters;
