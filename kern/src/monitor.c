@@ -1005,14 +1005,14 @@ int mon_db(int argc, char **argv, struct hw_trapframe *hw_tf)
 
 	if (argc < 2) {
 		printk("Usage: db OPTION\n");
-		printk("\tsem [PID]: print all semaphore info\n");
+		printk("\tblk [PID]: print all blocked kthreads\n");
 		printk("\taddr PID 0xADDR: for PID lookup ADDR's file/vmr info\n");
 		return 1;
 	}
-	if (!strcmp(argv[1], "sem")) {
+	if (!strcmp(argv[1], "blk") || !strcmp(argv[1], "sem")) {
 		if (argc > 2)
 			pid = strtol(argv[2], 0, 0);
-		print_all_sem_info(pid);
+		print_db_blk_info(pid);
 	} else if (!strcmp(argv[1], "addr")) {
 		if (argc < 4) {
 			printk("Usage: db addr PID 0xADDR\n");

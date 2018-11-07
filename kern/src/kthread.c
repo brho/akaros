@@ -673,7 +673,7 @@ static void db_print_obj(struct kth_db_info *db, pid_t pid)
 	spin_unlock_irqsave(db_get_spinlock(db));
 }
 
-void print_all_sem_info(pid_t pid)
+void print_db_blk_info(pid_t pid)
 {
 	struct kth_db_info *db_i;
 
@@ -700,7 +700,7 @@ static void db_init(struct kth_db_info *db, int type)
 {
 }
 
-void print_all_sem_info(pid_t pid)
+void print_db_blk_info(pid_t pid)
 {
 	printk("Failed to print all sems: build with CONFIG_SEMAPHORE_DEBUG\n");
 }

@@ -158,7 +158,7 @@ void sem_down_bulk_irqsave(struct semaphore *sem, int nr_signals,
                            int8_t *irq_state);
 void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state);
 bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state);
-void print_all_sem_info(pid_t pid);
+void print_db_blk_info(pid_t pid);
 
 void cv_init(struct cond_var *cv);
 void cv_init_irqsave(struct cond_var *cv);
