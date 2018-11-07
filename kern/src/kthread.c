@@ -345,7 +345,7 @@ bool sem_trydown(struct semaphore *sem)
 }
 
 /* Bottom-half of sem_down.  This is called after we jumped to the new stack. */
-static void __attribute__((noreturn)) __unlock_and_idle(void *arg)
+static void __attribute__((noreturn)) __sem_unlock_and_idle(void *arg)
 {
 	struct semaphore *sem = (struct semaphore*)arg;
 
@@ -354,32 +354,23 @@ static void __attribute__((noreturn)) __unlock_and_idle(void *arg)
 	smp_idle();
 }
 
-/* This downs the semaphore and suspends the current kernel context on its
- * waitqueue if there are no pending signals.  Note that the case where the
- * signal is already there is not optimized. */
-void sem_down(struct semaphore *sem)
+static void pre_block_check(int nr_locks)
 {
-	struct kthread *kthread, *new_kthread;
-	register uintptr_t new_stacktop;
-	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	bool irqs_were_on = irq_is_enabled();
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
 
 	assert(can_block(pcpui));
 	/* Make sure we aren't holding any locks (only works if SPINLOCK_DEBUG) */
-	if (pcpui->lock_depth)
+	if (pcpui->lock_depth > nr_locks)
 		panic("Kthread tried to sleep, with lockdepth %d\n", pcpui->lock_depth);
-	/* Try to down the semaphore.  If there is a signal there, we can skip all
-	 * of the sleep prep and just return. */
-#ifdef CONFIG_SEM_SPINWAIT
-	for (int i = 0; i < CONFIG_SEM_SPINWAIT_NR_LOOPS; i++) {
-		if (sem_trydown(sem))
-			goto block_return_path;
-		cpu_relax();
-	}
-#else
-	if (sem_trydown(sem))
-		goto block_return_path;
-#endif
+
+}
+
+static struct kthread *save_kthread_ctx(void)
+{
+	struct kthread *kthread, *new_kthread;
+	register uintptr_t new_stacktop;
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
+
 	assert(pcpui->cur_kthread);
 	/* We're probably going to sleep, so get ready.  We'll check again later. */
 	kthread = pcpui->cur_kthread;
@@ -427,8 +418,53 @@ void sem_down(struct semaphore *sem)
 	} else {
 		assert(kthread->proc == 0);
 	}
+	return kthread;
+}
+
+static void unsave_kthread_ctx(struct kthread *kthread)
+{
+	struct per_cpu_info *pcpui = this_pcpui_ptr();
+	struct kthread *new_kthread = pcpui->cur_kthread;
+
+	printd("[kernel] Didn't sleep, unwinding...\n");
+	/* Restore the core's current and default stacktop */
+	if (kthread->flags & KTH_SAVE_ADDR_SPACE) {
+		proc_decref(kthread->proc);
+		kthread->proc = 0;
+	}
+	set_stack_top(kthread->stacktop);
+	pcpui->cur_kthread = kthread;
+	/* Save the allocs as the spare */
+	assert(!pcpui->spare);
+	pcpui->spare = new_kthread;
+}
+
+/* This downs the semaphore and suspends the current kernel context on its
+ * waitqueue if there are no pending signals. */
+void sem_down(struct semaphore *sem)
+{
+	bool irqs_were_on = irq_is_enabled();
+	struct kthread *kthread;
+
+	pre_block_check(0);
+
+	/* Try to down the semaphore.  If there is a signal there, we can skip all
+	 * of the sleep prep and just return. */
+#ifdef CONFIG_SEM_SPINWAIT
+	for (int i = 0; i < CONFIG_SEM_SPINWAIT_NR_LOOPS; i++) {
+		if (sem_trydown(sem))
+			goto block_return_path;
+		cpu_relax();
+	}
+#else
+	if (sem_trydown(sem))
+		goto block_return_path;
+#endif
+
+	kthread = save_kthread_ctx();
 	if (setjmp(&kthread->context))
 		goto block_return_path;
+
 	debug_lock_semlist();
 	spin_lock(&sem->lock);
 	sem->nr_signals -= 1;
@@ -442,7 +478,8 @@ void sem_down(struct semaphore *sem)
 		 * that doesn't change stacks, unlike x86_64), we'll be using the stack
 		 * at the same time as the kthread.  We could just disable IRQs, but
 		 * that wouldn't protect us from NMIs that don't change stacks. */
-		__reset_stack_pointer(sem, new_stacktop, __unlock_and_idle);
+		__reset_stack_pointer(sem, current_kthread->stacktop,
+		                      __sem_unlock_and_idle);
 		assert(0);
 	}
 	/* We get here if we should not sleep on sem (the signal beat the sleep).
@@ -450,17 +487,9 @@ void sem_down(struct semaphore *sem)
 	debug_downed_sem(sem);
 	spin_unlock(&sem->lock);
 	debug_unlock_semlist();
-	printd("[kernel] Didn't sleep, unwinding...\n");
-	/* Restore the core's current and default stacktop */
-	if (kthread->flags & KTH_SAVE_ADDR_SPACE) {
-		proc_decref(kthread->proc);
-		kthread->proc = 0;
-	}
-	set_stack_top(kthread->stacktop);
-	pcpui->cur_kthread = kthread;
-	/* Save the allocs as the spare */
-	assert(!pcpui->spare);
-	pcpui->spare = new_kthread;
+
+	unsave_kthread_ctx(kthread);
+
 block_return_path:
 	printd("[kernel] Returning from being 'blocked'! at %llu\n", read_tsc());
 	/* restart_kthread and longjmp did not reenable IRQs.  We need to make sure
@@ -469,7 +498,6 @@ block_return_path:
 	 * them. */
 	if (irqs_were_on)
 		enable_irq();
-	return;
 }
 
 void sem_down_bulk(struct semaphore *sem, int nr_signals)
