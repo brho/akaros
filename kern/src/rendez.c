@@ -97,7 +97,7 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	 * condition (and we should exit), other alarms with different timeouts (and
 	 * we should go back to sleep), etc.  Note it is possible for our alarm to
 	 * fire immediately upon setting it: before we even cv_lock. */
-	while (!cond(arg) && awaiter.on_tchain) {
+	while (!cond(arg) && !alarm_expired(&awaiter)) {
 		if (should_abort(&cle)) {
 			cv_unlock_irqsave(&rv->cv, &irq_state);
 			unset_alarm(pcpui_tchain, &awaiter);

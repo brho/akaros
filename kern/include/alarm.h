@@ -119,6 +119,11 @@ void __trigger_tchain(struct timer_chain *tchain, struct hw_trapframe *hw_tf);
 /* Sets the timer chain interrupt according to the next timer in the chain. */
 void set_pcpu_alarm_interrupt(struct timer_chain *tchain);
 
+static inline bool alarm_expired(struct alarm_waiter *awaiter)
+{
+	return awaiter->wake_up_time <= read_tsc();
+}
+
 /* Debugging */
 #define ALARM_POISON_TIME 12345				/* could use some work */
 void print_chain(struct timer_chain *tchain);
