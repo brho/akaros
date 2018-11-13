@@ -120,8 +120,7 @@ void smp_percpu_init(void)
 	STAILQ_INIT(&per_cpu_info[coreid].immed_amsgs);
 	spinlock_init_irqsave(&per_cpu_info[coreid].routine_amsg_lock);
 	STAILQ_INIT(&per_cpu_info[coreid].routine_amsgs);
-	/* Initialize the per-core timer chain */
-	init_timer_chain(&per_cpu_info[coreid].tchain, set_pcpu_alarm_interrupt);
+	init_timer_chain(&this_pcpui_var(tchain), set_pcpu_alarm_interrupt);
 	/* Init generic tracing ring */
 	trace_buf = kpage_alloc_addr();
 	assert(trace_buf);
