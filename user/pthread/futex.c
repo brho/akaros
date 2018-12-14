@@ -150,7 +150,7 @@ int futex(int *uaddr, int op, int val, const struct timespec *timeout,
 
 	switch (op) {
 	case FUTEX_WAIT:
-		return futex_wait(uaddr, val, abs_timeout);
+		return futex_wait(uaddr, val, timeout ? abs_timeout : NULL);
 	case FUTEX_WAKE:
 		return futex_wake(uaddr, val);
 	default:
