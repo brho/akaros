@@ -264,7 +264,7 @@ static void handle_alarm_prof(struct event_msg *ev_msg, unsigned int ev_type,
 {
 	int vcoreid = vcore_id();
 	struct pvcalarm_data *pvcalarm_data = &global_pvcalarm.data[vcoreid];
-	uint32_t uptime = vcore_account_uptime_ticks(vcoreid);
+	uint64_t uptime = vcore_account_uptime_ticks(vcoreid);
 	uint64_t diff = uptime - pvcalarm_data->start_uptime;
 
 	if (diff < global_pvcalarm.interval) {
