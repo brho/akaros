@@ -307,14 +307,12 @@ void sem_init(struct semaphore *sem, int signals)
 {
 	sem_init_common(sem, signals);
 	spinlock_init(&sem->lock);
-	sem->irq_okay = FALSE;
 }
 
 void sem_init_irqsave(struct semaphore *sem, int signals)
 {
 	sem_init_common(sem, signals);
 	spinlock_init_irqsave(&sem->lock);
-	sem->irq_okay = TRUE;
 }
 
 bool sem_trydown_bulk(struct semaphore *sem, int nr_signals)
@@ -721,7 +719,6 @@ void cv_init(struct cond_var *cv)
 
 	cv->lock = &cv->internal_lock;
 	spinlock_init(cv->lock);
-	cv->irq_okay = FALSE;
 }
 
 void cv_init_irqsave(struct cond_var *cv)
@@ -730,7 +727,6 @@ void cv_init_irqsave(struct cond_var *cv)
 
 	cv->lock = &cv->internal_lock;
 	spinlock_init_irqsave(cv->lock);
-	cv->irq_okay = TRUE;
 }
 
 void cv_init_with_lock(struct cond_var *cv, spinlock_t *lock)
@@ -738,15 +734,11 @@ void cv_init_with_lock(struct cond_var *cv, spinlock_t *lock)
 	__cv_raw_init(cv);
 
 	cv->lock = lock;
-	cv->irq_okay = FALSE;
 }
 
 void cv_init_irqsave_with_lock(struct cond_var *cv, spinlock_t *lock)
 {
-	__cv_raw_init(cv);
-
-	cv->lock = lock;
-	cv->irq_okay = TRUE;
+	cv_init_with_lock(cv, lock);
 }
 
 void cv_lock(struct cond_var *cv)
@@ -779,8 +771,9 @@ static void __attribute__((noreturn)) __cv_unlock_and_idle(void *arg)
 	smp_idle();
 }
 
-/* Comes in locked.  The initial cv_lock would have disabled irqs (if
- * applicable). */
+/* Comes in locked.  Regarding IRQs, the initial cv_lock_irqsave would have
+ * disabled irqs.  When this returns, IRQs would still be disabled.  If it was a
+ * regular cv_lock(), IRQs will be enabled when we return. */
 void cv_wait_and_unlock(struct cond_var *cv)
 {
 	bool irqs_were_on = irq_is_enabled();
@@ -806,12 +799,11 @@ void cv_wait_and_unlock(struct cond_var *cv)
 }
 
 /* Comes in locked.  Note cv_lock does not disable irqs.   They should still be
- * disabled from the initial cv_lock_irqsave(). */
+ * disabled from the initial cv_lock_irqsave(), which cv_wait_and_unlock()
+ * maintained. */
 void cv_wait(struct cond_var *cv)
 {
 	cv_wait_and_unlock(cv);
-	if (cv->irq_okay)
-		assert(!irq_is_enabled());
 	cv_lock(cv);
 }
 

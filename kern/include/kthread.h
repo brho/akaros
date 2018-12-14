@@ -73,7 +73,6 @@ struct semaphore {
 	struct kthread_tailq		waiters;
 	int 						nr_signals;
 	spinlock_t 					lock;
-	bool						irq_okay;
 };
 
 #ifdef CONFIG_SEMAPHORE_DEBUG
@@ -87,7 +86,6 @@ struct semaphore {
     .waiters    = TAILQ_HEAD_INITIALIZER((name).waiters),                      \
 	.nr_signals = (n),                                                         \
     .lock       = SPINLOCK_INITIALIZER,                                        \
-    .irq_okay   = FALSE,                                                       \
 	KTH_DB_INIT                                                                \
 }
 
@@ -96,7 +94,6 @@ struct semaphore {
     .waiters    = TAILQ_HEAD_INITIALIZER((name).waiters),                      \
 	.nr_signals = (n),                                                         \
     .lock       = SPINLOCK_INITIALIZER_IRQSAVE,                                \
-    .irq_okay   = TRUE,                                                        \
 	KTH_DB_INIT                                                                \
 }
 
@@ -108,7 +105,6 @@ struct cond_var {
 	spinlock_t 					*lock;		/* usually points to internal_ */
 	spinlock_t 					internal_lock;
 	unsigned long				nr_waiters;
-	bool						irq_okay;
 };
 
 struct cv_lookup_elm {
