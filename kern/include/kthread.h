@@ -147,13 +147,11 @@ bool sem_trydown(struct semaphore *sem);
 void sem_down_bulk(struct semaphore *sem, int nr_signals);
 void sem_down(struct semaphore *sem);
 bool sem_up(struct semaphore *sem);
-bool sem_trydown_bulk_irqsave(struct semaphore *sem, int nr_signals,
-                              int8_t *irq_state);
-bool sem_trydown_irqsave(struct semaphore *sem, int8_t *irq_state);
-void sem_down_bulk_irqsave(struct semaphore *sem, int nr_signals,
-                           int8_t *irq_state);
-void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state);
-bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state);
+bool sem_trydown_bulk_irqsave(struct semaphore *sem, int nr_signals);
+bool sem_trydown_irqsave(struct semaphore *sem);
+void sem_down_bulk_irqsave(struct semaphore *sem, int nr_signals);
+void sem_down_irqsave(struct semaphore *sem);
+bool sem_up_irqsave(struct semaphore *sem);
 void print_db_blk_info(pid_t pid);
 
 void cv_init(struct cond_var *cv);

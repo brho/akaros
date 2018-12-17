@@ -529,41 +529,44 @@ bool sem_up(struct semaphore *sem)
 	return FALSE;
 }
 
-bool sem_trydown_bulk_irqsave(struct semaphore *sem, int nr_signals,
-                              int8_t *irq_state)
+bool sem_trydown_bulk_irqsave(struct semaphore *sem, int nr_signals)
 {
 	bool ret;
+	int8_t irq_state = 0;
 
-	disable_irqsave(irq_state);
+	disable_irqsave(&irq_state);
 	ret = sem_trydown_bulk(sem, nr_signals);
-	enable_irqsave(irq_state);
+	enable_irqsave(&irq_state);
 	return ret;
 }
 
-bool sem_trydown_irqsave(struct semaphore *sem, int8_t *irq_state)
+bool sem_trydown_irqsave(struct semaphore *sem)
 {
-	return sem_trydown_bulk_irqsave(sem, 1, irq_state);
+	return sem_trydown_bulk_irqsave(sem, 1);
 }
 
-void sem_down_bulk_irqsave(struct semaphore *sem, int nr_signals,
-                           int8_t *irq_state)
+void sem_down_bulk_irqsave(struct semaphore *sem, int nr_signals)
 {
-	disable_irqsave(irq_state);
+	int8_t irq_state = 0;
+
+	disable_irqsave(&irq_state);
 	sem_down_bulk(sem, nr_signals);
-	enable_irqsave(irq_state);
+	enable_irqsave(&irq_state);
 }
 
-void sem_down_irqsave(struct semaphore *sem, int8_t *irq_state)
+void sem_down_irqsave(struct semaphore *sem)
 {
-	sem_down_bulk_irqsave(sem, 1, irq_state);
+	sem_down_bulk_irqsave(sem, 1);
 }
 
-bool sem_up_irqsave(struct semaphore *sem, int8_t *irq_state)
+bool sem_up_irqsave(struct semaphore *sem)
 {
 	bool retval;
-	disable_irqsave(irq_state);
+	int8_t irq_state = 0;
+
+	disable_irqsave(&irq_state);
 	retval = sem_up(sem);
-	enable_irqsave(irq_state);
+	enable_irqsave(&irq_state);
 	return retval;
 }
 
