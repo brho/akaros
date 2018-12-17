@@ -533,6 +533,7 @@ static int alarm_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
 static char *alarm_chaninfo(struct chan *ch, char *ret, size_t ret_l)
 {
 	struct proc_alarm *a;
+	struct timespec ts;
 
 	switch (TYPE(ch->qid)) {
 	case Qctl:
@@ -540,9 +541,13 @@ static char *alarm_chaninfo(struct chan *ch, char *ret, size_t ret_l)
 	case Qperiod:
 	case Qcount:
 		a = QID2A(ch->qid);
-		snprintf(ret, ret_l, "Id %d, %s, expires %llu, period %llu, count %llu",
-		         a->id, SLIST_EMPTY(&a->fd_taps) ? "untapped" : "tapped",
-		         a->a_waiter.wake_up_time, a->period, a->count);
+		ts = tsc2timespec(a->a_waiter.wake_up_time);
+		snprintf(ret, ret_l,
+		         "Id %d, %s, expires [%7d.%09d] (%p), period %llu, count %llu",
+		         a->id,
+		         SLIST_EMPTY(&a->fd_taps) ? "untapped" : "tapped",
+		         ts.tv_sec, ts.tv_nsec, a->a_waiter.wake_up_time,
+		         a->period, a->count);
 		break;
 	default:
 		return devchaninfo(ch, ret, ret_l);

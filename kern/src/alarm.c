@@ -356,16 +356,25 @@ void set_pcpu_alarm_interrupt(struct timer_chain *tchain)
 void print_chain(struct timer_chain *tchain)
 {
 	struct alarm_waiter *i;
+	struct timespec x = {0}, y = {0};
+
 	spin_lock_irqsave(&tchain->lock);
-	printk("Chain %p is%s empty, early: %llu latest: %llu\n", tchain,
-	       TAILQ_EMPTY(&tchain->waiters) ? "" : " not",
-	       tchain->earliest_time,
-	       tchain->latest_time);
+	if (TAILQ_EMPTY(&tchain->waiters)) {
+		printk("Chain %p is empty\n", tchain);
+		spin_unlock_irqsave(&tchain->lock);
+		return;
+	}
+	x = tsc2timespec(tchain->earliest_time);
+	y = tsc2timespec(tchain->latest_time);
+	printk("Chain %p:  earliest: [%7d.%09d] latest: [%7d.%09d]\n",
+	       tchain, x.tv_sec, x.tv_nsec, y.tv_sec, y.tv_nsec);
 	TAILQ_FOREACH(i, &tchain->waiters, next) {
 		uintptr_t f = (uintptr_t)i->func;
 
-		printk("\tWaiter %p, time %llu, func %p (%s)\n", i,
-		       i->wake_up_time, f, get_fn_name(f));
+		x = tsc2timespec(i->wake_up_time);
+		printk("\tWaiter %p, time [%7d.%09d] (%p), func %p (%s)\n",
+		       i, x.tv_sec, x.tv_nsec, i->wake_up_time, f,
+		       get_fn_name(f));
 	}
 	spin_unlock_irqsave(&tchain->lock);
 }
@@ -374,7 +383,10 @@ void print_chain(struct timer_chain *tchain)
 void print_pcpu_chains(void)
 {
 	struct timer_chain *pcpu_chain;
-	printk("PCPU Chains:  It is now %llu\n", read_tsc());
+	struct timespec ts;
+
+	ts = tsc2timespec(read_tsc());
+	printk("PCPU Chains:  It is now [%7d.%09d]\n", ts.tv_sec, ts.tv_nsec);
 
 	for (int i = 0; i < num_cores; i++) {
 		pcpu_chain = &per_cpu_info[i].tchain;
