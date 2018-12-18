@@ -1,4 +1,5 @@
 /* Copyright (c) 2013 The Regents of the University of California
+ * Copyright (c) 2018 Google Inc.
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
@@ -53,9 +54,6 @@ struct alarm_waiter {
 	void						*data;
 	TAILQ_ENTRY(alarm_waiter)	next;
 	bool						on_tchain;
-	bool						is_running;
-	bool						no_rearm;
-	struct uth_cond_var			done_cv;
 };
 TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
 
@@ -63,10 +61,11 @@ typedef void (*alarm_handler)(struct alarm_waiter *waiter);
 
 /* Sorted collection of alarms. */
 struct timer_chain {
-	struct spin_pdr_lock		lock;
 	struct awaiters_tailq		waiters;
+	struct alarm_waiter			*running;
 	uint64_t					earliest_time;
 	uint64_t					latest_time;
+	struct uth_cond_var			cv;
 	int							ctlfd;
 	int							timerfd;
 	int							alarmid;

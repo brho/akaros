@@ -1,4 +1,5 @@
 /* Copyright (c) 2013 The Regents of the University of California
+ * Copyright (c) 2018 Google Inc.
  * Barret Rhoden <brho@cs.berkeley.edu>
  * See LICENSE for details.
  *
@@ -17,8 +18,7 @@
  * - init_alarm_service, run as a constructor
  * - set_alarm() and friends are __tc_set_alarm(), passing global_tchain.
  * - reset_tchain_interrupt() uses #alarm
- * - removed anything related to semaphores or kthreads
- * - spinlocks -> spin_pdr_locks
+ * - spinlocks -> spin_pdr_locks (cv's lock, actually)
  * - ev_q wrappers for converting #alarm events to __triggers
  * - printks, and other minor stuff. */
 
@@ -152,9 +152,10 @@ static void __attribute__((constructor)) alarm_service_ctor(void)
 	if (__in_fake_parlib())
 		return;
 	/* Sets up timer chain (only one chain per process) */
-	spin_pdr_init(&global_tchain.lock);
 	TAILQ_INIT(&global_tchain.waiters);
+	global_tchain.running = NULL;
 	reset_tchain_times(&global_tchain);
+	uth_cond_var_init(&global_tchain.cv);
 
 	if (devalarm_get_fds(&ctlfd, &timerfd, &alarmid)) {
 		perror("Useralarm: devalarm_get_fds");
@@ -193,9 +194,6 @@ void init_awaiter(struct alarm_waiter *waiter,
 	assert(func);
 	waiter->func = func;
 	waiter->on_tchain = false;
-	waiter->is_running = false;
-	waiter->no_rearm = false;
-	uth_cond_var_init(&waiter->done_cv);
 }
 
 /* Give this the absolute time.  For now, abs_time is the TSC time that you want
@@ -272,48 +270,58 @@ static void reset_tchain_interrupt(struct timer_chain *tchain)
 	}
 }
 
-/* When an awaiter's time has come, this gets called. */
-static void wake_awaiter(struct alarm_waiter *waiter)
-{
-	waiter->func(waiter);
-	uth_cond_var_lock(&waiter->done_cv);
-	waiter->is_running = false;
-	__uth_cond_var_broadcast_and_unlock(&waiter->done_cv);
-}
-
 /* This is called when the kernel alarm triggers a tchain, and needs to wake up
  * everyone whose time is up.  Called from vcore context. */
 static void __trigger_tchain(struct timer_chain *tchain)
 {
 	struct alarm_waiter *i, *temp;
-	uint64_t now = read_tsc();
-	struct awaiters_tailq to_wake = TAILQ_HEAD_INITIALIZER(to_wake);
+	struct uthread *unsetter;
 
-	spin_pdr_lock(&tchain->lock);
-	TAILQ_FOREACH_SAFE(i, &tchain->waiters, next, temp) {
-		printd("Trying to wake up %p who is due at %llu and now is %llu\n",
-		       i, i->wake_up_time, now);
-		/* TODO: Could also do something in cases where we're close to now */
-		if (i->wake_up_time > now)
+	spin_pdr_lock(&tchain->cv.lock);
+	/* It's possible we have multiple contexts running a single tchain.  It
+	 * shouldn't be possible for per-core tchains, but it is possible
+	 * otherwise.  In that case, we can just abort, treating the event/IRQ
+	 * that woke us up as a 'poke'. */
+	if (tchain->running) {
+		spin_pdr_unlock(&tchain->cv.lock);
+		return;
+	}
+	while ((i = TAILQ_FIRST(&tchain->waiters))) {
+		/* TODO: Could also do something in cases where it's close to
+		 * expiring. */
+		if (i->wake_up_time > read_tsc())
 			break;
-		/* At this point, unset must wait until it has finished */
-		i->on_tchain = false;
-		i->is_running = true;
 		TAILQ_REMOVE(&tchain->waiters, i, next);
-		TAILQ_INSERT_TAIL(&to_wake, i, next);
-	}
-	reset_tchain_times(tchain);
-	reset_tchain_interrupt(tchain);
-	spin_pdr_unlock(&tchain->lock);
+		i->on_tchain = false;
+		tchain->running = i;
 
-	TAILQ_FOREACH_SAFE(i, &to_wake, next, temp) {
-		/* Don't touch the waiter after waking it, since it could be in use on
-		 * another core (and the waiter can be clobbered as the kthread unwinds
-		 * its stack).  Or it could be kfreed.  Technically, the waiter hasn't
-		 * finished until we cleared is_running and unlocked the cv lock. */
-		TAILQ_REMOVE(&to_wake, i, next);
-		wake_awaiter(i);
+		/* Need the tchain times (earliest/latest) in sync when
+		 * unlocked. */
+		reset_tchain_times(tchain);
+
+		spin_pdr_unlock(&tchain->cv.lock);
+
+		/* Don't touch the waiter after running it, since the memory can
+		 * be used immediately */
+		i->func(i);
+
+		spin_pdr_lock(&tchain->cv.lock);
+		tchain->running = NULL;
+
+		/* This is the guts of a signal, but we're optimizing for the
+		 * common case where there is no unsetter.  Uthread CV
+		 * signal/broadcast wakes the uthreads up outside of the CV
+		 * lock, which will avoid any lock-ordering issues with the 2LS
+		 * and the CV - in this case, the alarm service. */
+		unsetter = __uth_cond_var_wake_one(&tchain->cv);
+		if (unsetter) {
+			spin_pdr_unlock(&tchain->cv.lock);
+			uthread_runnable(unsetter);
+			spin_pdr_lock(&tchain->cv.lock);
+		}
 	}
+	reset_tchain_interrupt(tchain);
+	spin_pdr_unlock(&tchain->cv.lock);
 }
 
 static void handle_user_alarm(struct event_msg *ev_msg, unsigned int ev_type,
@@ -374,14 +382,10 @@ static void __tc_set_alarm(struct timer_chain *tchain,
 	assert(waiter->wake_up_time != ALARM_POISON_TIME);
 	assert(!waiter->on_tchain);
 
-	spin_pdr_lock(&tchain->lock);
-	if (waiter->no_rearm) {
-		spin_pdr_unlock(&tchain->lock);
-		return;
-	}
+	spin_pdr_lock(&tchain->cv.lock);
 	if (__insert_awaiter(tchain, waiter))
 		reset_tchain_interrupt(tchain);
-	spin_pdr_unlock(&tchain->lock);
+	spin_pdr_unlock(&tchain->cv.lock);
 }
 
 /* Helper, rips the waiter from the tchain, knowing that it is on the list.
@@ -415,28 +419,28 @@ static bool __remove_awaiter(struct timer_chain *tchain,
 static bool __tc_unset_alarm(struct timer_chain *tchain,
                              struct alarm_waiter *waiter)
 {
-	spin_pdr_lock(&tchain->lock);
-	if (waiter->on_tchain) {
-		if (__remove_awaiter(tchain, waiter))
-			reset_tchain_interrupt(tchain);
-		spin_pdr_unlock(&tchain->lock);
-		return true;
+	spin_pdr_lock(&tchain->cv.lock);
+	for (;;) {
+		if (waiter->on_tchain) {
+			if (__remove_awaiter(tchain, waiter))
+				reset_tchain_interrupt(tchain);
+			spin_pdr_unlock(&tchain->cv.lock);
+			return true;
+		}
+		if (tchain->running != waiter) {
+			spin_pdr_unlock(&tchain->cv.lock);
+			return false;
+		}
+		/* It's running.  We'll need to try again.  Note the alarm could
+		 * have resubmitted itself, so ideally the caller can tell it to
+		 * not resubmit.
+		 *
+		 * Despite the slightly more difficult wake-up code in userspace
+		 * compared to the kernel, it's still better to use a CV here.
+		 * Some go tests in qemu were more likely to timeout/starve even
+		 * if we did some form of unlock/yield/relock pattern. */
+		uth_cond_var_wait(&tchain->cv, NULL);
 	}
-
-	/* no_rearm is set and checked under the tchain lock.  It is cleared when
-	 * unset completes, outside the lock.  That is safe since we know the alarm
-	 * service is no longer aware of waiter (either the handler ran or we
-	 * stopped it). */
-	waiter->no_rearm = true;
-	spin_pdr_unlock(&tchain->lock);
-
-	uth_cond_var_lock(&waiter->done_cv);
-	while (waiter->is_running)
-		uth_cond_var_wait(&waiter->done_cv, NULL);
-	uth_cond_var_unlock(&waiter->done_cv);
-
-	waiter->no_rearm = false;
-	return false;
 }
 
 /* waiter may be on the tchain, or it might have fired already and be off the
@@ -459,12 +463,12 @@ static bool __tc_reset_alarm_abs(struct timer_chain *tchain,
 void print_chain(struct timer_chain *tchain)
 {
 	struct alarm_waiter *i;
-	spin_pdr_lock(&tchain->lock);
+	spin_pdr_lock(&tchain->cv.lock);
 	printf("Chain %p is%s empty, early: %llu latest: %llu\n", tchain,
 	       TAILQ_EMPTY(&tchain->waiters) ? "" : " not",
 	       tchain->earliest_time,
 	       tchain->latest_time);
-	spin_pdr_unlock(&tchain->lock);
+	spin_pdr_unlock(&tchain->cv.lock);
 }
 
 /* "parlib" alarm handlers */
