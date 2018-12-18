@@ -61,6 +61,24 @@ static void rendez_alarm_handler(struct alarm_waiter *awaiter)
 	rendez_wakeup(rv);
 }
 
+void rendez_debug_waiter(struct alarm_waiter *awaiter)
+{
+	struct rendez *rv = (struct rendez*)awaiter->data;
+	struct cond_var *cv = &rv->cv;
+	struct kthread *kth;
+	int8_t irq_state = 0;
+
+	cv_lock_irqsave(cv, &irq_state);
+	TAILQ_FOREACH(kth, &cv->waiters, link) {
+		print_lock();
+		printk("-------- kth %s ----------\n", kth->name);
+		backtrace_kthread(kth);
+		printk("-----------------\n");
+		print_unlock();
+	}
+	cv_unlock_irqsave(cv, &irq_state);
+}
+
 /* Like sleep, but it will timeout in 'usec' microseconds. */
 void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
                           uint64_t usec)

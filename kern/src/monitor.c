@@ -1007,6 +1007,7 @@ int mon_db(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("Usage: db OPTION\n");
 		printk("\tblk [PID]: print all blocked kthreads\n");
 		printk("\taddr PID 0xADDR: for PID lookup ADDR's file/vmr info\n");
+		printk("\trv WAITER: backtrace rendez alarm waiter\n");
 		return 1;
 	}
 	if (!strcmp(argv[1], "blk") || !strcmp(argv[1], "sem")) {
@@ -1019,6 +1020,12 @@ int mon_db(int argc, char **argv, struct hw_trapframe *hw_tf)
 			return 1;
 		}
 		debug_addr_pid(strtol(argv[2], 0, 10), strtol(argv[3], 0, 16));
+	} else if (!strcmp(argv[1], "rv")) {
+		if (argc < 3) {
+			printk("Usage: db rv 0xWAITER\n");
+			return 1;
+		}
+		rendez_debug_waiter((struct alarm_waiter*)strtoul(argv[2], 0, 16));
 	} else {
 		printk("Bad option\n");
 		return 1;

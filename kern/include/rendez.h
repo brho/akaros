@@ -39,6 +39,7 @@
 
 #include <ros/common.h>
 #include <kthread.h>
+#include <alarm.h>
 
 struct rendez {
 	struct cond_var				cv;
@@ -51,3 +52,4 @@ void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg);
 void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
                           uint64_t usec);
 bool rendez_wakeup(struct rendez *rv);
+void rendez_debug_waiter(struct alarm_waiter *awaiter);
