@@ -59,27 +59,33 @@ struct kthread {
 #define KTH_DB_SEM			1
 #define KTH_DB_CV			2
 
+#ifdef CONFIG_SEMAPHORE_DEBUG
+
 struct kth_db_info {
 	TAILQ_ENTRY(kth_db_info)	link;
 	unsigned int				type;
 	bool						on_list;
 };
 
+#define KTH_DB_INIT .db         = { .type = KTH_DB_SEM },
+
+#else
+
+struct kth_db_info {
+};
+
+#define KTH_DB_INIT
+
+#endif
+
+
 /* Semaphore for kthreads to sleep on.  0 or less means you need to sleep */
 struct semaphore {
-#ifdef CONFIG_SEMAPHORE_DEBUG
 	struct kth_db_info			db;
-#endif
 	struct kthread_tailq		waiters;
 	int 						nr_signals;
 	spinlock_t 					lock;
 };
-
-#ifdef CONFIG_SEMAPHORE_DEBUG
-#define KTH_DB_INIT .db         = { .type = KTH_DB_SEM },
-#else
-#define KTH_DB_INIT
-#endif
 
 #define SEMAPHORE_INITIALIZER(name, n)                                         \
 {                                                                              \
@@ -98,9 +104,7 @@ struct semaphore {
 }
 
 struct cond_var {
-#ifdef CONFIG_SEMAPHORE_DEBUG
 	struct kth_db_info			db;
-#endif
 	struct kthread_tailq		waiters;
 	spinlock_t 					*lock;		/* usually points to internal_ */
 	spinlock_t 					internal_lock;
