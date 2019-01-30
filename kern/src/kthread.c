@@ -208,20 +208,26 @@ static void __launch_kthread(uint32_t srcid, long a0, long a1, long a2)
  * particularly smart yet, but when we do, we can put it here. */
 void kthread_runnable(struct kthread *kthread)
 {
-	uint32_t dst = core_id();
-	#if 0
-	/* turn this block on if you want to test migrating non-core0 kthreads */
-	switch (dst) {
-		case 0:
-			break;
-		case 7:
-			dst = 2;
-			break;
-		default:
-			dst++;
-	}
-	#endif
-	/* For lack of anything better, send it to ourselves. (TODO: KSCHED) */
+	int dst;
+
+	/* TODO: KSCHED - this is a scheduling decision.  The kthread can be
+	 * woken up by threads from somewhat unrelated processes.  Consider
+	 * unlocking a sem or kicking an RV from an MCP's syscall.  Where was
+	 * this kthread running before?  Did it belong to the MCP?  Is the
+	 * kthread from an old MCP that was on this core, but there is now a new
+	 * MCP?  (This can happen with alarms, currently).
+	 *
+	 * For ktasks, they tend to sleep on an RV forever.  Once they migrate
+	 * to a core other than core 0 due to blocking on a qlock/sem, they will
+	 * tend to stay on that core forever, interfering with an unrelated MCP.
+	 *
+	 * We could consider some sort of core affinity, but for now, we can
+	 * just route all ktasks to core 0.  Note this may hide some bugs that
+	 * would otherwise be exposed by running in parallel. */
+	if (is_ktask(kthread))
+		dst = 0;
+	else
+		dst = core_id();
 	send_kernel_message(dst, __launch_kthread, (long)kthread, 0, 0,
 	                    KMSG_ROUTINE);
 }
