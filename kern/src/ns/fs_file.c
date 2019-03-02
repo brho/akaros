@@ -432,7 +432,20 @@ size_t fs_file_write(struct fs_file *f, const uint8_t *buf, size_t count,
 		if (error)
 			error(-error, "write pm_load_page failed");
 		copy_amt = MIN(PGSIZE - pg_off, buf_end - buf);
-		memcpy_from_safe(page2kva(page) + pg_off, buf, copy_amt);
+		/* TODO: If you ask the kernel to write from a user address that
+		 * will page fault, the memcpy will fail and we'll move on to
+		 * the next region.  To avoid leaving a chunk of uninitialized
+		 * memory, we'll zero it out in the page cache.  Otherwise the
+		 * user could come back and read old kernel data.
+		 *
+		 * The real fix will be to have the kernel throw an error if it
+		 * was a segfault or block if it wasn't.  Note that when the
+		 * kernel attempts to access the user's page, it does so with a
+		 * handle_page_fault_nofile, which won't attempt to handle
+		 * file-backed VMRs *even if* the file is in the page cache.
+		 * Yikes! */
+		if (memcpy_from_safe(page2kva(page) + pg_off, buf, copy_amt))
+			memset(page2kva(page) + pg_off, 0, copy_amt);
 		buf += copy_amt;
 		so_far += copy_amt;
 		atomic_or(&page->pg_flags, PG_DIRTY);
