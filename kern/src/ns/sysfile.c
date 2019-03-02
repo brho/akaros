@@ -752,6 +752,8 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 			off = *offp;
 		if (off < 0)
 			error(EINVAL, ERROR_FIXME);
+		if ((off64_t)off + (size_t)n < (off64_t)off)
+			error(EINVAL, "bad offset %p + count %p", off, n);
 		if (off == 0) {
 			if (offp == NULL) {
 				spin_lock(&c->lock);
@@ -1121,6 +1123,8 @@ static long rwrite(int fd, void *va, long n, int64_t * offp)
 	}
 	if (off < 0)
 		error(EINVAL, ERROR_FIXME);
+	if ((off64_t)off + (size_t)n < (off64_t)off)
+		error(EINVAL, "bad offset %p + count %p", off, n);
 	m = devtab[c->type].write(c, va, n, off);
 	poperror();
 
