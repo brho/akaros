@@ -357,6 +357,9 @@ size_t fs_file_read(struct fs_file *f, uint8_t *buf, size_t count,
 	const uint8_t *buf_end = buf + count;
 	int error;
 
+	/* These errors should have been caught by higher level code */
+	if ((uintptr_t)buf + count < (uintptr_t)buf)
+		panic("Bad buf %p + count %p", buf, count);
 	if (waserror()) {
 		if (so_far) {
 			poperror();
@@ -403,6 +406,9 @@ size_t fs_file_write(struct fs_file *f, const uint8_t *buf, size_t count,
 	const uint8_t *buf_end = buf + count;
 	int error;
 
+	/* These errors should have been caught by higher level code */
+	if ((uintptr_t)buf + count < (uintptr_t)buf)
+		panic("Bad buf %p + count %p", buf, count);
 	if (waserror()) {
 		if (so_far) {
 			write_metadata(f, offset + so_far, false);

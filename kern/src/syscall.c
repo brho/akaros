@@ -1575,6 +1575,14 @@ static int sys_vmm_add_gpcs(struct proc *p, unsigned int nr_more_gpcs,
 	ERRSTACK(1);
 	struct vmm *vmm = &p->vmm;
 
+	/* We do a copy_from_user in __vmm_add_gpcs, but it ought to be clear
+	 * from the syscall.c code if we did our error checking. */
+	if (!is_user_rwaddr(gpcis, sizeof(struct vmm_gpcore_init) *
+	                           nr_more_gpcs)) {
+		set_error(EINVAL, "bad user addr %p + %p", gpcis,
+		          sizeof(struct vmm_gpcore_init) * nr_more_gpcs);
+		return -1;
+	}
 	qlock(&vmm->qlock);
 	if (waserror()) {
 		qunlock(&vmm->qlock);
@@ -1694,12 +1702,22 @@ static unsigned long sys_populate_va(struct proc *p, uintptr_t va,
 
 static intreg_t sys_read(struct proc *p, int fd, void *buf, size_t len)
 {
+	if (!is_user_rwaddr(buf, len)) {
+		set_error(EINVAL, "bad user addr %p + %p", buf, len);
+		return -1;
+	}
 	sysc_save_str("read on fd %d", fd);
 	return sysread(fd, buf, len);
 }
 
 static intreg_t sys_write(struct proc *p, int fd, const void *buf, size_t len)
 {
+	/* We'll let this one include read-only areas, unlike most other
+	 * syscalls that take bufs created and written by the user. */
+	if (!is_user_raddr(buf, len)) {
+		set_error(EINVAL, "bad user addr %p + %p", buf, len);
+		return -1;
+	}
 	sysc_save_str("write on fd %d", fd);
 	return syswrite(fd, (void*)buf, len);
 }
@@ -2234,10 +2252,11 @@ intreg_t sys_fd2path(struct proc *p, int fd, void *u_buf, size_t len)
 	int ret = 0;
 	struct chan *ch;
 	ERRSTACK(1);
-	/* UMEM: Check the range, can PF later and kill if the page isn't present */
+
+	/* UMEM: Check the range, can PF later and kill if the page isn't
+	 * present */
 	if (!is_user_rwaddr(u_buf, len)) {
-		printk("[kernel] bad user addr %p (+%p) in %s (user bug)\n", u_buf,
-		       len, __FUNCTION__);
+		set_error(EINVAL, "bad user addr %p + %p", u_buf, len);
 		return -1;
 	}
 	/* fdtochan throws */
@@ -2259,8 +2278,13 @@ intreg_t sys_wstat(struct proc *p, char *path, size_t path_l,
                    uint8_t *stat_m, size_t stat_sz, int flags)
 {
 	int retval = 0;
-	char *t_path = copy_in_path(p, path, path_l);
+	char *t_path;
 
+	if (!is_user_rwaddr(stat_m, stat_sz)) {
+		set_error(EINVAL, "bad user addr %p + %p", stat_m, stat_sz);
+		return -1;
+	}
+	t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
 	retval = syswstat(t_path, stat_m, stat_sz);
@@ -2271,6 +2295,10 @@ intreg_t sys_wstat(struct proc *p, char *path, size_t path_l,
 intreg_t sys_fwstat(struct proc *p, int fd, uint8_t *stat_m, size_t stat_sz,
                     int flags)
 {
+	if (!is_user_rwaddr(stat_m, stat_sz)) {
+		set_error(EINVAL, "bad user addr %p + %p", stat_m, stat_sz);
+		return -1;
+	}
 	return sysfwstat(fd, stat_m, stat_sz);
 }
 
@@ -2298,7 +2326,8 @@ static intreg_t sys_dup_fds_to(struct proc *p, unsigned int pid,
 	int slot;
 
 	if (!is_user_rwaddr(map, sizeof(struct childfdmap) * nentries)) {
-		set_errno(EINVAL);
+		set_error(EINVAL, "bad user addr %p + %p", map,
+		          sizeof(struct childfdmap) * nentries);
 		return -1;
 	}
 	child = get_controllable_proc(p, pid);
@@ -2340,8 +2369,10 @@ static intreg_t sys_tap_fds(struct proc *p, struct fd_tap_req *tap_reqs,
 {
 	struct fd_tap_req *req_i = tap_reqs;
 	int done;
+
 	if (!is_user_rwaddr(tap_reqs, sizeof(struct fd_tap_req) * nr_reqs)) {
-		set_errno(EINVAL);
+		set_error(EINVAL, "bad user addr %p + %p", tap_reqs,
+		          sizeof(struct fd_tap_req) * nr_reqs);
 		return 0;
 	}
 	for (done = 0; done < nr_reqs; done++, req_i++) {
