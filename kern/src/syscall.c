@@ -1676,7 +1676,7 @@ out:
 
 static int sys_abort_sysc(struct proc *p, struct syscall *sysc)
 {
-	return abort_sysc(p, sysc);
+	return abort_sysc(p, (uintptr_t)sysc);
 }
 
 static int sys_abort_sysc_fd(struct proc *p, int fd)

@@ -901,7 +901,7 @@ static void __abort_and_release_cle(struct cv_lookup_elm *cle)
  * - if you sleep, you're on the list
  * - if you are on the list or abort_in_progress is set, CV is signallable, and
  *   all the memory for CLE is safe */
-bool abort_sysc(struct proc *p, struct syscall *sysc)
+bool abort_sysc(struct proc *p, uintptr_t sysc)
 {
 	ERRSTACK(1);
 	struct cv_lookup_elm *cle;
@@ -909,7 +909,7 @@ bool abort_sysc(struct proc *p, struct syscall *sysc)
 
 	spin_lock_irqsave(&p->abort_list_lock);
 	TAILQ_FOREACH(cle, &p->abortable_sleepers, link) {
-		if (cle->sysc == sysc) {
+		if ((uintptr_t)cle->sysc == sysc) {
 			/* Note: we could have multiple aborters, so we need to use a
 			 * numeric refcnt instead of a flag. */
 			atomic_inc(&cle->abort_in_progress);
