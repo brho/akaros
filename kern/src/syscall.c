@@ -1432,8 +1432,12 @@ static int sys_send_event(struct proc *p, struct event_queue *ev_q,
 {
 	struct event_msg local_msg = {0};
 
-	if (memcpy_from_user(p, &local_msg, u_msg, sizeof(struct event_msg))) {
-		set_errno(EINVAL);
+	if (memcpy_from_user_errno(p, &local_msg, u_msg,
+	                           sizeof(struct event_msg))) {
+		return -1;
+	}
+	if (!is_user_rwaddr(ev_q, sizeof(struct event_queue))) {
+		set_error(EINVAL, "bad event_queue %p", ev_q);
 		return -1;
 	}
 	send_event(p, ev_q, &local_msg, vcoreid);
@@ -2568,6 +2572,11 @@ void __signal_syscall(struct syscall *sysc, struct proc *p)
 			memset(&local_msg, 0, sizeof(struct event_msg));
 			local_msg.ev_type = EV_SYSCALL;
 			local_msg.ev_arg3 = sysc;
+			if (!is_user_rwaddr(ev_q, sizeof(struct event_queue))) {
+				printk("[kernel] syscall had bad ev_q %p\n",
+				       ev_q);
+				return;
+			}
 			send_event(p, ev_q, &local_msg, 0);
 		}
 	}

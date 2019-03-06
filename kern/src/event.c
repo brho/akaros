@@ -370,22 +370,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	if (proc_is_dying(p))
 		return;
 	printd("[kernel] sending msg to proc %p, ev_q %p\n", p, ev_q);
-	if (!ev_q) {
-		warn("[kernel] Null ev_q - kernel code should check before sending!");
-		return;
-	}
-	if (!is_user_rwaddr(ev_q, sizeof(struct event_queue))) {
-		/* Ought to kill them, just warn for now */
-		printk("[kernel] Illegal addr for ev_q\n");
-		return;
-	}
-	/* This should be caught by "future technology" that can tell when the
-	 * kernel PFs on the user's behalf.  For now, we catch common userspace bugs
-	 * (had this happen a few times). */
-	if (!PTE_ADDR(ev_q)) {
-		printk("[kernel] Bad addr %p for ev_q\n", ev_q);
-		return;
-	}
+	assert(is_user_rwaddr(ev_q, sizeof(struct event_queue)));
 	/* ev_q is a user pointer, so we need to make sure we're in the right
 	 * address space */
 	old_proc = switch_to(p);
