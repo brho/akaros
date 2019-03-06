@@ -1018,7 +1018,7 @@ static size_t procread(struct chan *c, void *va, size_t n, off64_t off)
 				return i;
 			}
 			int2flag(mw->cm->mflag, flag);
-			if (strcmp(mw->cm->to->name->s, "#M") == 0) {
+			if (strcmp(mw->cm->to->name->s, "#mnt") == 0) {
 				srv = srvname(mw->cm->to->mchan);
 				i = snprintf(va, n, "mount %s %s %s %s\n", flag,
 							 srv == NULL ? mw->cm->to->mchan->name->s : srv,
