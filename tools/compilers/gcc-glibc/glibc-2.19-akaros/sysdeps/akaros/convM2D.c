@@ -36,8 +36,8 @@ int statcheck(uint8_t * buf, unsigned int nbuf)
 
 static char nullstring[] = "";
 
-unsigned int
-convM2D(uint8_t * buf, unsigned int nbuf, struct dir *d, char *strs)
+unsigned int convM2D(uint8_t * buf, unsigned int nbuf, struct dir *d, char
+		     *strs)
 {
 	uint8_t *p, *ebuf;
 	char *sv[4];

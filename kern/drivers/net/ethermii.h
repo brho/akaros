@@ -121,4 +121,7 @@ int miiane(struct mii *mii, int a, int p, int e);
 int miistatus(struct mii *mii);
 char *miidumpphy(struct mii *mii, char *p, char *e);
 void miidetach(struct mii *mii);
-struct mii *miiattach(void *ctlr, int mask, int (*rw)(struct mii *, int unused_int, int unused2, int unused3, int unused4));
+struct mii *miiattach(void *ctlr, int mask, int (*rw)(struct mii *,
+						      int unused_int,
+						      int unused2, int unused3,
+						      int unused4));

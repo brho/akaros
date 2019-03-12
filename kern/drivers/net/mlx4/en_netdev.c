@@ -105,10 +105,10 @@ struct mlx4_en_filter {
 
 	int rxq_index;
 	struct mlx4_en_priv *priv;
-	uint32_t flow_id;			/* RFS infrastructure id */
+	uint32_t flow_id;		/* RFS infrastructure id */
 	int id;				/* mlx4_en driver id */
-	uint64_t reg_id;			/* Flow steering API id */
-	uint8_t activated;			/* Used to prevent expiry before filter
+	uint64_t reg_id;		/* Flow steering API id */
+	uint8_t activated;		/* Used to prevent expiry before filter
 					 * is attached
 					 */
 	struct hlist_node filter_chain;

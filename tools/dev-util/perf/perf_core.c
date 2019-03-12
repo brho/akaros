@@ -29,9 +29,9 @@
 #include "elf.h"
 
 struct perf_generic_event {
-	char						*name;
-	uint32_t					type;
-	uint32_t					config;
+	char			*name;
+	uint32_t		type;
+	uint32_t		config;
 };
 
 struct perf_generic_event generic_events[] = {
@@ -82,8 +82,8 @@ static const char *perf_get_event_mask_name(const pfm_event_info_t *einfo,
 	ZERO_DATA(ainfo);
 	ainfo.size = sizeof(ainfo);
 	pfm_for_each_event_attr(i, einfo) {
-		pfm_err_t err = pfm_get_event_attr_info(einfo->idx, i, PFM_OS_NONE,
-												&ainfo);
+		pfm_err_t err = pfm_get_event_attr_info(einfo->idx, i,
+							PFM_OS_NONE, &ainfo);
 
 		if (err != PFM_SUCCESS) {
 			fprintf(stderr, "Failed to get attribute info: %s\n",
@@ -170,7 +170,8 @@ static bool parse_pfm_encoding(const char *str, struct perf_eventsel *sel)
 	strlcpy(sel->fq_str, ptr, MAX_FQSTR_SZ);
 	free(ptr);
 	if (encode.count == 0) {
-		fprintf(stderr, "Found event %s, but it had no codes!\n", sel->fq_str);
+		fprintf(stderr, "Found event %s, but it had no codes!\n",
+			sel->fq_str);
 		return FALSE;
 	}
 	sel->ev.event = encode.codes[0];
@@ -248,13 +249,17 @@ static void parse_modifiers(const char *str, struct perf_eventsel *sel)
 			break;
 		case 'c':
 			if (tok[1] != '=') {
-				fprintf(stderr, "Bad cmask tok %s, ignoring\n", tok);
+				fprintf(stderr, "Bad cmask tok %s, ignoring\n",
+					tok);
 				break;
 			}
 			errno = 0;
-			PMEV_SET_CMASK(sel->ev.event, strtoul(&tok[2], NULL, 0));
+			PMEV_SET_CMASK(sel->ev.event,
+				       strtoul(&tok[2], NULL, 0));
 			if (errno)
-				fprintf(stderr, "Bad cmask tok %s, trying anyway\n", tok);
+				fprintf(stderr,
+					"Bad cmask tok %s, trying anyway\n",
+					tok);
 			break;
 		}
 	}
@@ -276,9 +281,9 @@ static bool parse_raw_encoding(const char *str, struct perf_eventsel *sel)
 	colon = strchr(str, ':');
 	if (colon)
 		parse_modifiers(colon + 1, sel);
-	/* Note that we do not call x86_handle_pseudo_encoding here.  We'll submit
-	 * exactly what the user asked us for - which also means no fixed counters
-	 * for them (unless we want a :f: token or something). */
+	/* Note that we do not call x86_handle_pseudo_encoding here.  We'll
+	 * submit exactly what the user asked us for - which also means no fixed
+	 * counters for them (unless we want a :f: token or something). */
 	sel->type = PERF_TYPE_RAW;
 	sel->config = (PMEV_GET_MASK(sel->ev.event) << 8) |
 	              PMEV_GET_EVENT(sel->ev.event);
@@ -290,8 +295,8 @@ static bool parse_raw_encoding(const char *str, struct perf_eventsel *sel)
 static bool generic_str_get_code(const char *str, struct perf_eventsel *sel)
 {
 	char *colon = strchr(str, ':');
-	/* if there was no :, we compare as far as we can.  generic_events.name is a
-	 * string literal, so strcmp() is fine. */
+	/* if there was no :, we compare as far as we can.  generic_events.name
+	 * is a string literal, so strcmp() is fine. */
 	size_t len = colon ? colon - str : SIZE_MAX;
 
 	for (int i = 0; i < COUNT_OF(generic_events); i++) {
@@ -430,7 +435,7 @@ static void perf_get_arch_info(int perf_fd, struct perf_arch_info *pai)
 }
 
 static int perf_open_event(int perf_fd, const struct core_set *cores,
-						   const struct perf_eventsel *sel)
+			   const struct perf_eventsel *sel)
 {
 	uint8_t cmdbuf[1 + 3 * sizeof(uint64_t) + sizeof(uint32_t) +
 				   CORE_SET_SIZE];
@@ -448,7 +453,8 @@ static int perf_open_event(int perf_fd, const struct core_set *cores,
 	for (i = CORE_SET_SIZE - 1; (i >= 0) && !cores->core_set[i]; i--)
 		;
 	if (i < 0) {
-		fprintf(stderr, "Performance event CPU set must not be empty\n");
+		fprintf(stderr,
+			"Performance event CPU set must not be empty\n");
 		exit(1);
 	}
 	wptr = put_le_u32(wptr, i + 1);
@@ -481,14 +487,16 @@ static uint64_t *perf_get_event_values(int perf_fd, int ped, size_t *pnvalues)
 	rsize = pread(perf_fd, cmdbuf, bufsize, 0);
 
 	if (rsize < (sizeof(uint32_t))) {
-		fprintf(stderr, "Invalid read size while fetching event status: %ld\n",
-				rsize);
+		fprintf(stderr,
+			"Invalid read size while fetching event status: %ld\n",
+			rsize);
 		exit(1);
 	}
 	rptr = get_le_u32(rptr, &n);
 	if (((rptr - cmdbuf) + n * sizeof(uint64_t)) > rsize) {
-		fprintf(stderr, "Invalid read size while fetching event status: %ld\n",
-				rsize);
+		fprintf(stderr,
+			"Invalid read size while fetching event status: %ld\n",
+			rsize);
 		exit(1);
 	}
 	values = xmalloc(n * sizeof(uint64_t));
@@ -533,9 +541,9 @@ struct perf_context *perf_create_context(struct perf_context_config *cfg)
 
 	pctx->cfg = cfg;
 	pctx->perf_fd = xopen(cfg->perf_file, O_RDWR, 0);
-	/* perf record needs kpctl_fd, but other perf subcommands might not.  We'll
-	 * delay the opening of kpctl until we need it, since kprof is picky about
-	 * multiple users of kpctl. */
+	/* perf record needs kpctl_fd, but other perf subcommands might not.
+	 * We'll delay the opening of kpctl until we need it, since kprof is
+	 * picky about multiple users of kpctl. */
 	pctx->kpctl_fd = -1;
 	perf_get_arch_info(pctx->perf_fd, &pctx->pai);
 
@@ -551,22 +559,22 @@ void perf_free_context(struct perf_context *pctx)
 }
 
 void perf_context_event_submit(struct perf_context *pctx,
-							   const struct core_set *cores,
-							   const struct perf_eventsel *sel)
+			       const struct core_set *cores,
+			       const struct perf_eventsel *sel)
 {
 	struct perf_event *pevt = pctx->events + pctx->event_count;
 
 	if (pctx->event_count >= COUNT_OF(pctx->events)) {
-		fprintf(stderr, "Too many open events: %d\n", pctx->event_count);
-		exit(1);
+		fprintf(stderr, "Too many open events: %d\n",
+			pctx->event_count); exit(1);
 	}
 	pctx->event_count++;
 	pevt->cores = *cores;
 	pevt->sel = *sel;
 	pevt->ped = perf_open_event(pctx->perf_fd, cores, sel);
 	if (pevt->ped < 0) {
-		fprintf(stderr, "Unable to submit event \"%s\": %s\n", sel->fq_str,
-		        errstr());
+		fprintf(stderr, "Unable to submit event \"%s\": %s\n",
+			sel->fq_str, errstr());
 		exit(1);
 	}
 }
@@ -642,7 +650,7 @@ static void perf_print_attr_flags(const pfm_event_attr_info_t *info, FILE *file)
 
 /* Ported from libpfm4 */
 static void perf_show_event_info(const pfm_event_info_t *info,
-								 const pfm_pmu_info_t *pinfo, FILE *file)
+				 const pfm_pmu_info_t *pinfo, FILE *file)
 {
 	static const char * const srcs[PFM_ATTR_CTRL_MAX] = {
 		[PFM_ATTR_CTRL_UNKNOWN] = "???",
@@ -673,8 +681,8 @@ static void perf_show_event_info(const pfm_event_info_t *info,
 
 	pfm_for_each_event_attr(i, info) {
 		const char *src;
-		pfm_err_t err = pfm_get_event_attr_info(info->idx, i, PFM_OS_NONE,
-												&ainfo);
+		pfm_err_t err = pfm_get_event_attr_info(info->idx, i,
+							PFM_OS_NONE, &ainfo);
 
 		if (err != PFM_SUCCESS) {
 			fprintf(stderr, "Failed to get attribute info: %s\n",
@@ -683,39 +691,45 @@ static void perf_show_event_info(const pfm_event_info_t *info,
 		}
 
 		if (ainfo.ctrl >= PFM_ATTR_CTRL_MAX) {
-			fprintf(stderr, "event: %s has unsupported attribute source %d",
-					info->name, ainfo.ctrl);
+			fprintf(stderr,
+				"event: %s has unsupported attribute source %d",
+				info->name, ainfo.ctrl);
 			ainfo.ctrl = PFM_ATTR_CTRL_UNKNOWN;
 		}
 		src = srcs[ainfo.ctrl];
 		switch (ainfo.type) {
-			case PFM_ATTR_UMASK:
-				fprintf(file, "Umask-%02u : 0x%02"PRIx64" : %s : [%s] : ",
-						um, ainfo.code, src, ainfo.name);
-				perf_print_attr_flags(&ainfo, file);
-				fputc(':', file);
-				if (ainfo.equiv)
-					fprintf(file, " Alias to %s", ainfo.equiv);
-				else
-					fprintf(file, " %s", ainfo.desc);
-				fputc('\n', file);
-				um++;
-				break;
-			case PFM_ATTR_MOD_BOOL:
-				fprintf(file, "Modif-%02u : 0x%02"PRIx64" : %s : [%s] : "
-						"%s (boolean)\n", mod, ainfo.code, src, ainfo.name,
-						ainfo.desc);
-				mod++;
-				break;
-			case PFM_ATTR_MOD_INTEGER:
-				fprintf(file, "Modif-%02u : 0x%02"PRIx64" : %s : [%s] : "
-						"%s (integer)\n", mod, ainfo.code, src, ainfo.name,
-						ainfo.desc);
-				mod++;
-				break;
-			default:
-				fprintf(file, "Attr-%02u  : 0x%02"PRIx64" : %s : [%s] : %s\n",
-						i, ainfo.code, ainfo.name, src, ainfo.desc);
+		case PFM_ATTR_UMASK:
+			fprintf(file,
+				"Umask-%02u : 0x%02"PRIx64" : %s : [%s] : ",
+				um, ainfo.code, src, ainfo.name);
+			perf_print_attr_flags(&ainfo, file);
+			fputc(':', file);
+			if (ainfo.equiv)
+				fprintf(file, " Alias to %s",
+					ainfo.equiv);
+			else
+				fprintf(file, " %s", ainfo.desc);
+			fputc('\n', file);
+			um++;
+			break;
+		case PFM_ATTR_MOD_BOOL:
+			fprintf(file,
+				"Modif-%02u : 0x%02"PRIx64" : %s : [%s] : "
+				"%s (boolean)\n", mod, ainfo.code, src,
+				ainfo.name, ainfo.desc);
+			mod++;
+			break;
+		case PFM_ATTR_MOD_INTEGER:
+			fprintf(file,
+				"Modif-%02u : 0x%02"PRIx64" : %s : [%s] : "
+				"%s (integer)\n", mod, ainfo.code, src,
+				ainfo.name, ainfo.desc);
+			mod++;
+			break;
+		default:
+			fprintf(file,
+				"Attr-%02u  : 0x%02"PRIx64" : %s : [%s] : %s\n",
+				i, ainfo.code, ainfo.name, src, ainfo.desc);
 		}
 	}
 }
@@ -733,10 +747,10 @@ void perf_show_events(const char *rx, FILE *file)
 		exit(1);
 	}
 
-    ZERO_DATA(pinfo);
-    pinfo.size = sizeof(pinfo);
-    ZERO_DATA(info);
-    info.size = sizeof(info);
+	ZERO_DATA(pinfo);
+	pinfo.size = sizeof(pinfo);
+	ZERO_DATA(info);
+	info.size = sizeof(info);
 
 	pfm_for_all_pmus(pmu) {
 		pfm_err_t err = pfm_get_pmu_info(pmu, &pinfo);
@@ -744,15 +758,17 @@ void perf_show_events(const char *rx, FILE *file)
 		if (err != PFM_SUCCESS || !pinfo.is_present)
 			continue;
 
-		for (int i = pinfo.first_event; i != -1; i = pfm_get_event_next(i)) {
+		for (int i = pinfo.first_event; i != -1;
+		     i = pfm_get_event_next(i)) {
 			err = pfm_get_event_info(i, PFM_OS_NONE, &info);
 			if (err != PFM_SUCCESS) {
-				fprintf(stderr, "Failed to get event info: %s\n",
-						pfm_strerror(err));
+				fprintf(stderr,
+					"Failed to get event info: %s\n",
+					pfm_strerror(err));
 				exit(1);
 			}
-			snprintf(fullname, sizeof(fullname), "%s::%s", pinfo.name,
-					 info.name);
+			snprintf(fullname, sizeof(fullname), "%s::%s",
+				 pinfo.name, info.name);
 			if (!rx || regexec(&crx, fullname, 0, NULL, 0) == 0)
 				perf_show_event_info(&info, &pinfo, file);
 		}

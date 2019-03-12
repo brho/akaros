@@ -24,6 +24,7 @@
 bool enable_pse(void)
 {
 	uint32_t edx, cr4;
+
 	cpuid(0x1, 0x0, 0, 0, 0, &edx);
 	if (edx & CPUID_PSE_SUPPORT) {
 		cr4 = rcr4();
@@ -34,12 +35,12 @@ bool enable_pse(void)
 		return 0;
 }
 
-#define PAT_UC					0x00
-#define PAT_WC					0x01
-#define PAT_WT					0x04
-#define PAT_WP					0x05
-#define PAT_WB					0x06
-#define PAT_UCm					0x07
+#define PAT_UC				0x00
+#define PAT_WC				0x01
+#define PAT_WT				0x04
+#define PAT_WP				0x05
+#define PAT_WB				0x06
+#define PAT_UCm				0x07
 
 static inline uint64_t mk_pat(int pat_idx, int type)
 {
@@ -53,17 +54,17 @@ static void pat_init(void)
 	/* Default PAT at boot:
 	 *   0: WB, 1: WT, 2: UC-, 3: UC, 4: WB, 5: WT, 6: UC-, 7: UC
 	 *
-	 * We won't use PATs 4-7, but we'll at least enforce that they are set up
-	 * the way we think they are.  I'd like to avoid using the PAT flag, since
-	 * that is also the PTE_PS (jumbo) flag.  That means we can't use __PTE_PAT
-	 * on jumbo pages, and we'd need to be careful whenever using any unorthodox
-	 * types.  We're better off just not using it.
+	 * We won't use PATs 4-7, but we'll at least enforce that they are set
+	 * up the way we think they are.  I'd like to avoid using the PAT flag,
+	 * since that is also the PTE_PS (jumbo) flag.  That means we can't use
+	 * __PTE_PAT on jumbo pages, and we'd need to be careful whenever using
+	 * any unorthodox types.  We're better off just not using it.
 	 *
-	 * We want WB, WT, WC, and either UC or UC- for our memory types.  (WT is
-	 * actually optional at this point).  We'll use UC- instead of UC, since
-	 * Linux uses that for their pgprot_noncached.  The UC- type is UC with the
-	 * ability to override to WC via MTRR.  We don't use the MTRRs much yet, and
-	 * hopefully won't.  The UC- will only matter if we do.
+	 * We want WB, WT, WC, and either UC or UC- for our memory types.  (WT
+	 * is actually optional at this point).  We'll use UC- instead of UC,
+	 * since Linux uses that for their pgprot_noncached.  The UC- type is UC
+	 * with the ability to override to WC via MTRR.  We don't use the MTRRs
+	 * much yet, and hopefully won't.  The UC- will only matter if we do.
 	 *
 	 * No one should be using the __PTE_{PAT,PCD,PWT} bits directly, and
 	 * everyone should use things like PTE_NOCACHE. */
@@ -122,7 +123,8 @@ void setup_default_mtrrs(barrier_t* smp_barrier)
 	write_msr(IA32_MTRR_PHYSMASK6, 0);
 	write_msr(IA32_MTRR_PHYSMASK7, 0);
 
-	// keeps default type to WB (06), turns MTRRs on, and turns off fixed ranges
+	// keeps default type to WB (06), turns MTRRs on, and turns off fixed
+	// ranges
 	write_msr(IA32_MTRR_DEF_TYPE, 0x00000806);
 #endif
 	pat_init();

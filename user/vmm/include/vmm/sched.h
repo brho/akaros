@@ -17,56 +17,56 @@ __BEGIN_DECLS
  * controllers are 1:1 (via *buddy).  Task threads are for the VMM itself, such
  * as a console thread. */
 
-#define VMM_THREAD_GUEST		1
-#define VMM_THREAD_CTLR			2
-#define VMM_THREAD_TASK			3
+#define VMM_THREAD_GUEST	1
+#define VMM_THREAD_CTLR		2
+#define VMM_THREAD_TASK		3
 
-#define VMM_THR_STACKSIZE		(4 * PGSIZE)
+#define VMM_THR_STACKSIZE	(4 * PGSIZE)
 
 struct guest_thread;
 struct ctlr_thread;
 struct task_thread;
 
 struct guest_thread {
-	struct uthread				uthread;
-	struct ctlr_thread			*buddy;
-	unsigned int				gpc_id;
-	uth_mutex_t					*halt_mtx;
-	uth_cond_var_t				*halt_cv;
-	unsigned long				nr_vmexits;
+	struct uthread			uthread;
+	struct ctlr_thread		*buddy;
+	unsigned int			gpc_id;
+	uth_mutex_t			*halt_mtx;
+	uth_cond_var_t			*halt_cv;
+	unsigned long			nr_vmexits;
 	struct vmm_gpcore_init		gpci;
-	void						*user_data;
+	void				*user_data;
 };
 
 struct ctlr_thread {
-	struct uthread				uthread;
-	struct guest_thread			*buddy;
-	size_t						stacksize;
-	void						*stacktop;
+	struct uthread			uthread;
+	struct guest_thread		*buddy;
+	size_t				stacksize;
+	void				*stacktop;
 };
 
 struct task_thread {
-	struct uthread				uthread;
-	void						*(*func)(void *);
-	void						*arg;
-	size_t						stacksize;
-	void						*stacktop;
+	struct uthread			uthread;
+	void				*(*func)(void *);
+	void				*arg;
+	size_t				stacksize;
+	void				*stacktop;
 };
 
-struct virtual_machine;			/* in vmm/vmm.h */
+struct virtual_machine;		/* in vmm/vmm.h */
 struct vmm_thread {
 	union {
-		struct guest_thread		guest;
-		struct ctlr_thread		ctlr;
-		struct task_thread		task;
+		struct guest_thread	guest;
+		struct ctlr_thread	ctlr;
+		struct task_thread	task;
 	};
-	int							type;
+	int				type;
 	TAILQ_ENTRY(vmm_thread)		tq_next;
 	struct virtual_machine		*vm;
 	/* Sched stats */
-	int							prev_vcoreid;
-	unsigned long				nr_runs;
-	unsigned long				nr_resched;
+	int				prev_vcoreid;
+	unsigned long			nr_runs;
+	unsigned long			nr_resched;
 };
 
 TAILQ_HEAD(vmm_thread_tq, vmm_thread);

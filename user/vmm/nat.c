@@ -75,13 +75,13 @@
  *   dealt with, but it's subtle.  There also might be races with FD taps
  *   firing, the fdtap_watcher not putting items on the list, and the thread
  *   then not putting it on the list.  Specifically:
- *   	fdtap_watcher:							__poll_inbound:
+ *   	fdtap_watcher:				__poll_inbound:
  *   	-------------------------------------------------------
- *   											yanks map off list
- *   											map tracked as "on inbound"
- *   											unlock mtx
- *   											readv, get -1 EAGAIN
- *   											decide to drop the item
+ *   						yanks map off list
+ *   						map tracked as "on inbound"
+ *   						unlock mtx
+ *   						readv, get -1 EAGAIN
+ *   						decide to drop the item
  *   	packet arrives
  *   	FD tap fires
  *   	send event
@@ -89,9 +89,9 @@
  *   	see map is "on inbound"
  *   	ignore event
  *   	unlock mtx
- *   											lock mtx
- *   											clear "on inbound"
- *   											unlock + sleep on CV
+ *   						lock mtx
+ *   						clear "on inbound"
+ *   						unlock + sleep on CV
  *   The FD has data, but we lost the event, and we'll never read it.
  *
  * - Why is the fdtap_watcher its own thread?  You can't kick a CV from vcore
@@ -188,16 +188,16 @@ int snoop_fd;
 struct ip_nat_map {
 	TAILQ_ENTRY(ip_nat_map)		lookup_tuple;
 	TAILQ_ENTRY(ip_nat_map)		lookup_fd;
-	struct kref					kref;
-	uint8_t						protocol;
-	uint16_t					guest_port;
-	uint16_t					host_port;
-	int							host_data_fd;
-	bool						is_static;
-	bool						is_stale;
+	struct kref			kref;
+	uint8_t				protocol;
+	uint16_t			guest_port;
+	uint16_t			host_port;
+	int				host_data_fd;
+	bool				is_static;
+	bool				is_stale;
 	/* These fields are protected by the rx mutex */
 	TAILQ_ENTRY(ip_nat_map)		inbound;
-	bool						is_on_inbound;
+	bool				is_on_inbound;
 };
 
 #define NR_VNET_HASH 128
@@ -216,8 +216,8 @@ struct ip_nat_map_tailq inbound_todo = TAILQ_HEAD_INITIALIZER(inbound_todo);
  * responses) into the guest via receive_packet. */
 struct buf_pkt {
 	STAILQ_ENTRY(buf_pkt)		next;
-	uint8_t						*buf;
-	size_t						sz;
+	uint8_t				*buf;
+	size_t				sz;
 };
 STAILQ_HEAD(buf_pkt_stailq, buf_pkt);
 
@@ -255,7 +255,8 @@ static struct ip_nat_map *lookup_map_by_tuple(uint8_t protocol,
 
 	spin_pdr_lock(&maps_lock);
 	TAILQ_FOREACH(i, list_hash_tuple(protocol, guest_port), lookup_tuple) {
-		if ((i->protocol == protocol) && (i->guest_port == guest_port)) {
+		if ((i->protocol == protocol) &&
+		    (i->guest_port == guest_port)) {
 			kref_get(&i->kref, 1);
 			break;
 		}
@@ -331,7 +332,8 @@ static struct ip_nat_map *create_map(uint8_t protocol, uint16_t guest_port,
 	default:
 		panic("get_map for unsupported protocol %d!", protocol);
 	}
-	snprintf(dialstring, sizeof(dialstring), "%s!*!%s", proto_str, host_port);
+	snprintf(dialstring, sizeof(dialstring), "%s!*!%s", proto_str,
+		 host_port);
 
 	bypass_fd = bypass9(dialstring, conv_dir, 0);
 	if (bypass_fd < 0) {
@@ -381,16 +383,20 @@ static void *map_reaper(void *arg)
 		spin_pdr_lock(&maps_lock);
 		/* Only need to scan one map_hash, might as well be the tuple */
 		for (int j = 0; j < NR_VNET_HASH; j++) {
-			TAILQ_FOREACH_SAFE(i, &map_hash_tuple[j], lookup_tuple, temp) {
+			TAILQ_FOREACH_SAFE(i, &map_hash_tuple[j], lookup_tuple,
+					   temp) {
 				if (i->is_static)
 					continue;
 				if (!i->is_stale) {
 					i->is_stale = TRUE;
 					continue;
 				}
-				/* Remove from both lists, hashing for the FD list */
-				TAILQ_REMOVE(&map_hash_tuple[j], i, lookup_tuple);
-				TAILQ_REMOVE(list_hash_fd(i->host_data_fd), i, lookup_fd);
+				/* Remove from both lists, hashing for the FD
+				 * list */
+				TAILQ_REMOVE(&map_hash_tuple[j], i,
+					     lookup_tuple);
+				TAILQ_REMOVE(list_hash_fd(i->host_data_fd), i,
+					     lookup_fd);
 				/* Use the lookup_tuple for the temp list */
 				TAILQ_INSERT_HEAD(&to_release, i, lookup_tuple);
 			}
@@ -411,8 +417,9 @@ static void map_dumper(void)
 	for (int j = 0; j < NR_VNET_HASH; j++) {
 		TAILQ_FOREACH(i, &map_hash_tuple[j], lookup_tuple) {
 			fprintf(stderr, "\tproto %2d, host %5d, guest %5d, FD %4d, stale %d, static %d, ref %d\n",
-			        i->protocol, i->host_port, i->guest_port, i->host_data_fd,
-			        i->is_stale, i->is_static, i->kref.refcnt);
+				i->protocol, i->host_port, i->guest_port,
+				i->host_data_fd, i->is_stale, i->is_static,
+				i->kref.refcnt);
 		}
 	}
 	spin_pdr_unlock(&maps_lock);
@@ -488,12 +495,13 @@ static void xsum_update(struct iovec *iov, int iovcnt, size_t xsum_off,
 	/* for each short: HC' = ~(~HC + ~m + m') (' == new, ~ == ones-comp) */
 	for (int i = 0; i < amt / 2; i++, old += 2, new += 2) {
 		xsum = ones_comp(xsum) + ones_comp(nhgets(old)) + nhgets(new);
-		/* Need to deal with the carry for any additions, before the outer ~()
-		 * operation.  (Not mentioned in the RFC, determined manually...) */
+		/* Need to deal with the carry for any additions, before the
+		 * outer ~() operation.  (Not mentioned in the RFC, determined
+		 * manually...) */
 		while (xsum >> 16)
 			xsum = (xsum & 0xffff) + (xsum >> 16);
-		/* Yes, next time around the loop we ones comp right back.  Not worth
-		 * optimizing. */
+		/* Yes, next time around the loop we ones comp right back.  Not
+		 * worth optimizing. */
 		xsum = ones_comp(xsum);
 	}
 	iov_put_be16(iov, iovcnt, xsum_off, xsum);
@@ -551,7 +559,8 @@ static void get_host_ip_addrs(void)
 
 	lifc = get_first_noloop_iplifc(NULL, &to_free);
 	if (!lifc) {
-		fprintf(stderr, "IP addr lookup failed (%r), no VM networking\n");
+		fprintf(stderr,
+			"IP addr lookup failed (%r), no VM networking\n");
 		return;
 	}
 	snprintf(my_ip_str, sizeof(my_ip_str), "%i", lifc->ip);
@@ -561,7 +570,8 @@ static void get_host_ip_addrs(void)
 
 	ret = my_router_addr(router_ip, NULL);
 	if (ret) {
-		fprintf(stderr, "Router lookup failed (%r), no VM networking\n");
+		fprintf(stderr,
+			"Router lookup failed (%r), no VM networking\n");
 		return;
 	}
 	v6tov4(host_v4_router, router_ip);
@@ -573,7 +583,8 @@ static void get_host_ip_addrs(void)
 	}
 	nt = ndbipinfo(ndb, "ip", my_ip_str, &dns, 1);
 	if (!nt) {
-		fprintf(stderr, "DNS server lookup failed (%r), no VM networking\n");
+		fprintf(stderr,
+			"DNS server lookup failed (%r), no VM networking\n");
 		return;
 	}
 	v4parseip(host_v4_dns, nt->val);
@@ -649,7 +660,8 @@ static void *fdtap_watcher(void *arg)
 	while (1) {
 		uth_blockon_evqs(msg, NULL, 1, inbound_evq);
 		map = lookup_map_by_hostfd(msg->ev_type);
-		/* Could get an event for an FD/map that has since been reaped. */
+		/* Could get an event for an FD/map that has since been reaped.
+		 */
 		if (!map)
 			continue;
 		uth_mutex_lock(rx_mtx);
@@ -672,11 +684,13 @@ static struct event_queue *get_inbound_evq(void)
 	ceq = get_eventq_raw();
 	ceq->ev_mbox->type = EV_MBOX_CEQ;
 	ceq_init(&ceq->ev_mbox->ceq, CEQ_OR, NR_FILE_DESC_MAX, 128);
-	/* As far as flags go, we might not want IPI in the future.  Depends on some
-	 * longer range VMM/2LS changes.  Regarding INDIR, if you want to find out
-	 * about the event (i.e. not poll) for non-VCPD mboxes (like this evq's
-	 * mbox), then you need INDIR.  We need that for the wakeup/blockon. */
-	ceq->ev_flags = EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP | EVENT_IPI;
+	/* As far as flags go, we might not want IPI in the future.  Depends on
+	 * some longer range VMM/2LS changes.  Regarding INDIR, if you want to
+	 * find out about the event (i.e. not poll) for non-VCPD mboxes (like
+	 * this evq's mbox), then you need INDIR.  We need that for the
+	 * wakeup/blockon. */
+	ceq->ev_flags = EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP |
+			EVENT_IPI;
 	evq_attach_wakeup_ctlr(ceq);
 	return ceq;
 }
@@ -731,8 +745,8 @@ void vnet_init(struct virtual_machine *vm, struct virtio_vq_dev *vqdev)
 #define DHCP_RSP_LEN (DHCP_MAIN_BODY_LEN + DHCP_MAX_OPT_LEN)
 #define DHCP_LEASE_TIME 3600
 
-#define DHCP_OP_REQ				1
-#define DHCP_OP_RSP				2
+#define DHCP_OP_REQ			1
+#define DHCP_OP_RSP			2
 
 #define DHCP_MSG_DISCOVER		1
 #define DHCP_MSG_OFFER			2
@@ -760,7 +774,8 @@ void vnet_init(struct virtual_machine *vm, struct virtio_vq_dev *vqdev)
 
 static int get_dhcp_req_type(struct iovec *iov, int iovcnt)
 {
-	size_t idx = ETH_HDR_LEN + IPV4_HDR_LEN + UDP_HDR_LEN + DHCP_MAIN_BODY_LEN;
+	size_t idx = ETH_HDR_LEN + IPV4_HDR_LEN + UDP_HDR_LEN
+		     + DHCP_MAIN_BODY_LEN;
 
 	if (!iov_has_bytes(iov, iovcnt, idx + 4)) {
 		fprintf(stderr, "DHCP request too short!\n");
@@ -774,9 +789,9 @@ static int get_dhcp_req_type(struct iovec *iov, int iovcnt)
 		fprintf(stderr, "DHCP request didn't have magic cookie!\n");
 		return -1;
 	}
-	/* Some clients might ask us to look in sname or other locations, which is
-	 * communicated by an option.  So far, the clients I've seen just use the
-	 * main options to communicate the message type. */
+	/* Some clients might ask us to look in sname or other locations, which
+	 * is communicated by an option.  So far, the clients I've seen just use
+	 * the main options to communicate the message type. */
 	idx += 4;
 	while (1) {
 		if (!iov_has_bytes(iov, iovcnt, idx + 1)) {
@@ -801,7 +816,8 @@ static int get_dhcp_req_type(struct iovec *iov, int iovcnt)
 				fprintf(stderr, "DHCP request too short!\n");
 				return -1;
 			}
-			/* idx + 1 is size of the payload.  Skip the opt, size, payload. */
+			/* idx + 1 is size of the payload.  Skip the opt, size,
+			 * payload. */
 			idx += 2 + iov_get_byte(iov, iovcnt, idx + 1);
 			break;
 		}
@@ -818,8 +834,8 @@ static size_t build_dhcp_response(struct iovec *iov, int iovcnt, uint8_t *buf)
 	*p++ = ETH_ADDR_LEN;
 	*p++ = 0x00;	/* hops */
 	/* TODO: copies XID; assumes the inbound packet had standard headers */
-	iov_memcpy_from(iov, iovcnt, ETH_HDR_LEN + IPV4_HDR_LEN + UDP_HDR_LEN + 4,
-	                p, 4);
+	iov_memcpy_from(iov, iovcnt,
+			ETH_HDR_LEN + IPV4_HDR_LEN + UDP_HDR_LEN + 4, p, 4);
 	p += 4;
 	p += 8;			/* secs, flags, CIADDR */
 	memcpy(p, guest_v4_addr, IPV4_ADDR_LEN);
@@ -836,9 +852,9 @@ static size_t build_dhcp_response(struct iovec *iov, int iovcnt, uint8_t *buf)
 
 	req_type = get_dhcp_req_type(iov, iovcnt);
 
-	/* DHCP options: Technically, we should be responding with whatever fields
-	 * they asked for in their incoming message.  For the most part, there are a
-	 * bunch of standard things we can just respond with. */
+	/* DHCP options: Technically, we should be responding with whatever
+	 * fields they asked for in their incoming message.  For the most part,
+	 * there are a bunch of standard things we can just respond with. */
 
 	*p++ = DHCP_MAGIC_COOKIE_1;
 	*p++ = DHCP_MAGIC_COOKIE_2;
@@ -910,8 +926,8 @@ static size_t build_udp_response(struct iovec *iov, int iovcnt, uint8_t *buf,
 	p += 2;
 	hnputs(p, payload_sz + UDP_HDR_LEN);
 	p += 2;
-	/* For v4, we don't need to do the xsum.  It's a minor pain too, since they
-	 * xsum parts of the IP header too. */
+	/* For v4, we don't need to do the xsum.  It's a minor pain too, since
+	 * they xsum parts of the IP header too. */
 	hnputs(p, 0);
 	p += 2;
 
@@ -981,10 +997,11 @@ static void fake_dhcp_response(struct iovec *iov, int iovcnt)
 	case DHCP_MSG_INFORM:
 		return;
 	}
-	bpkt = zalloc_bpkt(ETH_HDR_LEN + IPV4_HDR_LEN + UDP_HDR_LEN + DHCP_RSP_LEN);
+	bpkt = zalloc_bpkt(ETH_HDR_LEN + IPV4_HDR_LEN + UDP_HDR_LEN +
+			   DHCP_RSP_LEN);
 
-	payload_sz = build_dhcp_response(iov, iovcnt, bpkt->buf + ETH_HDR_LEN
-	                                              + IPV4_HDR_LEN + UDP_HDR_LEN);
+	payload_sz = build_dhcp_response(iov, iovcnt, bpkt->buf + ETH_HDR_LEN +
+					 IPV4_HDR_LEN + UDP_HDR_LEN);
 	payload_sz = build_udp_response(iov, iovcnt,
 	                                bpkt->buf + ETH_HDR_LEN + IPV4_HDR_LEN,
 	                                payload_sz, 67, 68);
@@ -992,8 +1009,8 @@ static void fake_dhcp_response(struct iovec *iov, int iovcnt)
 	 * 255.255.255.255 (bcast).  For renewals, it seems like that that also
 	 * suffices, which seems reasonable. */
 	payload_sz = build_ip_response(iov, iovcnt, bpkt->buf + ETH_HDR_LEN,
-	                               payload_sz, guest_v4_router, bcast_v4_addr,
-	                               IP_UDPPROTO);
+				       payload_sz, guest_v4_router,
+				       bcast_v4_addr, IP_UDPPROTO);
 	payload_sz = build_eth_response(iov, iovcnt, bpkt->buf, payload_sz,
 	                                ETH_TYPE_IPV4);
 
@@ -1018,13 +1035,16 @@ static size_t build_arp_response(struct iovec *iov, int iovcnt, uint8_t *buf)
 	memcpy(p, host_eth_addr, ETH_ADDR_LEN);
 	p += ETH_ADDR_LEN;
 	/* SPA: addr they are looking for, which was the request TPA */
-	iov_memcpy_from(iov, iovcnt, ETH_HDR_LEN + ARP_OFF_TPA, p, IPV4_ADDR_LEN);
+	iov_memcpy_from(iov, iovcnt, ETH_HDR_LEN + ARP_OFF_TPA, p,
+			IPV4_ADDR_LEN);
 	p += IPV4_ADDR_LEN;
 	/* THA was the SHA of the request */
-	iov_memcpy_from(iov, iovcnt, ETH_HDR_LEN + ARP_OFF_SHA, p, ETH_ADDR_LEN);
+	iov_memcpy_from(iov, iovcnt, ETH_HDR_LEN + ARP_OFF_SHA, p,
+			ETH_ADDR_LEN);
 	p += ETH_ADDR_LEN;
 	/* TPA was the SPA of the request */
-	iov_memcpy_from(iov, iovcnt, ETH_HDR_LEN + ARP_OFF_SPA, p, IPV4_ADDR_LEN);
+	iov_memcpy_from(iov, iovcnt, ETH_HDR_LEN + ARP_OFF_SPA, p,
+			IPV4_ADDR_LEN);
 	p += IPV4_ADDR_LEN;
 
 	return p - buf;
@@ -1121,8 +1141,8 @@ static struct ip_nat_map *handle_icmp_tx(struct iovec *iov, int iovcnt,
                                          size_t icmp_off)
 {
 	/* TODO: we could respond to pings sent to us (router_ip).  For anything
-	 * else, we'll need to work with the bypass (if possible, maybe ID it with
-	 * the Identifier field and map that to the bypassed conv)). */
+	 * else, we'll need to work with the bypass (if possible, maybe ID it
+	 * with the Identifier field and map that to the bypassed conv)). */
 	return NULL;
 }
 
@@ -1187,8 +1207,8 @@ static void handle_ipv4_tx(struct iovec *iov, int iovcnt)
 		fprintf(stderr, "Short IPv4 header, dropping!\n");
 		return;
 	}
-	/* It's up to each protocol to give us the ip_nat_map matching the packet
-	 * and to change the packet's src port. */
+	/* It's up to each protocol to give us the ip_nat_map matching the
+	 * packet and to change the packet's src port. */
 	protocol = iov_get_byte(iov, iovcnt, ip_off + IPV4_OFF_PROTO);
 	proto_hdr_off = ipv4_get_proto_off(iov, iovcnt, ip_off);
 	switch (protocol) {
@@ -1202,21 +1222,21 @@ static void handle_ipv4_tx(struct iovec *iov, int iovcnt)
 		map = handle_icmp_tx(iov, iovcnt, proto_hdr_off);
 		break;
 	}
-	/* If the protocol handler already dealt with it (e.g. via emulation), we
-	 * bail out.  o/w, they gave us the remapping we should use to rewrite and
-	 * send the packet. */
+	/* If the protocol handler already dealt with it (e.g. via emulation),
+	 * we bail out.  o/w, they gave us the remapping we should use to
+	 * rewrite and send the packet. */
 	if (!map)
 		return;
-	/* At this point, we have a refcnted map, which will keep the map alive and
-	 * its FD open. */
+	/* At this point, we have a refcnted map, which will keep the map alive
+	 * and its FD open. */
 	iov_memcpy_from(iov, iovcnt, ip_off + IPV4_OFF_SRC, src_addr,
 	                IPV4_ADDR_LEN);
 	iov_memcpy_from(iov, iovcnt, ip_off + IPV4_OFF_DST, dst_addr,
 	                IPV4_ADDR_LEN);
-	/* If the destination is the ROUTER_IP, then it's really meant to go to the
-	 * host (loopback).  In that case, we also need the src to be loopback, so
-	 * that the *host's* IP stack recognizes the connection (necessary for
-	 * host-initiated connections via static maps). */
+	/* If the destination is the ROUTER_IP, then it's really meant to go to
+	 * the host (loopback).  In that case, we also need the src to be
+	 * loopback, so that the *host's* IP stack recognizes the connection
+	 * (necessary for host-initiated connections via static maps). */
 	if (!memcmp(dst_addr, guest_v4_router, IPV4_ADDR_LEN)) {
 		ipv4_change_addr(iov, iovcnt, ip_off, protocol, proto_hdr_off,
 		                 dst_addr, loopback_v4_addr, IPV4_OFF_DST);
@@ -1228,15 +1248,15 @@ static void handle_ipv4_tx(struct iovec *iov, int iovcnt)
 	}
 	/* We didn't change the size of the packet, just a few fields.  So we
 	 * shouldn't need to worry about iov[] being too big.  This is different
-	 * than the receive case, where the guest should give us an MTU-sized iov.
-	 * Here, they just gave us whatever they wanted to send.
+	 * than the receive case, where the guest should give us an MTU-sized
+	 * iov.  Here, they just gave us whatever they wanted to send.
 	 *
-	 * However, we still need to drop the ethernet header from the front of the
-	 * packet, and just send the IP header + payload. */
+	 * However, we still need to drop the ethernet header from the front of
+	 * the packet, and just send the IP header + payload. */
 	iov_strip_bytes(iov, iovcnt, ETH_HDR_LEN);
-	/* As far as blocking goes, this is like blasting out a raw IP packet.  It
-	 * shouldn't block, preferring to drop, though there might be some cases
-	 * where a qlock is grabbed or the medium/NIC blocks. */
+	/* As far as blocking goes, this is like blasting out a raw IP packet.
+	 * It shouldn't block, preferring to drop, though there might be some
+	 * cases where a qlock is grabbed or the medium/NIC blocks. */
 	writev(map->host_data_fd, iov, iovcnt);
 	map->is_stale = FALSE;
 	kref_put(&map->kref);
@@ -1254,7 +1274,8 @@ int vnet_transmit_packet(struct iovec *iov, int iovcnt)
 	if (vnet_snoop)
 		writev(snoop_fd, iov, iovcnt);
 	if (!iov_has_bytes(iov, iovcnt, ETH_HDR_LEN)) {
-		fprintf(stderr, "Short ethernet frame from the guest, dropping!\n");
+		fprintf(stderr,
+			"Short ethernet frame from the guest, dropping!\n");
 		return -1;
 	}
 	ether_type = iov_get_be16(iov, iovcnt, ETH_OFF_ETYPE);
@@ -1269,7 +1290,8 @@ int vnet_transmit_packet(struct iovec *iov, int iovcnt)
 		handle_ipv6_tx(iov, iovcnt);
 		break;
 	default:
-		fprintf(stderr, "Unknown ethertype 0x%x, dropping!\n", ether_type);
+		fprintf(stderr, "Unknown ethertype 0x%x, dropping!\n",
+			ether_type);
 		return -1;
 	};
 	return 0;
@@ -1353,22 +1375,25 @@ static void handle_ipv4_rx(struct iovec *iov, int iovcnt, size_t len,
 	/* If the src was the host (loopback), the guest thinks the remote is
 	 * ROUTER_IP. */
 	if (!memcmp(src_addr, loopback_v4_addr, IPV4_ADDR_LEN)) {
-		ipv4_change_addr(iov, iovcnt, ip_off, map->protocol, proto_hdr_off,
-		                 src_addr, guest_v4_router, IPV4_OFF_SRC);
+		ipv4_change_addr(iov, iovcnt, ip_off, map->protocol,
+				 proto_hdr_off, src_addr, guest_v4_router,
+				 IPV4_OFF_SRC);
 	}
-	/* Interesting case.  If we rewrite it to guest_v4_router, when the guest
-	 * responds, *that* packet will get rewritten to loopback.  If we ignore it,
-	 * and it's qemu mode, it'll actually work.  If it's real addr mode, the
-	 * guest won't send an IP packet out that it thinks is for itself.  */
-	if (vnet_real_ip_addrs && !memcmp(src_addr, host_v4_addr, IPV4_ADDR_LEN)) {
+	/* Interesting case.  If we rewrite it to guest_v4_router, when the
+	 * guest responds, *that* packet will get rewritten to loopback.  If we
+	 * ignore it, and it's qemu mode, it'll actually work.  If it's real
+	 * addr mode, the guest won't send an IP packet out that it thinks is
+	 * for itself.  */
+	if (vnet_real_ip_addrs && !memcmp(src_addr, host_v4_addr,
+					  IPV4_ADDR_LEN)) {
 		fprintf(stderr, "VNET received packet from host_v4_addr.  Not translating, the guest cannot respond!\n");
 	}
 	/* Regardless, the dst changes from HOST_IP/loopback to GUEST_IP */
 	ipv4_change_addr(iov, iovcnt, ip_off, map->protocol, proto_hdr_off,
 	                 dst_addr, guest_v4_addr, IPV4_OFF_DST);
-	/* Note we did the incremental xsum for the IP header, but also do a final
-	 * xsum.  We need the final xsum in case the kernel's networking stack
-	 * messed up the header. */
+	/* Note we did the incremental xsum for the IP header, but also do a
+	 * final xsum.  We need the final xsum in case the kernel's networking
+	 * stack messed up the header. */
 	xsum_ipv4_header(iov, iovcnt, ip_off);
 }
 
@@ -1388,8 +1413,8 @@ static size_t handle_rx(struct iovec *iov, int iovcnt, size_t len,
 	uint8_t version;
 	uint16_t ether_type;
 
-	/* The conv is reading from a Qmsg queue.  We should always receive at least
-	 * an IPv4 header from the kernel. */
+	/* The conv is reading from a Qmsg queue.  We should always receive at
+	 * least an IPv4 header from the kernel. */
 	assert(len >= IPV4_HDR_LEN + ETH_HDR_LEN);
 	version = ipv4_get_version(iov, iovcnt, ip_off);
 	switch (version) {
@@ -1428,9 +1453,9 @@ static size_t __poll_inbound(struct iovec *iov, int iovcnt)
 	ssize_t pkt_sz = 0;
 	struct iovec iov_copy[iovcnt];
 
-	/* We're going to readv ETH_HDR_LEN bytes into the iov.  To do so, we'll use
-	 * a separate iov to track this offset.  The iov and iov_copy both point to
-	 * the same memory (minus the stripping). */
+	/* We're going to readv ETH_HDR_LEN bytes into the iov.  To do so, we'll
+	 * use a separate iov to track this offset.  The iov and iov_copy both
+	 * point to the same memory (minus the stripping). */
 	memcpy(iov_copy, iov, sizeof(struct iovec) * iovcnt);
 	iov_strip_bytes(iov_copy, iovcnt, ETH_HDR_LEN);
 	TAILQ_FOREACH_SAFE(i, &inbound_todo, inbound, temp) {

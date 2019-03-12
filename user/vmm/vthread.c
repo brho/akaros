@@ -40,8 +40,8 @@ void gpci_init(struct vmm_gpcore_init *gpci)
 {
 	uint8_t *p;
 
-	/* Technically, we don't need these pages for the all guests. Currently, the
-	 * kernel requires them. */
+	/* Technically, we don't need these pages for the all guests. Currently,
+	 * the kernel requires them. */
 	p = pages(3);
 	if (!p)
 		panic("Can't allocate 3 pages for guest: %r");
@@ -197,8 +197,8 @@ static uintptr_t vth_get_stack(struct vthread *vth)
 	}
 	stacktop = alloc_stacktop(vth_to_vm(vth));
 	assert(stacktop);
-	/* Yes, an evil part of me thought of using the top of the stack for this
-	 * struct's storage. */
+	/* Yes, an evil part of me thought of using the top of the stack for
+	 * this struct's storage. */
 	gth->user_data = malloc(sizeof(struct vthread_info));
 	assert(gth->user_data);
 	info = (struct vthread_info*)gth->user_data;
@@ -216,7 +216,8 @@ struct vthread *vthread_create(struct virtual_machine *vm, void *entry,
 	vth = vthread_alloc(vm, gpci);
 	if (!vth)
 		return NULL;
-	vthread_init_ctx(vth, (uintptr_t)entry, (uintptr_t)arg, vth_get_stack(vth));
+	vthread_init_ctx(vth, (uintptr_t)entry, (uintptr_t)arg,
+			 vth_get_stack(vth));
 	vthread_run(vth);
 	return vth;
 }

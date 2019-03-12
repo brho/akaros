@@ -100,7 +100,8 @@ bool get_absolute_path_from_fd(int fd, const char *path, char **absolute_path)
 	int len1 = strlen(path);
 
 	if (len1 == 0) {
-		fprintf(stderr, "get_absolute_path_from_fd: suffix is empty.\n");
+		fprintf(stderr,
+			"get_absolute_path_from_fd: suffix is empty.\n");
 		return false;
 	}
 
@@ -118,7 +119,8 @@ bool get_absolute_path_from_fd(int fd, const char *path, char **absolute_path)
 	uth_mutex_lock(fd_table_lock);
 	if (!openfd_filenames[fd]) {
 		uth_mutex_unlock(fd_table_lock);
-		fprintf(stderr, "get_absolute_path_from_fd: no file open at fd.\n");
+		fprintf(stderr,
+			"get_absolute_path_from_fd: no file open at fd.\n");
 		return false;
 	}
 
@@ -175,8 +177,8 @@ int convert_open_flags_ltoa(int flags)
 		otherstuff |= O_RDWR;
 		break;
 	default:
-		// TODO(ganshun): We panic here for now if they are trying behavior we
-		// do not expect
+		// TODO(ganshun): We panic here for now if they are trying
+		// behavior we do not expect
 		panic("linuxemu, convert_open_flags_ltoa: unknown open flags provided\n");
 		break;
 	}
@@ -199,8 +201,8 @@ int convert_open_flags_atol(int flags)
 		otherstuff |= 2;
 		break;
 	default:
-		// TODO(ganshun): We panic here for now if they are trying behavior we
-		// do not expect
+		// TODO(ganshun): We panic here for now if they are trying
+		// behavior we do not expect
 		panic("linuxemu, convert_open_flags_atol: unknown open flags provided\n");
 		break;
 	}
@@ -336,7 +338,8 @@ bool dune_sys_pread64(struct vm_trapframe *tf)
 
 bool dune_sys_read(struct vm_trapframe *tf)
 {
-	ssize_t retval = read(tf->tf_rdi, (void*) tf->tf_rsi, (size_t) tf->tf_rdx);
+	ssize_t retval = read(tf->tf_rdi, (void*) tf->tf_rsi,
+			      (size_t) tf->tf_rdx);
 	int err = errno;
 
 	if (retval == -1) {
@@ -396,7 +399,8 @@ bool dune_sys_getpid(struct vm_trapframe *tf)
 	// Getpid always suceeds
 	int retval = getpid();
 
-	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false, "SUCCESS %d\n", retval);
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false, "SUCCESS %d\n",
+		  retval);
 	tf->tf_rax = retval;
 	return true;
 }
@@ -458,7 +462,8 @@ bool dune_sys_umask(struct vm_trapframe *tf)
 	//Umask always succeeds
 	int retval = umask((mode_t) tf->tf_rdi);
 
-	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false, "SUCCESS %d\n", retval);
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false, "SUCCESS %d\n",
+		  retval);
 	tf->tf_rax = retval;
 	return true;
 }
@@ -525,7 +530,8 @@ bool dune_sys_gettid(struct vm_trapframe *tf)
 	// Gettid always succeeds
 	int retval = tf->tf_guest_pcoreid;
 
-	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false, "SUCCESS %d\n", retval);
+	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false, "SUCCESS %d\n",
+		  retval);
 	tf->tf_rax = retval;
 	return true;
 }
@@ -578,7 +584,8 @@ bool dune_sys_openat(struct vm_trapframe *tf)
 	// where we'd want to recover and return EBADF or ENOTDIR
 	if (!get_absolute_path_from_fd(fd, s, &s_absolute)) {
 		panic("[TID %d] %s: ERROR in getting absolute path fd was %d, suffix was %s\n",
-		      tf->tf_guest_pcoreid, dune_syscall_table[tf->tf_rax].name, fd, s);
+		      tf->tf_guest_pcoreid, dune_syscall_table[tf->tf_rax].name,
+		      fd, s);
 	}
 
 	flags = convert_open_flags_ltoa(flags);
@@ -622,8 +629,8 @@ bool dune_sys_readlinkat(struct vm_trapframe *tf)
 
 	if (!get_absolute_path_from_fd(fd, s, &s_absolute)) {
 		panic("[TID %d] %s: ERROR in getting absolute path fd was %d, suffix was %s\n",
-		      tf->tf_guest_pcoreid, dune_syscall_table[tf->tf_rax].name, fd,
-		      s);
+		      tf->tf_guest_pcoreid, dune_syscall_table[tf->tf_rax].name,
+		      fd, s);
 	}
 
 	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
@@ -654,8 +661,8 @@ bool dune_sys_unlinkat(struct vm_trapframe *tf)
 
 	if (!get_absolute_path_from_fd(fd, s, &s_absolute)) {
 		panic("[TID %d] %s: ERROR in getting absolute path fd was %d, suffix was %s\n",
-		      tf->tf_guest_pcoreid, dune_syscall_table[tf->tf_rax].name, fd,
-		      s);
+		      tf->tf_guest_pcoreid, dune_syscall_table[tf->tf_rax].name,
+		      fd, s);
 	}
 
 	lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
@@ -805,7 +812,7 @@ int dune_fallocate(int fd, int mode, off_t offset, off_t len)
 	if (offset + len >= st.st_size) {
 		// Panic here as we cannot support changing the size of the file
 		// right now.
-		panic("dune_fallocate: we would write over the size of the file!");
+		panic("dune_fallocate: would write over the size of the file!");
 	}
 	if (S_ISFIFO(st.st_mode)) {
 		errno = ESPIPE;
@@ -816,7 +823,8 @@ int dune_fallocate(int fd, int mode, off_t offset, off_t len)
 		return -1;
 	}
 
-	// TODO(ganshun): For punch hole, we just write zeros to the file for now
+	// TODO(ganshun): For punch hole, we just write zeros to the file for
+	// now
 	if ((mode & FALLOC_FL_PUNCH_HOLE) && (mode & FALLOC_FL_KEEP_SIZE)) {
 		const size_t buffer_size = 0x100000;
 		int pos;
@@ -893,8 +901,8 @@ bool dune_sys_pselect6(struct vm_trapframe *tf)
 	const sigset_t *sigmask = (const sigset_t *) tf->tf_r9;
 
 	// Check if process wants to sleep
-	if (nfds == 0 && readfds == NULL && writefds == NULL && exceptfds == NULL
-	    && timeout != NULL) {
+	if (nfds == 0 && readfds == NULL && writefds == NULL &&
+	    exceptfds == NULL && timeout != NULL) {
 		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, false,
 		          "Sleeping for %ld seconds, %ld nanoseconds\n",
 		          timeout->tv_sec, timeout->tv_nsec);
@@ -933,8 +941,8 @@ bool dune_sys_getrandom(struct vm_trapframe *tf)
 
 	if (fd == -1) {
 		lemuprint(tf->tf_guest_pcoreid, tf->tf_rax, true,
-		          "ERROR opening random source %s, errno=%d\n", random_source,
-		           err);
+			  "ERROR opening random source %s, errno=%d\n",
+			  random_source, err);
 		return false;
 	}
 
@@ -1441,7 +1449,8 @@ bool init_linuxemu(void)
 	}
 
 	if (dlopen("liblinuxemu_extend.so", RTLD_NOW) == NULL) {
-		fprintf(stderr, "Not using any syscall extensions\n Reason: %s\n",
+		fprintf(stderr,
+			"Not using any syscall extensions\n Reason: %s\n",
 		        dlerror());
 		return false;
 	}
@@ -1503,8 +1512,7 @@ void lemuprint(const uint32_t tid, uint64_t syscall_number,
  * call, and in many cases we have to rearrange arguments
  * since Linux and Akaros don't share signatures, so this
  * gets tricky. */
-bool
-linuxemu(struct guest_thread *gth, struct vm_trapframe *tf)
+bool linuxemu(struct guest_thread *gth, struct vm_trapframe *tf)
 {
 	bool ret = false;
 

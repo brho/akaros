@@ -12,11 +12,11 @@
 int debug_virtio_blk;
 
 #define DPRINTF(fmt, ...)                                                      \
-	do {                                                                       \
-	if (debug_virtio_blk) {                                                    \
-		fprintf(stderr, "virtio_blk: " fmt, ##__VA_ARGS__);                    \
-	}                                                                          \
-	} while (0)
+do {                                                                           \
+	if (debug_virtio_blk) {                                                \
+		fprintf(stderr, "virtio_blk: " fmt, ##__VA_ARGS__);            \
+	}                                                                      \
+} while (0)
 
 /* TODO(ganshun): multiple disks */
 static int diskfd;
@@ -30,7 +30,8 @@ void blk_init_fn(struct virtio_vq_dev *vqdev, const char *filename)
 
 	diskfd = open(filename, O_RDWR);
 	if (diskfd < 0)
-		VIRTIO_DEV_ERRX(vqdev, "Could not open disk image file %s", filename);
+		VIRTIO_DEV_ERRX(vqdev, "Could not open disk image file %s",
+				filename);
 
 	if (stat(filename, &stat_result) == -1)
 		VIRTIO_DEV_ERRX(vqdev, "Could not stat file %s", filename);
@@ -64,12 +65,12 @@ void *blk_request(void *_vq)
 
 	if (!dev->poke_guest)
 		VIRTIO_DEV_ERRX(vq->vqdev,
-		                "The 'poke_guest' function pointer was not set.");
+			"The 'poke_guest' function pointer was not set.");
 
 	iov = malloc(vq->qnum_max * sizeof(struct iovec));
 	if (iov == NULL)
 		VIRTIO_DEV_ERRX(vq->vqdev,
-		                "malloc returned null trying to allocate iov.\n");
+			"malloc returned null trying to allocate iov.\n");
 
 	for (;;) {
 		head = virtio_next_avail_vq_desc(vq, iov, &olen, &ilen);
@@ -96,7 +97,8 @@ void *blk_request(void *_vq)
 		if (out->type & VIRTIO_BLK_T_OUT) {
 
 			if ((offset + iov[1].iov_len) > (cfg->capacity * 512))
-				VIRTIO_DEV_ERRX(vq->vqdev, "write past end of file!\n");
+				VIRTIO_DEV_ERRX(vq->vqdev,
+						"write past end of file!\n");
 
 			ret = writev(diskfd, &iov[1], 1);
 
@@ -120,7 +122,8 @@ void *blk_request(void *_vq)
 				char *pf = "";
 
 				for (int i = 0; i < iov[olen].iov_len; i += 2) {
-					uint8_t *p = (uint8_t *)iov[olen].iov_base + i;
+					uint8_t *p =
+					  (uint8_t*)iov[olen].iov_base + i;
 
 					fprintf(stderr, "%s%02x", pf, *(p + 1));
 					fprintf(stderr, "%02x", *p);

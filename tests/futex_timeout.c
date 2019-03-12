@@ -8,15 +8,17 @@
 #define NUM_THREADS 10
 pthread_t thandlers[NUM_THREADS];
 
-void *handler(void *arg) {
+void *handler(void *arg)
+{
 	int id = pthread_self()->id;
 	int var = 0;
-    struct timespec timeout = {
+	struct timespec timeout = {
 		.tv_sec = id,
 		.tv_nsec = 0
 	};
+
 	printf("Begin thread: %d\n", id);
-    futex(&var, FUTEX_WAIT, 0, &timeout, NULL, 0);
+	futex(&var, FUTEX_WAIT, 0, &timeout, NULL, 0);
 	printf("End thread: %d\n", id);
 	return 0;
 }

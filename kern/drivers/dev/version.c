@@ -28,13 +28,13 @@ enum {
 
 struct dev verdevtab;
 static struct dirtab vertab[] = {
-	{".",				{Kverdirqid,		0, QTDIR}, 0,	DMDIR|0550},
-	{"build_id",		{Kverbuildid},		0,	0444},
-	{"date",			{Kverdate},			0,	0444},
-	{"commitid",		{Kvercommitid},		0,	0444},
-	{"version",			{Kverversion},		0,	0444},
-	{"version_name",	{Kverversionname},	0,	0444},
-	{"kconfig",			{Kverkconfig},		0,	0444},
+	{".",		{Kverdirqid, 0, QTDIR}, 0,	DMDIR|0550},
+	{"build_id",	{Kverbuildid},		0,	0444},
+	{"date",	{Kverdate},		0,	0444},
+	{"commitid",	{Kvercommitid},		0,	0444},
+	{"version",	{Kverversion},		0,	0444},
+	{"version_name",{Kverversionname},	0,	0444},
+	{"kconfig",	{Kverkconfig},		0,	0444},
 };
 
 extern char __note_build_id_start[];
@@ -84,7 +84,8 @@ static void ver_init(void)
 	vertab[Kverdate].length = ver_get_file_size(build_info_date);
 	vertab[Kvercommitid].length = ver_get_file_size(build_info_commitid);
 	vertab[Kverversion].length = ver_get_file_size(build_info_version);
-	vertab[Kverversionname].length = ver_get_file_size(build_info_version_name);
+	vertab[Kverversionname].length =
+		ver_get_file_size(build_info_version_name);
 	vertab[Kverkconfig].length = strlen(__kconfig_str) + 1;
 }
 
@@ -94,7 +95,7 @@ static void ver_shutdown(void)
 }
 
 static struct walkqid *ver_walk(struct chan *c, struct chan *nc, char **name,
-								unsigned int nname)
+				unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, vertab, ARRAY_SIZE(vertab), devgen);
 }
@@ -152,19 +153,23 @@ static size_t ver_read(struct chan *c, void *va, size_t n, off64_t off)
 		return read_buildid(va, n, off);
 	case Kverdate:
 		if (build_info_date)
-			return ver_emit_nlstr(va, build_info_date, n, (long) off);
+			return ver_emit_nlstr(va, build_info_date, n,
+					      (long) off);
 		break;
 	case Kvercommitid:
 		if (build_info_commitid)
-			return ver_emit_nlstr(va, build_info_commitid, n, (long) off);
+			return ver_emit_nlstr(va, build_info_commitid, n,
+					      (long) off);
 		break;
 	case Kverversion:
 		if (build_info_version)
-			return ver_emit_nlstr(va, build_info_version, n, (long) off);
+			return ver_emit_nlstr(va, build_info_version, n,
+					      (long) off);
 		break;
 	case Kverversionname:
 		if (build_info_version_name)
-			return ver_emit_nlstr(va, build_info_version_name, n, (long) off);
+			return ver_emit_nlstr(va, build_info_version_name, n,
+					      (long) off);
 		break;
 	case Kverkconfig:
 		return readstr(off, va, n, __kconfig_str);

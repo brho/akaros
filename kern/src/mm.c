@@ -29,7 +29,7 @@
 
 /* These are the only mmap flags that are saved in the VMR.  If we implement
  * more of the mmap interface, we may need to grow this. */
-#define MAP_PERSIST_FLAGS		(MAP_SHARED | MAP_PRIVATE | MAP_ANONYMOUS)
+#define MAP_PERSIST_FLAGS	(MAP_SHARED | MAP_PRIVATE | MAP_ANONYMOUS)
 
 struct kmem_cache *vmr_kcache;
 
@@ -85,7 +85,8 @@ ssize_t foc_read(struct file_or_chan *foc, void *buf, size_t amt, off64_t off)
 		if (!qid_is_file(foc->chan->qid))
 			return -1;
 		if (!waserror())
-			ret = devtab[foc->chan->type].read(foc->chan, buf, amt, off);
+			ret = devtab[foc->chan->type].read(foc->chan, buf, amt,
+							   off);
 		poperror();
 		return ret;
 	}
@@ -108,10 +109,11 @@ static void __foc_free_rcu(struct rcu_head *head)
 
 static void foc_release(struct kref *kref)
 {
-	struct file_or_chan *foc = container_of(kref, struct file_or_chan, kref);
+	struct file_or_chan *foc = container_of(kref, struct file_or_chan,
+						kref);
 
-	/* A lot of places decref while holding a spinlock, but we can't free then,
-	 * since the cclose() might block. */
+	/* A lot of places decref while holding a spinlock, but we can't free
+	 * then, since the cclose() might block. */
 	call_rcu(&foc->rcu, __foc_free_rcu);
 }
 
@@ -227,7 +229,8 @@ static int foc_dev_mmap(struct file_or_chan *foc, struct vm_region *vmr,
 			set_error(ENODEV, "device does not support mmap");
 			return -1;
 		}
-		foc->fsf = devtab[foc->chan->type].mmap(foc->chan, vmr, prot, flags);
+		foc->fsf = devtab[foc->chan->type].mmap(foc->chan, vmr, prot,
+							flags);
 		return foc->fsf ? 0 : -1;
 	}
 	panic("unknown F_OR_C type, %d", foc->type);
@@ -287,13 +290,15 @@ static bool vmr_insert(struct vm_region *vmr, struct proc *p, uintptr_t va,
 				continue;
 			/* Find a gap that is big enough */
 			if (gap_end - vm_i->vm_end >= len) {
-				/* if we can put it at va, let's do that.  o/w, put it so it
-				 * fits */
-				if ((gap_end >= va + len) && (va >= vm_i->vm_end))
+				/* if we can put it at va, let's do that.  o/w,
+				 * put it so it fits */
+				if ((gap_end >= va + len) &&
+				    (va >= vm_i->vm_end))
 					vmr->vm_base = va;
 				else
 					vmr->vm_base = vm_i->vm_end;
-				TAILQ_INSERT_AFTER(&p->vm_regions, vm_i, vmr, vm_link);
+				TAILQ_INSERT_AFTER(&p->vm_regions, vm_i, vmr,
+						   vm_link);
 				ret = true;
 				break;
 			}
@@ -305,7 +310,8 @@ static bool vmr_insert(struct vm_region *vmr, struct proc *p, uintptr_t va,
 		vmr->vm_end = vmr->vm_base + len;
 	}
 	if (!ret)
-		warn("Not making a VMR, wanted %p, + %p = %p", va, len, va + len);
+		warn("Not making a VMR, wanted %p, + %p = %p", va, len, va +
+		     len);
 	return ret;
 }
 
@@ -378,8 +384,9 @@ static int merge_vmr(struct vm_region *first, struct vm_region *second)
 static struct vm_region *merge_me(struct vm_region *vmr)
 {
 	struct vm_region *vmr_temp;
-	/* Merge will fail if it cannot do it.  If it succeeds, the second VMR is
-	 * destroyed, so we need to be a bit careful. */
+
+	/* Merge will fail if it cannot do it.  If it succeeds, the second VMR
+	 * is destroyed, so we need to be a bit careful. */
 	vmr_temp = TAILQ_PREV(vmr, vmr_tailq, vm_link);
 	if (vmr_temp)
 		if (!merge_vmr(vmr_temp, vmr))
@@ -420,6 +427,7 @@ static int shrink_vmr(struct vm_region *vmr, uintptr_t va)
 static struct vm_region *find_vmr(struct proc *p, uintptr_t va)
 {
 	struct vm_region *vmr;
+
 	/* ugly linear seach */
 	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link) {
 		if ((vmr->vm_base <= va) && (vmr->vm_end > va))
@@ -433,6 +441,7 @@ static struct vm_region *find_vmr(struct proc *p, uintptr_t va)
 static struct vm_region *find_first_vmr(struct proc *p, uintptr_t va)
 {
 	struct vm_region *vmr;
+
 	/* ugly linear seach */
 	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link) {
 		if ((vmr->vm_base <= va) && (vmr->vm_end > va))
@@ -458,19 +467,22 @@ static void isolate_vmrs(struct proc *p, uintptr_t va, size_t len)
 void unmap_and_destroy_vmrs(struct proc *p)
 {
 	struct vm_region *vmr_i, *vmr_temp;
+
 	/* this only gets called from __proc_free, so there should be no sync
 	 * concerns.  still, better safe than sorry. */
 	spin_lock(&p->vmr_lock);
 	p->vmr_history++;
 	spin_lock(&p->pte_lock);
 	TAILQ_FOREACH(vmr_i, &p->vm_regions, vm_link) {
-		/* note this CB sets the PTE = 0, regardless of if it was P or not */
+		/* note this CB sets the PTE = 0, regardless of if it was P or
+		 * not */
 		env_user_mem_walk(p, (void*)vmr_i->vm_base,
-		                  vmr_i->vm_end - vmr_i->vm_base, __vmr_free_pgs, 0);
+				  vmr_i->vm_end - vmr_i->vm_base,
+				  __vmr_free_pgs, 0);
 	}
 	spin_unlock(&p->pte_lock);
-	/* need the safe style, since destroy_vmr modifies the list.  also, we want
-	 * to do this outside the pte lock, since it grabs the pm lock. */
+	/* need the safe style, since destroy_vmr modifies the list.  also, we
+	 * want to do this outside the pte lock, since it grabs the pm lock. */
 	TAILQ_FOREACH_SAFE(vmr_i, &p->vm_regions, vm_link, vmr_temp)
 		destroy_vmr(vmr_i);
 	spin_unlock(&p->vmr_lock);
@@ -488,7 +500,7 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 	 * Check for: alignment, wraparound, or userspace addresses */
 	if ((PGOFF(va_start)) ||
 	    (PGOFF(va_end)) ||
-	    (va_end < va_start) ||	/* now, start > UMAPTOP -> end > UMAPTOP */
+	    (va_end < va_start) ||/* now, start > UMAPTOP -> end > UMAPTOP */
 	    (va_end > UMAPTOP)) {
 		warn("VMR mapping is probably screwed up (%p - %p)", va_start,
 		     va_end);
@@ -497,32 +509,36 @@ static int copy_pages(struct proc *p, struct proc *new_p, uintptr_t va_start,
 	int copy_page(struct proc *p, pte_t pte, void *va, void *arg) {
 		struct proc *new_p = (struct proc*)arg;
 		struct page *pp;
+
 		if (pte_is_unmapped(pte))
 			return 0;
-		/* pages could be !P, but right now that's only for file backed VMRs
-		 * undergoing page removal, which isn't the caller of copy_pages. */
+		/* pages could be !P, but right now that's only for file backed
+		 * VMRs undergoing page removal, which isn't the caller of
+		 * copy_pages. */
 		if (pte_is_mapped(pte)) {
 			/* TODO: check for jumbos */
 			if (upage_alloc(new_p, &pp, 0))
 				return -ENOMEM;
 			memcpy(page2kva(pp), KADDR(pte_get_paddr(pte)), PGSIZE);
-			if (page_insert(new_p->env_pgdir, pp, va, pte_get_settings(pte))) {
+			if (page_insert(new_p->env_pgdir, pp, va,
+					pte_get_settings(pte))) {
 				page_decref(pp);
 				return -ENOMEM;
 			}
 		} else if (pte_is_paged_out(pte)) {
-			/* TODO: (SWAP) will need to either make a copy or CoW/refcnt the
-			 * backend store.  For now, this PTE will be the same as the
-			 * original PTE */
+			/* TODO: (SWAP) will need to either make a copy or
+			 * CoW/refcnt the backend store.  For now, this PTE will
+			 * be the same as the original PTE */
 			panic("Swapping not supported!");
 		} else {
-			panic("Weird PTE %p in %s!", pte_print(pte), __FUNCTION__);
+			panic("Weird PTE %p in %s!", pte_print(pte),
+			      __FUNCTION__);
 		}
 		return 0;
 	}
 	spin_lock(&p->pte_lock);	/* walking and changing PTEs */
-	ret = env_user_mem_walk(p, (void*)va_start, va_end - va_start, &copy_page,
-	                        new_p);
+	ret = env_user_mem_walk(p, (void*)va_start, va_end - va_start,
+				&copy_page, new_p);
 	spin_unlock(&p->pte_lock);
 	return ret;
 }
@@ -536,15 +552,17 @@ static int fill_vmr(struct proc *p, struct proc *new_p, struct vm_region *vmr)
 		assert(!(vmr->vm_flags & MAP_SHARED));
 		ret = copy_pages(p, new_p, vmr->vm_base, vmr->vm_end);
 	} else {
-		/* non-private file, i.e. page cacheable.  we have to honor MAP_LOCKED,
-		 * (but we might be able to ignore MAP_POPULATE). */
+		/* non-private file, i.e. page cacheable.  we have to honor
+		 * MAP_LOCKED, (but we might be able to ignore MAP_POPULATE). */
 		if (vmr->vm_flags & MAP_LOCKED) {
-			/* need to keep the file alive in case we unlock/block */
+			/* need to keep the file alive in case we unlock/block
+			 */
 			foc_incref(vmr->__vm_foc);
 			/* math is a bit nasty if vm_base isn't page aligned */
 			assert(!PGOFF(vmr->vm_base));
 			ret = populate_pm_va(new_p, vmr->vm_base,
-			                     (vmr->vm_end - vmr->vm_base) >> PGSHIFT,
+					     (vmr->vm_end - vmr->vm_base) >>
+					     			       PGSHIFT,
 			                     vmr->vm_prot, vmr_to_pm(vmr),
 			                     vmr->vm_foff, vmr->vm_flags,
 			                     vmr->vm_prot & PROT_EXEC);
@@ -618,9 +636,8 @@ void print_vmrs(struct proc *p)
 	print_unlock();
 }
 
-void enumerate_vmrs(struct proc *p,
-					void (*func)(struct vm_region *vmr, void *opaque),
-					void *opaque)
+void enumerate_vmrs(struct proc *p, void (*func)(struct vm_region *vmr,
+						 void *opaque), void *opaque)
 {
 	struct vm_region *vmr;
 
@@ -653,8 +670,8 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	void *result;
 
 	offset <<= PGSHIFT;
-	printd("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n", addr,
-	       len, prot, flags, fd, offset);
+	printd("mmap(addr %x, len %x, prot %x, flags %x, fd %x, off %x)\n",
+	       addr, len, prot, flags, fd, offset);
 	if (!mmap_flags_priv_ok(flags)) {
 		set_errno(EINVAL);
 		return MAP_FAILED;
@@ -671,17 +688,18 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 			goto out_ref;
 		}
 	}
-	/* Check for overflow.  This helps do_mmap and populate_va, among others. */
+	/* Check for overflow.  This helps do_mmap and populate_va, among
+	 * others. */
 	if (offset + len < offset) {
 		set_errno(EINVAL);
 		result = MAP_FAILED;
 		goto out_ref;
 	}
-	/* If they don't care where to put it, we'll start looking after the break.
-	 * We could just have userspace handle this (in glibc's mmap), so we don't
-	 * need to know about BRK_END, but this will work for now (and may avoid
-	 * bugs).  Note that this limits mmap(0) a bit.  Keep this in sync with
-	 * do_mmap()'s check.  (Both are necessary).  */
+	/* If they don't care where to put it, we'll start looking after the
+	 * break.  We could just have userspace handle this (in glibc's mmap),
+	 * so we don't need to know about BRK_END, but this will work for now
+	 * (and may avoid bugs).  Note that this limits mmap(0) a bit.  Keep
+	 * this in sync with do_mmap()'s check.  (Both are necessary).  */
 	if (addr == 0)
 		addr = BRK_END;
 	/* Still need to enforce this: */
@@ -716,6 +734,7 @@ static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
                             int prot)
 {
 	pte_t pte;
+
 	spin_lock(&p->pte_lock);	/* walking and changing PTEs */
 	/* find offending PTE (prob don't read this in).  This might alloc an
 	 * intermediate page table page. */
@@ -726,21 +745,22 @@ static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
 			page_decref(page);
 		return -ENOMEM;
 	}
-	/* a spurious, valid PF is possible due to a legit race: the page might have
-	 * been faulted in by another core already (and raced on the memory lock),
-	 * in which case we should just return. */
+	/* a spurious, valid PF is possible due to a legit race: the page might
+	 * have been faulted in by another core already (and raced on the memory
+	 * lock), in which case we should just return. */
 	if (pte_is_present(pte)) {
 		spin_unlock(&p->pte_lock);
 		if (!page_is_pagemap(page))
 			page_decref(page);
 		return 0;
 	}
-	/* I used to allow clobbering an old entry (contrary to the documentation),
-	 * but it's probably a sign of another bug. */
+	/* I used to allow clobbering an old entry (contrary to the
+	 * documentation), but it's probably a sign of another bug. */
 	assert(!pte_is_mapped(pte));
 	/* preserve the dirty bit - pm removal could be looking concurrently */
 	prot |= (pte_is_dirty(pte) ? PTE_D : 0);
-	/* We have a ref to page (for non PMs), which we are storing in the PTE */
+	/* We have a ref to page (for non PMs), which we are storing in the PTE
+	 */
 	pte_write(pte, page2pa(page), prot);
 	spin_unlock(&p->pte_lock);
 	return 0;
@@ -751,6 +771,7 @@ static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
 static int __copy_and_swap_pmpg(struct proc *p, struct page **pp)
 {
 	struct page *new_page, *old_page = *pp;
+
 	if (upage_alloc(p, &new_page, FALSE))
 		return -ENOMEM;
 	memcpy(page2kva(new_page), page2kva(old_page), PGSIZE);
@@ -766,6 +787,7 @@ static int populate_anon_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
 {
 	struct page *page;
 	int ret;
+
 	for (long i = 0; i < nr_pgs; i++) {
 		if (upage_alloc(p, &page, TRUE))
 			return -ENOMEM;
@@ -787,13 +809,13 @@ static int populate_pm_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
 	int vmr_history = ACCESS_ONCE(p->vmr_history);
 	struct page *page;
 
-	/* This is a racy check - see the comments in fs_file.c.  Also, we're not
-	 * even attempting to populate the va, though we could do a partial if
-	 * necessary. */
+	/* This is a racy check - see the comments in fs_file.c.  Also, we're
+	 * not even attempting to populate the va, though we could do a partial
+	 * if necessary. */
 	if (pm_idx0 + nr_pgs > nr_pages(fs_file_get_length(pm->pm_file)))
 		return -ESPIPE;
-	/* locking rules: start the loop holding the vmr lock, enter and exit the
-	 * entire func holding the lock. */
+	/* locking rules: start the loop holding the vmr lock, enter and exit
+	 * the entire func holding the lock. */
 	for (long i = 0; i < nr_pgs; i++) {
 		ret = pm_load_page_nowait(pm, pm_idx0 + i, &page);
 		if (ret) {
@@ -805,10 +827,12 @@ static int populate_pm_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
 			spin_lock(&p->vmr_lock);
 			if (ret)
 				break;
-			/* while we were sleeping, the VMRs could have changed on us. */
+			/* while we were sleeping, the VMRs could have changed
+			 * on us. */
 			if (vmr_history != ACCESS_ONCE(p->vmr_history)) {
 				pm_put_page(page);
-				printk("[kernel] FYI: VMR changed during populate\n");
+				printk("[kernel] "
+				       "FYI: VMR changed during populate\n");
 				break;
 			}
 		}
@@ -824,7 +848,8 @@ static int populate_pm_va(struct proc *p, uintptr_t va, unsigned long nr_pgs,
 		 * TODO: is this still needed?  andrew put this in a while ago*/
 		if (exec)
 			icache_flush_page(0, page2kva(page));
-		/* The page could be either in the PM, or a private, now-anon page. */
+		/* The page could be either in the PM, or a private, now-anon
+		 * page. */
 		ret = map_page_at_addr(p, page, va + i * PGSIZE, pte_prot);
 		if (page_is_pagemap(page))
 			pm_put_page(page);
@@ -844,15 +869,16 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	vmr = vmr_zalloc();
 
 	/* Sanity check, for callers that bypass mmap().  We want addr for anon
-	 * memory to start above the break limit (BRK_END), but not 0.  Keep this in
-	 * sync with BRK_END in mmap(). */
+	 * memory to start above the break limit (BRK_END), but not 0.  Keep
+	 * this in sync with BRK_END in mmap(). */
 	if (addr == 0)
 		addr = BRK_END;
 	assert(!PGOFF(offset));
-	/* MCPs will need their code and data pinned.  This check will start to fail
-	 * after uthread_slim_init(), at which point userspace should have enough
-	 * control over its mmaps (i.e. no longer done by LD or load_elf) that it
-	 * can ask for pinned and populated pages.  Except for dl_opens(). */
+	/* MCPs will need their code and data pinned.  This check will start to
+	 * fail after uthread_slim_init(), at which point userspace should have
+	 * enough control over its mmaps (i.e. no longer done by LD or load_elf)
+	 * that it can ask for pinned and populated pages.  Except for
+	 * dl_opens(). */
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[0];
 
 	if (file && (atomic_read(&vcpd->flags) & VC_SCP_NOVCCTX))
@@ -863,8 +889,9 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	/* We grab the file early, so we can block.  This is all hokey.  The VMR
 	 * isn't ready yet, so the PM code will ignore it. */
 	if (file) {
-		/* Prep the FS and make sure it can mmap the file.  The device/FS checks
-		 * perms, and does whatever else it needs to make the mmap work. */
+		/* Prep the FS and make sure it can mmap the file.  The
+		 * device/FS checks perms, and does whatever else it needs to
+		 * make the mmap work. */
 		if (foc_dev_mmap(file, vmr, prot, flags & MAP_PERSIST_FLAGS)) {
 			vmr_free(vmr);
 			set_errno(EACCES);	/* not quite */
@@ -874,25 +901,27 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		pm_add_vmr(foc_to_pm(file), vmr);
 		foc_incref(file);
 		vmr->__vm_foc = file;
-		/* TODO: consider locking the file while checking (not as manadatory as
-		 * in handle_page_fault() */
+		/* TODO: consider locking the file while checking (not as
+		 * manadatory as in handle_page_fault() */
 		if (nr_pages(offset + len) > nr_pages(foc_get_len(file))) {
-			/* We're allowing them to set up the VMR, though if they attempt to
-			 * fault in any pages beyond the file's limit, they'll fail.  Since
-			 * they might not access the region, we need to make sure POPULATE
-			 * is off.  FYI, 64 bit glibc shared libs map in an extra 2MB of
-			 * unaligned space between their RO and RW sections, but then
-			 * immediately mprotect it to PROT_NONE. */
+			/* We're allowing them to set up the VMR, though if they
+			 * attempt to fault in any pages beyond the file's
+			 * limit, they'll fail.  Since they might not access the
+			 * region, we need to make sure POPULATE is off.  FYI,
+			 * 64 bit glibc shared libs map in an extra 2MB of
+			 * unaligned space between their RO and RW sections, but
+			 * then immediately mprotect it to PROT_NONE. */
 			flags &= ~MAP_POPULATE;
 		}
 	}
 	/* read/write vmr lock (will change the tree) */
 	spin_lock(&p->vmr_lock);
 	p->vmr_history++;
-	/* Need to make sure nothing is in our way when we want a FIXED location.
-	 * We just need to split on the end points (if they exist), and then remove
-	 * everything in between.  __do_munmap() will do this.  Careful, this means
-	 * an mmap can be an implied munmap() (not my call...). */
+	/* Need to make sure nothing is in our way when we want a FIXED
+	 * location.  We just need to split on the end points (if they exist),
+	 * and then remove everything in between.  __do_munmap() will do this.
+	 * Careful, this means an mmap can be an implied munmap() (not my
+	 * call...). */
 	if (flags & MAP_FIXED)
 		__do_munmap(p, addr, len);
 	if (!vmr_insert(vmr, p, addr, len)) {
@@ -903,8 +932,8 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		}
 		vmr_free(vmr);
 		set_error(ENOMEM, "probably tried to mmap beyond UMAPTOP");
-		/* Slightly weird semantics: if we fail and had munmapped the space,
-		 * they will have a hole in their VM now. */
+		/* Slightly weird semantics: if we fail and had munmapped the
+		 * space, they will have a hole in their VM now. */
 		return MAP_FAILED;
 	}
 	addr = vmr->vm_base;
@@ -920,16 +949,18 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 		if (!file) {
 			ret = populate_anon_va(p, addr, nr_pgs, pte_prot);
 		} else {
-			/* Note: this will unlock if it blocks.  our refcnt on the file
-			 * keeps the pm alive when we unlock */
-			ret = populate_pm_va(p, addr, nr_pgs, pte_prot, foc_to_pm(file),
-			                     offset, flags, prot & PROT_EXEC);
+			/* Note: this will unlock if it blocks.  our refcnt on
+			 * the file keeps the pm alive when we unlock */
+			ret = populate_pm_va(p, addr, nr_pgs, pte_prot,
+					     foc_to_pm(file), offset, flags,
+					     prot & PROT_EXEC);
 		}
 		if (ret == -ENOMEM) {
 			spin_unlock(&p->vmr_lock);
 			printk("[kernel] ENOMEM, killing %d\n", p->pid);
 			proc_destroy(p);
-			return MAP_FAILED;	/* will never make it back to userspace */
+			/* this will never make it back to userspace */
+			return MAP_FAILED;
 		}
 	}
 	spin_unlock(&p->vmr_lock);
@@ -975,26 +1006,29 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	int pte_prot = (prot & PROT_WRITE) ? PTE_USER_RW :
 	               (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : PTE_NONE;
 
-	/* TODO: this is aggressively splitting, when we might not need to if the
-	 * prots are the same as the previous.  Plus, there are three excessive
-	 * scans. */
+	/* TODO: this is aggressively splitting, when we might not need to if
+	 * the prots are the same as the previous.  Plus, there are three
+	 * excessive scans. */
 	isolate_vmrs(p, addr, len);
 	vmr = find_first_vmr(p, addr);
 	while (vmr && vmr->vm_base < addr + len) {
 		if (vmr->vm_prot == prot)
 			goto next_vmr;
-		if (vmr_has_file(vmr) && !check_foc_perms(vmr, vmr->__vm_foc, prot)) {
+		if (vmr_has_file(vmr) &&
+		    !check_foc_perms(vmr, vmr->__vm_foc, prot)) {
 			file_access_failure = TRUE;
 			goto next_vmr;
 		}
 		vmr->vm_prot = prot;
 		spin_lock(&p->pte_lock);	/* walking and changing PTEs */
-		/* TODO: use a memwalk.  At a minimum, we need to change every existing
-		 * PTE that won't trigger a PF (meaning, present PTEs) to have the new
-		 * prot.  The others will fault on access, and we'll change the PTE
-		 * then.  In the off chance we have a mapped but not present PTE, we
-		 * might as well change it too, since we're already here. */
-		for (uintptr_t va = vmr->vm_base; va < vmr->vm_end; va += PGSIZE) {
+		/* TODO: use a memwalk.  At a minimum, we need to change every
+		 * existing PTE that won't trigger a PF (meaning, present PTEs)
+		 * to have the new prot.  The others will fault on access, and
+		 * we'll change the PTE then.  In the off chance we have a
+		 * mapped but not present PTE, we might as well change it too,
+		 * since we're already here. */
+		for (uintptr_t va = vmr->vm_base; va < vmr->vm_end;
+		     va += PGSIZE) {
 			pte = pgdir_walk(p->env_pgdir, (void*)va, 0);
 			if (pte_walk_okay(pte) && pte_is_mapped(pte)) {
 				pte_replace_perm(pte, pte_prot);
@@ -1003,11 +1037,11 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 		}
 		spin_unlock(&p->pte_lock);
 next_vmr:
-		/* Note that this merger could cause us to not look at the next one,
-		 * since we merged with it.  That's ok, since in that case, the next one
-		 * already has the right prots.  Also note that every VMR in the region,
-		 * including the ones at the endpoints, attempted to merge left and
-		 * right. */
+		/* Note that this merger could cause us to not look at the next
+		 * one, since we merged with it.  That's ok, since in that case,
+		 * the next one already has the right prots.  Also note that
+		 * every VMR in the region, including the ones at the endpoints,
+		 * attempted to merge left and right. */
 		vmr = merge_me(vmr);
 		next_vmr = TAILQ_NEXT(vmr, vm_link);
 		vmr = next_vmr;
@@ -1051,7 +1085,7 @@ static int __munmap_pte(struct proc *p, pte_t pte, void *va, void *arg)
 	struct page *page;
 
 	/* could put in some checks here for !P and also !0 */
-	if (!pte_is_present(pte))	/* unmapped (== 0) *ptes are also not PTE_P */
+	if (!pte_is_present(pte)) /* unmapped (== 0) *ptes are also not PTE_P */
 		return 0;
 	if (pte_is_dirty(pte)) {
 		page = pa2page(pte_get_paddr(pte));
@@ -1099,25 +1133,29 @@ int __do_munmap(struct proc *p, uintptr_t addr, size_t len)
 	vmr = first_vmr;
 	spin_lock(&p->pte_lock);	/* changing PTEs */
 	while (vmr && vmr->vm_base < addr + len) {
-		/* It's important that we call __munmap_pte and sync the PG_DIRTY bit
-		 * before we unhook the VMR from the PM (in destroy_vmr). */
-		env_user_mem_walk(p, (void*)vmr->vm_base, vmr->vm_end - vmr->vm_base,
-		                  __munmap_pte, &shootdown_needed);
+		/* It's important that we call __munmap_pte and sync the
+		 * PG_DIRTY bit before we unhook the VMR from the PM (in
+		 * destroy_vmr). */
+		env_user_mem_walk(p, (void*)vmr->vm_base,
+				  vmr->vm_end - vmr->vm_base, __munmap_pte,
+				  &shootdown_needed);
 		vmr = TAILQ_NEXT(vmr, vm_link);
 	}
 	spin_unlock(&p->pte_lock);
-	/* we haven't freed the pages yet; still using the PTEs to store the them.
-	 * There should be no races with inserts/faults, since we still hold the mm
-	 * lock since the previous CB. */
+	/* we haven't freed the pages yet; still using the PTEs to store the
+	 * them.  There should be no races with inserts/faults, since we still
+	 * hold the mm lock since the previous CB. */
 	if (shootdown_needed)
 		proc_tlbshootdown(p, addr, addr + len);
 	vmr = first_vmr;
 	while (vmr && vmr->vm_base < addr + len) {
-		/* there is rarely more than one VMR in this loop.  o/w, we'll need to
-		 * gather up the vmrs and destroy outside the pte_lock. */
+		/* there is rarely more than one VMR in this loop.  o/w, we'll
+		 * need to gather up the vmrs and destroy outside the pte_lock.
+		 */
 		spin_lock(&p->pte_lock);	/* changing PTEs */
-		env_user_mem_walk(p, (void*)vmr->vm_base, vmr->vm_end - vmr->vm_base,
-			              __vmr_free_pgs, 0);
+		env_user_mem_walk(p, (void*)vmr->vm_base,
+				  vmr->vm_end - vmr->vm_base, __vmr_free_pgs,
+				  0);
 		spin_unlock(&p->pte_lock);
 		next_vmr = TAILQ_NEXT(vmr, vm_link);
 		destroy_vmr(vmr);
@@ -1144,37 +1182,37 @@ static int __hpf_load_page(struct proc *p, struct page_map *pm,
 	bool wake_scp = FALSE;
 	spin_lock(&p->proc_lock);
 	switch (p->state) {
-		case (PROC_RUNNING_S):
-			wake_scp = TRUE;
-			__proc_set_state(p, PROC_WAITING);
-			/* it's possible for HPF to loop a few times; we can only save the
-			 * first time, o/w we could clobber. */
-			if (first) {
-				__proc_save_context_s(p);
-				__proc_save_fpu_s(p);
-				/* We clear the owner, since userspace doesn't run here
-				 * anymore, but we won't abandon since the fault handler
-				 * still runs in our process. */
-				clear_owning_proc(coreid);
-			}
-			/* other notes: we don't currently need to tell the ksched
-			 * we switched from running to waiting, though we probably
-			 * will later for more generic scheds. */
-			break;
-		case (PROC_RUNNABLE_M):
-		case (PROC_RUNNING_M):
-			spin_unlock(&p->proc_lock);
-			return -EAGAIN;	/* will get reflected back to userspace */
-		case (PROC_DYING):
-		case (PROC_DYING_ABORT):
-			spin_unlock(&p->proc_lock);
-			return -EINVAL;
-		default:
-			/* shouldn't have any waitings, under the current yield style.  if
-			 * this becomes an issue, we can branch on is_mcp(). */
-			printk("HPF unexpectecd state(%s)", procstate2str(p->state));
-			spin_unlock(&p->proc_lock);
-			return -EINVAL;
+	case (PROC_RUNNING_S):
+		wake_scp = TRUE;
+		__proc_set_state(p, PROC_WAITING);
+		/* it's possible for HPF to loop a few times; we can only save
+		 * the first time, o/w we could clobber. */
+		if (first) {
+			__proc_save_context_s(p);
+			__proc_save_fpu_s(p);
+			/* We clear the owner, since userspace doesn't run here
+			 * anymore, but we won't abandon since the fault handler
+			 * still runs in our process. */
+			clear_owning_proc(coreid);
+		}
+		/* other notes: we don't currently need to tell the ksched
+		 * we switched from running to waiting, though we probably
+		 * will later for more generic scheds. */
+		break;
+	case (PROC_RUNNABLE_M):
+	case (PROC_RUNNING_M):
+		spin_unlock(&p->proc_lock);
+		return -EAGAIN;	/* will get reflected back to userspace */
+	case (PROC_DYING):
+	case (PROC_DYING_ABORT):
+		spin_unlock(&p->proc_lock);
+		return -EINVAL;
+	default:
+		/* shouldn't have any waitings, under the current yield style.
+		 * if this becomes an issue, we can branch on is_mcp(). */
+		printk("HPF unexpectecd state(%s)", procstate2str(p->state));
+		spin_unlock(&p->proc_lock);
+		return -EINVAL;
 	}
 	spin_unlock(&p->proc_lock);
 	ret = pm_load_page(pm, idx, page);
@@ -1212,12 +1250,12 @@ refault:
 	spin_lock(&p->vmr_lock);
 	/* Check the vmr's protection */
 	vmr = find_vmr(p, va);
-	if (!vmr) {							/* not mapped at all */
+	if (!vmr) {			/* not mapped at all */
 		printd("fault: %p not mapped\n", va);
 		ret = -EFAULT;
 		goto out;
 	}
-	if (!(vmr->vm_prot & prot)) {		/* wrong prots for this vmr */
+	if (!(vmr->vm_prot & prot)) {	/* wrong prots for this vmr */
 		ret = -EPERM;
 		goto out;
 	}
@@ -1233,16 +1271,17 @@ refault:
 			goto out;
 		}
 		file = vmr->__vm_foc;
-		/* If this fails, either something got screwed up with the VMR, or the
-		 * permissions changed after mmap/mprotect.  Either way, I want to know
-		 * (though it's not critical). */
+		/* If this fails, either something got screwed up with the VMR,
+		 * or the permissions changed after mmap/mprotect.  Either way,
+		 * I want to know (though it's not critical). */
 		if (!check_foc_perms(vmr, file, prot))
-			printk("[kernel] possible issue with VMR prots on file %s!\n",
+			printk("[kernel] "
+			       "possible issue with VMR prots on file %s!\n",
 			       foc_to_name(file));
 		/* Load the file's page in the page cache.
-		 * TODO: (BLK) Note, we are holding the mem lock!  We need to rewrite
-		 * this stuff so we aren't hold the lock as excessively as we are, and
-		 * such that we can block and resume later. */
+		 * TODO: (BLK) Note, we are holding the mem lock!  We need to
+		 * rewrite this stuff so we aren't hold the lock as excessively
+		 * as we are, and such that we can block and resume later. */
 		assert(!PGOFF(va - vmr->vm_base + vmr->vm_foff));
 		f_idx = (va - vmr->vm_base + vmr->vm_foff) >> PGSHIFT;
 		/* This is a racy check - see the comments in fs_file.c */
@@ -1257,39 +1296,40 @@ refault:
 			/* keep the file alive after we unlock */
 			foc_incref(file);
 			spin_unlock(&p->vmr_lock);
-			ret = __hpf_load_page(p, foc_to_pm(file), f_idx, &a_page,
-			                      first);
+			ret = __hpf_load_page(p, foc_to_pm(file), f_idx,
+					      &a_page, first);
 			first = FALSE;
 			foc_decref(file);
 			if (ret)
 				return ret;
 			goto refault;
 		}
-		/* If we want a private map, we'll preemptively give you a new page.  We
-		 * used to just care if it was private and writable, but were running
-		 * into issues with libc changing its mapping (map private, then
-		 * mprotect to writable...)  In the future, we want to CoW this anyway,
-		 * so it's not a big deal. */
+		/* If we want a private map, we'll preemptively give you a new
+		 * page.  We used to just care if it was private and writable,
+		 * but were running into issues with libc changing its mapping
+		 * (map private, then mprotect to writable...)  In the future,
+		 * we want to CoW this anyway, so it's not a big deal. */
 		if ((vmr->vm_flags & MAP_PRIVATE)) {
 			ret = __copy_and_swap_pmpg(p, &a_page);
 			if (ret)
 				goto out_put_pg;
 		}
-		/* if this is an executable page, we might have to flush the instruction
-		 * cache if our HW requires it. */
+		/* if this is an executable page, we might have to flush the
+		 * instruction cache if our HW requires it. */
 		if (vmr->vm_prot & PROT_EXEC)
 			icache_flush_page((void*)va, page2kva(a_page));
 	}
-	/* update the page table TODO: careful with MAP_PRIVATE etc.  might do this
-	 * separately (file, no file) */
+	/* update the page table TODO: careful with MAP_PRIVATE etc.  might do
+	 * this separately (file, no file) */
 	int pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
 	               (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
 	ret = map_page_at_addr(p, a_page, va, pte_prot);
 	/* fall through, even for errors */
 out_put_pg:
-	/* the VMR's existence in the PM (via the mmap) allows us to have PTE point
-	 * to a_page without it magically being reallocated.  For non-PM memory
-	 * (anon memory or private pages) we transferred the ref to the PTE. */
+	/* the VMR's existence in the PM (via the mmap) allows us to have PTE
+	 * point to a_page without it magically being reallocated.  For non-PM
+	 * memory (anon memory or private pages) we transferred the ref to the
+	 * PTE. */
 	if (page_is_pagemap(a_page))
 		pm_put_page(a_page);
 out:
@@ -1320,8 +1360,8 @@ unsigned long populate_va(struct proc *p, uintptr_t va, unsigned long nr_pgs)
 	int ret;
 
 	/* we can screw around with ways to limit the find_vmr calls (can do the
-	 * next in line if we didn't unlock, etc., but i don't expect us to do this
-	 * for more than a single VMR in most cases. */
+	 * next in line if we didn't unlock, etc., but i don't expect us to do
+	 * this for more than a single VMR in most cases. */
 	spin_lock(&p->vmr_lock);
 	while (nr_pgs) {
 		vmr = find_vmr(p, va);
@@ -1330,28 +1370,33 @@ unsigned long populate_va(struct proc *p, uintptr_t va, unsigned long nr_pgs)
 		if (vmr->vm_prot == PROT_NONE)
 			break;
 		pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
-		           (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
+		           (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO
+			                                          : 0;
 		nr_pgs_this_vmr = MIN(nr_pgs, (vmr->vm_end - va) >> PGSHIFT);
 		if (!vmr_has_file(vmr)) {
-			if (populate_anon_va(p, va, nr_pgs_this_vmr, pte_prot)) {
-				/* on any error, we can just bail.  we might be underestimating
-				 * nr_filled. */
+			if (populate_anon_va(p, va, nr_pgs_this_vmr, pte_prot))
+			{
+				/* on any error, we can just bail.  we might be
+				 * underestimating nr_filled. */
 				break;
 			}
 		} else {
 			file = vmr->__vm_foc;
-			/* need to keep the file alive in case we unlock/block */
+			/* need to keep the file alive in case we unlock/block
+			 */
 			foc_incref(file);
-			/* Regarding foff + (va - base): va - base < len, and foff + len
-			 * does not over flow */
+			/* Regarding foff + (va - base): va - base < len, and
+			 * foff + len does not over flow */
 			ret = populate_pm_va(p, va, nr_pgs_this_vmr, pte_prot,
 			                     foc_to_pm(file),
 			                     vmr->vm_foff + (va - vmr->vm_base),
-			                     vmr->vm_flags, vmr->vm_prot & PROT_EXEC);
+			                     vmr->vm_flags,
+					     vmr->vm_prot & PROT_EXEC);
 			foc_decref(file);
 			if (ret) {
-				/* we might have failed if the underlying file doesn't cover the
-				 * mmap window, depending on how we'll deal with truncation. */
+				/* we might have failed if the underlying file
+				 * doesn't cover the mmap window, depending on
+				 * how we'll deal with truncation. */
 				break;
 			}
 		}
@@ -1369,8 +1414,8 @@ static struct arena *vmap_addr_arena;
 struct arena *vmap_arena;
 static spinlock_t vmap_lock = SPINLOCK_INITIALIZER;
 struct vmap_free_tracker {
-	void						*addr;
-	size_t						nr_bytes;
+	void				*addr;
+	size_t				nr_bytes;
 };
 static struct vmap_free_tracker *vmap_to_free;
 static size_t vmap_nr_to_free;
@@ -1388,8 +1433,8 @@ static void __vmap_free(struct arena *source, void *obj, size_t size)
 
 	spin_lock(&vmap_lock);
 	/* All objs get *unmapped* immediately, but we'll shootdown later.  Note
-	 * that it is OK (but slightly dangerous) for the kernel to reuse the paddrs
-	 * pointed to by the vaddrs before a TLB shootdown. */
+	 * that it is OK (but slightly dangerous) for the kernel to reuse the
+	 * paddrs pointed to by the vaddrs before a TLB shootdown. */
 	unmap_segment(boot_pgdir, (uintptr_t)obj, size);
 	if (vmap_nr_to_free < VMAP_MAX_TO_FREE) {
 		vft = &vmap_to_free[vmap_nr_to_free++];
@@ -1414,14 +1459,14 @@ void vmap_init(void)
 	vmap_addr_arena = arena_create("vmap_addr", (void*)KERN_DYN_BOT,
 	                               KERN_DYN_TOP - KERN_DYN_BOT,
 	                               PGSIZE, NULL, NULL, NULL, 0, MEM_WAIT);
-	vmap_arena = arena_create("vmap", NULL, 0, PGSIZE, arena_alloc, __vmap_free,
-	                          vmap_addr_arena, 0, MEM_WAIT);
-	vmap_to_free = kmalloc(sizeof(struct vmap_free_tracker) * VMAP_MAX_TO_FREE,
-	                       MEM_WAIT);
-	/* This ensures the boot_pgdir's top-most PML (PML4) has entries pointing to
-	 * PML3s that cover the dynamic mapping range.  Now, it's safe to create
-	 * processes that copy from boot_pgdir and still dynamically change the
-	 * kernel mappings. */
+	vmap_arena = arena_create("vmap", NULL, 0, PGSIZE, arena_alloc,
+				  __vmap_free, vmap_addr_arena, 0, MEM_WAIT);
+	vmap_to_free = kmalloc(sizeof(struct vmap_free_tracker)
+			       * VMAP_MAX_TO_FREE, MEM_WAIT);
+	/* This ensures the boot_pgdir's top-most PML (PML4) has entries
+	 * pointing to PML3s that cover the dynamic mapping range.  Now, it's
+	 * safe to create processes that copy from boot_pgdir and still
+	 * dynamically change the kernel mappings. */
 	arch_add_intermediate_pts(boot_pgdir, KERN_DYN_BOT,
 	                          KERN_DYN_TOP - KERN_DYN_BOT);
 }
@@ -1476,8 +1521,8 @@ static uintptr_t vmap_pmem_flags(uintptr_t paddr, size_t nr_bytes, int flags)
 		warn("Unable to get a vmap segment");	/* probably a bug */
 		return 0;
 	}
-	/* it's not strictly necessary to drop paddr's pgoff, but it might save some
-	 * vmap heartache in the future. */
+	/* it's not strictly necessary to drop paddr's pgoff, but it might save
+	 * some vmap heartache in the future. */
 	if (map_vmap_segment(vaddr, PG_ADDR(paddr), nr_pages,
 	                     PTE_KERN_RW | flags)) {
 		warn("Unable to map a vmap segment");	/* probably a bug */

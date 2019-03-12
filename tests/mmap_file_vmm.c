@@ -87,7 +87,7 @@ int main(void)
 	void *loc = (void*) 0x1000000;
 
 	addr = mmap(loc, nr_pgs * PGSIZE, PROT_WRITE | PROT_READ | PROT_EXEC,
-			    MAP_SHARED, fd, 0);
+		    MAP_SHARED, fd, 0);
 	if (addr == MAP_FAILED) {
 		perror("mmap failed");
 		exit(-1);

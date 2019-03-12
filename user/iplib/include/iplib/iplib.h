@@ -14,9 +14,9 @@ __BEGIN_DECLS
 
 enum
 {
-	ETH_HDR_LEN			= 14,
-	ETH_OFF_DST			= 0,
-	ETH_OFF_SRC			= 6,
+	ETH_HDR_LEN		= 14,
+	ETH_OFF_DST		= 0,
+	ETH_OFF_SRC		= 6,
 	ETH_OFF_ETYPE		= 12,
 
 	ETH_ADDR_LEN		= 6,
@@ -27,7 +27,7 @@ enum
 
 	IPV4_HDR_LEN		= 20,
 	IPV4_OFF_LEN		= 2,
-	IPV4_OFF_ID			= 4,
+	IPV4_OFF_ID		= 4,
 	IPV4_OFF_TTL		= 8,
 	IPV4_OFF_PROTO		= 9,
 	IPV4_OFF_XSUM		= 10,
@@ -37,39 +37,39 @@ enum
 	IPV4_ADDR_LEN		= 4,
 	IP_ICMPPROTO		= 1,
 	IP_IGMPPROTO		= 2,
-	IP_TCPPROTO			= 6,
-	IP_UDPPROTO			= 17,
-	IP_ILPROTO			= 40,
+	IP_TCPPROTO		= 6,
+	IP_UDPPROTO		= 17,
+	IP_ILPROTO		= 40,
 
-	UDP_HDR_LEN			= 8,
+	UDP_HDR_LEN		= 8,
 	UDP_OFF_SRC_PORT	= 0,
 	UDP_OFF_DST_PORT	= 2,
-	UDP_OFF_LEN			= 4,
+	UDP_OFF_LEN		= 4,
 	UDP_OFF_XSUM		= 6,
 
-	TCP_HDR_LEN			= 20,
+	TCP_HDR_LEN		= 20,
 	TCP_OFF_SRC_PORT	= 0,
 	TCP_OFF_DST_PORT	= 2,
-	TCP_OFF_SEQ			= 4,
-	TCP_OFF_ACK			= 8,
+	TCP_OFF_SEQ		= 4,
+	TCP_OFF_ACK		= 8,
 	TCP_OFF_DATA		= 12,
-	TCP_OFF_FL			= 12,
-	TCP_OFF_WIN			= 14,
+	TCP_OFF_FL		= 12,
+	TCP_OFF_WIN		= 14,
 	TCP_OFF_XSUM		= 16,
 
-	ARP_PKT_LEN			= 28,
+	ARP_PKT_LEN		= 28,
 	ARP_OFF_HTYPE		= 0,
 	ARP_OFF_PTYPE		= 2,
 	ARP_OFF_HLEN		= 4,
 	ARP_OFF_PLEN		= 5,
-	ARP_OFF_OP			= 6,
-	ARP_OFF_SHA			= 8,
-	ARP_OFF_SPA			= 14,
-	ARP_OFF_THA			= 18,
-	ARP_OFF_TPA			= 24,
+	ARP_OFF_OP		= 6,
+	ARP_OFF_SHA		= 8,
+	ARP_OFF_SPA		= 14,
+	ARP_OFF_THA		= 18,
+	ARP_OFF_TPA		= 24,
 
-	ARP_OP_REQ			= 1,
-	ARP_OP_RSP			= 2,
+	ARP_OP_REQ		= 1,
+	ARP_OP_RSP		= 2,
 
 	IPaddrlen=	16,
 	IPv4addrlen=	4,
@@ -238,39 +238,39 @@ struct udphdr
 	uint8_t	lport[2];		/* local port */
 };
 
-uint8_t*	defmask(uint8_t*);
-void	maskip(uint8_t*, uint8_t*, uint8_t*);
-//int	eipfmt(Fmt*);
-int	isv4(uint8_t*);
-int64_t	parseip(uint8_t*, char*);
-int64_t	parseipmask(uint8_t*, char*);
-char*	v4parseip(uint8_t*, char*);
-char*	v4parsecidr(uint8_t*, uint8_t*, char*);
-int	parseether(uint8_t*, char*);
-int	myipaddr(uint8_t*, char*);
+uint8_t *defmask(uint8_t*);
+void maskip(uint8_t*, uint8_t*, uint8_t*);
+//int eipfmt(Fmt*);
+int isv4(uint8_t*);
+int64_t parseip(uint8_t*, char*);
+int64_t parseipmask(uint8_t*, char*);
+char *v4parseip(uint8_t*, char*);
+char *v4parsecidr(uint8_t*, uint8_t*, char*);
+int parseether(uint8_t*, char*);
+int myipaddr(uint8_t*, char*);
 int my_router_addr(uint8_t *addr, char *net);
-int	myetheraddr(uint8_t*, char*);
-int	equivip4(uint8_t*, uint8_t*);
-int	equivip6(uint8_t*, uint8_t*);
+int myetheraddr(uint8_t*, char*);
+int equivip4(uint8_t*, uint8_t*);
+int equivip6(uint8_t*, uint8_t*);
 
 struct ipifc *readipifc(char *net, struct ipifc *to_free, int index);
 struct iplifc *get_first_noloop_iplifc(char *net, struct ipifc **ifc);
 void free_ipifc(struct ipifc *ifc);
 
-void	hnputv(void*, uint64_t);
-void	hnputl(void*, unsigned int);
-void	hnputs(void*, uint16_t);
-uint64_t	nhgetv(void*);
-unsigned int	nhgetl(void*);
-uint16_t	nhgets(void*);
-uint16_t	ptclbsum(uint8_t*, int);
+void hnputv(void*, uint64_t);
+void hnputl(void*, unsigned int);
+void hnputs(void*, uint16_t);
+uint64_t nhgetv(void*);
+unsigned int nhgetl(void*);
+uint16_t nhgets(void*);
+uint16_t ptclbsum(uint8_t*, int);
 uint16_t ip_calc_xsum(uint8_t *addr, size_t len);
 
-int	v6tov4(uint8_t*, uint8_t*);
-void	v4tov6(uint8_t*, uint8_t*);
+int v6tov4(uint8_t*, uint8_t*);
+void v4tov6(uint8_t*, uint8_t*);
 
-#define	ipcmp(x, y) memcmp(x, y, IPaddrlen)
-#define	ipmove(x, y) memmove(x, y, IPaddrlen)
+#define ipcmp(x, y) memcmp(x, y, IPaddrlen)
+#define ipmove(x, y) memmove(x, y, IPaddrlen)
 
 extern uint8_t IPv4bcast[IPaddrlen];
 extern uint8_t IPv4bcastobs[IPaddrlen];

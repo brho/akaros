@@ -63,16 +63,18 @@ void add_pte_entries(struct virtual_machine *vm, uintptr_t start, uintptr_t end)
 	aligned_end = ALIGN(end, PAGE_RESOLUTION);
 
 	cur_page = aligned_start;
-	/* We always do end-1 because end from /proc/self/maps is not inclusive */
+	/* We always do end-1 because end from /proc/self/maps is not inclusive
+	 * */
 	for (pml4 = PML4(start); pml4 <= PML4(end - 1); pml4++) {
 		struct ptp *p1 = p512 + pml4 + 1;
 
-		/* Create the PML4 entry. Rather than check, I just overwrite it. */
+		/* Create the PML4 entry. Rather than check, I just overwrite
+		 * it. */
 		p512->pte[pml4] = (uintptr_t) p1 | PTE_KERN_RW;
 
-		for (pml3 = PML3(cur_page); pml3 < NPTENTRIES &&
-		     cur_page < aligned_end; pml3++, cur_page += PML3_PTE_REACH) {
-
+		for (pml3 = PML3(cur_page);
+		     pml3 < NPTENTRIES && cur_page < aligned_end;
+		     pml3++, cur_page += PML3_PTE_REACH) {
 			/* Create the PML3 entry. */
 			p1->pte[pml3] = cur_page | PTE_KERN_RW | PTE_PS;
 		}
@@ -96,10 +98,10 @@ void setup_paging(struct virtual_machine *vm)
 	uintptr_t first, second;
 
 	/* How many page table pages do we need?
-	 * If we create 1G PTEs for the whole space, it just takes 2M + 4k worth of
-	 * memory. Perhaps we should just identity map the whole space upfront.
-	 * Right now we don't MAP_POPULATE because we don't expect all the PTEs
-	 * to be used. */
+	 * If we create 1G PTEs for the whole space, it just takes 2M + 4k worth
+	 * of memory. Perhaps we should just identity map the whole space
+	 * upfront.  Right now we don't MAP_POPULATE because we don't expect all
+	 * the PTEs to be used. */
 	if (!vm->root)
 		vm->root = mmap((void *)PAGE_TABLE_ROOT_START, 0x201000,
 		                PROT_READ | PROT_WRITE,

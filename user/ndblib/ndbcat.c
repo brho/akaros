@@ -16,14 +16,13 @@
 #include <iplib/iplib.h>
 #include <ndblib/ndb.h>
 
-struct ndb*
-ndbcat(struct ndb *a, struct ndb *b)
+struct ndb *ndbcat(struct ndb *a, struct ndb *b)
 {
 	struct ndb *db = a;
 
-	if(a == NULL)
+	if (a == NULL)
 		return b;
-	while(a->next != NULL)
+	while (a->next != NULL)
 		a = a->next;
 	a->next = b;
 	return db;

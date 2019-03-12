@@ -10,7 +10,7 @@
 #include <ros/common.h>
 
 struct bcq_header {
-	uint32_t prod_idx;		/* next to be produced in */
+	uint32_t prod_idx;	/* next to be produced in */
 	uint32_t cons_pub_idx;	/* last completely consumed */
 	uint32_t cons_pvt_idx;	/* last a consumer has dibs on */
 };
@@ -19,12 +19,12 @@ struct bcq_header {
                                                                                \
 /* Wrapper, per element, with the consumption bool */                          \
 struct __name##_bcq_wrap {                                                     \
-	__elem_t elem;                                                             \
-	bool rdy_for_cons;	/* elem is ready for consumption */                    \
+	__elem_t elem;                                                         \
+	bool rdy_for_cons;	/* elem is ready for consumption */            \
 };                                                                             \
                                                                                \
 /* The actual BC queue */                                                      \
 struct __name##_bcq {                                                          \
-	struct bcq_header hdr;                                                     \
-	struct __name##_bcq_wrap wraps[__num_elems];                               \
+	struct bcq_header hdr;                                                 \
+	struct __name##_bcq_wrap wraps[__num_elems];                           \
 };

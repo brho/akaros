@@ -1,5 +1,6 @@
-/* Copyright (c) 2015 Google Inc
+/* Copyright (c) 2015, 2018 Google Inc
  * Davide Libenzi <dlibenzi@google.com>
+ * Barret Rhoden <brho@google.com>
  * See LICENSE for details.
  */
 
@@ -24,7 +25,8 @@ static void run_init_functions(void)
 
 	if (PERCPU_INIT_START_VAR) {
 		void (**pfunc)(void) = (void (**)(void)) PERCPU_INIT_START_VAR;
-		void (**pfunc_top)(void) = (void (**)(void)) PERCPU_INIT_STOP_VAR;
+		void (**pfunc_top)(void) =
+			(void (**)(void)) PERCPU_INIT_STOP_VAR;
 
 		for (; pfunc < pfunc_top; pfunc++)
 			(*pfunc)();
@@ -41,10 +43,11 @@ void percpu_init(void)
 			memcpy(percpu_base + i * PERCPU_SIZE, PERCPU_START_VAR,
 				   PERCPU_STATIC_SIZE);
 	}
-	/* We hand out addresses starting right above the static section, which ends
-	 * at PERCPU_STOP_VAR. */
-	pcpu_dyn_arena = arena_create("pcpu_dyn", PERCPU_STOP_VAR, PERCPU_DYN_SIZE,
-	                              1, NULL, NULL, NULL, 0, MEM_WAIT);
+	/* We hand out addresses starting right above the static section, which
+	 * ends at PERCPU_STOP_VAR. */
+	pcpu_dyn_arena = arena_create("pcpu_dyn", PERCPU_STOP_VAR,
+				      PERCPU_DYN_SIZE, 1, NULL, NULL, NULL, 0,
+				      MEM_WAIT);
 	assert(pcpu_dyn_arena);
 	run_init_functions();
 }

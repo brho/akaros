@@ -4,16 +4,16 @@
 #define CPIO_CRC_ASCII	070702
 /* Mode bits */
 #define CPIO_FILE_MASK	0170000
-#define CPIO_SOCKET		0120000
+#define CPIO_SOCKET	0120000
 #define CPIO_SYMLINK	0120000
 #define CPIO_REG_FILE	0100000
 #define CPIO_BLK_SPEC	0060000
 #define CPIO_DIRECTORY	0040000
 #define CPIO_CHAR_SPEC	0020000
 #define CPIO_FIFO_PIPE	0010000
-#define CPIO_SUID		0004000
-#define CPIO_SGID		0002000
-#define CPIO_STICKY		0001000
+#define CPIO_SUID	0004000
+#define CPIO_SGID	0002000
+#define CPIO_STICKY	0001000
 #define CPIO_PERM_MASK	0000777
 
 struct cpio_newc_header
@@ -31,23 +31,25 @@ struct cpio_newc_header
 	char c_rdev_maj[8];	/* only valid for chr and blk special files */
 	char c_rdev_min[8];	/* only valid for chr and blk special files */
 	char c_namesize[8];	/* count includes terminating NUL in pathname */
-	char c_chksum[8];	/* for CRC format the sum of all the bytes in the file*/
+	/* for CRC format, chksum is the sum of all the bytes in the file */
+	char c_chksum[8];
 };
 
 /* Header passed around when initing a FS based on a CPIO archive */
 struct cpio_bin_hdr
 {
-	unsigned long	c_ino;	/* FYI: we ignore this */
-	int				c_mode;
+	unsigned long		c_ino;	/* FYI: we ignore this */
+	int			c_mode;
 	uid_t			c_uid;
 	gid_t			c_gid;
-	unsigned int	c_nlink; /* not sure how this makes CPIO-sense, ignoring */
-	unsigned long	c_mtime;
+	/* not sure how this makes CPIO-sense, ignoring */
+	unsigned int		c_nlink;
+	unsigned long		c_mtime;
 	size_t			c_filesize;
-	unsigned long	c_dev_maj;
-	unsigned long	c_dev_min;
-	unsigned long	c_rdev_maj;
-	unsigned long	c_rdev_min;
+	unsigned long		c_dev_maj;
+	unsigned long		c_dev_min;
+	unsigned long		c_rdev_maj;
+	unsigned long		c_rdev_min;
 	char			*c_filename;
 	void			*c_filestart;
 };

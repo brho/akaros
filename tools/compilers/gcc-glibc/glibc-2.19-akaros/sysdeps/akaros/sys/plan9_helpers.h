@@ -42,13 +42,13 @@ enum {
  */
 struct Rock {
 	Rock *next;
-	unsigned long dev;			/* inode & dev of data file */
-	unsigned long inode;		/* ... */
-	int domain;					/* from socket call */
-	int stype;					/* socket type, from socket()'s type field */
-	int sopts;					/* socket options, from socket()'s type field */
-	int protocol;				/* ... */
-	int reserved;				/* use a priveledged port # (< 1024) */
+	unsigned long dev;	/* inode & dev of data file */
+	unsigned long inode;	/* ... */
+	int domain;		/* from socket call */
+	int stype;		/* socket type, from socket()'s type field */
+	int sopts;		/* socket options, from socket()'s type field */
+	int protocol;		/* ... */
+	int reserved;		/* use a priveledged port # (< 1024) */
 	union {
 		struct sockaddr addr;	/* address from bind */
 		struct sockaddr_storage addr_stor;
@@ -57,11 +57,11 @@ struct Rock {
 		struct sockaddr raddr;	/* peer address */
 		struct sockaddr_storage raddr_stor;
 	};
-	char ctl[Ctlsize];			/* Only used for relative path lookups now */
-	int ctl_fd;					/* fd of the ctl file */
-	int other;					/* fd of the remote end for Unix domain */
-	bool has_listen_fd;			/* has set up a listen file, O_PATH */
-	int listen_fd;				/* fd of the listen file, if any */
+	char ctl[Ctlsize];	/* Only used for relative path lookups now */
+	int ctl_fd;		/* fd of the ctl file */
+	int other;		/* fd of the remote end for Unix domain */
+	bool has_listen_fd;	/* has set up a listen file, O_PATH */
+	int listen_fd;		/* fd of the listen file, if any */
 };
 
 extern Rock *_sock_findrock(int, struct stat *);
@@ -73,7 +73,7 @@ extern int _sock_data(int, const char *, int, int, int, Rock **);
 extern int _sock_ipattr(const char *);
 extern void _sock_get_conv_filename(Rock *r, const char *name, char *retloc);
 extern void _sock_ingetaddr(Rock *, struct sockaddr_in *, socklen_t *,
-							const char *);
+			    const char *);
 extern int _sock_strip_opts(int type);
 extern int _sock_get_opts(int type);
 extern void _sock_lookup_rock_fds(int sock_fd, bool can_open_listen_fd,

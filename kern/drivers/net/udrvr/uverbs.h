@@ -61,12 +61,12 @@
 		(udata)->outlen = (olen);				\
 	} while (0)
 
-#define INIT_UDATA_BUF_OR_NULL(udata, ibuf, obuf, ilen, olen)			\
-	do {									\
-		(udata)->inbuf  = (ilen) ? (const void __user *) (ibuf) : NULL;	\
-		(udata)->outbuf = (olen) ? (void __user *) (obuf) : NULL;	\
-		(udata)->inlen  = (ilen);					\
-		(udata)->outlen = (olen);					\
+#define INIT_UDATA_BUF_OR_NULL(udata, ibuf, obuf, ilen, olen)		\
+	do {								\
+		(udata)->inbuf  = (ilen) ? (const void __user *) (ibuf) : NULL;\
+		(udata)->outbuf = (olen) ? (void __user *) (obuf) : NULL;\
+		(udata)->inlen  = (ilen);				\
+		(udata)->outlen = (olen);				\
 	} while (0)
 
 /*

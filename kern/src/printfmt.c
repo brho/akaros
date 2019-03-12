@@ -17,6 +17,7 @@ void printnum(void (*putch)(int, void**), void **putdat,
 {
 	unsigned long long temp = num;
 	int nr_digits = 1;
+
 	/* Determine how many leading zeros we need.
 	 * For every digit/nibble beyond base, we do one less width padding */
 	while ((temp /= base)) {
@@ -38,7 +39,8 @@ void printnum(void (*putch)(int, void**), void **putdat,
 
 void printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
 
-void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list ap)
+void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt,
+	       va_list ap)
 {
 	register const char *p;
 	const char *last_fmt;
@@ -145,7 +147,8 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 				uint32_t hostfmt;
 				for(i = 0; i < 4; i++){
 					hnputl(&hostfmt, lp[i]);
-					printfmt(putch, putdat, "%08lx", hostfmt);
+					printfmt(putch, putdat, "%08lx",
+						 hostfmt);
 				}
 			}
 			break;
@@ -170,9 +173,14 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 			if ((p = va_arg(ap, char *)) == NULL)
 				p = "(null)";
 			if (width > 0 && padc != '-')
-				for (width -= strnlen(p, precision); width > 0; width--)
+				for (width -= strnlen(p, precision);
+				     width > 0;
+				     width--)
 					putch(padc, putdat);
-			for (; (ch = *p) != '\0' && (precision < 0 || --precision >= 0); width--) {
+			for (;
+			     (ch = *p) != '\0' && (precision < 0
+						   || --precision >= 0);
+			     width--) {
 				if (altflag && (ch < ' ' || ch > '~'))
 					putch('?', putdat);
 				else
@@ -219,9 +227,11 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_li
 		case 'p':
 			putch('0', putdat);
 			putch('x', putdat);
-			/* automatically zero-pad pointers, out to the length of a ptr */
+			/* automatically zero-pad pointers, out to the length of
+			 * a ptr */
 			padc = '0';
-			width = sizeof(void*) * 2;	/* 8 bits per byte / 4 bits per char */
+			/* 8 bits per byte / 4 bits per char */
+			width = sizeof(void*) * 2;
 			num = (unsigned long long)
 				(uintptr_t) va_arg(ap, void *);
 			base = 16;
@@ -284,10 +294,10 @@ int vsnprintf(char *buf, size_t n, const char *fmt, va_list ap)
 	 * snprintf(), e.g.:
 	 * 		len += snprintf(buf + len, bufsz - len, "foo");
 	 * 		len += snprintf(buf + len, bufsz - len, "bar");
-	 * If len > bufsz, that will appear as a large value.  This is not quite the
-	 * glibc semantics (we aren't returning the size we would have printed), but
-	 * it short circuits the rest of the function and avoids potential errors in
-	 * the putch() functions. */
+	 * If len > bufsz, that will appear as a large value.  This is not quite
+	 * the glibc semantics (we aren't returning the size we would have
+	 * printed), but it short circuits the rest of the function and avoids
+	 * potential errors in the putch() functions. */
 	if (!n || (n > INT32_MAX))
 		return 0;
 

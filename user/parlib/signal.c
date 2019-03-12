@@ -7,22 +7,22 @@
  * will get this mixed in.  Mostly just registration of signal handlers.
  *
  * POSIX signal handling caveats:
- * 	- We don't copy signal handling tables or anything across forks or execs
- *	- We don't send meaningful info in the siginfos, nor do we pass pid/uids on
- *	signals coming from a kill.  This is especially pertinent for sigqueue,
- *	which needs a payload (value) and sending PID
- * 	- We run handlers in vcore context, so any blocking syscall will spin.
- * 	Regular signals have restrictions on their syscalls too, though not this
- * 	great.  We could spawn off a uthread to run the handler, given that we have
- * 	a 2LS (which we don't for SCPs).
- * 	- We don't do anything with signal blocking/masking.  When in a signal
- * 	handler, you won't get interrupted with another signal handler (so long as
- * 	you run it in vcore context!).  With uthreads, you could get interrupted.
- * 	There is also no process wide signal blocking yet (sigprocmask()).  If this
- * 	is desired, we can abort certain signals when we h_p_signal(), 
- * 	- Likewise, we don't do waiting for particular signals yet.  Just about the
- * 	only thing we do is allow the registration of signal handlers. 
- * 	- Check each function for further notes.  */
+ * - We don't copy signal handling tables or anything across forks or execs
+ * - We don't send meaningful info in the siginfos, nor do we pass pid/uids on
+ * signals coming from a kill.  This is especially pertinent for sigqueue,
+ * which needs a payload (value) and sending PID
+ * - We run handlers in vcore context, so any blocking syscall will spin.
+ * Regular signals have restrictions on their syscalls too, though not this
+ * great.  We could spawn off a uthread to run the handler, given that we have
+ * a 2LS (which we don't for SCPs).
+ * - We don't do anything with signal blocking/masking.  When in a signal
+ * handler, you won't get interrupted with another signal handler (so long as
+ * you run it in vcore context!).  With uthreads, you could get interrupted.
+ * There is also no process wide signal blocking yet (sigprocmask()).  If this
+ * is desired, we can abort certain signals when we h_p_signal(), 
+ * - Likewise, we don't do waiting for particular signals yet.  Just about the
+ * only thing we do is allow the registration of signal handlers. 
+ * - Check each function for further notes.  */
 
 // Needed for sigmask functions...
 #define _GNU_SOURCE
@@ -90,14 +90,16 @@ static void handle_event(struct event_msg *ev_msg, unsigned int ev_type,
 	assert(ev_msg);
 	sig_nr = ev_msg->ev_arg1;
 	/* We're handling a process-wide signal, but signal handlers will want a
-	 * user context.  They operate on the model that some thread got the signal,
-	 * but that didn't happen on Akaros.  If we happen to have a current
-	 * uthread, we can use that - perhaps that's what the user wants.  If not,
-	 * we'll build a fake one representing our current call stack. */
+	 * user context.  They operate on the model that some thread got the
+	 * signal, but that didn't happen on Akaros.  If we happen to have a
+	 * current uthread, we can use that - perhaps that's what the user
+	 * wants.  If not, we'll build a fake one representing our current call
+	 * stack. */
 	if (current_uthread) {
 		trigger_posix_signal(sig_nr, &info, get_cur_uth_ctx());
 	} else {
-		init_user_ctx(&fake_uctx, (uintptr_t)handle_event, get_stack_pointer());
+		init_user_ctx(&fake_uctx, (uintptr_t)handle_event,
+			      get_stack_pointer());
 		trigger_posix_signal(sig_nr, &info, &fake_uctx);
 	}
 }
@@ -167,16 +169,19 @@ static void __prep_sighandler(struct uthread *uthread,
 	case ROS_HW_CTX:
 	case ROS_VM_CTX:
 		assert(uthread->flags & UTHREAD_FPSAVED);
-		/* We need to save the already-saved FP state into the sigstate space.
-		 * The sig handler is taking over the uthread and its GP and FP spaces.
+		/* We need to save the already-saved FP state into the sigstate
+		 * space.  The sig handler is taking over the uthread and its GP
+		 * and FP spaces.
 		 *
-		 * If we ever go back to not aggressively saving the FP state, then for
-		 * HW and VM ctxs, the state is in hardware.  Regardless, we still need
-		 * to save it in ->as, with something like:
-		 *			save_fp_state(&uthread->sigstate.data->as);
-		 * Either way, when we're done with this entire function, the *uthread*
-		 * will have ~UTHREAD_FPSAVED, since we will be talking about the SW
-		 * context that is running the signal handler. */
+		 * If we ever go back to not aggressively saving the FP state,
+		 * then for HW and VM ctxs, the state is in hardware.
+		 * Regardless, we still need to save it in ->as, with something
+		 * like: save_fp_state(&uthread->sigstate.data->as);
+		 *
+		 * Either way, when we're done with this entire function, the
+		 * *uthread* will have ~UTHREAD_FPSAVED, since we will be
+		 * talking about the SW context that is running the signal
+		 * handler. */
 		uthread->sigstate.data->as = uthread->as;
 		uthread->flags &= ~UTHREAD_FPSAVED;
 		break;
@@ -191,9 +196,9 @@ static void __prep_sighandler(struct uthread *uthread,
 		stack = uthread->sigstate.sigalt_stacktop;
 
 	init_user_ctx(&uthread->sigstate.data->u_ctx, (uintptr_t)entry, stack);
-	/* The uthread may or may not be UTHREAD_SAVED.  That depends on whether the
-	 * uthread was in that state initially.  We're swapping into the location of
-	 * 'ctx', which is either in VCPD or the uth itself. */
+	/* The uthread may or may not be UTHREAD_SAVED.  That depends on whether
+	 * the uthread was in that state initially.  We're swapping into the
+	 * location of 'ctx', which is either in VCPD or the uth itself. */
 	swap_user_contexts(ctx, &uthread->sigstate.data->u_ctx);
 }
 
@@ -249,7 +254,8 @@ static void __run_all_sighandlers(void)
 	for (int i = 1; i < _NSIG; i++) {
 		if (__sigismember(&andset, i)) {
 			__sigdelset(&uthread->sigstate.pending, i);
-			trigger_posix_signal(i, NULL, &uthread->sigstate.data->u_ctx);
+			trigger_posix_signal(i, NULL,
+					     &uthread->sigstate.data->u_ctx);
 		}
 	}
 	uthread_yield(FALSE, __exit_sighandler_cb, 0);
@@ -287,8 +293,10 @@ void uthread_prep_signal_from_fault(struct uthread *uthread,
 		struct siginfo info = {0};
 
 		if (uth_is_handling_sigs(uthread)) {
-			printf("Uthread sighandler faulted, signal: %d\n", signo);
-			/* uthread.c already copied out the faulting ctx into the uth */
+			printf("Uthread sighandler faulted, signal: %d\n",
+			       signo);
+			/* uthread.c already copied out the faulting ctx into
+			 * the uth */
 			print_user_context(&uthread->u_ctx);
 			exit(-1);
 		}
@@ -339,12 +347,12 @@ static int __sigprocmask(int __how, __const sigset_t *__restrict __set,
 {
 	sigset_t *sigmask;
 
-	/* Signal handlers might call sigprocmask, with the intent of affecting the
-	 * uthread's sigmask.  Process-wide signal handlers run on behalf of the
-	 * entire process and aren't bound to a uthread, which means sigprocmask
-	 * won't work.  We can tell we're running one of these handlers since we are
-	 * in vcore context.  Uthread signals (e.g. pthread_kill()) run from uthread
-	 * context. */
+	/* Signal handlers might call sigprocmask, with the intent of affecting
+	 * the uthread's sigmask.  Process-wide signal handlers run on behalf of
+	 * the entire process and aren't bound to a uthread, which means
+	 * sigprocmask won't work.  We can tell we're running one of these
+	 * handlers since we are in vcore context.  Uthread signals (e.g.
+	 * pthread_kill()) run from uthread context. */
 	if (in_vcore_context()) {
 		errno = ENOENT;
 		return -1;

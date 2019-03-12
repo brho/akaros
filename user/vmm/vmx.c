@@ -31,9 +31,11 @@ void showstatus(FILE *f, struct guest_thread *vm_thread)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(vm_thread);
 	int shutdown = vm_tf->tf_exit_reason;
-	char *when = shutdown & VMX_EXIT_REASONS_FAILED_VMENTRY ? "entry" : "exit";
-	shutdown &= ~VMX_EXIT_REASONS_FAILED_VMENTRY;
+	char *when = shutdown & VMX_EXIT_REASONS_FAILED_VMENTRY ? "entry"
+		                                                : "exit";
 	char *reason = "UNKNOWN";
+
+	shutdown &= ~VMX_EXIT_REASONS_FAILED_VMENTRY;
 	if (shutdown < COUNT_OF(vmxexit) && vmxexit[shutdown])
 		reason = vmxexit[shutdown];
 	fprintf(f, "Shutdown: core %d, %s due to %s(0x%x); ret code 0x%x\n",
@@ -51,7 +53,9 @@ int gva2gpa(struct guest_thread *vm_thread, uint64_t va, uint64_t *pa)
 	uint64_t *ptptr = (uint64_t *)vm_tf->tf_cr3;
 	uint64_t entry;
 
-	for (int shift = PML4_SHIFT; shift >= PML1_SHIFT; shift -= BITS_PER_PML) {
+	for (int shift = PML4_SHIFT;
+	     shift >= PML1_SHIFT;
+	     shift -= BITS_PER_PML) {
 		entry = ptptr[PMLx(va, shift)];
 		/* bit 63 can be NX.  Bits 62:52 are ignored (for PML4) */
 		entry &= 0x000fffffffffffff;

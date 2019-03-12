@@ -187,10 +187,12 @@ struct virtio_mmio_dev {
 	// we save the same value here as we report to guest via kernel cmd line
 	uint64_t addr;
 
-	// Reads from vqdev.dev_feat are performed starting at bit 32 * dev_feat_sel
+	// Reads from vqdev.dev_feat are performed starting at bit 32 *
+	// dev_feat_sel
 	uint32_t dev_feat_sel;
 
-	// Writes to vqdev.dri_feat are performed starting at bit 32 * dri_feat_sel
+	// Writes to vqdev.dri_feat are performed starting at bit 32 *
+	// dri_feat_sel
 	uint32_t dri_feat_sel;
 
 	// Reads and writes to queue-specific registers target vqdev->vqs[qsel]
@@ -199,8 +201,9 @@ struct virtio_mmio_dev {
 	// Interrupt status register
 	uint32_t isr;
 
-	// This utility function will be called when the device needs to interrupt
-	// the guest. You can have it do whatever you want, but it is required.
+	// This utility function will be called when the device needs to
+	// interrupt the guest. You can have it do whatever you want, but it is
+	// required.
 	void (*poke_guest)(uint8_t vec, uint32_t dest);
 
 	// Status flags for the device

@@ -30,21 +30,24 @@ int ufd_get_fd(struct user_fd *ufd)
 	int fd;
 
 	if (!ufds) {
-		nr_ufds = 1 << (sizeof(int) * 8 - LOG2_UP(NR_FILE_DESC_MAX) - 1);
-		/* Two things: instead of worrying about growing and reallocing (which
-		 * would need a lock), let's just alloc the entire 2^15 bytes (32KB).
-		 * Also, it's unlikely, but we might have two threads trying to init at
-		 * once.  First one wins, second one aborts (and frees). */
+		nr_ufds = 1 << (sizeof(int) * 8 - LOG2_UP(NR_FILE_DESC_MAX)
+				- 1);
+		/* Two things: instead of worrying about growing and reallocing
+		 * (which would need a lock), let's just alloc the entire 2^15
+		 * bytes (32KB).  Also, it's unlikely, but we might have two
+		 * threads trying to init at once.  First one wins, second one
+		 * aborts (and frees). */
 		new_ufds = malloc(sizeof(struct user_fd*) * nr_ufds);
 		memset(new_ufds, 0, sizeof(struct user_fd*) * nr_ufds);
 		if (!atomic_cas_ptr((void**)&ufds, 0, new_ufds))
 			free(new_ufds);
 		cmb();
 	}
-	/* At this point, ufds is set.  Just do a linear search for an empty slot.
-	 * We're not actually bound to return the lowest number available, so in the
-	 * future we could do things like partition the space based on vcoreid so we
-	 * start in different areas, or maintain a 'last used' hint FD. */
+	/* At this point, ufds is set.  Just do a linear search for an empty
+	 * slot.  We're not actually bound to return the lowest number
+	 * available, so in the future we could do things like partition the
+	 * space based on vcoreid so we start in different areas, or maintain a
+	 * 'last used' hint FD. */
 	for (int i = 0; i < nr_ufds; i++) {
 		if (!ufds[i]) {
 			if (atomic_cas_ptr((void**)&ufds[i], 0, ufd)) {
@@ -61,15 +64,15 @@ int ufd_get_fd(struct user_fd *ufd)
 /* Given an FD, returns the user_fd struct.  Returns 0 and sets errno if there's
  * an error.  There's no protection for concurrent closes, just like how you
  * shouldn't attempt to use an FD after closing.  So don't do stuff like:
- * 		foo = ufd_lookup(7);
- * 		                                           close(7);
- * 		foo->whatever = 6; // foo could be free!
+ * 	foo = ufd_lookup(7);
+ * 	close(7);
+ * 	foo->whatever = 6; // foo could be free!
  *
  * or
- * 		                                           close(7);
- * 		foo = ufd_lookup(7);
- *      // this might succeed if it races with close()
- * 		foo->whatever = 6; // foo could be free!
+ * 	close(7);
+ * 	foo = ufd_lookup(7);
+ * 	// this might succeed if it races with close()
+ * 	foo->whatever = 6; // foo could be free!
  */
 struct user_fd *ufd_lookup(int fd)
 {

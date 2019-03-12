@@ -15,6 +15,7 @@
 struct u16_pool *create_u16_pool(unsigned int size)
 {
 	struct u16_pool *id;
+
 	/* We could have size be a u16, but this might catch bugs where users
 	 * tried to ask for more than 2^16 and had it succeed. */
 	if (size > MAX_U16_POOL_SZ)
@@ -43,6 +44,7 @@ struct u16_pool *create_u16_pool(unsigned int size)
 int get_u16(struct u16_pool *id)
 {
 	uint16_t v;
+
 	spin_lock_irqsave(&id->lock);
 	if (id->tos == id->size) {
 		spin_unlock_irqsave(&id->lock);
@@ -52,7 +54,8 @@ int get_u16(struct u16_pool *id)
 	spin_unlock_irqsave(&id->lock);
 	/* v is ours, we can freely read and write its check field */
 	if (id->check[v] != 0xfe) {
-		printk("BAD! %d is already allocated (0x%x)\n", v, id->check[v]);
+		printk("BAD! %d is already allocated (0x%x)\n", v,
+		       id->check[v]);
 		return -1;
 	}
 	id->check[v] = 0x5a;
@@ -63,7 +66,8 @@ void put_u16(struct u16_pool *id, int v)
 {
 	/* we could check for if v is in range before dereferencing. */
 	if (id->check[v] != 0x5a) {
-		printk("BAD! freeing non-allocated: %d(0x%x)\n", v, id->check[v]);
+		printk("BAD! freeing non-allocated: %d(0x%x)\n", v,
+		       id->check[v]);
 		return;
 	}
 	id->check[v] = 0xfe;

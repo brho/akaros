@@ -52,9 +52,10 @@ void *cons_receiveq_fn(void *_vq) // host -> guest
 
 	// NOTE: The virtio_next_avail_vq_desc will not write more than
 	//       vq->vring.num entries to iov, and the device implementation
-	//       (virtio_mmio.c) will not allow the driver to set vq->vring.num to a
-	//       value greater than QueueNumMax (vq->qnum_max), so you are safe as
-	//       long as your iov is at least vq->qnum_max iovecs in size.
+	//       (virtio_mmio.c) will not allow the driver to set vq->vring.num
+	//       to a value greater than QueueNumMax (vq->qnum_max), so you are
+	//       safe as long as your iov is at least vq->qnum_max iovecs in
+	//       size.
 	iov = malloc(vq->qnum_max * sizeof(struct iovec));
 
 	if (vq->qready == 0x0)
@@ -69,7 +70,8 @@ void *cons_receiveq_fn(void *_vq) // host -> guest
 		head = virtio_next_avail_vq_desc(vq, iov, &olen, &ilen);
 
 		if (olen) {
-			// virtio-v1.0-cs04 s5.3.6.1 Device Operation (console section)
+			// virtio-v1.0-cs04 s5.3.6.1 Device Operation (console
+			// section)
 			VIRTIO_DRI_ERRX(vq->vqdev,
 				"The driver placed a device-readable buffer in the console device's receiveq.\n"
 				"  See virtio-v1.0-cs04 s5.3.6.1 Device Operation");
@@ -77,7 +79,8 @@ void *cons_receiveq_fn(void *_vq) // host -> guest
 
 		// TODO: We may want to add some sort of console abort
 		//       (e.g. type q and enter to quit)
-		// readv from stdin as much as we can (to end of bufs or end of input)
+		// readv from stdin as much as we can (to end of bufs or end of
+		// input)
 		num_read = readv(0, iov, ilen);
 		if (num_read < 0)
 			VIRTIO_DEV_ERRX(vq->vqdev,
@@ -123,9 +126,10 @@ void *cons_transmitq_fn(void *_vq) // guest -> host
 
 	// NOTE: The virtio_next_avail_vq_desc will not write more than
 	//       vq->vring.num entries to iov, and the device implementation
-	//       (virtio_mmio.c) will not allow the driver to set vq->vring.num to a
-	//       value greater than QueueNumMax (vq->qnum_max), so you are safe as
-	//       long as your iov is at least vq->qnum_max iovecs in size.
+	//       (virtio_mmio.c) will not allow the driver to set vq->vring.num
+	//       to a value greater than QueueNumMax (vq->qnum_max), so you are
+	//       safe as long as your iov is at least vq->qnum_max iovecs in
+	//       size.
 	iov = malloc(vq->qnum_max * sizeof(struct iovec));
 
 	if (vq->qready == 0x0)
@@ -138,7 +142,8 @@ void *cons_transmitq_fn(void *_vq) // guest -> host
 		head = virtio_next_avail_vq_desc(vq, iov, &olen, &ilen);
 
 		if (ilen) {
-			// virtio-v1.0-cs04 s5.3.6.1 Device Operation (console section)
+			// virtio-v1.0-cs04 s5.3.6.1 Device Operation (console
+			// section)
 			VIRTIO_DRI_ERRX(vq->vqdev,
 				"The driver placed a device-writeable buffer in the console device's transmitq.\n"
 				"  See virtio-v1.0-cs04 s5.3.6.1 Device Operation");

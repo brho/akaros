@@ -27,17 +27,19 @@ void kmalloc_init(void)
 {
 	char kc_name[KMC_NAME_SZ];
 
-	/* we want at least a 16 byte alignment of the tag so that the bufs kmalloc
-	 * returns are 16 byte aligned.  we used to check the actual size == 16,
-	 * since we adjusted the KMALLOC_SMALLEST based on that. */
+	/* we want at least a 16 byte alignment of the tag so that the bufs
+	 * kmalloc returns are 16 byte aligned.  we used to check the actual
+	 * size == 16, since we adjusted the KMALLOC_SMALLEST based on that. */
 	static_assert(ALIGNED(sizeof(struct kmalloc_tag), 16));
-	/* build caches of common sizes.  this size will later include the tag and
-	 * the actual returned buffer. */
+	/* build caches of common sizes.  this size will later include the tag
+	 * and the actual returned buffer. */
 	size_t ksize = KMALLOC_SMALLEST;
+
 	for (int i = 0; i < NUM_KMALLOC_CACHES; i++) {
 		snprintf(kc_name, KMC_NAME_SZ, "kmalloc_%d", ksize);
-		kmalloc_caches[i] = kmem_cache_create(kc_name, ksize, KMALLOC_ALIGNMENT,
-		                                      0, NULL, 0, 0, NULL);
+		kmalloc_caches[i] = kmem_cache_create(kc_name, ksize,
+						      KMALLOC_ALIGNMENT, 0,
+						      NULL, 0, 0, NULL);
 		ksize <<= 1;
 	}
 }
@@ -55,9 +57,10 @@ void *kmalloc(size_t size, int flags)
 		cache_id = LOG2_UP(ksize) - LOG2_UP(KMALLOC_SMALLEST);
 	// if we don't have a cache to handle it, alloc cont pages
 	if (cache_id >= NUM_KMALLOC_CACHES) {
-		/* The arena allocator will round up too, but we want to know in advance
-		 * so that krealloc can avoid extra allocations. */
-		size_t amt_alloc = ROUNDUP(size + sizeof(struct kmalloc_tag), PGSIZE);
+		/* The arena allocator will round up too, but we want to know in
+		 * advance so that krealloc can avoid extra allocations. */
+		size_t amt_alloc = ROUNDUP(size + sizeof(struct kmalloc_tag),
+					   PGSIZE);
 
 		buf = kpages_alloc(amt_alloc, flags);
 		if (!buf)
@@ -86,6 +89,7 @@ void *kmalloc(size_t size, int flags)
 void *kzmalloc(size_t size, int flags)
 {
 	void *v = kmalloc(size, flags);
+
 	if (!v)
 		return v;
 	memset(v, 0, size);
@@ -96,11 +100,12 @@ void *kmalloc_align(size_t size, int flags, size_t align)
 {
 	void *addr, *retaddr;
 	int *tag_flags, offset;
-	/* alignment requests must be a multiple of long, even though we only need
-	 * int in the current code. */
+
+	/* alignment requests must be a multiple of long, even though we only
+	 * need int in the current code. */
 	assert(ALIGNED(align, sizeof(long)));
-	/* must fit in the space reserved for the offset amount, which is at most
-	 * 'align'. */
+	/* must fit in the space reserved for the offset amount, which is at
+	 * most 'align'. */
 	assert(align < (1 << (32 - KMALLOC_ALIGN_SHIFT)));
 	assert(IS_PWR2(align));
 	addr = kmalloc(size + align, flags);
@@ -111,8 +116,8 @@ void *kmalloc_align(size_t size, int flags, size_t align)
 	retaddr = ROUNDUP(addr, align);
 	offset = retaddr - addr;
 	assert(offset < align);
-	/* we might not have room for a full tag.  we might have only 8 bytes.  but
-	 * we'll at least have room for the flags part. */
+	/* we might not have room for a full tag.  we might have only 8 bytes.
+	 * but we'll at least have room for the flags part. */
 	tag_flags = (int*)(retaddr - sizeof(int));
 	*tag_flags = (offset << KMALLOC_ALIGN_SHIFT) | KMALLOC_TAG_UNALIGN;
 	return retaddr;
@@ -121,6 +126,7 @@ void *kmalloc_align(size_t size, int flags, size_t align)
 void *kzmalloc_align(size_t size, int flags, size_t align)
 {
 	void *v = kmalloc_align(size, flags, align);
+
 	if (!v)
 		return v;
 	memset(v, 0, size);
@@ -129,10 +135,10 @@ void *kzmalloc_align(size_t size, int flags, size_t align)
 
 static struct kmalloc_tag *__get_km_tag(void *buf)
 {
-	struct kmalloc_tag *tag = (struct kmalloc_tag*)(buf -
-	                                            sizeof(struct kmalloc_tag));
+	struct kmalloc_tag *tag =
+		(struct kmalloc_tag*)(buf - sizeof(struct kmalloc_tag));
 	if (tag->canary != KMALLOC_CANARY){
-		printk("__get_km_tag bad canary: %08lx@%p, buf %p, expected %08lx\n",
+		printk("kmalloc bad canary: %08lx@%p, buf %p, expected %08lx\n",
 		       tag->canary, &tag->canary, buf, KMALLOC_CANARY);
 		hexdump((void *)(buf - sizeof(struct kmalloc_tag)), 256);
 		panic("Bad canary");
@@ -148,6 +154,7 @@ static struct kmalloc_tag *__get_km_tag(void *buf)
 static void *__get_unaligned_orig_buf(void *buf)
 {
 	int *tag_flags = (int*)(buf - sizeof(int));
+
 	if ((*tag_flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_UNALIGN)
 		return (buf - (*tag_flags >> KMALLOC_ALIGN_SHIFT));
 	else
@@ -164,11 +171,13 @@ void *krealloc(void* buf, size_t size, int flags)
 		if (__get_unaligned_orig_buf(buf))
 			panic("krealloc of a kmalloc_align not supported");
 		tag = __get_km_tag(buf);
-		/* whatever we got from either a slab or the page allocator is meant for
-		 * both the buf+size as well as the kmalloc tag */
+		/* whatever we got from either a slab or the page allocator is
+		 * meant for both the buf+size as well as the kmalloc tag */
 		if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_CACHE) {
-			osize = tag->my_cache->obj_size - sizeof(struct kmalloc_tag);
-		} else if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_PAGES) {
+			osize = tag->my_cache->obj_size
+				- sizeof(struct kmalloc_tag);
+		} else if ((tag->flags & KMALLOC_FLAG_MASK)
+			   == KMALLOC_TAG_PAGES) {
 			osize = tag->amt_alloc - sizeof(struct kmalloc_tag);
 		} else {
 			panic("Probably a bad tag, flags %p\n", tag->flags);
@@ -202,15 +211,17 @@ void *krealloc(void* buf, size_t size, int flags)
 void kmalloc_incref(void *buf)
 {
 	void *orig_buf = __get_unaligned_orig_buf(buf);
+
 	buf = orig_buf ? orig_buf : buf;
-	/* if we want a smaller tag, we can extract the code from kref and manually
-	 * set the release method in kfree. */
+	/* if we want a smaller tag, we can extract the code from kref and
+	 * manually set the release method in kfree. */
 	kref_get(&__get_km_tag(buf)->kref, 1);
 }
 
 int kmalloc_refcnt(void *buf)
 {
 	void *orig_buf = __get_unaligned_orig_buf(buf);
+
 	buf = orig_buf ? orig_buf : buf;
 	return kref_refcnt(&__get_km_tag(buf)->kref);
 }
@@ -218,6 +229,7 @@ int kmalloc_refcnt(void *buf)
 static void __kfree_release(struct kref *kref)
 {
 	struct kmalloc_tag *tag = container_of(kref, struct kmalloc_tag, kref);
+
 	if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_CACHE)
 		kmem_cache_free(tag->my_cache, tag);
 	else if ((tag->flags & KMALLOC_FLAG_MASK) == KMALLOC_TAG_PAGES)
@@ -238,10 +250,11 @@ void kfree(void *buf)
 
 void kmalloc_canary_check(char *str)
 {
+	struct kmalloc_tag *tag;
+
 	if (!debug_canary)
 		return;
-	struct kmalloc_tag *tag = (struct kmalloc_tag*)(debug_canary -
-	                                                sizeof(struct kmalloc_tag));
+	tag = (struct kmalloc_tag*)(debug_canary - sizeof(struct kmalloc_tag));
 	if (tag->canary != KMALLOC_CANARY)
 		panic("\t\t KMALLOC CANARY CHECK FAILED %s\n", str);
 }

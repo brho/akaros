@@ -11,16 +11,16 @@ static void __attribute__((constructor)) parlib_stdio_ctor(void)
 		return;
 	/* This isn't ideal, since it might affect some stdout streams where our
 	 * parent tried to do something else.  Note that isatty() always returns
-	 * TRUE, due to how we fake tcgetattr(), and that doesn't affect whatever
-	 * our shells are doing to set us up. */
+	 * TRUE, due to how we fake tcgetattr(), and that doesn't affect
+	 * whatever our shells are doing to set us up. */
 	setlinebuf(stdout);
 }
 
 static void __attribute__((noreturn)) fatal_backtrace(void)
 {
 	/* This will cause the kernel to print out a backtrace to the console.
-	 * Short of reading /proc/self/maps or other stuff, userspace would have a
-	 * hard time backtracing itself. */
+	 * Short of reading /proc/self/maps or other stuff, userspace would have
+	 * a hard time backtracing itself. */
 	breakpoint();
 	abort();
 }

@@ -25,8 +25,8 @@ static inline bool seqctr_retry(seq_ctr_t old_ctr, seq_ctr_t new_ctr);
 
 /* Basic helpers for readers.  Ex:
  * do {
- * 		seq_ctr_t seq = kernel_maintained_seq_ctr
- * 		read_data_whatever();
+ * 	seq_ctr_t seq = kernel_maintained_seq_ctr
+ * 	read_data_whatever();
  * } while (seqctr_retry(seq, kernel_maintained_seq_ctr);
  */
 static inline bool seq_is_locked(seq_ctr_t seq_ctr)
@@ -39,8 +39,8 @@ static inline bool seqctr_retry(seq_ctr_t old_ctr, seq_ctr_t new_ctr)
 	seq_ctr_t old_val;
 
 	rmb();	/* don't allow protected reads to reorder after the check */
-	/* Even though old_ctr is passed in, we might be inlined and can't guarantee
-	 * old_ctr was in a register or otherwise won't be re-read. */
+	/* Even though old_ctr is passed in, we might be inlined and can't
+	 * guarantee old_ctr was in a register or otherwise won't be re-read. */
 	old_val = READ_ONCE(old_ctr);
 	return (seq_is_locked(old_val)) || (old_val != new_ctr);
 }

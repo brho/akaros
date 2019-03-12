@@ -81,9 +81,9 @@ bool test_ptclbsum_bench(void)
 }
 
 static struct ktest ktests[] = {
-	KTEST_REG(ptclbsum,				CONFIG_TEST_ptclbsum),
-	KTEST_REG(simplesum_bench,		CONFIG_TEST_simplesum_bench),
-	KTEST_REG(ptclbsum_bench,		CONFIG_TEST_ptclbsum_bench),
+	KTEST_REG(ptclbsum,		CONFIG_TEST_ptclbsum),
+	KTEST_REG(simplesum_bench,	CONFIG_TEST_simplesum_bench),
+	KTEST_REG(ptclbsum_bench,	CONFIG_TEST_ptclbsum_bench),
 };
 
 static int num_ktests = sizeof(ktests) / sizeof(struct ktest);

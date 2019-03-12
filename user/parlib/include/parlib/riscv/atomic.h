@@ -81,8 +81,8 @@ static inline void atomic_andb(volatile uint8_t* number, uint8_t mask)
 {
 	uintptr_t offset = (uintptr_t)number & 3;
 	uint32_t wmask = (1<<(8*offset+8)) - (1<<(8*offset));
-	wmask = ~wmask | ((uint32_t)mask << (8*offset));
 
+	wmask = ~wmask | ((uint32_t)mask << (8*offset));
 	__sync_fetch_and_and((uint32_t*)((uintptr_t)number & ~3), wmask);
 }
 

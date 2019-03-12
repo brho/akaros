@@ -30,10 +30,10 @@ int kstack_ctor(void *blob, void *priv, int flags)
 	if (!stackbot)
 		return -1;
 	if (map_vmap_segment((uintptr_t)blob, 0x123456000, KSTACK_NR_GUARD_PGS,
-		                 PTE_NONE))
+			     PTE_NONE))
 		goto error;
 	if (map_vmap_segment((uintptr_t)blob + KSTACK_GUARD_SZ, PADDR(stackbot),
-		                 KSTKSIZE / PGSIZE, PTE_KERN_RW))
+			     KSTKSIZE / PGSIZE, PTE_KERN_RW))
 		goto error;
 	return 0;
 error:
@@ -90,14 +90,15 @@ void kthread_init(void)
 					   __alignof__(struct kthread), 0,
 					   NULL, 0, 0, NULL);
 	kstack_cache = kmem_cache_create("kstack", KSTKSIZE + KSTACK_GUARD_SZ,
-	                                 PGSIZE, 0, vmap_arena, kstack_ctor,
-									 kstack_dtor, NULL);
+					 PGSIZE, 0, vmap_arena, kstack_ctor,
+					 kstack_dtor, NULL);
 }
 
 /* Used by early init routines (smp_boot, etc) */
 struct kthread *__kthread_zalloc(void)
 {
 	struct kthread *kthread;
+
 	kthread = kmem_cache_alloc(kthread_kcache, 0);
 	assert(kthread);
 	memset(kthread, 0, sizeof(struct kthread));
@@ -132,10 +133,11 @@ void restart_kthread(struct kthread *kthread)
 	/* Avoid messy complications.  The kthread will enable_irqsave() when it
 	 * comes back up. */
 	disable_irq();
-	/* Free any spare, since we need the current to become the spare.  Without
-	 * the spare, we can't free our current kthread/stack (we could free the
-	 * kthread, but not the stack, since we're still on it).  And we can't free
-	 * anything after popping kthread, since we never return. */
+	/* Free any spare, since we need the current to become the spare.
+	 * Without the spare, we can't free our current kthread/stack (we could
+	 * free the kthread, but not the stack, since we're still on it).  And
+	 * we can't free anything after popping kthread, since we never return.
+	 * */
 	if (pcpui->spare) {
 		put_kstack(pcpui->spare->stacktop);
 		kmem_cache_free(kthread_kcache, pcpui->spare);
@@ -148,26 +150,31 @@ void restart_kthread(struct kthread *kthread)
 	/* When a kthread runs, its stack is the default kernel stack */
 	set_stack_top(kthread->stacktop);
 	pcpui->cur_kthread = kthread;
-	/* Only change current if we need to (the kthread was in process context) */
+	/* Only change current if we need to (the kthread was in process
+	 * context) */
 	if (kthread->proc) {
 		if (kthread->proc == pcpui->cur_proc) {
-			/* We're already loaded, but we do need to drop the extra ref stored
-			 * in kthread->proc. */
+			/* We're already loaded, but we do need to drop the
+			 * extra ref stored in kthread->proc. */
 			proc_decref(kthread->proc);
 			kthread->proc = 0;
 		} else {
-			/* Load our page tables before potentially decreffing cur_proc.
+			/* Load our page tables before potentially decreffing
+			 * cur_proc.
 			 *
-			 * We don't need to do an EPT flush here.  The EPT is flushed and
-			 * managed in sync with the VMCS.  We won't run a different VM (and
-			 * thus *need* a different EPT) without first removing the old GPC,
-			 * which ultimately will result in a flushed EPT (on x86, this
-			 * actually happens when we clear_owning_proc()). */
+			 * We don't need to do an EPT flush here.  The EPT is
+			 * flushed and managed in sync with the VMCS.  We won't
+			 * run a different VM (and thus *need* a different EPT)
+			 * without first removing the old GPC, which ultimately
+			 * will result in a flushed EPT (on x86, this actually
+			 * happens when we clear_owning_proc()). */
 			lcr3(kthread->proc->env_cr3);
-			/* Might have to clear out an existing current.  If they need to be
-			 * set later (like in restartcore), it'll be done on demand. */
+			/* Might have to clear out an existing current.  If they
+			 * need to be set later (like in restartcore), it'll be
+			 * done on demand. */
 			old_proc = pcpui->cur_proc;
-			/* Transfer our counted ref from kthread->proc to cur_proc. */
+			/* Transfer our counted ref from kthread->proc to
+			 * cur_proc. */
 			pcpui->cur_proc = kthread->proc;
 			kthread->proc = 0;
 			if (old_proc)
@@ -187,19 +194,20 @@ static void __launch_kthread(uint32_t srcid, long a0, long a1, long a2)
 	struct proc *cur_proc = pcpui->cur_proc;
 
 	if (pcpui->owning_proc && pcpui->owning_proc != kthread->proc) {
-		/* Some process should be running here that is not the same as the
-		 * kthread.  This means the _M is getting interrupted or otherwise
-		 * delayed.  If we want to do something other than run it (like send the
-		 * kmsg to another pcore, or ship the context from here to somewhere
-		 * else/deschedule it (like for an _S)), do it here.
+		/* Some process should be running here that is not the same as
+		 * the kthread.  This means the _M is getting interrupted or
+		 * otherwise delayed.  If we want to do something other than run
+		 * it (like send the kmsg to another pcore, or ship the context
+		 * from here to somewhere else/deschedule it (like for an _S)),
+		 * do it here.
 		 *
-		 * If you want to do something here, call out to the ksched, then
-		 * abandon_core(). */
+		 * If you want to do something here, call out to the ksched,
+		 * then abandon_core(). */
 		cmb();	/* do nothing/placeholder */
 	}
-	/* o/w, just run the kthread.  any trapframes that are supposed to run or
-	 * were interrupted will run whenever the kthread smp_idles() or otherwise
-	 * finishes. */
+	/* o/w, just run the kthread.  any trapframes that are supposed to run
+	 * or were interrupted will run whenever the kthread smp_idles() or
+	 * otherwise finishes. */
 	restart_kthread(kthread);
 	assert(0);
 }
@@ -237,6 +245,7 @@ void kthread_runnable(struct kthread *kthread)
 void kthread_yield(void)
 {
 	struct semaphore local_sem, *sem = &local_sem;
+
 	sem_init(sem, 0);
 	run_as_rkm(sem_up, sem);
 	sem_down(sem);
@@ -245,7 +254,8 @@ void kthread_yield(void)
 void kthread_usleep(uint64_t usec)
 {
 	ERRSTACK(1);
-	/* TODO: classic ksched issue: where do we want the wake up to happen? */
+	/* TODO: classic ksched issue: where do we want the wake up to happen?
+	 */
 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
 	struct rendez rv;
 
@@ -269,10 +279,11 @@ static void __ktask_wrapper(uint32_t srcid, long a0, long a1, long a2)
 	void *arg = (void*)a1;
 	char *name = (char*)a2;
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
 	assert(is_ktask(pcpui->cur_kthread));
 	pcpui->cur_kthread->name = name;
-	/* There are some rendezs out there that aren't wrapped.  Though no one can
-	 * abort them.  Yet. */
+	/* There are some rendezs out there that aren't wrapped.  Though no one
+	 * can abort them.  Yet. */
 	if (waserror()) {
 		printk("Ktask %s threw error %s\n", name, current_errstr());
 		goto out;
@@ -356,7 +367,8 @@ static void pre_block_check(int nr_locks)
 	struct per_cpu_info *pcpui = this_pcpui_ptr();
 
 	assert(can_block(pcpui));
-	/* Make sure we aren't holding any locks (only works if SPINLOCK_DEBUG) */
+	/* Make sure we aren't holding any locks (only works if SPINLOCK_DEBUG)
+	 */
 	if (pcpui->lock_depth > nr_locks)
 		panic("Kthread tried to sleep, with lockdepth %d\n", pcpui->lock_depth);
 
@@ -369,7 +381,8 @@ static struct kthread *save_kthread_ctx(void)
 	struct per_cpu_info *pcpui = this_pcpui_ptr();
 
 	assert(pcpui->cur_kthread);
-	/* We're probably going to sleep, so get ready.  We'll check again later. */
+	/* We're probably going to sleep, so get ready.  We'll check again
+	 * later. */
 	kthread = pcpui->cur_kthread;
 	/* We need to have a spare slot for restart, so we also use it when
 	 * sleeping.  Right now, we need a new kthread to take over if/when our
@@ -381,10 +394,11 @@ static struct kthread *save_kthread_ctx(void)
 		new_kthread = pcpui->spare;
 		new_stacktop = new_kthread->stacktop;
 		pcpui->spare = 0;
-		/* The old flags could have KTH_IS_KTASK set.  The reason is that the
-		 * launching of blocked kthreads also uses PRKM, and that KMSG
-		 * (__launch_kthread) doesn't return.  Thus the soon-to-be spare
-		 * kthread, that is launching another, has flags & KTH_IS_KTASK set. */
+		/* The old flags could have KTH_IS_KTASK set.  The reason is
+		 * that the launching of blocked kthreads also uses PRKM, and
+		 * that KMSG (__launch_kthread) doesn't return.  Thus the
+		 * soon-to-be spare kthread, that is launching another, has
+		 * flags & KTH_IS_KTASK set. */
 		new_kthread->flags = KTH_DEFAULT_FLAGS;
 		new_kthread->proc = 0;
 		new_kthread->name = 0;
@@ -397,20 +411,21 @@ static struct kthread *save_kthread_ctx(void)
 	/* Set the core's new default stack and kthread */
 	set_stack_top(new_stacktop);
 	pcpui->cur_kthread = new_kthread;
-	/* Kthreads that are ktasks are not related to any process, and do not need
-	 * to work in a process's address space.  They can operate in any address
-	 * space that has the kernel mapped (like boot_pgdir, or any pgdir).  Some
-	 * ktasks may switch_to, at which point they do care about the address
-	 * space and must maintain a reference.
+	/* Kthreads that are ktasks are not related to any process, and do not
+	 * need to work in a process's address space.  They can operate in any
+	 * address space that has the kernel mapped (like boot_pgdir, or any
+	 * pgdir).  Some ktasks may switch_to, at which point they do care about
+	 * the address space and must maintain a reference.
 	 *
-	 * Normal kthreads need to stay in the process context, but we want the core
-	 * (which could be a vcore) to stay in the context too. */
+	 * Normal kthreads need to stay in the process context, but we want the
+	 * core (which could be a vcore) to stay in the context too. */
 	if ((kthread->flags & KTH_SAVE_ADDR_SPACE) && current) {
 		kthread->proc = current;
-		/* In the future, we could check owning_proc. If it isn't set, we could
-		 * clear current and transfer the refcnt to kthread->proc.  If so, we'll
-		 * need to reset the cr3 to something (boot_cr3 or owning_proc's cr3),
-		 * which might not be worth the potentially excessive TLB flush. */
+		/* In the future, we could check owning_proc. If it isn't set,
+		 * we could clear current and transfer the refcnt to
+		 * kthread->proc.  If so, we'll need to reset the cr3 to
+		 * something (boot_cr3 or owning_proc's cr3), which might not be
+		 * worth the potentially excessive TLB flush. */
 		proc_incref(kthread->proc, 1);
 	} else {
 		assert(kthread->proc == 0);
@@ -445,8 +460,8 @@ void sem_down(struct semaphore *sem)
 
 	pre_block_check(0);
 
-	/* Try to down the semaphore.  If there is a signal there, we can skip all
-	 * of the sleep prep and just return. */
+	/* Try to down the semaphore.  If there is a signal there, we can skip
+	 * all of the sleep prep and just return. */
 #ifdef CONFIG_SEM_SPINWAIT
 	for (int i = 0; i < CONFIG_SEM_SPINWAIT_NR_LOOPS; i++) {
 		if (sem_trydown(sem))
@@ -467,13 +482,14 @@ void sem_down(struct semaphore *sem)
 	if (sem->nr_signals < 0) {
 		TAILQ_INSERT_TAIL(&sem->waiters, kthread, link);
 		db_blocked_kth(&sem->db);
-		/* At this point, we know we'll sleep and change stacks.  Once we unlock
-		 * the sem, we could have the kthread restarted (possibly on another
-		 * core), so we need to leave the old stack before unlocking.  If we
-		 * don't and we stay on the stack, then if we take an IRQ or NMI (NMI
-		 * that doesn't change stacks, unlike x86_64), we'll be using the stack
-		 * at the same time as the kthread.  We could just disable IRQs, but
-		 * that wouldn't protect us from NMIs that don't change stacks. */
+		/* At this point, we know we'll sleep and change stacks.  Once
+		 * we unlock the sem, we could have the kthread restarted
+		 * (possibly on another core), so we need to leave the old stack
+		 * before unlocking.  If we don't and we stay on the stack, then
+		 * if we take an IRQ or NMI (NMI that doesn't change stacks,
+		 * unlike x86_64), we'll be using the stack at the same time as
+		 * the kthread.  We could just disable IRQs, but that wouldn't
+		 * protect us from NMIs that don't change stacks. */
 		__reset_stack_pointer(sem, current_kthread->stacktop,
 		                      __sem_unlock_and_idle);
 		assert(0);
@@ -484,24 +500,25 @@ void sem_down(struct semaphore *sem)
 
 block_return_path:
 	printd("[kernel] Returning from being 'blocked'! at %llu\n", read_tsc());
-	/* restart_kthread and longjmp did not reenable IRQs.  We need to make sure
-	 * irqs are on if they were on when we started to block.  If they were
-	 * already on and we short-circuited the block, it's harmless to reenable
-	 * them. */
+	/* restart_kthread and longjmp did not reenable IRQs.  We need to make
+	 * sure irqs are on if they were on when we started to block.  If they
+	 * were already on and we short-circuited the block, it's harmless to
+	 * reenable them. */
 	if (irqs_were_on)
 		enable_irq();
 }
 
 void sem_down_bulk(struct semaphore *sem, int nr_signals)
 {
-	/* This is far from ideal.  Our current sem code expects a 1:1 pairing of
-	 * signals to waiters.  For instance, if we have 10 waiters of -1 each or 1
-	 * waiter of -10, we can't tell from looking at the overall structure.  We'd
-	 * need to track the desired number of signals per waiter.
+	/* This is far from ideal.  Our current sem code expects a 1:1 pairing
+	 * of signals to waiters.  For instance, if we have 10 waiters of -1
+	 * each or 1 waiter of -10, we can't tell from looking at the overall
+	 * structure.  We'd need to track the desired number of signals per
+	 * waiter.
 	 *
 	 * Note that if there are a bunch of signals available, sem_down will
-	 * quickly do a try_down and return, so we won't block repeatedly.  But if
-	 * we do block, we could wake up N times. */
+	 * quickly do a try_down and return, so we won't block repeatedly.  But
+	 * if we do block, we could wake up N times. */
 	for (int i = 0; i < nr_signals; i++)
 		sem_down(sem);
 }
@@ -525,9 +542,10 @@ bool sem_up(struct semaphore *sem)
 		assert(TAILQ_EMPTY(&sem->waiters));
 	}
 	spin_unlock(&sem->lock);
-	/* Note that once we call kthread_runnable(), we cannot touch the sem again.
-	 * Some sems are on stacks.  The caller can touch sem, if it knows about the
-	 * memory/usage of the sem.  Likewise, we can't touch the kthread either. */
+	/* Note that once we call kthread_runnable(), we cannot touch the sem
+	 * again.  Some sems are on stacks.  The caller can touch sem, if it
+	 * knows about the memory/usage of the sem.  Likewise, we can't touch
+	 * the kthread either. */
 	if (kthread) {
 		kthread_runnable(kthread);
 		return TRUE;
@@ -876,14 +894,18 @@ void cv_broadcast_irqsave(struct cond_var *cv, int8_t *irq_state)
 static void __abort_and_release_cle(struct cv_lookup_elm *cle)
 {
 	int8_t irq_state = 0;
-	/* At this point, we have a handle on the syscall that we want to abort (via
-	 * the cle), and we know none of the memory will disappear on us (deregers
-	 * wait on the flag).  So we'll signal ABORT, which rendez will pick up next
-	 * time it is awake.  Then we make sure it is awake with a broadcast. */
+
+	/* At this point, we have a handle on the syscall that we want to abort
+	 * (via the cle), and we know none of the memory will disappear on us
+	 * (deregers wait on the flag).  So we'll signal ABORT, which rendez
+	 * will pick up next time it is awake.  Then we make sure it is awake
+	 * with a broadcast. */
 	atomic_or(&cle->sysc->flags, SC_ABORT);
-	cmb();	/* flags write before signal; atomic op provided CPU mb */
+	/* flags write before signal; atomic op provided CPU mb */
+	cmb();
 	cv_broadcast_irqsave(cle->cv, &irq_state);
-	cmb();	/* broadcast writes before abort flag; atomic op provided CPU mb */
+	/* broadcast writes before abort flag; atomic op provided CPU mb */
+	cmb();
 	atomic_dec(&cle->abort_in_progress);
 }
 
@@ -910,8 +932,8 @@ bool abort_sysc(struct proc *p, uintptr_t sysc)
 	spin_lock_irqsave(&p->abort_list_lock);
 	TAILQ_FOREACH(cle, &p->abortable_sleepers, link) {
 		if ((uintptr_t)cle->sysc == sysc) {
-			/* Note: we could have multiple aborters, so we need to use a
-			 * numeric refcnt instead of a flag. */
+			/* Note: we could have multiple aborters, so we need to
+			 * use a numeric refcnt instead of a flag. */
 			atomic_inc(&cle->abort_in_progress);
 			break;
 		}
@@ -944,9 +966,9 @@ static int __abort_all_sysc(struct proc *p,
 	int ret = 0;
 
 	/* Concerns: we need to not remove them from their original list, since
-	 * concurrent wake ups will cause a dereg, which will remove from the list.
-	 * We also can't touch freed memory, so we need a refcnt to keep cles
-	 * around. */
+	 * concurrent wake ups will cause a dereg, which will remove from the
+	 * list.  We also can't touch freed memory, so we need a refcnt to keep
+	 * cles around. */
 	TAILQ_INIT(&abortall_list);
 	spin_lock_irqsave(&p->abort_list_lock);
 	TAILQ_FOREACH(cle, &p->abortable_sleepers, link) {
@@ -1007,6 +1029,7 @@ int abort_all_sysc_fd(struct proc *p, int fd)
 void __reg_abortable_cv(struct cv_lookup_elm *cle, struct cond_var *cv)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
 	cle->cv = cv;
 	cle->kthread = pcpui->cur_kthread;
 	/* Could be a ktask.  Can build in support for aborting these later */
@@ -1035,8 +1058,8 @@ void dereg_abortable_cv(struct cv_lookup_elm *cle)
 	spin_lock_irqsave(&cle->proc->abort_list_lock);
 	TAILQ_REMOVE(&cle->proc->abortable_sleepers, cle, link);
 	spin_unlock_irqsave(&cle->proc->abort_list_lock);
-	/* If we won the race and yanked it out of the list before abort claimed it,
-	 * this will already be FALSE. */
+	/* If we won the race and yanked it out of the list before abort claimed
+	 * it, this will already be FALSE. */
 	while (atomic_read(&cle->abort_in_progress))
 		cpu_relax();
 }
@@ -1075,9 +1098,9 @@ uintptr_t switch_to_ktask(void)
 
 	if (is_ktask(kth))
 		return 0;
-	/* We leave the SAVE_ADDR_SPACE flag on.  Now we're basically a ktask that
-	 * cares about its addr space, since we need to return to it (not that we're
-	 * leaving). */
+	/* We leave the SAVE_ADDR_SPACE flag on.  Now we're basically a ktask
+	 * that cares about its addr space, since we need to return to it (not
+	 * that we're leaving). */
 	kth->flags |= KTH_IS_KTASK;
 	return 1;
 }

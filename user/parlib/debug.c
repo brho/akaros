@@ -52,7 +52,8 @@ void reset_print_func_depth(void)
 void toggle_print_func(void)
 {
 	print = !print;
-	printf("Func entry/exit printing is now %sabled\n", print ? "en" : "dis");
+	printf("Func entry/exit printing is now %sabled\n", print ? "en" :
+	       "dis");
 }
 
 static spinlock_t lock = {0};
@@ -64,7 +65,7 @@ void __print_func_entry(const char *func, const char *file)
 	if (is_blacklisted(func))
 		return;
 	spinlock_lock(&lock);
-	printd("Vcore %2d", vcore_id());	/* helps with multicore output */
+	printd("Vcore %2d", vcore_id()); /* helps with multicore output */
 	for (int i = 0; i < tab_depth; i++)
 		printf("\t");
 	printf("%s() in %s\n", func, file);

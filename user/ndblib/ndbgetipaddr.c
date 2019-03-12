@@ -17,8 +17,7 @@
 #include <ndblib/ndb.h>
 
 /* return list of ip addresses for a name */
-struct ndbtuple*
-ndbgetipaddr(struct ndb *db, char *val)
+struct ndbtuple *ndbgetipaddr(struct ndb *db, char *val)
 {
 	char *attr, *p;
 	struct ndbtuple *it, *first, *last, *next;

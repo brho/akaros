@@ -15,20 +15,20 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#define min(a, b)								\
+#define min(a, b)							\
 	({ __typeof__(a) _a = (a);					\
 		__typeof__(b) _b = (b);					\
 		_a < _b ? _a : _b; })
-#define max(a, b)								\
+#define max(a, b)							\
 	({ __typeof__(a) _a = (a);					\
 		__typeof__(b) _b = (b);					\
 		_a > _b ? _a : _b; })
-#define always_assert(c)												\
-	do {																\
-		if (!(c))														\
-			fprintf(stderr, "%s: %d: Assertion failed: " #c "\n",		\
-					__FILE__, __LINE__);								\
-	} while (0)
+#define always_assert(c)						\
+do {									\
+	if (!(c))							\
+		fprintf(stderr, "%s: %d: Assertion failed: " #c "\n",	\
+				__FILE__, __LINE__);			\
+} while (0)
 
 int xopen(const char *path, int flags, mode_t mode);
 void xwrite(int fd, const void *data, size_t size);
@@ -52,9 +52,8 @@ static inline void cpuid(uint32_t ieax, uint32_t iecx, uint32_t *eaxp,
 {
 	uint32_t eax, ebx, ecx, edx;
 
-	asm volatile("cpuid"
-				 : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-				 : "a" (ieax), "c" (iecx));
+	asm volatile("cpuid" : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
+			     : "a" (ieax), "c" (iecx));
 	if (eaxp)
 		*eaxp = eax;
 	if (ebxp)

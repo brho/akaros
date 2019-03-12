@@ -28,10 +28,11 @@ struct sigstate {
 struct signal_ops {
 	/* Standard ops */
 	int (*sigaltstack)(__const struct sigaltstack *__restrict,
-                       struct sigaltstack *__restrict);
+			   struct sigaltstack *__restrict);
 	int (*siginterrupt)(int, int);
 	int (*sigpending)(sigset_t *);
-	int (*sigprocmask)(int, __const sigset_t *__restrict, sigset_t *__restrict);
+	int (*sigprocmask)(int, __const sigset_t *__restrict,
+			   sigset_t *__restrict);
 	int (*sigqueue)(__pid_t, int, __const union sigval);
 	int (*sigreturn)(struct sigcontext *__scp);
 	int (*sigstack)(struct sigstack *, struct sigstack *);

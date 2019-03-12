@@ -62,11 +62,12 @@ int __bind(int fd, __CONST_SOCKADDR_ARG addr, socklen_t alen)
 	}
 	if (lip->sin_port <= 0)
 		_sock_ingetaddr(r, lip, &len, "local");
-	/* UDP sockets are in headers mode, and need to be announced.  This isn't a
-	 * full announce, in that the kernel UDP stack doesn't expect someone to
-	 * open the listen file or anything like that. */
+	/* UDP sockets are in headers mode, and need to be announced.  This
+	 * isn't a full announce, in that the kernel UDP stack doesn't expect
+	 * someone to open the listen file or anything like that. */
 	if ((r->domain == PF_INET) && (r->stype == SOCK_DGRAM)) {
-		n = snprintf(msg, sizeof(msg), "announce *!%d", ntohs(lip->sin_port));
+		n = snprintf(msg, sizeof(msg), "announce *!%d",
+			     ntohs(lip->sin_port));
 		n = write(r->ctl_fd, msg, n);
 		if (n < 0) {
 			perror("bind-announce failed");

@@ -49,27 +49,27 @@ int devalarm_disable(int timerfd);
 
 /* Specifc waiter, per alarm */
 struct alarm_waiter {
-	uint64_t 					wake_up_time;	/* tsc time */
+	uint64_t 			wake_up_time;	/* tsc time */
 	void (*func) (struct alarm_waiter *waiter);
-	void						*data;
+	void				*data;
 	TAILQ_ENTRY(alarm_waiter)	next;
-	bool						on_tchain;
+	bool				on_tchain;
 };
-TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
+TAILQ_HEAD(awaiters_tailq, alarm_waiter);	/* ideally not a LL */
 
 typedef void (*alarm_handler)(struct alarm_waiter *waiter);
 
 /* Sorted collection of alarms. */
 struct timer_chain {
 	struct awaiters_tailq		waiters;
-	struct alarm_waiter			*running;
-	uint64_t					earliest_time;
-	uint64_t					latest_time;
-	struct uth_cond_var			cv;
-	int							ctlfd;
-	int							timerfd;
-	int							alarmid;
-	struct event_queue			*ev_q;
+	struct alarm_waiter		*running;
+	uint64_t			earliest_time;
+	uint64_t			latest_time;
+	struct uth_cond_var		cv;
+	int				ctlfd;
+	int				timerfd;
+	int				alarmid;
+	struct event_queue		*ev_q;
 };
 
 /* For fresh alarm waiters.  func == 0 for kthreads */

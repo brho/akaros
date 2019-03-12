@@ -38,13 +38,13 @@ static char *apicregnames[] = {
 	[MSR_LAPIC_LVT_THERMAL] "Thermal Sensor",
 };
 
-enum {							/* Siv */
-	Swen = 0x00000100,			/* Software Enable */
+enum {				/* Siv */
+	Swen = 0x00000100,	/* Software Enable */
 	Fdis = 0x00000200,	/* Focus Disable */
 };
 
-enum {							/* Iclo */
-	Lassert = 0x00004000,		/* Assert level */
+enum {				/* Iclo */
+	Lassert = 0x00004000,	/* Assert level */
 
 	DSnone = 0x00000000,	/* Use Destination Field */
 	DSself = 0x00040000,	/* Self is only destination */
@@ -52,12 +52,12 @@ enum {							/* Iclo */
 	DSallexc = 0x000c0000,	/* All Excluding self */
 };
 
-enum {							/* Tlvt */
-	Periodic = 0x00020000,		/* Periodic Timer Mode */
+enum {				/* Tlvt */
+	Periodic = 0x00020000,	/* Periodic Timer Mode */
 };
 
-enum {							/* Tdc */
-	DivX2 = 0x00000000,			/* Divide by 2 */
+enum {				/* Tdc */
+	DivX2 = 0x00000000,	/* Divide by 2 */
 	DivX4 = 0x00000001,	/* Divide by 4 */
 	DivX8 = 0x00000002,	/* Divide by 8 */
 	DivX16 = 0x00000003,	/* Divide by 16 */
@@ -87,16 +87,18 @@ static void __apic_ir_dump(uint64_t r)
 	for (i = 7; i >= 0; i--) {
 		val = apicrget(r+i);
 		if (val) {
-			printk("Register at range (%d,%d]: 0x%08x\n", ((i+1)*32),
-			       i*32, val);
+			printk("Register at range (%d,%d]: 0x%08x\n",
+			       ((i + 1) * 32), i * 32, val);
 		}
 	}
 }
+
 void apic_isr_dump(void)
 {
 	printk("ISR DUMP\n");
 	__apic_ir_dump(MSR_LAPIC_ISR_START);
 }
+
 void apic_irr_dump(void)
 {
 	printk("IRR DUMP\n");
@@ -152,6 +154,7 @@ void apicinit(int apicno, uintptr_t pa, int isbp)
 {
 	struct apic *apic;
 	uint64_t msr_val;
+
 	/*
 	 * Mark the APIC useable if it has a good ID
 	 * and the registers can be mapped.
@@ -209,8 +212,8 @@ char *apicdump(char *start, char *end)
 	if (!2)
 		return start;
 
-	start =
-		seprintf(start, end, "apicbase %#p apmachno %d\n", apicbase, apmachno);
+	start = seprintf(start, end, "apicbase %#p apmachno %d\n", apicbase,
+			 apmachno);
 	for (i = 0; i < Napic; i++)
 		start = apicdump0(start, end, xlapic + i, i);
 	for (i = 0; i < Napic; i++)
@@ -221,6 +224,7 @@ char *apicdump(char *start, char *end)
 void handle_lapic_error(struct hw_trapframe *hw_tf, void *data)
 {
 	uint32_t err;
+
 	apicrput(MSR_LAPIC_ESR, 0);
 	err = apicrget(MSR_LAPIC_ESR);
 	/* i get a shitload of these on my nehalem, many with err == 0 */
@@ -247,7 +251,8 @@ int apiconline(void)
 	apic = &xlapic[apicno];
 	/* The addr check tells us if it is an IOAPIC or not... */
 	if (!apic->useable || apic->addr) {
-		printk("Unsuitable apicno %d on HW core %d!!\n", apicno, hw_core_id());
+		printk("Unsuitable apicno %d on HW core %d!!\n", apicno,
+		       hw_core_id());
 		return 0;
 	}
 	/* Things that can only be done when on the processor owning the APIC,
@@ -262,8 +267,8 @@ int apiconline(void)
 	apic->nlvt = nlvt;
 	apic->ver = ver & 0xff;
 
-	/* These don't really matter in Physical mode; set the defaults anyway.  If
-	 * we have problems with logical IPIs on AMD, check this out: */
+	/* These don't really matter in Physical mode; set the defaults anyway.
+	 * If we have problems with logical IPIs on AMD, check this out: */
 	//if (memcmp(m->cpuinfo, "AuthenticAMD", 12) == 0)
 	//	dfr = 0xf0000000;
 	//else
@@ -271,32 +276,32 @@ int apiconline(void)
 	//apicrput(Df, dfr);
 	//apicrput(MSR_LAPIC_LDR, 0x00000000);
 
-	/* Disable interrupts until ready by setting the Task Priority register to
-	 * 0xff. */
+	/* Disable interrupts until ready by setting the Task Priority register
+	 * to 0xff. */
 	apicrput(MSR_LAPIC_TPR, 0xff);
 
-	/* Software-enable the APIC in the Spurious Interrupt Vector register and
-	 * set the vector number. The vector number must have bits 3-0 0x0f unless
-	 * the Extended Spurious Vector Enable bit is set in the HyperTransport
-	 * Transaction Control register. */
+	/* Software-enable the APIC in the Spurious Interrupt Vector register
+	 * and set the vector number. The vector number must have bits 3-0 0x0f
+	 * unless the Extended Spurious Vector Enable bit is set in the
+	 * HyperTransport Transaction Control register. */
 	apicrput(MSR_LAPIC_SPURIOUS, Swen | IdtLAPIC_SPURIOUS);
 
 	/* Acknowledge any outstanding interrupts. */
 	apicrput(MSR_LAPIC_EOI, 0);
 
 	/* Mask interrupts on Performance Counter overflow and Thermal Sensor if
-	 * implemented, and on Lintr0 (Legacy INTR), Lintr1 (Legacy NMI), and the
-	 * Timer.  Clear any Error Status (write followed by read) and enable the
-	 * Error interrupt. */
+	 * implemented, and on Lintr0 (Legacy INTR), Lintr1 (Legacy NMI), and
+	 * the Timer.  Clear any Error Status (write followed by read) and
+	 * enable the Error interrupt. */
 	switch (apic->nlvt) {
-		case 6:
-			apicrput(MSR_LAPIC_LVT_THERMAL, Im);
-			/* fall-through */
-		case 5:
-			apicrput(MSR_LAPIC_LVT_PERFMON, Im);
-			/* fall-through */
-		default:
-			break;
+	case 6:
+		apicrput(MSR_LAPIC_LVT_THERMAL, Im);
+		/* fall-through */
+	case 5:
+		apicrput(MSR_LAPIC_LVT_PERFMON, Im);
+		/* fall-through */
+	default:
+		break;
 	}
 	/* lvt[0] and [1] were set to 0 in the BSS */
 	apicrput(MSR_LAPIC_LVT_LINT1, apic->lvt[1] | Im | IdtLAPIC_LINT1);

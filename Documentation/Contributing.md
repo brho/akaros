@@ -1,6 +1,6 @@
 Akaros Contribution Policies
 ===========================
-**2016-03-14** Barret Rhoden (`brho`)
+**2019-03-14** Barret Rhoden (`brho`)
 
 Interested in contributing to Akaros?  This document covers coding standards,
 version control usage, and other contribution policies.
@@ -148,19 +148,24 @@ commits.
 
 Coding Standard
 ---------------------------
-Our coding standard is similar to the Linux kernel style (but with a tabstop of
-4), so when in doubt, do what they do.
+We use the Linux kernel coding style.  When in doubt, do what they do.
 
 + If you are bringing in code from another project other than Linux, such as
-Plan 9, run clang-format on it.  We have a format file in the root of the Akaros
-repo.  clang-format isn't perfect, but it's close enough.  Linux code is usually
-fine (even with 8 space tabs), and formatters sometimes do more harm than good
-on that code.  You can try clang-format for Linux code and see how it works.
+  Plan 9, consider running clang-format on it.  We have a format file in the
+  root of the Akaros repo.  clang-format isn't perfect, but it's close enough.
+  We do this for Plan 9 code, which we heavily internalize, but if the code is
+  a library (random, crypto, zlib) that we won't touch, then just leave it as
+  is.  That makes it easier to update the library.
 
 + You'll note that old code may lack the correct style, especially due to the
   large bodies of code from other systems involved.  Typically, we fix it when
   fixing the code for other reasons, so that git blame points at the most
   recent relevant change.
+
++ We can do major reformatting commits and have git blame ignore them.  Talk
+  with brho before doing major reformatting.
+
++ Indentation is done with tabs, 8-spaces wide.
 
 + No spaces after the name of a function in a call.  For example,
   `printk("hello")` not `printk ("hello")`.
@@ -181,8 +186,11 @@ on that code.  You can try clang-format for Linux code and see how it works.
   and one of them has braces, put braces on both.  An `else` line should start
   with a brace.
 
-+ Beginning-of-line indentation via tabs, not spaces.  Use spaces for
-  additional formatting (such as lining up text when word wrapping).
++ You can use tabs or spaces for indentation, so long as the spaces follow the
+  tabs and they are not intermixed.  Older code used tabs for indentation, and
+  spaces for formatting/aligning.  Using spaces for alignment  was easier when
+  we changed from four-space tabs to eight-space tabs.  That style is also
+  eaiser for some scenarios and editors.  Don't worry too much about it.
 
 + Preprocessor macros are usually upper-case.  Try to avoid using macros
   unless necessary (I prefer static inlines).
@@ -213,6 +221,8 @@ on that code.  You can try clang-format for Linux code and see how it works.
   hierarchies.  Keep in mind that people will need to work with and find these
   files (even via tab completion, it can be a pain).
 
++ Consider aligning the members of structs with multiple values.  I often align
+  the members (not the types) at 40 chars.  This is a stylistic choice.
 
 Git Workflow
 ------------------------------------

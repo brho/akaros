@@ -69,13 +69,13 @@ static long bnx2x_ifstat(struct ether *edev, void *a, long n, uint32_t offset)
 			continue;
 		/* based on the stat, spit out a string */
 		switch (i) {
-			default:
-				ctlr->statistics[i] += r;
-				if (ctlr->statistics[i] == 0)
-					continue;
-				l += snprintf(p + l, READSTR - l, "%s: %ud %ud\n",
-							  s, ctlr->statistics[i], r);
-				break;
+		default:
+			ctlr->statistics[i] += r;
+			if (ctlr->statistics[i] == 0)
+				continue;
+			l += snprintf(p + l, READSTR - l, "%s: %ud %ud\n", s,
+				      ctlr->statistics[i], r);
+			break;
 		}
 	}
 
@@ -130,23 +130,23 @@ static long bnx2x_ctl(struct ether *edev, void *buf, long n)
  * again).  Consider this:
  *
  * this func:
- * 		calls start_xmit, fails with BUSY.  wants to set ABORT flag
+ * 	calls start_xmit, fails with BUSY.  wants to set ABORT flag
  *
  *      PAUSE - meanwhile:
  *
  * tx_int clears the ABORT flag, then pokes:
- * 		drain so there is room;
- * 		clear flag (combo of these is "post work");
- * 		poke;.  guaranteed that poke will happen after we cleared flag.
- * 		        but it is concurrent with this function
+ * 	drain so there is room;
+ * 	clear flag (combo of these is "post work");
+ * 	poke;.  guaranteed that poke will happen after we cleared flag.
+ * 	        but it is concurrent with this function
  *
- * 		RESUME this func:
+ * 	RESUME this func:
  *
- * 		sets ABORT flag
- * 		returns.
- * 		tx_int's poke ensures we run again
- * 		we run again and see ABORT, then return
- * 		never try again til the next tx_int, if ever
+ * 	sets ABORT flag
+ * 	returns.
+ * 	tx_int's poke ensures we run again
+ * 	we run again and see ABORT, then return
+ * 	never try again til the next tx_int, if ever
  *
  * Instead, in this func, we must set ABORT flag, then check tx_avail.  Or
  * have two flags, one set by us, another set by tx_int, where this func only
@@ -167,18 +167,20 @@ void __bnx2x_tx_queue(void *txdata_arg)
 
 	while ((block = qget(oq))) {
 		if ((bnx2x_start_xmit(block, txdata) != NETDEV_TX_OK)) {
-			/* all queue readers are sync'd by the poke, so we can putback
-			 * without fear of going out of order. */
+			/* all queue readers are sync'd by the poke, so we can
+			 * putback without fear of going out of order. */
 
-			/* TODO: q code has methods that should be called with the spinlock
-			 * held, but no methods to do the locking... */
+			/* TODO: q code has methods that should be called with
+			 * the spinlock held, but no methods to do the
+			 * locking... */
 			//spin_unlock_irqsave(&oq->lock);
 			qputback(oq, block);
 			//spin_lock_irqsave(&oq->lock);
 
-			/* device can't handle any more, we're done for now.  tx_int will
-			 * poke when space frees up.  it may be poking concurrently, and in
-			 * which case, we'll run again immediately. */
+			/* device can't handle any more, we're done for now.
+			 * tx_int will poke when space frees up.  it may be
+			 * poking concurrently, and in which case, we'll run
+			 * again immediately. */
 			break;
 		}
 	}
@@ -208,7 +210,8 @@ static void bnx2x_replenish(struct bnx2x *ctlr)
 			// TODO: use your block size, e.g. Rbsz
 			bp = block_alloc(64, MEM_ATOMIC);
 			if (bp == NULL) {
-				/* needs to be a safe print for interrupt level */
+				/* needs to be a safe print for interrupt level
+				 * */
 				printk("#l%d bnx2x_replenish: no available buffers\n",
 					   ctlr->edev->ctlrno);
 				break;
@@ -254,7 +257,8 @@ static void bnx2x_rproc(void *arg)
 		rendez_sleep(&ctlr->rrendez, bnx2x_rim, ctlr);
 
 		for (;;) {
-			/* if we can get a block, here's how to ram it up the stack */
+			/* if we can get a block, here's how to ram it up the
+			 * stack */
 
 			if (1) {
 				bp = (void*)0xdeadbeef;
@@ -262,10 +266,10 @@ static void bnx2x_rproc(void *arg)
 				//bp->wp += rd->length;
 				//bp->next = NULL;
 				/* conditionally, set block flags */
-					//bp->flag |= Bipck; /* IP checksum done in HW */
-					//bp->flag |= Btcpck | Budpck;
-					//bp->checksum = rd->checksum;
-					//bp->flag |= Bpktck;	/* Packet checksum? */
+				//bp->flag |= Bipck; /* IP checksum done in HW*/
+				//bp->flag |= Btcpck | Budpck;
+				//bp->checksum = rd->checksum;
+				//bp->flag |= Bpktck;	/* Packet checksum? */
 				etheriq(edev, bp, 1);
 			} else {
 				//freeb(ctlr->rb[rdh]);
@@ -324,8 +328,8 @@ static void bnx2x_interrupt(struct hw_trapframe *hw_tf, void *arg)
 			/* At some point, wake up the rproc */
 			rendez_wakeup(&ctlr->rrendez);
 
-	/* optionally, might need to transmit (not sure if this is a good idea in
-	 * hard irq or not) */
+	/* optionally, might need to transmit (not sure if this is a good idea
+	 * in hard irq or not) */
 	bnx2x_transmit(edev);
 }
 
@@ -358,7 +362,6 @@ static void bnx2x_pci(void)
 	const struct pci_device_id *pci_id;
 
 	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
-		/* This checks that pcidev is a Network Controller for Ethernet */
 		if (pcidev->class != 0x02 || pcidev->subclass != 0x00)
 			continue;
 		id = pcidev->dev_id << 16 | pcidev->ven_id;
@@ -403,8 +406,8 @@ static int bnx2x_pnp(struct ether *edev)
 {
 	struct bnx2x *ctlr;
 
-	/* Allocs ctlrs for all PCI devices matching our IDs, does various PCI and
-	 * MMIO/port setup */
+	/* Allocs ctlrs for all PCI devices matching our IDs, does various PCI
+	 * and MMIO/port setup */
 	run_once(bnx2x_pci());
 
 	spin_lock(&bnx2x_tq_lock);
@@ -423,7 +426,7 @@ static int bnx2x_pnp(struct ether *edev)
 	ctlr->edev = edev;
 	strlcpy(edev->drv_name, "bnx2x", KNAMELEN);
 
-	//edev->port = ctlr->port;	/* might just remove this from devether */
+	//edev->port = ctlr->port;	/* might remove this from devether */
 	edev->irq = ctlr->pcidev->irqline;
 	edev->tbdf = MKBUS(BusPCI, ctlr->pcidev->bus, ctlr->pcidev->dev,
 	                   ctlr->pcidev->func);

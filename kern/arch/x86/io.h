@@ -53,8 +53,8 @@ enum {
 /*
  * PCI support code.
  */
-enum {							/* type 0 and type 1 pre-defined header */
-	PciVID = 0x00,				/* vendor ID */
+enum {			/* type 0 and type 1 pre-defined header */
+	PciVID = 0x00,	/* vendor ID */
 	PciDID = 0x02,	/* device ID */
 	PciPCR = 0x04,	/* command */
 	PciPSR = 0x06,	/* status */
@@ -78,16 +78,16 @@ enum {							/* type 0 and type 1 pre-defined header */
 
 /* ccrb (base class code) values; controller types */
 enum {
-	Pcibcpci1 = 0,				/* pci 1.0; no class codes defined */
-	Pcibcstore = 1,	/* mass storage */
-	Pcibcnet = 2,	/* network */
-	Pcibcdisp = 3,	/* display */
+	Pcibcpci1 = 0,		/* pci 1.0; no class codes defined */
+	Pcibcstore = 1,		/* mass storage */
+	Pcibcnet = 2,		/* network */
+	Pcibcdisp = 3,		/* display */
 	Pcibcmmedia = 4,	/* multimedia */
-	Pcibcmem = 5,	/* memory */
+	Pcibcmem = 5,		/* memory */
 	Pcibcbridge = 6,	/* bridge */
-	Pcibccomm = 7,	/* simple comms (e.g., serial) */
+	Pcibccomm = 7,		/* simple comms (e.g., serial) */
 	Pcibcbasesys = 8,	/* base system */
-	Pcibcinput = 9,	/* input */
+	Pcibcinput = 9,		/* input */
 	Pcibcdock = 0xa,	/* docking stations */
 	Pcibcproc = 0xb,	/* processors */
 	Pcibcserial = 0xc,	/* serial bus (e.g., USB) */
@@ -101,17 +101,17 @@ enum {
 /* ccru (sub-class code) values; common cases only */
 enum {
 	/* mass storage */
-	Pciscscsi = 0,				/* SCSI */
-	Pciscide = 1,	/* IDE (ATA) */
-	Pciscsata = 6,	/* SATA */
+	Pciscscsi = 0,		/* SCSI */
+	Pciscide = 1,		/* IDE (ATA) */
+	Pciscsata = 6,		/* SATA */
 
 	/* network */
-	Pciscether = 0,	/* Ethernet */
+	Pciscether = 0,		/* Ethernet */
 
 	/* display */
-	Pciscvga = 0,	/* VGA */
-	Pciscxga = 1,	/* XGA */
-	Pcisc3d = 2,	/* 3D */
+	Pciscvga = 0,		/* VGA */
+	Pciscxga = 1,		/* XGA */
+	Pcisc3d = 2,		/* 3D */
 
 	/* bridges */
 	Pcischostpci = 0,	/* host/pci */
@@ -125,17 +125,17 @@ enum {
 	Pciscusb = 3,	/* USB */
 };
 
-enum {							/* type 0 pre-defined header */
-	PciCIS = 0x28,				/* cardbus CIS pointer */
+enum {			/* type 0 pre-defined header */
+	PciCIS = 0x28,	/* cardbus CIS pointer */
 	PciSVID = 0x2C,	/* subsystem vendor ID */
 	PciSID = 0x2E,	/* cardbus CIS pointer */
-	PciEBAR0 = 0x30,	/* expansion ROM base address */
+	PciEBAR0 = 0x30,/* expansion ROM base address */
 	PciMGNT = 0x3E,	/* burst period length */
 	PciMLT = 0x3F,	/* maximum latency between bursts */
 };
 
-enum {							/* type 1 pre-defined header */
-	PciPBN = 0x18,				/* primary bus number */
+enum {			/* type 1 pre-defined header */
+	PciPBN = 0x18,	/* primary bus number */
 	PciSBN = 0x19,	/* secondary bus number */
 	PciUBN = 0x1A,	/* subordinate bus number */
 	PciSLTR = 0x1B,	/* secondary latency timer */
@@ -150,11 +150,11 @@ enum {							/* type 1 pre-defined header */
 	PciPULR = 0x2C,	/* prefetchable limit upper 32 bits */
 	PciIUBR = 0x30,	/* I/O base upper 16 bits */
 	PciIULR = 0x32,	/* I/O limit upper 16 bits */
-	PciEBAR1 = 0x28,	/* expansion ROM base address */
+	PciEBAR1 = 0x28,/* expansion ROM base address */
 	PciBCR = 0x3E,	/* bridge control register */
 };
 
-enum {							/* type 2 pre-defined header */
+enum {				/* type 2 pre-defined header */
 	PciCBExCA = 0x10,
 	PciCBSPSR = 0x16,
 	PciCBPBN = 0x18,	/* primary bus number */
@@ -176,7 +176,7 @@ enum {							/* type 2 pre-defined header */
 
 /* capabilities */
 enum {
-	PciCapPMG = 0x01,			/* power management */
+	PciCapPMG = 0x01,	/* power management */
 	PciCapAGP = 0x02,
 	PciCapVPD = 0x03,	/* vital product data */
 	PciCapSID = 0x04,	/* slot id */

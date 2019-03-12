@@ -7,13 +7,12 @@
  * in the LICENSE file.
  */
 
-
 #include <assert.h>
 #include <cpio.h>
 #include <error.h>
-#include <net/ip.h>
 #include <kmalloc.h>
 #include <kref.h>
+#include <net/ip.h>
 #include <pmap.h>
 #include <sd.h>
 #include <slab.h>
@@ -164,7 +163,8 @@ static int scsirio(struct sdreq *r)
 			/*
 			 * If no medium present, bail out.
 			 * If unit is becoming ready, rather than not
-			 * not ready, wait a little then poke it again. 				 */
+			 * not ready, wait a little then poke it again.
+			 */
 			if (r->sense[12] == 0x3A)
 				break;
 			if (r->sense[12] != 0x04 || r->sense[13] != 0x01)
@@ -226,8 +226,10 @@ int scsionline(struct sdunit *unit)
 		default:
 			break;
 		case 0:
-			unit->sectors = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
-			unit->secsize = (p[4] << 24) | (p[5] << 16) | (p[6] << 8) | p[7];
+			unit->sectors =
+			    (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+			unit->secsize =
+			    (p[4] << 24) | (p[5] << 16) | (p[6] << 8) | p[7];
 
 			/*
 			 * Some ATAPI CD readers lie about the block size.
@@ -405,8 +407,8 @@ again:
 		default:
 			break;
 		case 0x01: /* recovered error */
-			printd("%s: recovered error at sector %llu\n", unit->SDperm.name,
-			       bno);
+			printd("%s: recovered error at sector %llu\n",
+			       unit->SDperm.name, bno);
 			rlen = r->rlen;
 			break;
 		case 0x06: /* check condition */

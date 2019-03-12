@@ -7,16 +7,16 @@
  * We implement it with CVs, and it can handle multiple sleepers/wakers.
  *
  * Init:
- * 		rendez_init(&rv);
+ * 	rendez_init(&rv);
  *
  * Sleeper usage:
- * 		rendez_sleep(&rv, some_func_taking_void*, void *arg);
+ * 	rendez_sleep(&rv, some_func_taking_void*, void *arg);
  * 			or
- * 		rendez_sleep_timeout(&rv, some_func_taking_void*, void *arg, usec);
+ * 	rendez_sleep_timeout(&rv, some_func_taking_void*, void *arg, usec);
  *
  * Waker usage: (can be used from IRQ context)
- * 		// set the condition to TRUE, then:
- * 		rendez_wakeup(&rv);
+ * 	// set the condition to TRUE, then:
+ * 	rendez_wakeup(&rv);
  *
  * Some notes:
  * - Some_func checks some condition and returns TRUE when we want to wake up.
@@ -42,7 +42,7 @@
 #include <alarm.h>
 
 struct rendez {
-	struct cond_var				cv;
+	struct cond_var			cv;
 };
 
 typedef int (*rendez_cond_t)(void *arg);

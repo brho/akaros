@@ -85,8 +85,8 @@ size_t circular_buffer_write(struct circular_buffer *cb,
 
 	if (unlikely(esize > cb->allocated))
 		return 0;
-	/* If at the end of the buffer, the next block to be written does not fit,
-	 * we move the pointer to the beginning of the circular buffer.
+	/* If at the end of the buffer, the next block to be written does not
+	 * fit, we move the pointer to the beginning of the circular buffer.
 	 */
 	if (unlikely(esize > wspace)) {
 		circular_buffer_write_skip(cb, wrptr, wspace);
@@ -123,7 +123,8 @@ size_t circular_buffer_read(struct circular_buffer *cb, char *data, size_t size,
 			} else {
 				size_t csize = MIN(esize - off, size);
 
-				memcpy(data, rdptr + sizeof(cbuf_size_t) + off, csize);
+				memcpy(data, rdptr + sizeof(cbuf_size_t) + off,
+				       csize);
 				data += csize;
 				size -= csize;
 				rsize += csize;

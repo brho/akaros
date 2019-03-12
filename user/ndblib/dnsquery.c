@@ -156,8 +156,9 @@ doquery(int fd, char *dn, char *type)
 		n = read(fd, buf, sizeof(buf)-2);
 		if(n <= 0)
 			break;
+		/* ndbparsline needs a trailing new line */
 		if(buf[n-1] != '\n')
-			buf[n++] = '\n';	/* ndbparsline needs a trailing new line */
+			buf[n++] = '\n';
 		buf[n] = 0;
 
 		/* check for the error condition */

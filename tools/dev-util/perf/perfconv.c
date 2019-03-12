@@ -7,9 +7,9 @@
  * Converts kprof profiler files into Linux perf ones. The Linux Perf file
  * format has bee illustrated here:
  *
- *	 https://lwn.net/Articles/644919/
- *	 https://openlab-mu-internal.web.cern.ch/openlab-mu-internal/03_Documents/
- *			 3_Technical_Documents/Technical_Reports/2011/Urs_Fassler_report.pdf
+ * https://lwn.net/Articles/644919/
+ * https://openlab-mu-internal.web.cern.ch/openlab-mu-internal/03_Documents/
+ *	 3_Technical_Documents/Technical_Reports/2011/Urs_Fassler_report.pdf
  *
  */
 
@@ -78,8 +78,8 @@ static int read_record(FILE *file, struct perf_record *pr)
 		vb_fdecode_uint64(file, &pr->size) == EOF)
 		return EOF;
 	if (pr->size > MAX_PERF_RECORD_SIZE) {
-		fprintf(stderr, "Invalid record size: type=%lu size=%lu\n", pr->type,
-				pr->size);
+		fprintf(stderr, "Invalid record size: type=%lu size=%lu\n",
+			pr->type, pr->size);
 		exit(1);
 	}
 	if (pr->size > sizeof(pr->buffer))
@@ -199,11 +199,14 @@ void perfconv_add_kernel_mmap(struct perfconv_context *cctx)
 	mm->pid = -1;				/* Linux HOST_KERNEL_ID == -1 */
 	mm->tid = 0;				/* Default thread: swapper */
 	mm->header_misc = PERF_RECORD_MISC_KERNEL;
-	/* Linux sets addr = 0, size = 0xffffffff9fffffff, off = 0xffffffff81000000
-	 * Their mmap record is also called [kernel.kallsyms]_text (I think).  They
-	 * also have a _text symbol in kallsyms at ffffffff81000000 (equiv to our
-	 * KERN_LOAD_ADDR (which is 0xffffffffc0000000)).  Either way, this seems to
-	 * work for us; we'll see.  It's also arch-independent (for now). */
+	/* Linux sets addr = 0, size = 0xffffffff9fffffff, off =
+	 * 0xffffffff81000000
+	 *
+	 * Their mmap record is also called [kernel.kallsyms]_text (I think).
+	 * They also have a _text symbol in kallsyms at ffffffff81000000 (equiv
+	 * to our KERN_LOAD_ADDR (which is 0xffffffffc0000000)).  Either way,
+	 * this seems to work for us; we'll see.  It's also arch-independent
+	 * (for now). */
 	mm->addr = 0;
 	mm->size = 0xffffffffffffffff;
 	mm->offset = 0x0;
@@ -241,8 +244,9 @@ static void headers_finalize(struct perf_headers *hdrs, struct mem_file *mf)
 	struct mem_block *mb;
 	size_t mb_sz;
 
-	/* For each header, we need a perf_file_section.  These header file sections
-	 * are right after the main perf header, and they point to actual header. */
+	/* For each header, we need a perf_file_section.  These header file
+	 * sections are right after the main perf header, and they point to
+	 * actual header. */
 	for (int i = 0; i < HEADER_FEAT_BITS; i++)
 		if (hdrs->headers[i])
 			nr_hdrs++;
@@ -253,8 +257,8 @@ static void headers_finalize(struct perf_headers *hdrs, struct mem_file *mf)
 	hdr_off = sizeof(struct perf_file_section) * nr_hdrs;
 	file_sec = header_file_secs;
 
-	/* Spit out the perf_file_sections first and track relocations for all of
-	 * the offsets. */
+	/* Spit out the perf_file_sections first and track relocations for all
+	 * of the offsets. */
 	for (int i = 0; i < HEADER_FEAT_BITS; i++) {
 		mb = hdrs->headers[i];
 		if (!mb)
@@ -266,13 +270,14 @@ static void headers_finalize(struct perf_headers *hdrs, struct mem_file *mf)
 			mb_sz += mb->wptr - mb->base;
 		}
 		file_sec->size = mb_sz;
-		file_sec->offset = hdr_off;		/* offset rel to this memfile */
-		/* When we sync the memfile, we'll need to relocate each of the offsets
-		 * so that they are relative to the final file.   mem_file_write()
-		 * should be returning the location of where it wrote our file section
-		 * within the memfile.  that's the offset that we'll reloc later. */
+		file_sec->offset = hdr_off;	/* offset rel to this memfile */
+		/* When we sync the memfile, we'll need to relocate each of the
+		 * offsets so that they are relative to the final file.
+		 * mem_file_write() should be returning the location of where it
+		 * wrote our file section within the memfile.  that's the offset
+		 * that we'll reloc later. */
 		file_sec_reloc = mem_file_write(mf, file_sec,
-		                                sizeof(struct perf_file_section), 0);
+					sizeof(struct perf_file_section), 0);
 		assert(file_sec->size == file_sec_reloc->size);
 		assert(file_sec->offset == file_sec_reloc->offset);
 		mem_file_add_reloc(mf, &file_sec_reloc->offset);
@@ -302,9 +307,9 @@ static struct mem_block *header_make_string(const char *str)
 	                        PERF_STRING_ALIGN);
 
 	mb = mem_block_alloc(hdr_sz);
-	/* Manually writing to the block to avoid another alloc.  I guess I could do
-	 * two writes (len and string) and try to not screw it up, but that'd be a
-	 * mess. */
+	/* Manually writing to the block to avoid another alloc.  I guess I
+	 * could do two writes (len and string) and try to not screw it up, but
+	 * that'd be a mess. */
 	hdr = (struct perf_header_string*)mb->wptr;
 	mb->wptr += hdr_sz;
 	hdr->len = str_sz;
@@ -415,7 +420,7 @@ static bool lookup_buildid(struct perfconv_context *cctx, const char *path)
 		b_evt = (struct build_id_event*)mb->base;
 		b_evt_path_sz = b_evt->header.size -
 		                offsetof(struct build_id_event, filename);
-		/* ignoring the last byte since we forced it to be \0 earlier. */
+		/* ignoring the last byte since we forced it to be \0 earlier.*/
 		if (!strncmp(b_evt->filename, path, b_evt_path_sz - 1))
 			return TRUE;
 		mb = mb->next;
@@ -556,7 +561,7 @@ static void emit_attr(struct mem_file *attr_mf, struct mem_file *attr_id_mf,
  * If this is the first time we've seen 'raw_info', we'll also add an attribute
  * to the perf ctx.  There is one attr per 'id' / event stream. */
 static uint64_t perfconv_get_event_id(struct perfconv_context *cctx,
-									  uint64_t raw_info)
+				      uint64_t raw_info)
 {
 	struct perf_eventsel *sel = (struct perf_eventsel*)raw_info;
 	struct perf_event_attr attr;
@@ -591,7 +596,8 @@ static void emit_static_mmaps(struct perfconv_context *cctx)
 	struct static_mmap64 *mm;
 
 	for (mm = cctx->static_mmaps; mm; mm = mm->next) {
-		size_t size = sizeof(struct perf_record_mmap) + strlen(mm->path) + 1;
+		size_t size = sizeof(struct perf_record_mmap)
+			      + strlen(mm->path) + 1;
 		struct perf_record_mmap *xrec = xzmalloc(size);
 
 		xrec->header.type = PERF_RECORD_MMAP;
@@ -628,9 +634,10 @@ static void emit_comm(uint32_t pid, const char *comm,
 }
 
 static void emit_pid_mmap64(struct perf_record *pr,
-							struct perfconv_context *cctx)
+			    struct perfconv_context *cctx)
 {
-	struct proftype_pid_mmap64 *rec = (struct proftype_pid_mmap64 *) pr->data;
+	struct proftype_pid_mmap64 *rec =
+		(struct proftype_pid_mmap64 *) pr->data;
 	size_t size = sizeof(struct perf_record_mmap) +
 	              strlen((char*)rec->path) + 1;
 	struct perf_record_mmap *xrec = xzmalloc(size);
@@ -652,7 +659,7 @@ static void emit_pid_mmap64(struct perf_record *pr,
 }
 
 static void emit_kernel_trace64(struct perf_record *pr,
-								struct perfconv_context *cctx)
+				struct perfconv_context *cctx)
 {
 	struct proftype_kern_trace64 *rec = (struct proftype_kern_trace64 *)
 		pr->data;
@@ -665,8 +672,8 @@ static void emit_kernel_trace64(struct perf_record *pr,
 	xrec->header.size = size;
 	xrec->ip = rec->trace[0];
 	/* TODO: -1 means "not a process".  We could track ktasks with IDs, emit
-	 * COMM events for them (probably!) and report them as the tid.  For now,
-	 * tid of 0 means [swapper] to Linux. */
+	 * COMM events for them (probably!) and report them as the tid.  For
+	 * now, tid of 0 means [swapper] to Linux. */
 	if (rec->pid == -1) {
 		xrec->pid = -1;
 		xrec->tid = 0;
@@ -679,7 +686,8 @@ static void emit_kernel_trace64(struct perf_record *pr,
 	xrec->identifier = perfconv_get_event_id(cctx, rec->info);
 	xrec->cpu = rec->cpu;
 	xrec->nr = rec->num_traces - 1;
-	memcpy(xrec->ips, rec->trace + 1, (rec->num_traces - 1) * sizeof(uint64_t));
+	memcpy(xrec->ips, rec->trace + 1,
+	       (rec->num_traces - 1) * sizeof(uint64_t));
 
 	mem_file_write(&cctx->data, xrec, size, 0);
 
@@ -687,7 +695,7 @@ static void emit_kernel_trace64(struct perf_record *pr,
 }
 
 static void emit_user_trace64(struct perf_record *pr,
-							  struct perfconv_context *cctx)
+			      struct perfconv_context *cctx)
 {
 	struct proftype_user_trace64 *rec = (struct proftype_user_trace64 *)
 		pr->data;
@@ -705,7 +713,8 @@ static void emit_user_trace64(struct perf_record *pr,
 	xrec->identifier = perfconv_get_event_id(cctx, rec->info);
 	xrec->cpu = rec->cpu;
 	xrec->nr = rec->num_traces - 1;
-	memcpy(xrec->ips, rec->trace + 1, (rec->num_traces - 1) * sizeof(uint64_t));
+	memcpy(xrec->ips, rec->trace + 1,
+	       (rec->num_traces - 1) * sizeof(uint64_t));
 
 	mem_file_write(&cctx->data, xrec, size, 0);
 
@@ -713,9 +722,10 @@ static void emit_user_trace64(struct perf_record *pr,
 }
 
 static void emit_new_process(struct perf_record *pr,
-							 struct perfconv_context *cctx)
+			     struct perfconv_context *cctx)
 {
-	struct proftype_new_process *rec = (struct proftype_new_process *) pr->data;
+	struct proftype_new_process *rec =
+		(struct proftype_new_process *) pr->data;
 	const char *comm;
 
 	hdr_add_buildid(cctx, (char*)rec->path, rec->pid);
@@ -730,7 +740,8 @@ static void emit_new_process(struct perf_record *pr,
 
 struct perfconv_context *perfconv_create_context(struct perf_context *pctx)
 {
-	struct perfconv_context *cctx = xzmalloc(sizeof(struct perfconv_context));
+	struct perfconv_context *cctx =
+		xzmalloc(sizeof(struct perfconv_context));
 
 	cctx->pctx = pctx;
 	perf_header_init(&cctx->ph);
@@ -752,7 +763,7 @@ void perfconv_free_context(struct perfconv_context *cctx)
 }
 
 void perfconv_process_input(struct perfconv_context *cctx, FILE *input,
-							FILE *output)
+			    FILE *output)
 {
 	size_t processed_records = 0;
 	uint64_t offset;
@@ -781,8 +792,8 @@ void perfconv_process_input(struct perfconv_context *cctx, FILE *input,
 			emit_new_process(&pr, cctx);
 			break;
 		default:
-			fprintf(stderr, "Unknown record: type=%lu size=%lu\n", pr.type,
-					pr.size);
+			fprintf(stderr, "Unknown record: type=%lu size=%lu\n",
+				pr.type, pr.size);
 			processed_records--;
 		}
 
@@ -795,8 +806,8 @@ void perfconv_process_input(struct perfconv_context *cctx, FILE *input,
 	/* attrs, events, and data will come after attr_ids. */
 	offset = sizeof(cctx->ph) + cctx->attr_ids.size;
 
-	/* These are the perf_file_sections in the main perf header.  We need this
-	 * sorted out before we emit the PH. */
+	/* These are the perf_file_sections in the main perf header.  We need
+	 * this sorted out before we emit the PH. */
 	cctx->ph.event_types.offset = offset;
 	cctx->ph.event_types.size = cctx->event_types.size;
 	offset += cctx->event_types.size;
@@ -812,8 +823,8 @@ void perfconv_process_input(struct perfconv_context *cctx, FILE *input,
 	xfwrite(&cctx->ph, sizeof(cctx->ph), output);
 
 	/* attr_ids comes right after the cctx->ph.  We need to put it before
-	 * attrs, since attrs needs to know the offset of the base of attrs_ids for
-	 * its relocs. */
+	 * attrs, since attrs needs to know the offset of the base of attrs_ids
+	 * for its relocs. */
 	assert(ftell(output) == attr_ids_off);
 	mem_file_sync(&cctx->attr_ids, output, OFFSET_NORELOC);
 	mem_file_sync(&cctx->event_types, output, OFFSET_NORELOC);
@@ -821,10 +832,11 @@ void perfconv_process_input(struct perfconv_context *cctx, FILE *input,
 	mem_file_sync(&cctx->attrs, output, attr_ids_off);
 	/* Keep data last, so we can append the feature headers.*/
 	mem_file_sync(&cctx->data, output, OFFSET_NORELOC);
-	/* The feature headers must be right after the data section.  I didn't see
-	 * anything in the ABI about this, but Linux's perf has this line:
+	/* The feature headers must be right after the data section.  I didn't
+	 * see anything in the ABI about this, but Linux's perf has this line:
 	 *
-	 *		ph->feat_offset  = header->data.offset + header->data.size;
+	 *		ph->feat_offset  = header->data.offset +
+	 *		header->data.size;
 	 */
 	mem_file_sync(&cctx->fhdrs, output,
 	              cctx->ph.data.offset + cctx->ph.data.size);

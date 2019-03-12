@@ -57,7 +57,8 @@ void hexdump(void *v, int length)
 				printk(" %02x", m[i + j]);
 			printk("  ");
 			for (j = 0; j < 16; j++)
-				printk("%c", isprint(m[i + j]) ? m[i + j] : '.');
+				printk("%c", isprint(m[i + j]) ? m[i + j] :
+				       '.');
 			printk("\n");
 		} else if (all_zero == 2) {
 			printk("...\n");
@@ -82,14 +83,15 @@ int printdump(char *buf, int numprint, int buflen, uint8_t *data)
 	if (buflen < 1)
 		return ret;
 	buf[ret++] = '\'';
-	/* we want 2 bytes left in the buf (which is ret < buflen - 1), one for the
-	 * char, and one for the \' after the loop. */
+	/* we want 2 bytes left in the buf (which is ret < buflen - 1), one for
+	 * the char, and one for the \' after the loop. */
 	while (ix < numprint && ret < (buflen - 1)) {
 		if (isprint(data[ix])) {
 			buf[ret++] = data[ix];
 		} else if (ret < buflen - 4) {
 			/* guarantee there is room for a \xxx sequence */
-			ret += snprintf(&buf[ret], buflen-ret, "\\%03o", data[ix]);
+			ret += snprintf(&buf[ret], buflen-ret, "\\%03o",
+					data[ix]);
 		} else {
 			break;
 		}

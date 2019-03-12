@@ -282,40 +282,40 @@ static void addnode(struct Fs *f, struct route **cur, struct route *new)
 	}
 
 	switch (rangecompare(new, p)) {
-		case Rpreceeds:
-			addnode(f, &p->rt.left, new);
-			break;
-		case Rfollows:
-			addnode(f, &p->rt.right, new);
-			break;
-		case Rcontains:
-			/*
-			 *  if new node is superset
-			 *  of tree node,
-			 *  replace tree node and
-			 *  queue tree node to be
-			 *  merged into root.
-			 */
-			*cur = new;
-			new->rt.depth = 1;
-			addqueue(&f->queue, p);
-			break;
-		case Requals:
-			/*
-			 *  supercede the old entry if the old one isn't
-			 *  a local interface.
-			 */
-			if ((p->rt.type & Rifc) == 0) {
-				p->rt.type = new->rt.type;
-				p->rt.ifcid = -1;
-				copygate(p, new);
-			} else if (new->rt.type & Rifc)
-				kref_get(&p->rt.kref, 1);
-			freeroute(new);
-			break;
-		case Rcontained:
-			addnode(f, &p->rt.mid, new);
-			break;
+	case Rpreceeds:
+		addnode(f, &p->rt.left, new);
+		break;
+	case Rfollows:
+		addnode(f, &p->rt.right, new);
+		break;
+	case Rcontains:
+		/*
+		 *  if new node is superset
+		 *  of tree node,
+		 *  replace tree node and
+		 *  queue tree node to be
+		 *  merged into root.
+		 */
+		*cur = new;
+		new->rt.depth = 1;
+		addqueue(&f->queue, p);
+		break;
+	case Requals:
+		/*
+		 *  supercede the old entry if the old one isn't
+		 *  a local interface.
+		 */
+		if ((p->rt.type & Rifc) == 0) {
+			p->rt.type = new->rt.type;
+			p->rt.ifcid = -1;
+			copygate(p, new);
+		} else if (new->rt.type & Rifc)
+			kref_get(&p->rt.kref, 1);
+		freeroute(new);
+		break;
+	case Rcontained:
+		addnode(f, &p->rt.mid, new);
+		break;
 	}
 
 	balancetree(cur);
@@ -323,9 +323,8 @@ static void addnode(struct Fs *f, struct route **cur, struct route *new)
 
 #define	V4H(a)	((a&0x07ffffff)>>(32-Lroot-5))
 
-void
-v4addroute(struct Fs *f, char *tag, uint8_t * a, uint8_t * mask,
-		   uint8_t * gate, int type)
+void v4addroute(struct Fs *f, char *tag, uint8_t *a, uint8_t *mask,
+		uint8_t *gate, int type)
 {
 	struct route *p;
 	uint32_t sa;
@@ -362,9 +361,8 @@ v4addroute(struct Fs *f, char *tag, uint8_t * a, uint8_t * mask,
 #define	V6H(a)	(((a)[IPllen-1] & 0x07ffffff)>>(32-Lroot-5))
 #define ISDFLT(a, mask, tag) ((ipcmp((a),v6Unspecified)==0) && (ipcmp((mask),v6Unspecified)==0) && (strcmp((tag), "ra")!=0))
 
-void
-v6addroute(struct Fs *f, char *tag, uint8_t * a, uint8_t * mask,
-		   uint8_t * gate, int type)
+void v6addroute(struct Fs *f, char *tag, uint8_t *a, uint8_t *mask,
+		uint8_t *gate, int type)
 {
 	struct route *p;
 	uint32_t sa[IPllen], ea[IPllen];
@@ -415,24 +413,24 @@ struct route **looknode(struct route **cur, struct route *r)
 			return 0;
 
 		switch (rangecompare(r, p)) {
-			case Rcontains:
-				return 0;
-			case Rpreceeds:
-				cur = &p->rt.left;
-				break;
-			case Rfollows:
-				cur = &p->rt.right;
-				break;
-			case Rcontained:
-				cur = &p->rt.mid;
-				break;
-			case Requals:
-				return cur;
+		case Rcontains:
+			return 0;
+		case Rpreceeds:
+			cur = &p->rt.left;
+			break;
+		case Rfollows:
+			cur = &p->rt.right;
+			break;
+		case Rcontained:
+			cur = &p->rt.mid;
+			break;
+		case Requals:
+			return cur;
 		}
 	}
 }
 
-void v4delroute(struct Fs *f, uint8_t * a, uint8_t * mask, int dolock)
+void v4delroute(struct Fs *f, uint8_t *a, uint8_t *mask, int dolock)
 {
 	struct route **r, *p;
 	struct route rt;
@@ -451,9 +449,10 @@ void v4delroute(struct Fs *f, uint8_t * a, uint8_t * mask, int dolock)
 		r = looknode(&f->v4root[h], &rt);
 		if (r) {
 			p = *r;
-			/* TODO: bad usage of kref (maybe use a release).  I didn't change
-			 * this one, since it looks like the if code is when we want to
-			 * release.  btw, use better code reuse btw v4 and v6... */
+			/* TODO: bad usage of kref (maybe use a release).  I
+			 * didn't change this one, since it looks like the if
+			 * code is when we want to release.  btw, use better
+			 * code reuse btw v4 and v6... */
 			if (kref_put(&p->rt.kref)) {
 				*r = 0;
 				addqueue(&f->queue, p->rt.left);
@@ -497,9 +496,10 @@ void v6delroute(struct Fs *f, uint8_t * a, uint8_t * mask, int dolock)
 		r = looknode(&f->v6root[h], &rt);
 		if (r) {
 			p = *r;
-			/* TODO: bad usage of kref (maybe use a release).  I didn't change
-			 * this one, since it looks like the if code is when we want to
-			 * release.  btw, use better code reuse btw v4 and v6... */
+			/* TODO: bad usage of kref (maybe use a release).  I
+			 * didn't change this one, since it looks like the if
+			 * code is when we want to release.  btw, use better
+			 * code reuse btw v4 and v6... */
 			if (kref_put(&p->rt.kref)) {
 				*r = 0;
 				addqueue(&f->queue, p->rt.left);
@@ -658,9 +658,8 @@ void routetype(int type, char *p)
 
 char *rformat = "%-15I %-4M %-15I %4.4s %4.4s %3s\n";
 
-void
-convroute(struct route *r, uint8_t * addr, uint8_t * mask,
-		  uint8_t * gate, char *t, int *nifc)
+void convroute(struct route *r, uint8_t *addr, uint8_t *mask, uint8_t *gate,
+	       char *t, int *nifc)
 {
 	int i;
 
@@ -674,7 +673,8 @@ convroute(struct route *r, uint8_t * addr, uint8_t * mask,
 	} else {
 		for (i = 0; i < IPllen; i++) {
 			hnputl(addr + 4 * i, r->v6.address[i]);
-			hnputl(mask + 4 * i, ~(r->v6.endaddress[i] ^ r->v6.address[i]));
+			hnputl(mask + 4 * i,
+			       ~(r->v6.endaddress[i] ^ r->v6.address[i]));
 		}
 		memmove(gate, r->v6.gate, IPaddrlen);
 	}
@@ -703,7 +703,8 @@ static void sprintroute(struct route *r, struct routewalk *rw)
 		iname = ifbuf;
 		snprintf(ifbuf, sizeof ifbuf, "%d", nifc);
 	}
-	p = seprintf(rw->p, rw->e, rformat, addr, mask, gate, t, r->rt.tag, iname);
+	p = seprintf(rw->p, rw->e, rformat, addr, mask, gate, t, r->rt.tag,
+		     iname);
 	if (rw->o < 0) {
 		n = p - rw->p;
 		if (n > -rw->o) {
@@ -807,7 +808,8 @@ int routeflush(struct Fs *f, struct route *r, char *tag)
 	if (routeflush(f, r->rt.right, tag))
 		return 1;
 	if ((r->rt.type & Rifc) == 0) {
-		if (tag == NULL || strncmp(tag, r->rt.tag, sizeof(r->rt.tag)) == 0) {
+		if (tag == NULL ||
+		    strncmp(tag, r->rt.tag, sizeof(r->rt.tag)) == 0) {
 			delroute(f, r, 0);
 			return 1;
 		}
@@ -869,8 +871,8 @@ long routewrite(struct Fs *f, struct chan *c, char *p, int n)
 			tag = a->tag;
 		}
 		if (memcmp(addr, v4prefix, IPv4off) == 0)
-			v4addroute(f, tag, addr + IPv4off, mask + IPv4off, gate + IPv4off,
-					   0);
+			v4addroute(f, tag, addr + IPv4off, mask + IPv4off,
+				   gate + IPv4off, 0);
 		else
 			v6addroute(f, tag, addr, mask, gate, 0);
 	} else if (strcmp(cb->f[0], "tag") == 0) {

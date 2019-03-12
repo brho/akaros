@@ -24,10 +24,10 @@ void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg)
 	struct cv_lookup_elm cle;
 
 	assert(can_block(this_pcpui_ptr()));
-	/* Do a quick check before registering and sleeping.  this is the 'check,
-	 * signal, check again' pattern, where the first check is an optimization.
-	 * Many rendezes will already be satisfied, so we want to avoid excessive
-	 * locking associated with reg/dereg. */
+	/* Do a quick check before registering and sleeping.  this is the
+	 * 'check, signal, check again' pattern, where the first check is an
+	 * optimization.  Many rendezes will already be satisfied, so we want to
+	 * avoid excessive locking associated with reg/dereg. */
 	cv_lock_irqsave(&rv->cv, &irq_state);
 	if (cond(arg)) {
 		cv_unlock_irqsave(&rv->cv, &irq_state);
@@ -37,8 +37,8 @@ void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg)
 	/* Mesa-style semantics, which is definitely what you want.  See the
 	 * discussion at the end of the URL above. */
 	while (!cond(arg)) {
-		/* it's okay if we miss the ABORT flag; we hold the cv lock, so an
-		 * aborter's broadcast is waiting until we unlock. */
+		/* it's okay if we miss the ABORT flag; we hold the cv lock, so
+		 * an aborter's broadcast is waiting until we unlock. */
 		if (should_abort(&cle)) {
 			cv_unlock_irqsave(&rv->cv, &irq_state);
 			dereg_abortable_cv(&cle);
@@ -91,8 +91,8 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	assert(can_block(this_pcpui_ptr()));
 	if (!usec)
 		return;
-	/* Doing this cond check early, but then unlocking again.  Mostly just to
-	 * avoid weird issues with the CV lock and the alarm tchain lock. */
+	/* Doing this cond check early, but then unlocking again.  Mostly just
+	 * to avoid weird issues with the CV lock and the alarm tchain lock. */
 	cv_lock_irqsave(&rv->cv, &irq_state);
 	if (cond(arg)) {
 		cv_unlock_irqsave(&rv->cv, &irq_state);
@@ -105,16 +105,16 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	init_awaiter(&awaiter, rendez_alarm_handler);
 	awaiter.data = rv;
 	set_awaiter_rel(&awaiter, usec);
-	/* Set our alarm on this cpu's tchain.  Note that when we sleep in cv_wait,
-	 * we could be migrated, and later on we could be unsetting the alarm
-	 * remotely. */
+	/* Set our alarm on this cpu's tchain.  Note that when we sleep in
+	 * cv_wait, we could be migrated, and later on we could be unsetting the
+	 * alarm remotely. */
 	set_alarm(pcpui_tchain, &awaiter);
 	cv_lock_irqsave(&rv->cv, &irq_state);
 	__reg_abortable_cv(&cle, &rv->cv);
 	/* We could wake early for a few reasons.  Legit wakeups after a changed
-	 * condition (and we should exit), other alarms with different timeouts (and
-	 * we should go back to sleep), etc.  Note it is possible for our alarm to
-	 * fire immediately upon setting it: before we even cv_lock. */
+	 * condition (and we should exit), other alarms with different timeouts
+	 * (and we should go back to sleep), etc.  Note it is possible for our
+	 * alarm to fire immediately upon setting it: before we even cv_lock. */
 	while (!cond(arg) && !alarm_expired(&awaiter)) {
 		if (should_abort(&cle)) {
 			cv_unlock_irqsave(&rv->cv, &irq_state);
@@ -138,8 +138,10 @@ bool rendez_wakeup(struct rendez *rv)
 {
 	int8_t irq_state = 0;
 	bool ret;
-	/* The plan9 style "one sleeper, one waker" could get by with a signal here.
-	 * But we want to make sure all potential waiters are woken up. */
+
+	/* The plan9 style "one sleeper, one waker" could get by with a signal
+	 * here.  But we want to make sure all potential waiters are woken up.
+	 */
 	cv_lock_irqsave(&rv->cv, &irq_state);
 	ret = rv->cv.nr_waiters ? TRUE : FALSE;
 	__cv_broadcast(&rv->cv);

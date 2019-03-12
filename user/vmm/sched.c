@@ -103,8 +103,8 @@ static void vmm_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
 {
 	struct syscall *sysc;
 
-	/* I think we can make this assert now.  If not, check pthread.c. (concern
-	 * was having old ev_qs firing and running this handler). */
+	/* I think we can make this assert now.  If not, check pthread.c.
+	 * (concern was having old ev_qs firing and running this handler). */
 	assert(ev_msg);
 	sysc = ev_msg->ev_arg3;
 	assert(sysc);
@@ -124,7 +124,8 @@ static struct event_queue *setup_sysc_evq(int vcoreid)
 	                             -1, 0);
 	evq = get_eventq_raw();
 	assert(mmap_block && evq);
-	evq->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP;
+	evq->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_SPAM_INDIR |
+		        EVENT_WAKEUP;
 	evq->ev_vcore = vcoreid;
 	evq->ev_mbox->type = EV_MBOX_UCQ;
 	ucq_init_raw(&evq->ev_mbox->ucq, mmap_block, mmap_block + PGSIZE);
@@ -148,8 +149,8 @@ static void vmm_sched_init(void)
 	task_thread_cache = kmem_cache_create("task threads",
 	                                      sizeof(struct vmm_thread),
 	                                      __alignof__(struct vmm_thread), 0,
-	                                      task_thread_ctor, task_thread_dtor,
-	                                      NULL);
+					      task_thread_ctor,
+					      task_thread_dtor, NULL);
 }
 
 /* The scheduling policy is encapsulated in the next few functions (from here
@@ -160,8 +161,9 @@ static int desired_nr_vcores(void)
 	/* Sanity checks on our accounting. */
 	assert(atomic_read(&nr_unblk_guests) >= 0);
 	assert(atomic_read(&nr_unblk_tasks) >= 0);
-	/* Lockless peak.  This is always an estimate.  Some of our tasks busy-wait,
-	 * so it's not enough to just give us one vcore for all tasks, yet. */
+	/* Lockless peak.  This is always an estimate.  Some of our tasks
+	 * busy-wait, so it's not enough to just give us one vcore for all
+	 * tasks, yet. */
 	return atomic_read(&nr_unblk_guests) + atomic_read(&nr_unblk_tasks);
 }
 
@@ -261,9 +263,11 @@ static struct vmm_thread *sched_pick_thread_greedy(void)
 	}
 	/* This races with enqueue_vmm_thread, which can run on another core.
 	 * Here are the rules:
-	 * - set when runnable (race free, only one state for the thread at a time)
+	 * - set when runnable (race free, only one state for the thread at a
+	 *   time)
 	 * - cleared when we run it (race free, we're the only runners)
-	 * - if we take an interrupt, we'll just run_current_uthread and not check
+	 * - if we take an interrupt, we'll just run_current_uthread and not
+	 *   check
 	 * - if we vmexit, we'll run the buddy directly */
 	assert(vcore_id() <= current_vm->nr_gpcs);
 	vth = greedy_rnbl_guests[vcore_id() - 1];
@@ -300,12 +304,14 @@ static void __attribute__((noreturn)) vmm_sched_entry(void)
 	if (sched_is_greedy()) {
 		vth = sched_pick_thread_greedy();
 		if (!vth) {
-			/* sys_halt_core will return, but we need to restart the vcore.  We
-			 * might have woke due to an event, and we'll need to handle_events
-			 * and other things dealt with by uthreads. */
+			/* sys_halt_core will return, but we need to restart the
+			 * vcore.  We might have woke due to an event, and we'll
+			 * need to handle_events and other things dealt with by
+			 * uthreads. */
 			if (vcore_id() == 0)
 				sys_halt_core(0);
-			/* In greedy mode, yield will abort and we'll just restart */
+			/* In greedy mode, yield will abort and we'll just
+			 * restart */
 			vcore_yield_or_restart();
 		}
 	} else {
@@ -327,8 +333,8 @@ static void vmm_thread_runnable(struct uthread *uth)
 
 static void vmm_thread_paused(struct uthread *uth)
 {
-	/* The thread stopped for some reason, usually a preemption.  We'd like to
-	 * just run it whenever we get a chance.  Note that it didn't become
+	/* The thread stopped for some reason, usually a preemption.  We'd like
+	 * to just run it whenever we get a chance.  Note that it didn't become
 	 * 'blocked' - it's still runnable. */
 	enqueue_vmm_thread((struct vmm_thread*)uth);
 }
@@ -340,8 +346,8 @@ static void vmm_thread_blockon_sysc(struct uthread *uth, void *syscall)
 	acct_thread_blocked((struct vmm_thread*)uth);
 	sysc->u_data = uth;
 	if (!register_evq(sysc, sysc_evq)) {
-		/* Lost the race with the call being done.  The kernel won't send the
-		 * event.  Just restart him. */
+		/* Lost the race with the call being done.  The kernel won't
+		 * send the event.  Just restart him. */
 		restart_thread(sysc);
 	}
 	/* GIANT WARNING: do not touch the thread after this point. */
@@ -349,10 +355,10 @@ static void vmm_thread_blockon_sysc(struct uthread *uth, void *syscall)
 
 static void vmm_thread_has_blocked(struct uthread *uth, int flags)
 {
-	/* The thread blocked on something like a mutex.  It's not runnable, so we
-	 * don't need to put it on a list, but we do need to account for it not
-	 * running.  We'll find out (via thread_runnable) when it starts up again.
-	 */
+	/* The thread blocked on something like a mutex.  It's not runnable, so
+	 * we don't need to put it on a list, but we do need to account for it
+	 * not running.  We'll find out (via thread_runnable) when it starts up
+	 * again.  */
 	acct_thread_blocked((struct vmm_thread*)uth);
 }
 
@@ -397,8 +403,8 @@ static void __swap_to_gth(struct uthread *uth, void *dummy)
 {
 	struct ctlr_thread *cth = (struct ctlr_thread*)uth;
 
-	/* We just immediately run our buddy.  The ctlr and the guest are accounted
-	 * together ("pass the token" back and forth). */
+	/* We just immediately run our buddy.  The ctlr and the guest are
+	 * accounted together ("pass the token" back and forth). */
 	current_uthread = NULL;
 	stats_run_vth((struct vmm_thread*)cth->buddy);
 	run_uthread((struct uthread*)cth->buddy);
@@ -417,7 +423,8 @@ static void __ctlr_entry(void)
 		struct vm_trapframe *vm_tf = gth_to_vmtf(cth->buddy);
 
 		fprintf(stderr, "vmm: handle_vmexit returned false\n");
-		fprintf(stderr, "Note: this may be a kernel module, not the kernel\n");
+		fprintf(stderr,
+			"Note: this may be a kernel module, not the kernel\n");
 		fprintf(stderr, "RSP was %p, ", (void *)vm_tf->tf_rsp);
 		fprintf(stderr, "RIP was %p:\n", (void *)vm_tf->tf_rip);
 		/* TODO: properly walk the kernel page tables to map the tf_rip
@@ -428,8 +435,8 @@ static void __ctlr_entry(void)
 		showstatus(stderr, cth->buddy);
 		exit(0);
 	}
-	/* We want to atomically yield and start/reenqueue our buddy.  We do so in
-	 * vcore context on the other side of the yield. */
+	/* We want to atomically yield and start/reenqueue our buddy.  We do so
+	 * in vcore context on the other side of the yield. */
 	uthread_yield(FALSE, __swap_to_gth, 0);
 }
 
@@ -443,8 +450,8 @@ static void vmm_thread_refl_vm_fault(struct uthread *uth)
 	cth->uthread.flags |= UTHREAD_SAVED;
 	init_user_ctx(&cth->uthread.u_ctx, (uintptr_t)&__ctlr_entry,
 	              (uintptr_t)(cth->stacktop));
-	/* We just immediately run our buddy.  The ctlr and the guest are accounted
-	 * together ("pass the token" back and forth). */
+	/* We just immediately run our buddy.  The ctlr and the guest are
+	 * accounted together ("pass the token" back and forth). */
 	current_uthread = NULL;
 	stats_run_vth((struct vmm_thread*)cth);
 	run_uthread((struct uthread*)cth);
@@ -576,16 +583,16 @@ static void ev_handle_diag(struct event_msg *ev_msg, unsigned int ev_type,
 		gth = gpcid_to_gth(vm, i);
 		cth = gth->buddy;
 		fprintf(stderr, "\tGPC %2d: %lu resched, %lu gth runs, %lu ctl runs, %lu user-handled vmexits\n",
-				i,
+			i,
 		        ((struct vmm_thread*)gth)->nr_resched,
 		        ((struct vmm_thread*)gth)->nr_runs,
 		        ((struct vmm_thread*)cth)->nr_runs,
 		        gth->nr_vmexits);
 		if (reset) {
-		    ((struct vmm_thread*)gth)->nr_resched = 0;
-		    ((struct vmm_thread*)gth)->nr_runs = 0;
-		    ((struct vmm_thread*)cth)->nr_runs = 0;
-		    gth->nr_vmexits = 0;
+			((struct vmm_thread*)gth)->nr_resched = 0;
+			((struct vmm_thread*)gth)->nr_runs = 0;
+			((struct vmm_thread*)cth)->nr_runs = 0;
+			gth->nr_vmexits = 0;
 		}
 	}
 	fprintf(stderr, "\n\tNr unblocked gpc %lu, Nr unblocked tasks %lu\n",
@@ -632,7 +639,8 @@ int vmm_init(struct virtual_machine *vm, struct vmm_gpcore_init *gpcis,
 	uthread_mcp_init();
 	register_ev_handler(EV_FREE_APPLE_PIE, ev_handle_diag, NULL);
 	if (sched_is_greedy()) {
-		greedy_rnbl_guests = calloc(vm->nr_gpcs, sizeof(struct vmm_thread *));
+		greedy_rnbl_guests = calloc(vm->nr_gpcs,
+					    sizeof(struct vmm_thread *));
 		assert(greedy_rnbl_guests);
 		vcore_request_total(sched_nr_greedy_cores());
 		syscall(SYS_vmm_ctl, VMM_CTL_SET_EXITS,

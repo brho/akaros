@@ -75,36 +75,38 @@ static inline bool __safe_to_printf(void)
 
 #define vfprintf(f_stream, fmt, ...)                                           \
 ({                                                                             \
-	int __parlib_safe_print_ret;                                               \
-	                                                                           \
-	if (__safe_to_printf())                                                    \
-		__parlib_safe_print_ret = vfprintf(f_stream, fmt, __VA_ARGS__);        \
-	else                                                                       \
-		__parlib_safe_print_ret = __vc_ctx_vfprintf(f_stream, fmt,             \
-		                                            __VA_ARGS__);              \
-	__parlib_safe_print_ret;                                                   \
+	int __parlib_safe_print_ret;                                           \
+	                                                                       \
+	if (__safe_to_printf())                                                \
+		__parlib_safe_print_ret = vfprintf(f_stream, fmt, __VA_ARGS__);\
+	else                                                                   \
+		__parlib_safe_print_ret = __vc_ctx_vfprintf(f_stream, fmt,     \
+		                                            __VA_ARGS__);      \
+	__parlib_safe_print_ret;                                               \
 })
 
 #define fprintf(f_stream, ...)                                                 \
 ({                                                                             \
-	int __parlib_safe_print_ret;                                               \
-	                                                                           \
-	if (__safe_to_printf())                                                    \
-		__parlib_safe_print_ret = fprintf(f_stream, __VA_ARGS__);              \
-	else                                                                       \
-		__parlib_safe_print_ret = __vc_ctx_fprintf(f_stream, __VA_ARGS__);     \
-	__parlib_safe_print_ret;                                                   \
+	int __parlib_safe_print_ret;                                           \
+	                                                                       \
+	if (__safe_to_printf())                                                \
+		__parlib_safe_print_ret = fprintf(f_stream, __VA_ARGS__);      \
+	else                                                                   \
+		__parlib_safe_print_ret = __vc_ctx_fprintf(f_stream,           \
+							   __VA_ARGS__);       \
+	__parlib_safe_print_ret;                                               \
 })
 
 #define printf(...)                                                            \
 ({                                                                             \
-	int __parlib_safe_print_ret;                                               \
-	                                                                           \
-	if (__safe_to_printf())                                                    \
-		__parlib_safe_print_ret = printf(__VA_ARGS__);                         \
-	else                                                                       \
-		__parlib_safe_print_ret = __vc_ctx_fprintf(stdout, __VA_ARGS__);       \
-	__parlib_safe_print_ret;                                                   \
+	int __parlib_safe_print_ret;                                           \
+	                                                                       \
+	if (__safe_to_printf())                                                \
+		__parlib_safe_print_ret = printf(__VA_ARGS__);                 \
+	else                                                                   \
+		__parlib_safe_print_ret = __vc_ctx_fprintf(stdout,             \
+							   __VA_ARGS__);       \
+	__parlib_safe_print_ret;                                               \
 })
 
 #define debug_fprintf(f, ...) __vc_ctx_fprintf(f, __VA_ARGS__)
@@ -112,16 +114,16 @@ static inline bool __safe_to_printf(void)
 
 #define printx(...)                                                            \
 do {                                                                           \
-	if (__procdata.printx_on)                                                  \
-		debug_fprintf(stderr, __VA_ARGS__);                                    \
+	if (__procdata.printx_on)                                              \
+		debug_fprintf(stderr, __VA_ARGS__);                            \
 } while (0);
 
 int trace_printf(const char *fmt, ...);
 
 #define trace_printx(...)                                                      \
 do {                                                                           \
-	if (__procdata.printx_on)                                                  \
-		trace_printf(__VA_ARGS__);                                             \
+	if (__procdata.printx_on)                                              \
+		trace_printf(__VA_ARGS__);                                     \
 } while (0);
 
 #define I_AM_HERE __vc_ctx_fprintf(stderr,                                     \

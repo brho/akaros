@@ -32,7 +32,8 @@ struct hw_trapframe {
 	uint16_t tf_padding3;		/* used in trap reflection */
 	uint32_t tf_padding2;
 	uint64_t tf_rflags;
-	/* unlike 32 bit, SS:RSP is always pushed, even when not changing rings */
+	/* unlike 32 bit, SS:RSP is always pushed, even when not changing rings
+	 */
 	uint64_t tf_rsp;
 	uint16_t tf_ss;
 	uint16_t tf_padding1;

@@ -15,6 +15,7 @@
 static void tap_min_release(struct kref *kref)
 {
 	struct fd_tap *tap = container_of(kref, struct fd_tap, kref);
+
 	cclose(tap->chan);
 	kfree(tap);
 }
@@ -22,6 +23,7 @@ static void tap_min_release(struct kref *kref)
 static void tap_full_release(struct kref *kref)
 {
 	struct fd_tap *tap = container_of(kref, struct fd_tap, kref);
+
 	devtab[tap->chan->type].tapfd(tap->chan, tap, FDTAP_CMD_REM);
 	tap_min_release(kref);
 }
@@ -51,7 +53,8 @@ int add_fd_tap(struct proc *p, struct fd_tap_req *tap_req)
 	tap->ev_id = tap_req->ev_id;
 	tap->data = tap_req->data;
 	if (!is_user_rwaddr(tap->ev_q, sizeof(struct event_queue))) {
-		set_error(EINVAL, "Tap request with bad event_queue %p", tap->ev_q);
+		set_error(EINVAL, "Tap request with bad event_queue %p",
+			  tap->ev_q);
 		kfree(tap);
 		return -1;
 	}
@@ -82,35 +85,36 @@ int add_fd_tap(struct proc *p, struct fd_tap_req *tap_req)
 	 * could come in and close the FD and the chan, once we unlock */
 	chan_incref(chan);
 	tap->chan = chan;
-	/* One for the FD table, one for us to keep the removal of *this* tap from
-	 * happening until we've attempted to register with the device. */
+	/* One for the FD table, one for us to keep the removal of *this* tap
+	 * from happening until we've attempted to register with the device. */
 	kref_init(&tap->kref, tap_full_release, 2);
 	fdt->fd[fd].fd_tap = tap;
-	/* As soon as we unlock, another thread can come in and remove our old tap
-	 * from the table and decref it.  Our ref keeps us from removing it yet,
-	 * as well as keeps the memory safe.  However, a new tap can be installed
-	 * and registered with the device before we even attempt to register.  The
-	 * devices should be able to handle multiple, distinct taps, even if they
-	 * happen to have the same {proc, fd} tuple. */
+	/* As soon as we unlock, another thread can come in and remove our old
+	 * tap from the table and decref it.  Our ref keeps us from removing it
+	 * yet, as well as keeps the memory safe.  However, a new tap can be
+	 * installed and registered with the device before we even attempt to
+	 * register.  The devices should be able to handle multiple, distinct
+	 * taps, even if they happen to have the same {proc, fd} tuple. */
 	spin_unlock(&fdt->lock);
 	/* For refcnting fans, the tap ref is weak/uncounted.  We'll protect the
 	 * memory and call the device when tap is being released. */
 	ret = devtab[chan->type].tapfd(chan, tap, FDTAP_CMD_ADD);
 	if (ret) {
-		/* we failed, so we need to make sure *our* tap is removed.  We haven't
-		 * decreffed, so we know our tap pointer is unique. */
+		/* we failed, so we need to make sure *our* tap is removed.  We
+		 * haven't decreffed, so we know our tap pointer is unique. */
 		spin_lock(&fdt->lock);
 		if (fdt->fd[fd].fd_tap == tap) {
 			fdt->fd[fd].fd_tap = 0;
-			/* normally we can't decref a tap while holding a lock, but we
-			 * know we have another reference so this won't trigger a release */
+			/* normally we can't decref a tap while holding a lock,
+			 * but we know we have another reference so this won't
+			 * trigger a release */
 			kref_put(&tap->kref);
 		}
 		spin_unlock(&fdt->lock);
-		/* Regardless of whether someone else removed it or not, *we* are the
-		 * only ones that know that registration failed and that we shouldn't
-		 * remove it.  Since we still hold a ref, we can change the release
-		 * method to skip the device dereg. */
+		/* Regardless of whether someone else removed it or not, *we*
+		 * are the only ones that know that registration failed and that
+		 * we shouldn't remove it.  Since we still hold a ref, we can
+		 * change the release method to skip the device dereg. */
 		tap->kref.release = tap_min_release;
 	}
 	kref_put(&tap->kref);
@@ -154,16 +158,17 @@ int fire_tap(struct fd_tap *tap, int filter)
 	if (!fire_filt)
 		return 0;
 	if (waserror()) {
-		/* The process owning the tap could trigger a kernel PF, as with any
-		 * send_event() call.  Eventually we'll catch that with waserror. */
-		warn("Tap for proc %d, fd %d, threw %s", tap->proc->pid, tap->fd,
-		     current_errstr());
+		/* The process owning the tap could trigger a kernel PF, as with
+		 * any send_event() call.  Eventually we'll catch that with
+		 * waserror. */
+		warn("Tap for proc %d, fd %d, threw %s", tap->proc->pid,
+		     tap->fd, current_errstr());
 		poperror();
 		return -1;
 	}
 	ev_msg.ev_type = tap->ev_id;	/* e.g. CEQ idx */
-	ev_msg.ev_arg2 = fire_filt;		/* e.g. CEQ coalesce */
-	ev_msg.ev_arg3 = tap->data;		/* e.g. CEQ data */
+	ev_msg.ev_arg2 = fire_filt;	/* e.g. CEQ coalesce */
+	ev_msg.ev_arg3 = tap->data;	/* e.g. CEQ data */
 	send_event(tap->proc, tap->ev_q, &ev_msg, 0);
 	poperror();
 	return 0;

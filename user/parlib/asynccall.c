@@ -28,7 +28,8 @@ void init_arc(struct arsc_channel* ac)
 
 	FRONT_RING_INIT(&ac->sysfr, ac->ring_page, SYSCALLRINGSIZE);
 	//BACK_RING_INIT(&syseventbackring, &(__procdata.syseventring), SYSEVENTRINGSIZE);
-	//TODO: eventually rethink about desc pools, they are here but no longer necessary
+	//TODO: eventually rethink about desc pools, they are here but no longer
+	//necessary
 	POOL_INIT(&syscall_desc_pool, MAX_SYSCALLS);
 	POOL_INIT(&async_desc_pool, MAX_ASYNCCALLS);
 }
@@ -48,11 +49,12 @@ int waiton_group_call(async_desc_t* desc, async_rsp_t* rsp)
 	while (!(TAILQ_EMPTY(&desc->syslist))) {
 		d = TAILQ_FIRST(&desc->syslist);
 		err = waiton_syscall(d);
-		// TODO: processing the retval out of rsp here.  might be specific to
-		// the async call.  do we want to accumulate?  return any negative
-		// values?  depends what we want from the return value, so we might
-		// have to pass in a function that is used to do the processing and
-		// pass the answer back out in rsp.
+		// TODO: processing the retval out of rsp here.  might be
+		// specific to the async call.  do we want to accumulate?
+		// return any negative values?  depends what we want from the
+		// return value, so we might have to pass in a function that is
+		// used to do the processing and pass the answer back out in
+		// rsp.
 		//rsp->retval += syscall_rsp.retval; // For example
 		retval = MIN(retval, err);
 		// remove from the list and free the syscall desc
@@ -117,17 +119,20 @@ int get_all_desc(async_desc_t** a_desc, syscall_desc_t** s_desc)
 // TODO: right now there is one channel (remote), in the future, the caller
 // may specify local which will cause it to give up the core to do the work.
 // creation of additional remote channel also allows the caller to prioritize
-// work, because the default policy for the kernel is to roundrobin between them.
+// work, because the default policy for the kernel is to roundrobin between
+// them.
 int async_syscall(arsc_channel_t* chan, syscall_req_t* req, syscall_desc_t** desc_ptr2)
 {
 	// Note that this assumes one global frontring (TODO)
-	// abort if there is no room for our request.  ring size is currently 64.
-	// we could spin til it's free, but that could deadlock if this same thread
-	// is supposed to consume the requests it is waiting on later.
+	// abort if there is no room for our request.  ring size is currently
+	// 64.  we could spin til it's free, but that could deadlock if this
+	// same thread is supposed to consume the requests it is waiting on
+	// later.
 	syscall_desc_t* desc = malloc(sizeof (syscall_desc_t));
 	desc->channel = chan;
 	syscall_front_ring_t *fr = &(desc->channel->sysfr);
-	//TODO: can do it locklessly using CAS, but could change with local async calls
+	//TODO: can do it locklessly using CAS, but could change with local
+	//async calls
 	struct mcs_lock_qnode local_qn = {0};
 	mcs_lock_lock(&(chan->aclock), &local_qn);
 	if (RING_FULL(fr)) {
@@ -145,8 +150,9 @@ int async_syscall(arsc_channel_t* chan, syscall_req_t* req, syscall_desc_t** des
 	memcpy(r, req, sizeof(syscall_req_t));
 	r->status = REQ_ready;
 	// push our updates to syscallfrontring.req_prod_pvt
-	// note: it is ok to push without protection since it is atomic and kernel
-	// won't process any requests until they are marked REQ_ready (also atomic)
+	// note: it is ok to push without protection since it is atomic and
+	// kernel won't process any requests until they are marked REQ_ready
+	// (also atomic)
 	RING_PUSH_REQUESTS(fr);
 	//cprintf("DEBUG: sring->req_prod: %d, sring->rsp_prod: %d\n", 
 	mcs_lock_unlock(&desc->channel->aclock, &local_qn);
@@ -192,7 +198,8 @@ int waiton_syscall(syscall_desc_t* desc)
 		return -1;
 	}
 	// Make sure we were given a desc with a non-NULL frontring.  This could
-	// happen if someone forgot to check the error code on the paired syscall.
+	// happen if someone forgot to check the error code on the paired
+	// syscall.
 	syscall_front_ring_t *fr =  &desc->channel->sysfr;
 	
 	if (!fr){
@@ -207,9 +214,9 @@ int waiton_syscall(syscall_desc_t* desc)
 		cpu_relax();
 	// memcpy(rsp, rsp_inring, sizeof(*rsp));
 	
-    // run a cleanup function for this desc, if available
-    if (rsp->cleanup)
-    	rsp->cleanup(rsp->data);
+	// run a cleanup function for this desc, if available
+	if (rsp->cleanup)
+		rsp->cleanup(rsp->data);
 	if (RSP_ERRNO(rsp)){
 		errno = RSP_ERRNO(rsp);
 		retval = -1;

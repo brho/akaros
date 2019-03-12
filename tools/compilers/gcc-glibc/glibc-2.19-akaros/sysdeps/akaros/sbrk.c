@@ -74,12 +74,13 @@ __internal_setbrk (uintptr_t addr)
   {
     if(real_new_brk > BRK_END)
       return -1;
-	// calling mmap directly to avoid referencing errno before it is initialized.
+	// calling mmap directly to avoid referencing errno before it is
+	// initialized.
     if ((void*)__ros_syscall_noerrno(SYS_mmap, (long)real_brk,
-	                                 real_new_brk-real_brk,
-	                                 PROT_READ | PROT_WRITE | PROT_EXEC,
-	                                 MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE,
-	                                 -1, 0) != (void*)real_brk)
+				     real_new_brk-real_brk, PROT_READ |
+				     PROT_WRITE | PROT_EXEC, MAP_FIXED |
+				     MAP_ANONYMOUS | MAP_PRIVATE, -1, 0)
+	!= (void*)real_brk)
       return -1;
   }
   else if(real_new_brk < real_brk)

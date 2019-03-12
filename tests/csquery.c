@@ -40,9 +40,12 @@ void query(char *addr)
 		error(1, 0, "cannot open %s: %r", server);
 	amt = write(fd, addr, strlen(addr));
 	if (amt != strlen(addr)) {
-		printf("CSQUERY:Tried to write %d to fd %d, only wrote %d\n", strlen(addr),fd,amt);
+		printf("CSQUERY:Tried to write %d to fd %d, only wrote %d\n",
+		       strlen(addr), fd, amt);
 		if (!statusonly)
-			fprintf(stderr, "CSQUERY:Writing request: translating %s: %r\n", addr);
+			fprintf(stderr,
+				"CSQUERY:Writing request: translating %s: %r\n",
+				addr);
 		status = "errors";
 		close(fd);
 		return;

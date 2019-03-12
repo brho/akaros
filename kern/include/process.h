@@ -43,7 +43,7 @@
 #define PROC_RUNNABLE_S			0x02
 #define PROC_RUNNING_S			0x04
 #define PROC_WAITING			0x08 // can split out to INT and UINT
-#define PROC_DYING				0x10
+#define PROC_DYING			0x10
 #define PROC_DYING_ABORT		0x20
 #define PROC_RUNNABLE_M			0x40
 #define PROC_RUNNING_M			0x80

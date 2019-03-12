@@ -1020,7 +1020,8 @@ static int bnx2x_rx_int(struct bnx2x_fastpath *fp, int budget)
 			if (likely(bnx2x_alloc_rx_data(bp, fp, bd_prod,
 						       0) == 0)) {
 				dma_unmap_single(&bp->pdev->dev,
-						 dma_unmap_addr(rx_buf, mapping),
+						 dma_unmap_addr(rx_buf,
+								mapping),
 						 fp->rx_buf_size,
 						 DMA_FROM_DEVICE);
 				/* TODO: block extra data here */
@@ -1135,7 +1136,8 @@ static void bnx2x_msix_fp_int(struct hw_trapframe *hw_tf, void *fp_cookie)
 
 	prefetch(&fp->sb_running_index[SM_RX_ID]);
 	// AKAROS_PORT
-	send_kernel_message(core_id(), bnx2x_poll, (long)fp, 0, 0, KMSG_ROUTINE);
+	send_kernel_message(core_id(), bnx2x_poll, (long)fp, 0, 0,
+			    KMSG_ROUTINE);
 	napi_schedule_irqoff(&bnx2x_fp(bp, fp->index, napi));
 
 	return;
@@ -1761,7 +1763,8 @@ static int bnx2x_req_msix_irqs(struct bnx2x *bp)
 	if (CNIC_SUPPORT(bp)) {
 		offset++;
 		// AKAROS_PORT
-		rc = register_irq(0, bullshit_handler, 0, pci_to_tbdf(bp->pdev));
+		rc = register_irq(0, bullshit_handler, 0,
+				  pci_to_tbdf(bp->pdev));
 		if (rc) {
 			BNX2X_ERR("Fucked up getting a CNIC MSIX vector!");
 			return -EBUSY;
@@ -2142,7 +2145,8 @@ int bnx2x_rss(struct bnx2x *bp, struct bnx2x_rss_config_obj *rss_obj,
 		#if 0 // AKAROS_PORT
 		netdev_rss_key_fill(params.rss_key, T_ETH_RSS_KEY * 4);
 		#else
-		/* linux picks a random, once, then uses it here.  it could be 5a! */
+		/* linux picks a random, once, then uses it here.  it could be
+		 * 5a! */
 		memset(params.rss_key, 0x5a, T_ETH_RSS_KEY * 4);
 		#endif
 		__set_bit(BNX2X_RSS_SET_SRCH, &params.rss_flags);
@@ -3950,7 +3954,8 @@ netdev_tx_t bnx2x_start_xmit(struct block *block,
 		/* when transmitting in a vf, start bd must hold the ethertype
 		 * for fw to enforce it
 		 */
-		uint16_t type_le16 = (eth->type[0] << 8) | eth->type[1];// AKAROS_PORT
+		// AKAROS_PORT
+		uint16_t type_le16 = (eth->type[0] << 8) | eth->type[1];
 #ifndef BNX2X_STOP_ON_ERROR
 		if (IS_VF(bp))
 #endif

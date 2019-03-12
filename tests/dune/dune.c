@@ -147,8 +147,7 @@ static struct option long_options[] = {
 	{0, 0, 0, 0}
 };
 
-static void
-usage(void)
+static void usage(void)
 {
 	// Sadly, the getopt_long struct does
 	// not have a pointer to help text.
@@ -167,8 +166,7 @@ usage(void)
 	exit(0);
 }
 
-static struct elf_aux *
-getextra(int *auxc, char *_s)
+static struct elf_aux *getextra(int *auxc, char *_s)
 {
 	struct elf_aux *auxv;
 	char *s = strdup(_s);
@@ -200,15 +198,15 @@ getextra(int *auxc, char *_s)
 		auxv[i].v[0] = t;
 		auxv[i].v[1] = v;
 		if (dune_debug)
-			fprintf(stderr, "Adding aux pair 0x%x:0x%x\n", auxv[i].v[0],
-			        auxv[i].v[1]);
+			fprintf(stderr, "Adding aux pair 0x%x:0x%x\n",
+				auxv[i].v[0], auxv[i].v[1]);
 	}
 	return auxv;
 
 }
 
-static struct elf_aux *
-buildaux(struct elf_aux *base, int basec, struct elf_aux *extra, int extrac)
+static struct elf_aux *buildaux(struct elf_aux *base, int basec,
+				struct elf_aux *extra, int extrac)
 {
 	int total = basec + extrac;
 	struct elf_aux *ret;
@@ -301,7 +299,8 @@ int main(int argc, char **argv)
 	mmap_memory(&vm, memstart, memsize);
 
 	if (dune_debug)
-		fprintf(stderr, "mmap guest physical memory at %p for 0x%lx bytes\n",
+		fprintf(stderr,
+			"mmap guest physical memory at %p for 0x%lx bytes\n",
 			memstart, memsize);
 
 	// TODO: find out why we can't use memstart + memsize as TOS.
@@ -333,7 +332,8 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Test: Populate stack at %p\n", tos);
 	tos = populate_stack(tos, ac, av, envc, environ, auxc, auxv);
 	if (dune_debug)
-		fprintf(stderr, "populated stack at %p; argc %d, envc %d, auxc %d\n",
+		fprintf(stderr,
+			"populated stack at %p; argc %d, envc %d, auxc %d\n",
 		        tos, ac, envc, auxc);
 
 	if (dune_debug)

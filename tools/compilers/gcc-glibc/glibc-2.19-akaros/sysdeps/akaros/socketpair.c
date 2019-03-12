@@ -25,10 +25,10 @@
 int socketpair(int domain, int type, int protocol, int *sv)
 {
 	switch (domain) {
-		case PF_UNIX:
-			return pipe(sv);
-		default:
-			errno = EOPNOTSUPP;
-			return -1;
+	case PF_UNIX:
+		return pipe(sv);
+	default:
+		errno = EOPNOTSUPP;
+		return -1;
 	}
 }

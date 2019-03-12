@@ -49,37 +49,37 @@ void main(int argc, char *argv[])
 	argc--, argv++;
 	while (argc > 0 && *argv[0] == '-') {
 		switch (argv[0][1]) {
-			case 'i':
-				justinterfaces = 1;
-				break;
-			case 'n':
-				notrans = 1;
-				break;
-			case 'p':
-				if (nproto >= maxproto){
-					fprintf(stderr, "too many protos");
-					exit(1);
-				}
-				if (argc < 2)
-					usage("netstat");
-				argc--, argv++;
-				proto[nproto++] = argv[0];
-				break;
-			default:
+		case 'i':
+			justinterfaces = 1;
+			break;
+		case 'n':
+			notrans = 1;
+			break;
+		case 'p':
+			if (nproto >= maxproto){
+				fprintf(stderr, "too many protos");
+				exit(1);
+			}
+			if (argc < 2)
 				usage("netstat");
+			argc--, argv++;
+			proto[nproto++] = argv[0];
+			break;
+		default:
+			usage("netstat");
 		}
 		argc--, argv++;
 	}
 
 	netroot = "/net";
 	switch (argc) {
-		case 0:
-			break;
-		case 1:
-			netroot = argv[0];
-			break;
-		default:
-			usage("netstat");
+	case 0:
+		break;
+	case 1:
+		netroot = argv[0];
+		break;
+	default:
+		usage("netstat");
 	}
 
 	if (justinterfaces) {
@@ -100,7 +100,8 @@ void main(int argc, char *argv[])
 		while ((d = readdir(dir))) {
 			if (strcmp(d->d_name, "ipifc") == 0)
 				continue;
-			snprintf(buf, sizeof buf, "%s/%s/0/local", netroot, d->d_name);
+			snprintf(buf, sizeof buf, "%s/%s/0/local", netroot,
+				 d->d_name);
 			/* access is bogus for now. */
 			if (1 || access(buf, 0) >= 0)
 				nstat(d->d_name, pip);
@@ -136,7 +137,8 @@ char *getport(char *net, char *p)
 
 	strncpy(port, p, sizeof(port) - 1);
 	port[sizeof(port) - 1] = 0;
-	if (1)	//if(notrans || (p = csgetvalue(netroot, "port", p, net, nil)) == nil)
+	//if(notrans || (p = csgetvalue(netroot, "port", p, net, nil)) == nil)
+	if (1)
 		return port;
 	strncpy(port, p, sizeof(port) - 1);
 	port[sizeof(port) - 1] = 0;
@@ -251,8 +253,9 @@ void pipifc(void)
 	for (nip = ip; nip; nip = nip->next) {
 		for (lifc = nip->lifc; lifc; lifc = lifc->next)
 			fprintf(out, "%-12s %5d %-*I %5M %-*I %8lud %8lud %8lud %8lud\n",
-					nip->dev, nip->mtu,
-					l, lifc->ip, lifc->mask, l, lifc->net,
-					nip->pktin, nip->pktout, nip->errin, nip->errout);
+				nip->dev, nip->mtu,
+				l, lifc->ip, lifc->mask, l, lifc->net,
+				nip->pktin, nip->pktout, nip->errin,
+				nip->errout);
 	}
 }

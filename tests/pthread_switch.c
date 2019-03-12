@@ -19,9 +19,9 @@ bool should_exit = FALSE;
 
 static void __pth_switch_cb(struct uthread *uthread, void *target)
 {
-	/* by not returning, this bypasses vcore entry and event checks, though when
-	 * we pop back out of the 2LS, we'll check notif pending.  think about this
-	 * if you put this into your 2LS. */
+	/* by not returning, this bypasses vcore entry and event checks, though
+	 * when we pop back out of the 2LS, we'll check notif pending.  think
+	 * about this if you put this into your 2LS. */
 	current_uthread = NULL;
 	run_uthread((struct uthread*)target);
 	assert(0);
@@ -44,12 +44,13 @@ void *switch_thread(void *arg)
 		pth_switch_to(other_thr);
 	}
 	if (pthread_self() == th1) {
-		/* we need to break out of the switching cycle.  when th2 runs again,
-		 * it'll know to stop.  but th1 needs to both exit and switch to th2.
-		 * we do this by making th2 runnable by the pth schedop, then exiting */
+		/* we need to break out of the switching cycle.  when th2 runs
+		 * again, it'll know to stop.  but th1 needs to both exit and
+		 * switch to th2.  we do this by making th2 runnable by the pth
+		 * schedop, then exiting */
 		should_exit = TRUE;
-		/* we also need to do this to th2 before it tries to exit, o/w we'll PF
-		 * in __pthread_generic_yield. */
+		/* we also need to do this to th2 before it tries to exit, o/w
+		 * we'll PF in __pthread_generic_yield. */
 		sched_ops->thread_runnable((struct uthread*)th2);
 	}
 	return 0;
@@ -70,7 +71,7 @@ int main(int argc, char** argv)
 	parlib_never_yield = TRUE;
 	parlib_never_vc_request = TRUE;
 	pthread_need_tls(FALSE);
-	pthread_mcp_init();					/* gives us one vcore */
+	pthread_mcp_init();		/* gives us one vcore */
 
 	pthread_barrier_init(&barrier, NULL, 2);
 	/* each is passed the other's pthread_t.  th1 starts the switching. */

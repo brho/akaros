@@ -33,23 +33,23 @@ struct Rbus {
 struct Rdt {
 	struct apic *apic;
 	int intin;
-	uint32_t lo;				/* matches the lo in the intin, incl Im */
-	uint32_t hi;				/* matches the hi in the intin, incl routing */
+	uint32_t lo;		/* matches the lo in the intin, incl Im */
+	uint32_t hi;		/* matches the hi in the intin, incl routing */
 
-	int ref;					/* could map to multiple busses */
-	int enabled;				/* times enabled */
+	int ref;		/* could map to multiple busses */
+	int enabled;		/* times enabled */
 };
 
-enum {							/* IOAPIC registers */
-	Ioregsel = 0x00,			/* indirect register address */
-	Iowin = 0x10,	/* indirect register data */
-	Ioipa = 0x08,	/* IRQ Pin Assertion */
-	Ioeoi = 0x10,	/* EOI */
+enum {				/* IOAPIC registers */
+	Ioregsel = 0x00,	/* indirect register address */
+	Iowin = 0x10,		/* indirect register data */
+	Ioipa = 0x08,		/* IRQ Pin Assertion */
+	Ioeoi = 0x10,		/* EOI */
 
 	Ioapicid = 0x00,	/* Identification */
 	Ioapicver = 0x01,	/* Version */
 	Ioapicarb = 0x02,	/* Arbitration */
-	Ioabcfg = 0x03,	/* Boot Coniguration */
+	Ioabcfg = 0x03,		/* Boot Coniguration */
 	Ioredtbl = 0x10,	/* Redirection Table */
 };
 
@@ -109,6 +109,7 @@ struct Rdt *rdtlookup(struct apic *apic, int intin)
 struct Rdt *rbus_get_rdt(int busno, int devno)
 {
 	struct Rbus *rbus;
+
 	for (rbus = rdtbus[busno]; rbus != NULL; rbus = rbus->next) {
 		if (rbus->devno == devno)
 			return rbus->rdt;
@@ -150,10 +151,11 @@ void ioapicintrinit(int busno, int ioapicno, int intin, int devno, int lo)
 		rdt->lo = lo;
 		rdt->hi = 0;
 	} else {
-		/* Polarity/trigger check.  Stored lo also has the vector in 0xff */
+		/* Polarity/trigger check.  Stored lo also has the vector in
+		 * 0xff */
 		if (lo != (rdt->lo & ~0xff)) {
-			printk("multiple irq botch bus %d %d/%d/%d lo %d vs %d\n",
-				   busno, ioapicno, intin, devno, lo, rdt->lo);
+			printk("multi-irq botch bus %d %d/%d/%d lo %d vs %d\n",
+			       busno, ioapicno, intin, devno, lo, rdt->lo);
 			return;
 		}
 	}
@@ -180,11 +182,13 @@ static int acpi_irq2ioapic(int irq)
 	struct apic *ioapic;
 	/* with acpi, the ioapics map a global interrupt space.  each covers a
 	 * window of the space from [ibase, ibase + nrdt). */
-	for (ioapic = xioapic; ioapic < &xioapic[Napic]; ioapic++, ioapic_idx++) {
+	for (ioapic = xioapic; ioapic < &xioapic[Napic]; ioapic++, ioapic_idx++)
+	{
 		/* addr check is just for sanity */
 		if (!ioapic->useable || !ioapic->addr)
 			continue;
-		if ((ioapic->ibase <= irq) && (irq < ioapic->ibase + ioapic->nrdt))
+		if ((ioapic->ibase <= irq) &&
+		    (irq < ioapic->ibase + ioapic->nrdt))
 			return ioapic_idx;
 	}
 	return -1;
@@ -198,20 +202,20 @@ static int acpi_irq2ioapic(int irq)
  *
  * From Brendan http://f.osdev.org/viewtopic.php?f=1&t=25951:
  *
- * 		Before parsing the MADT you should begin by assuming that redirection
- * 		entries 0 to 15 are used for ISA IRQs 0 to 15. The MADT's "Interrupt
- * 		Source Override Structures" will tell you when this initial/default
- * 		assumption is wrong. For example, the MADT might tell you that ISA IRQ 9
- * 		is connected to IO APIC 44 and is level triggered; and (in this case)
- * 		it'd be silly to assume that ISA IRQ 9 is also connected to IO APIC
- * 		input 9 just because IO APIC input 9 is not listed.
+ *	Before parsing the MADT you should begin by assuming that redirection
+ *	entries 0 to 15 are used for ISA IRQs 0 to 15. The MADT's "Interrupt
+ *	Source Override Structures" will tell you when this initial/default
+ *	assumption is wrong. For example, the MADT might tell you that ISA IRQ 9
+ *	is connected to IO APIC 44 and is level triggered; and (in this case)
+ *	it'd be silly to assume that ISA IRQ 9 is also connected to IO APIC
+ *	input 9 just because IO APIC input 9 is not listed.
  *
- *		For PCI IRQs, the MADT tells you nothing and you can't assume anything
- *		at all. Sadly, you have to interpret the ACPI AML to determine how PCI
- *		IRQs are connected to IO APIC inputs (or find some other work-around;
- *		like implementing a motherboard driver for each different motherboard,
- *		or some complex auto-detection scheme, or just configure PCI devices to
- *		use MSI instead). */
+ *	For PCI IRQs, the MADT tells you nothing and you can't assume anything
+ *	at all. Sadly, you have to interpret the ACPI AML to determine how PCI
+ *	IRQs are connected to IO APIC inputs (or find some other work-around;
+ *	like implementing a motherboard driver for each different motherboard,
+ *	or some complex auto-detection scheme, or just configure PCI devices to
+ *	use MSI instead). */
 static int acpi_make_rdt(int tbdf, int irq, int busno, int devno)
 {
 	struct Atable *at;
@@ -249,13 +253,15 @@ static int acpi_make_rdt(int tbdf, int irq, int busno, int devno)
 			gsi_irq = irq;
 		} else {
 			/* Need to query ACPI at some point to handle this */
-			printk("Non-ISA IRQ %d not found in MADT, aborting\n", irq);
+			printk("Non-ISA IRQ %d not found in MADT, aborting\n",
+			       irq);
 			return -1;
 		}
 	}
 	ioapic_nr = acpi_irq2ioapic(gsi_irq);
 	if (ioapic_nr < 0) {
-		printk("Could not find an IOAPIC for global irq %d!\n", gsi_irq);
+		printk("Could not find an IOAPIC for global irq %d!\n",
+		       gsi_irq);
 		return -1;
 	}
 	ioapicintrinit(busno, ioapic_nr, gsi_irq - xioapic[ioapic_nr].ibase,
@@ -268,7 +274,8 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 	struct apic *apic;
 	static int base;
 
-	assert((IOAPIC_PBASE <= pa) && (pa + PGSIZE <= IOAPIC_PBASE + APIC_SIZE));
+	assert((IOAPIC_PBASE <= pa) &&
+	       (pa + PGSIZE <= IOAPIC_PBASE + APIC_SIZE));
 	/*
 	 * Mark the IOAPIC useable if it has a good ID
 	 * and the registers can be mapped.
@@ -291,8 +298,8 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 	spin_lock(&apic->lock);
 	write_mmreg32(apic->addr + Ioregsel, Ioapicver);
 	apic->nrdt = ((read_mmreg32(apic->addr + Iowin) >> 16) & 0xff) + 1;
-	/* the ibase is the global system interrupt base, told to us by ACPI.  if
-	 * it's -1, we're called from mpparse, and just guess/make up our own
+	/* the ibase is the global system interrupt base, told to us by ACPI.
+	 * if it's -1, we're called from mpparse, and just guess/make up our own
 	 * assignments. */
 	if (ibase != -1)
 		apic->ibase = ibase;
@@ -320,13 +327,15 @@ char *ioapicdump(char *start, char *end)
 		apic = &xioapic[i];
 		if (!apic->useable || apic->addr == 0)
 			continue;
-		start = seprintf(start, end, "ioapic %d addr %p nrdt %d ibase %d\n",
-						 i, apic->addr, apic->nrdt, apic->ibase);
+		start = seprintf(start, end,
+				 "ioapic %d addr %p nrdt %d ibase %d\n",
+				 i, apic->addr, apic->nrdt, apic->ibase);
 		for (n = 0; n < apic->nrdt; n++) {
 			spin_lock(&apic->lock);
 			rtblget(apic, n, &hi, &lo);
 			spin_unlock(&apic->lock);
-			start = seprintf(start, end, " rdt %2.2d %p %p\n", n, hi, lo);
+			start = seprintf(start, end, " rdt %2.2d %p %p\n",
+					 n, hi, lo);
 		}
 	}
 	for (i = 0; i < Nbus; i++) {
@@ -336,9 +345,10 @@ char *ioapicdump(char *start, char *end)
 		for (; rbus != NULL; rbus = rbus->next) {
 			rdt = rbus->rdt;
 			start = seprintf(start, end,
-							 " apic %ld devno %p(%d %d) intin %d hi %p lo %p\n",
-							 rdt->apic - xioapic, rbus->devno, rbus->devno >> 2,
-							 rbus->devno & 0x03, rdt->intin, rdt->hi, rdt->lo);
+					 " apic %ld devno %p(%d %d) intin %d hi %p lo %p\n",
+					 rdt->apic - xioapic, rbus->devno,
+					 rbus->devno >> 2, rbus->devno & 0x03,
+					 rdt->intin, rdt->hi, rdt->lo);
 		}
 	}
 	return start;
@@ -449,12 +459,14 @@ static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 static struct Rdt *ioapic_vector2rdt(int apic_vector)
 {
 	struct Rdt *rdt;
+
 	if (apic_vector < IdtIOAPIC || apic_vector > MaxIdtIOAPIC) {
 		warn("ioapic vector %d out of range", apic_vector);
 		return 0;
 	}
-	/* Fortunately rdtvecno[vecno] is static once assigned. o/w, we'll need some
-	 * global sync for the callers, both for lookup and keeping rdt valid. */
+	/* Fortunately rdtvecno[vecno] is static once assigned. o/w, we'll need
+	 * some global sync for the callers, both for lookup and keeping rdt
+	 * valid. */
 	rdt = rdtvecno[apic_vector];
 	if (!rdt) {
 		warn("vector %d has no RDT! (did you enable it?)", apic_vector);
@@ -470,6 +482,7 @@ static void ioapic_route_irq(struct irq_handler *unused, int apic_vector,
                              int hw_coreid)
 {
 	struct Rdt *rdt = ioapic_vector2rdt(apic_vector);
+
 	if (!rdt) {
 		printk("Missing IOAPIC route for vector!\n", apic_vector);
 		return;
@@ -491,6 +504,7 @@ static void ioapic_mask_irq(struct irq_handler *unused, int apic_vector)
 {
 	/* could store the rdt in the irq_h */
 	struct Rdt *rdt = ioapic_vector2rdt(apic_vector);
+
 	if (!rdt)
 		return;
 	spin_lock(&rdt->apic->lock);
@@ -555,72 +569,74 @@ int bus_irq_setup(struct irq_handler *irq_h)
 		}
 	}
 	switch (BUSTYPE(irq_h->tbdf)) {
-		case BusLAPIC:
-			/* nxm used to set the initial 'isr' method (i think equiv to our
-			 * check_spurious) to apiceoi for non-spurious lapic vectors.  in
-			 * effect, i think they were sending the EOI early, and their eoi
-			 * method was 0.  we're not doing that (unless we have to). */
-			irq_h->check_spurious = lapic_check_spurious;
-			irq_h->eoi = lapic_send_eoi;
-			irq_h->mask = lapic_mask_irq;
-			irq_h->unmask = lapic_unmask_irq;
-			irq_h->route_irq = 0;
-			irq_h->type = "lapic";
-			/* For the LAPIC, irq == vector */
-			return irq_h->dev_irq;
-		case BusIPI:
-			/* similar to LAPIC, but we don't actually have LVT entries */
-			irq_h->check_spurious = lapic_check_spurious;
-			irq_h->eoi = lapic_send_eoi;
-			irq_h->mask = 0;
-			irq_h->unmask = 0;
-			irq_h->route_irq = 0;
-			irq_h->type = "IPI";
-			return irq_h->dev_irq;
-		case BusISA:
-			if (mpisabusno == -1)
-				panic("No ISA bus allocated");
-			busno = mpisabusno;
-			/* need to track the irq in devno in PCI interrupt assignment entry
-			 * format (see mp.c or MP spec D.3). */
-			devno = irq_h->dev_irq << 2;
-			break;
-		case BusPCI:
-			pcidev = pci_match_tbdf(irq_h->tbdf);
-			if (!pcidev) {
-				warn("No PCI dev for tbdf %p!", irq_h->tbdf);
-				return -1;
-			}
-			if ((vecno = msi_irq_enable(irq_h, pcidev)) != -1)
-				return vecno;
-			busno = BUSBNO(irq_h->tbdf);
-			assert(busno == pcidev->bus);
-			devno = pcidev_read8(pcidev, PciINTP);
+	case BusLAPIC:
+		/* nxm used to set the initial 'isr' method (i think equiv to
+		 * our check_spurious) to apiceoi for non-spurious lapic
+		 * vectors.  in effect, i think they were sending the EOI early,
+		 * and their eoi method was 0.  we're not doing that (unless we
+		 * have to). */
+		irq_h->check_spurious = lapic_check_spurious;
+		irq_h->eoi = lapic_send_eoi;
+		irq_h->mask = lapic_mask_irq;
+		irq_h->unmask = lapic_unmask_irq;
+		irq_h->route_irq = 0;
+		irq_h->type = "lapic";
+		/* For the LAPIC, irq == vector */
+		return irq_h->dev_irq;
+	case BusIPI:
+		/* similar to LAPIC, but we don't actually have LVT entries */
+		irq_h->check_spurious = lapic_check_spurious;
+		irq_h->eoi = lapic_send_eoi;
+		irq_h->mask = 0;
+		irq_h->unmask = 0;
+		irq_h->route_irq = 0;
+		irq_h->type = "IPI";
+		return irq_h->dev_irq;
+	case BusISA:
+		if (mpisabusno == -1)
+			panic("No ISA bus allocated");
+		busno = mpisabusno;
+		/* need to track the irq in devno in PCI interrupt assignment
+		 * entry format (see mp.c or MP spec D.3). */
+		devno = irq_h->dev_irq << 2;
+		break;
+	case BusPCI:
+		pcidev = pci_match_tbdf(irq_h->tbdf);
+		if (!pcidev) {
+			warn("No PCI dev for tbdf %p!", irq_h->tbdf);
+			return -1;
+		}
+		if ((vecno = msi_irq_enable(irq_h, pcidev)) != -1)
+			return vecno;
+		busno = BUSBNO(irq_h->tbdf);
+		assert(busno == pcidev->bus);
+		devno = pcidev_read8(pcidev, PciINTP);
 
-			/* this might not be a big deal - some PCI devices have no INTP.  if
-			 * so, change our devno - 1 below. */
-			if (devno == 0)
-				panic("no INTP for tbdf %p", irq_h->tbdf);
-			/* remember, devno is the device shifted with irq pin in bits 0-1.
-			 * we subtract 1, since the PCI intp maps 1 -> INTA, 2 -> INTB, etc,
-			 * and the MP spec uses 0 -> INTA, 1 -> INTB, etc. */
-			devno = BUSDNO(irq_h->tbdf) << 2 | (devno - 1);
-			break;
-		default:
-			panic("Unknown bus type, TBDF %p", irq_h->tbdf);
+		/* this might not be a big deal - some PCI devices have no INTP.
+		 * if so, change our devno - 1 below. */
+		if (devno == 0)
+			panic("no INTP for tbdf %p", irq_h->tbdf);
+		/* remember, devno is the device shifted with irq pin in bits
+		 * 0-1.  we subtract 1, since the PCI intp maps 1 -> INTA, 2 ->
+		 * INTB, etc, and the MP spec uses 0 -> INTA, 1 -> INTB, etc. */
+		devno = BUSDNO(irq_h->tbdf) << 2 | (devno - 1);
+		break;
+	default:
+		panic("Unknown bus type, TBDF %p", irq_h->tbdf);
 	}
-	/* busno and devno are set, regardless of the bustype, enough to find rdt.
-	 * these may differ from the values in tbdf. */
+	/* busno and devno are set, regardless of the bustype, enough to find
+	 * rdt.  these may differ from the values in tbdf. */
 	rdt = rbus_get_rdt(busno, devno);
 	if (!rdt) {
-		/* second chance.  if we didn't find the item the first time, then (if
-		 * it exists at all), it wasn't in the MP tables (or we had no tables).
-		 * So maybe we can figure it out via ACPI. */
+		/* second chance.  if we didn't find the item the first time,
+		 * then (if it exists at all), it wasn't in the MP tables (or we
+		 * had no tables).  So maybe we can figure it out via ACPI. */
 		acpi_make_rdt(irq_h->tbdf, irq_h->dev_irq, busno, devno);
 		rdt = rbus_get_rdt(busno, devno);
 	}
 	if (!rdt) {
-		printk("Unable to build IOAPIC route for irq %d\n", irq_h->dev_irq);
+		printk("Unable to build IOAPIC route for irq %d\n",
+		       irq_h->dev_irq);
 		return -1;
 	}
 	/*
@@ -636,15 +652,16 @@ int bus_irq_setup(struct irq_handler *irq_h)
 	 * rather than putting a Lock in each entry.
 	 */
 	spin_lock(&rdt->apic->lock);
-	/* if a destination has already been picked, we store it in the lo.  this
-	 * stays around regardless of enabled/disabled, since we don't reap vectors
-	 * yet.  nor do we really mess with enabled... */
+	/* if a destination has already been picked, we store it in the lo.
+	 * this stays around regardless of enabled/disabled, since we don't reap
+	 * vectors yet.  nor do we really mess with enabled... */
 	if ((rdt->lo & 0xff) == 0) {
 		vecno = nextvec();
 		rdt->lo |= vecno;
 		rdtvecno[vecno] = rdt;
 	} else {
-		printd("%p: mutiple irq bus %d dev %d\n", irq_h->tbdf, busno, devno);
+		printd("%p: mutiple irq bus %d dev %d\n", irq_h->tbdf, busno,
+		       devno);
 	}
 	rdt->enabled++;
 	rdt->hi = 0;			/* route to 0 by default */

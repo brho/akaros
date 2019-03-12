@@ -37,23 +37,23 @@
 typedef void (*linker_func_t)(void);
 
 #define linker_func_1(x)                                                       \
-	void (x)(void);                                                            \
-	linker_func_t __linkerfunc1 __##x = (x);                                   \
+	void (x)(void);                                                        \
+	linker_func_t __linkerfunc1 __##x = (x);                               \
 	void (x)(void)
 
 #define linker_func_2(x)                                                       \
-	void (x)(void);                                                            \
-	linker_func_t __linkerfunc2 __##x = (x);                                   \
+	void (x)(void);                                                        \
+	linker_func_t __linkerfunc2 __##x = (x);                               \
 	void (x)(void)
 
 #define linker_func_3(x)                                                       \
-	void (x)(void);                                                            \
-	linker_func_t __linkerfunc3 __##x = (x);                                   \
+	void (x)(void);                                                        \
+	linker_func_t __linkerfunc3 __##x = (x);                               \
 	void (x)(void)
 
 #define linker_func_4(x)                                                       \
-	void (x)(void);                                                            \
-	linker_func_t __linkerfunc4 __##x = (x);                                   \
+	void (x)(void);                                                        \
+	linker_func_t __linkerfunc4 __##x = (x);                               \
 	void (x)(void)
 
 extern linker_func_t __linkerfunc1start[];

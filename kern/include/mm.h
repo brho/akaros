@@ -17,7 +17,7 @@
 
 struct chan;
 struct fd_table;
-struct proc;								/* preprocessor games */
+struct proc;	/* preprocessor games */
 
 #define F_OR_C_CHAN 2
 
@@ -47,17 +47,17 @@ size_t foc_get_len(struct file_or_chan *foc);
 struct vm_region {
 	TAILQ_ENTRY(vm_region)		vm_link;
 	TAILQ_ENTRY(vm_region)		vm_pm_link;
-	struct proc					*vm_proc;	/* owning process, for now */
-	uintptr_t					vm_base;
-	uintptr_t					vm_end;
-	int							vm_prot;
-	int							vm_flags;
-	struct file_or_chan			*__vm_foc;
-	size_t						vm_foff;
-	bool						vm_ready;	/* racy, for the PM checks */
-	bool						vm_shootdown_needed;
+	struct proc			*vm_proc;
+	uintptr_t			vm_base;
+	uintptr_t			vm_end;
+	int				vm_prot;
+	int				vm_flags;
+	struct file_or_chan		*__vm_foc;
+	size_t				vm_foff;
+	bool				vm_ready; /* racy, for the PM checks */
+	bool				vm_shootdown_needed;
 };
-TAILQ_HEAD(vmr_tailq, vm_region);			/* Declares 'struct vmr_tailq' */
+TAILQ_HEAD(vmr_tailq, vm_region);	/* Declares 'struct vmr_tailq' */
 
 static inline bool vmr_has_file(struct vm_region *vmr)
 {
@@ -74,9 +74,8 @@ void vmr_init(void);
 void unmap_and_destroy_vmrs(struct proc *p);
 int duplicate_vmrs(struct proc *p, struct proc *new_p);
 void print_vmrs(struct proc *p);
-void enumerate_vmrs(struct proc *p,
-					void (*func)(struct vm_region *vmr, void *opaque),
-					void *opaque);
+void enumerate_vmrs(struct proc *p, void (*func)(struct vm_region *vmr, void
+						 *opaque), void *opaque);
 
 /* mmap() related functions.  These manipulate VMRs and change the hardware page
  * tables.  Any requests below the LOWEST_VA will silently be upped.  This may

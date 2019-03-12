@@ -12,10 +12,10 @@ struct conf {
 	char *type;
 	char *dev;
 	char mpoint[32];
-	int cfd;					// ifc control channel
-	int dfd;					// ifc data channel (for ppp)
+	int cfd;			// ifc control channel
+	int dfd;			// ifc data channel (for ppp)
 	char *cputype;
-	uint8_t hwa[32];			// hardware address
+	uint8_t hwa[32];		// hardware address
 	int hwatype;
 	int hwalen;
 	uint8_t cid[32];
@@ -42,10 +42,10 @@ struct conf {
 	char hostname[32];
 	char domainname[64];
 	uint8_t server[IPaddrlen];	// server IP address
-	uint32_t offered;			// offered lease time
-	uint32_t lease;				// lease time
-	uint32_t resend;			// # of resends for current state
-	uint32_t timeout;			// time to timeout - seconds
+	uint32_t offered;		// offered lease time
+	uint32_t lease;			// lease time
+	uint32_t resend;		// # of resends for current state
+	uint32_t timeout;		// time to timeout - seconds
 
 	//
 	// IPv6
@@ -59,25 +59,25 @@ struct conf {
 	uint8_t recvra;
 	uint8_t mflag;
 	uint8_t oflag;
-	int maxraint;				// rfc2461, p.39:
-								// 4sec ≤ maxraint ≤ 1800sec, def 600
-	int minraint;				// 3sec ≤ minraint ≤ 0.75*maxraint
+	int maxraint;			// rfc2461, p.39:
+					// 4sec ≤ maxraint ≤ 1800sec, def 600
+	int minraint;			// 3sec ≤ minraint ≤ 0.75*maxraint
 	int linkmtu;
-	int reachtime;				// 3,600,000 msec, default 0
-	int rxmitra;				// default 0
-	int ttl;					// default 0 (unspecified)
+	int reachtime;			// 3,600,000 msec, default 0
+	int rxmitra;			// default 0
+	int ttl;			// default 0 (unspecified)
 
 	// default gateway params
 	uint8_t v6gaddr[IPaddrlen];
-	int routerlt;				// router life time
+	int routerlt;			// router life time
 
 	// prefix related
 	uint8_t v6pref[IPaddrlen];
 	int prefixlen;
-	uint8_t onlink;				// flag: address is `on-link'
-	uint8_t autoflag;			// flag: autonomous
-	uint32_t validlt;			// valid lifetime (seconds)
-	uint32_t preflt;			// preferred lifetime (seconds)
+	uint8_t onlink;			// flag: address is `on-link'
+	uint8_t autoflag;		// flag: autonomous
+	uint32_t validlt;		// valid lifetime (seconds)
+	uint32_t preflt;		// preferred lifetime (seconds)
 };
 
 struct ctl {
@@ -199,10 +199,10 @@ enum {
 };
 
 struct routersol {
-	uint8_t vcf[4];				// version:4, traffic class:8, flow label:20
-	uint8_t ploadlen[2];		// payload length: packet length - 40
-	uint8_t proto;				// next header	type
-	uint8_t ttl;				// hop limit
+	uint8_t vcf[4];		// version:4, traffic class:8, flow label:20
+	uint8_t ploadlen[2];	// payload length: packet length - 40
+	uint8_t proto;		// next header	type
+	uint8_t ttl;		// hop limit
 	uint8_t src[IPaddrlen];
 	uint8_t dst[IPaddrlen];
 	uint8_t type;
@@ -212,10 +212,10 @@ struct routersol {
 };
 
 struct routeradv {
-	uint8_t vcf[4];				// version:4, traffic class:8, flow label:20
-	uint8_t ploadlen[2];		// payload length: packet length - 40
-	uint8_t proto;				// next header type
-	uint8_t ttl;				// hop limit
+	uint8_t vcf[4];		// version:4, traffic class:8, flow label:20
+	uint8_t ploadlen[2];	// payload length: packet length - 40
+	uint8_t proto;		// next header type
+	uint8_t ttl;		// hop limit
 	uint8_t src[IPaddrlen];
 	uint8_t dst[IPaddrlen];
 	uint8_t type;

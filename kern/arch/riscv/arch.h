@@ -86,9 +86,10 @@ static __inline void enable_irqsave(int8_t* state)
 	// < 0 means more disabled calls have been made
 	// Mostly doing this so we can call disable_irqsave first if we want
 
-	// one side or another "gets a point" if interrupts were already the
-	// way it wanted to go.  o/w, state stays at 0.  if the state was not 0
-	// then, enabling/disabling isn't even an option.  just increment/decrement
+	// one side or another "gets a point" if interrupts were already the way
+	// it wanted to go.  o/w, state stays at 0.  if the state was not 0
+	// then, enabling/disabling isn't even an option.  just
+	// increment/decrement
 
 	// if enabling is winning or tied, make sure it's enabled
 	if ((*state == 0) && !irq_is_enabled())

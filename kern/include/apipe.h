@@ -55,18 +55,18 @@
 #include <kthread.h>
 
 struct atomic_pipe {
-	char						*ap_buf;
-	size_t						ap_ring_sz;
-	size_t						ap_elem_sz;
-	size_t						ap_rd_off;
-	size_t						ap_wr_off;
-	unsigned int				ap_nr_readers;
-	unsigned int				ap_nr_writers;
-	spinlock_t					ap_lock;
-	struct cond_var				ap_priority_reader;
-	struct cond_var				ap_general_readers;
-	struct cond_var				ap_writers;
-	bool						ap_has_priority_reader;
+	char				*ap_buf;
+	size_t				ap_ring_sz;
+	size_t				ap_elem_sz;
+	size_t				ap_rd_off;
+	size_t				ap_wr_off;
+	unsigned int			ap_nr_readers;
+	unsigned int			ap_nr_writers;
+	spinlock_t			ap_lock;
+	struct cond_var			ap_priority_reader;
+	struct cond_var			ap_general_readers;
+	struct cond_var			ap_writers;
+	bool				ap_has_priority_reader;
 };
 
 void apipe_init(struct atomic_pipe *ap, void *buf, size_t buf_sz,

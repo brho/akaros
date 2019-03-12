@@ -64,7 +64,7 @@ static struct sigaction sigact = {.sa_sigaction = segv_action, 0};
 
 bool test_catching_fault(void)
 {
-	pthread_yield();	/* link in pth for intra-thread signals (SIGSEGV) */
+	pthread_yield();/* link in pth for intra-thread signals (SIGSEGV) */
 	sigaction(SIGSEGV, &sigact, 0);
 	blob = malloc(PGSIZE);
 	if (!setjmp(save)) {
@@ -89,7 +89,6 @@ int num_utests = sizeof(utests) / sizeof(struct utest);
 
 int main(int argc, char *argv[])
 {
-	// Run test suite passing it all the args as whitelist of what tests to run.
 	char **whitelist = &argv[1];
 	int whitelist_len = argc - 1;
 

@@ -22,15 +22,15 @@ __BEGIN_DECLS
 
 struct sample_stats {
 	int (*get_sample)(void **data, int i, int j, uint64_t *sample);
-	uint64_t					avg_time;
-	uint64_t					var_time;
-	uint64_t					max_time;
-	uint64_t					min_time;
-	unsigned int				lat_50;
-	unsigned int				lat_75;
-	unsigned int				lat_90;
-	unsigned int				lat_99;
-	uint64_t					total_samples;
+	uint64_t			avg_time;
+	uint64_t			var_time;
+	uint64_t			max_time;
+	uint64_t			min_time;
+	unsigned int			lat_50;
+	unsigned int			lat_75;
+	unsigned int			lat_90;
+	unsigned int			lat_99;
+	uint64_t			total_samples;
 };
 
 /* Computes basic stats and prints histograms, stats returned via *stats */

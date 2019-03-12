@@ -101,9 +101,10 @@ void print_arena_stats(struct arena *arena, bool verbose);
  * arena. */
 static struct arena *find_my_base(struct arena *arena)
 {
-	/* TODO: could walk down sources until is_base is set.  But barring that,
-	 * we'd still need a way to find a base arena for some other allocator that
-	 * just wants a page.  arena may be NULL, so handle that. */
+	/* TODO: could walk down sources until is_base is set.  But barring
+	 * that, we'd still need a way to find a base arena for some other
+	 * allocator that just wants a page.  arena may be NULL, so handle that.
+	 * */
 	return base_arena;
 }
 
@@ -117,15 +118,18 @@ static void setup_qcaches(struct arena *arena, size_t quantum,
 	if (!nr_qcaches)
 		return;
 
-	/* TODO: same as with hash tables, here and in slab.c, we ideally want the
-	 * nearest kpages arena, but bootstrappers need to use base_alloc. */
-	arena->qcaches = base_alloc(arena, nr_qcaches * sizeof(struct kmem_cache),
-	                            MEM_WAIT);
+	/* TODO: same as with hash tables, here and in slab.c, we ideally want
+	 * the nearest kpages arena, but bootstrappers need to use base_alloc.
+	 * */
+	arena->qcaches = base_alloc(arena,
+				    nr_qcaches * sizeof(struct kmem_cache),
+				    MEM_WAIT);
 	for (int i = 0; i < nr_qcaches; i++) {
 		qc_size = (i + 1) * quantum;
 		snprintf(kc_name, KMC_NAME_SZ, "%s_%d", arena->name, qc_size);
-		__kmem_cache_create(&arena->qcaches[i], kc_name, qc_size, quantum,
-		                    KMC_NOTOUCH | KMC_QCACHE, arena, NULL, NULL, NULL);
+		__kmem_cache_create(&arena->qcaches[i], kc_name, qc_size,
+				    quantum, KMC_NOTOUCH | KMC_QCACHE, arena,
+				    NULL, NULL, NULL);
 	}
 }
 
@@ -193,7 +197,8 @@ struct arena *arena_create(char *name, void *base, size_t size, size_t quantum,
 	arena_init(arena, name, quantum, afunc, ffunc, source, qcache_max);
 	if (base) {
 		if (!arena_add(arena, base, size, flags)) {
-			warn("Failed to add base to arena %s, aborting!", arena->name);
+			warn("Failed to add base to arena %s, aborting!",
+			     arena->name);
 			arena_destroy(arena);
 			return 0;
 		}
@@ -215,20 +220,22 @@ void arena_destroy(struct arena *arena)
 		assert(BSD_LIST_EMPTY(&arena->alloc_hash[i]));
 	if (arena->alloc_hash != arena->static_hash)
 		kfree(arena->alloc_hash);
-	/* We shouldn't have any spans left.  We can tell we messed up if we had a
-	 * source and still have some free segments.  Otherwise, just collect the
-	 * free tags on the unused btag list. */
+	/* We shouldn't have any spans left.  We can tell we messed up if we had
+	 * a source and still have some free segments.  Otherwise, just collect
+	 * the free tags on the unused btag list. */
 	for (int i = 0; i < ARENA_NR_FREE_LISTS; i++) {
 		if (arena->source)
 			assert(BSD_LIST_EMPTY(&arena->free_segs[i]));
-		BSD_LIST_FOREACH_SAFE(bt_i, &arena->free_segs[i], misc_link, temp) {
+		BSD_LIST_FOREACH_SAFE(bt_i, &arena->free_segs[i], misc_link,
+				      temp) {
 			BSD_LIST_REMOVE(bt_i, misc_link);
-			BSD_LIST_INSERT_HEAD(&arena->unused_btags, bt_i, misc_link);
+			BSD_LIST_INSERT_HEAD(&arena->unused_btags, bt_i,
+					     misc_link);
 		}
 	}
-	/* To free our BTs, we need to give the page back to the base arena.  The
-	 * BTs that are page aligned are the ones we want.  We can just ignore the
-	 * others (unlink from the list). */
+	/* To free our BTs, we need to give the page back to the base arena.
+	 * The BTs that are page aligned are the ones we want.  We can just
+	 * ignore the others (unlink from the list). */
 	BSD_LIST_FOREACH_SAFE(bt_i, &arena->unused_btags, misc_link, temp) {
 		if (PGOFF(bt_i->start))
 			BSD_LIST_REMOVE(bt_i, misc_link);
@@ -247,8 +254,9 @@ static void __insert_btag(struct rb_root *root, struct btag *bt)
 	while (*new) {
 		node = container_of(*new, struct btag, all_link);
 		parent = *new;
-		/* Span (BTAG_SPAN) nodes are ahead (less than) of regular segment nodes
-		 * (BTAG_FREE or BTAG_ALLOC) that have the same start. */
+		/* Span (BTAG_SPAN) nodes are ahead (less than) of regular
+		 * segment nodes (BTAG_FREE or BTAG_ALLOC) that have the same
+		 * start. */
 		if (bt->start < node->start)
 			new = &parent->rb_left;
 		else if (bt->start > node->start)
@@ -315,12 +323,13 @@ static void __try_hash_resize(struct arena *arena, int flags,
 		return;
 	new_tbl_nr_lists = hash_next_nr_lists(&arena->hh);
 	/* We want future checkers to not think we need an increase, to avoid
-	 * excessive hash resizers as well as base arena deadlocks (base_alloc must
-	 * not call into base_alloc infinitely) */
+	 * excessive hash resizers as well as base arena deadlocks (base_alloc
+	 * must not call into base_alloc infinitely) */
 	hash_set_load_limit(&arena->hh, SIZE_MAX);
 	spin_unlock_irqsave(&arena->lock);
 	new_tbl_sz = new_tbl_nr_lists * sizeof(struct btag_list);
-	/* Regardless of the caller's style, we'll try and be quick with INSTANT. */
+	/* Regardless of the caller's style, we'll try and be quick with
+	 * INSTANT. */
 	flags &= ~ARENA_ALLOC_STYLES;
 	flags |= ARENA_INSTANTFIT;
 	new_tbl = base_zalloc(arena, new_tbl_sz, flags);
@@ -347,8 +356,10 @@ static void __try_hash_resize(struct arena *arena, int flags,
 	for (int i = 0; i < old_tbl_nr_lists; i++) {
 		while ((bt_i = BSD_LIST_FIRST(&old_tbl[i]))) {
 			BSD_LIST_REMOVE(bt_i, misc_link);
-			hash_idx = hash_long(bt_i->start, arena->hh.nr_hash_bits);
-			BSD_LIST_INSERT_HEAD(&arena->alloc_hash[hash_idx], bt_i, misc_link);
+			hash_idx = hash_long(bt_i->start,
+					     arena->hh.nr_hash_bits);
+			BSD_LIST_INSERT_HEAD(&arena->alloc_hash[hash_idx], bt_i,
+					     misc_link);
 		}
 	}
 	hash_reset_load_limit(&arena->hh);
@@ -392,19 +403,20 @@ static struct btag *__add_more_btags(struct arena *arena, int mem_flags)
 	if (arena->is_base) {
 		bt = __get_from_freelists(arena, LOG2_UP(PGSIZE));
 		if (!bt) {
-			/* TODO: block / reclaim if not MEM_ATOMIC.  Remember, we hold the
-			 * lock!  We might need to rework this or get a reserved page. */
+			/* TODO: block / reclaim if not MEM_ATOMIC.  Remember,
+			 * we hold the lock!  We might need to rework this or
+			 * get a reserved page. */
 			if (!(mem_flags & MEM_ATOMIC))
-				panic("Base failed to alloc its own btag, OOM!");
+				panic("Base failed to alloc its own btag, OOM");
 			return 0;
 		}
-		/* __account_alloc() will often need a new BT; specifically when we
-		 * only need part of the segment tracked by the BT.  Since we don't have
-		 * any extra BTs, we'll use the first one on the page we just allocated.
-		 */
+		/* __account_alloc() will often need a new BT; specifically when
+		 * we only need part of the segment tracked by the BT.  Since we
+		 * don't have any extra BTs, we'll use the first one on the page
+		 * we just allocated. */
 		tags = (struct btag*)bt->start;
 		if (__account_alloc(arena, bt, PGSIZE, &tags[0])) {
-			/* We used the tag[0]; we'll have to skip over it now. */
+			/* We used the tag[0]; we'll have to skip over it now.*/
 			tags++;
 			nr_bts--;
 		}
@@ -442,9 +454,9 @@ static bool __get_enough_btags(struct arena *arena, size_t nr_needed,
 		assert(mem_flags & MEM_ATOMIC);
 		return FALSE;
 	}
-	/* Since the lock was held in __add_more_btags, no one should have been able
-	 * to drain them.  If someone asked for more than a page worth of BTs,
-	 * there's a problem somewhere else. */
+	/* Since the lock was held in __add_more_btags, no one should have been
+	 * able to drain them.  If someone asked for more than a page worth of
+	 * BTs, there's a problem somewhere else. */
 	assert(__has_enough_btags(arena, nr_needed));
 	return TRUE;
 }
@@ -457,8 +469,8 @@ static struct btag *__get_btag(struct arena *arena)
 	struct btag *ret;
 
 	ret = BSD_LIST_FIRST(&arena->unused_btags);
-	/* All code paths should have made sure that there were enough BTs before
-	 * diving in. */
+	/* All code paths should have made sure that there were enough BTs
+	 * before diving in. */
 	assert(ret);
 	BSD_LIST_REMOVE(ret, misc_link);
 	return ret;
@@ -593,7 +605,8 @@ static void *alloc_from_arena(struct arena *arena, size_t size, int flags)
 		ret = __alloc_nextfit(arena, size);
 	else
 		ret = __alloc_instantfit(arena, size);
-	/* Careful, this will unlock and relock.  It's OK right before an unlock. */
+	/* Careful, this will unlock and relock.  It's OK right before an
+	 * unlock. */
 	__try_hash_resize(arena, flags, &to_free_addr, &to_free_sz);
 	spin_unlock_irqsave(&arena->lock);
 	if (to_free_addr)
@@ -607,12 +620,12 @@ static void assert_quantum_alignment(struct arena *arena, void *base,
                                      size_t size)
 {
 	if (!ALIGNED(base, arena->quantum))
-		panic("Unaligned base %p for arena %s, quantum %p, source %s", base,
-		      arena->name, arena->quantum,
+		panic("Unaligned base %p for arena %s, quantum %p, source %s",
+		      base, arena->name, arena->quantum,
 		      arena->source ? arena->source->name : "none");
 	if (!ALIGNED(size, arena->quantum))
-		panic("Unaligned size %p for arena %s, quantum %p, source %s", size,
-		      arena->name, arena->quantum,
+		panic("Unaligned size %p for arena %s, quantum %p, source %s",
+		      size, arena->name, arena->quantum,
 		      arena->source ? arena->source->name : "none");
 }
 
@@ -639,7 +652,8 @@ static void *__arena_add(struct arena *arena, void *base, size_t size,
 		span_bt->start = (uintptr_t)base;
 		span_bt->size = size;
 		span_bt->status = BTAG_SPAN;
-		/* Note the btag span is not on any list, but it is in all_segs */
+		/* Note the btag span is not on any list, but it is in all_segs
+		 */
 		__insert_btag(&arena->all_segs, span_bt);
 	}
 	bt->start = (uintptr_t)base;
@@ -654,8 +668,9 @@ static void *__arena_add(struct arena *arena, void *base, size_t size,
 /* Adds segment [@base, @base + @size) to @arena. */
 void *arena_add(struct arena *arena, void *base, size_t size, int flags)
 {
-	/* This wasn't clear from the paper, but mixing source spans and manually
-	 * added spans seems like a pain when coalescing BTs and freeing. */
+	/* This wasn't clear from the paper, but mixing source spans and
+	 * manually added spans seems like a pain when coalescing BTs and
+	 * freeing. */
 	if (arena->source)
 		panic("Arenas with sources must not manually add resources.");
 	return __arena_add(arena, base, size, flags);
@@ -675,7 +690,8 @@ static bool get_more_resources(struct arena *arena, size_t size, int flags)
 		if (!span)
 			return FALSE;
 		if (!__arena_add(arena, span, import_size, flags)) {
-			/* We could fail if MEM_ATOMIC and we couldn't get a BT */
+			/* We could fail if MEM_ATOMIC and we couldn't get a BT
+			 */
 			warn("Excessively rare failure, tell brho");
 			arena->ffunc(arena->source, span, import_size);
 			return FALSE;
@@ -692,9 +708,9 @@ static bool get_more_resources(struct arena *arena, size_t size, int flags)
 /* Helper.  For a given size, return the applicable qcache. */
 static struct kmem_cache *size_to_qcache(struct arena *arena, size_t size)
 {
-	/* If we ever get grumpy about the costs of dividing (both here and in the
-	 * ROUND ops, we could either insist that quantum is a power of two, or
-	 * track whether or not it is and use other shifting ops. */
+	/* If we ever get grumpy about the costs of dividing (both here and in
+	 * the ROUND ops, we could either insist that quantum is a power of two,
+	 * or track whether or not it is and use other shifting ops. */
 	return &arena->qcaches[(size / arena->quantum) - 1];
 }
 
@@ -706,10 +722,11 @@ void *arena_alloc(struct arena *arena, size_t size, int flags)
 	if (!size)
 		panic("Arena %s, request for zero", arena->name);
 	if (size <= arena->qcache_max) {
-		/* NEXTFIT is an error, since free won't know to skip the qcache and
-		 * then we'd be handing an item to the qcache that it didn't alloc. */
+		/* NEXTFIT is an error, since free won't know to skip the qcache
+		 * and then we'd be handing an item to the qcache that it didn't
+		 * alloc. */
 		if (flags & ARENA_NEXTFIT)
-			panic("Arena %s, NEXTFIT, but has qcaches.  Use xalloc.",
+			panic("Arena %s, NEXTFIT, but has qcaches. Use xalloc.",
 			      arena->name);
 		return kmem_cache_alloc(size_to_qcache(arena, size), flags);
 	}
@@ -717,20 +734,22 @@ void *arena_alloc(struct arena *arena, size_t size, int flags)
 		ret = alloc_from_arena(arena, size, flags);
 		if (ret)
 			return ret;
-		/* This is a little nasty.  We asked our source for enough, but it may
-		 * be a bestfit sized chunk, not an instant fit.  Since we already
-		 * failed once, we can just downgrade to BESTFIT, which will likely find
-		 * our recently-allocated span.  Even worse, the source might only give
-		 * us segments that are BESTFIT, and if we only look at the INSTANTFIT,
-		 * we'll keep looping.  The invariant here is that if we
-		 * get_more_resources, then our allocation can succeed if no one else
-		 * grabs that memory first.
+		/* This is a little nasty.  We asked our source for enough, but
+		 * it may be a bestfit sized chunk, not an instant fit.  Since
+		 * we already failed once, we can just downgrade to BESTFIT,
+		 * which will likely find our recently-allocated span.  Even
+		 * worse, the source might only give us segments that are
+		 * BESTFIT, and if we only look at the INSTANTFIT, we'll keep
+		 * looping.  The invariant here is that if we
+		 * get_more_resources, then our allocation can succeed if no one
+		 * else grabs that memory first.
 		 *
-		 * We actually have two options here.  Either we downgrade to BESTFIT or
-		 * we round up our request to our source to the nearest power of two.
-		 * Doing so brings some of the fragmentation into our arena, but an
-		 * instant fit is likely to succeed.  Considering how the first item on
-		 * the BESTFIT list is likely ours, downgrading makes sense. */
+		 * We actually have two options here.  Either we downgrade to
+		 * BESTFIT or we round up our request to our source to the
+		 * nearest power of two.  Doing so brings some of the
+		 * fragmentation into our arena, but an instant fit is likely to
+		 * succeed.  Considering how the first item on the BESTFIT list
+		 * is likely ours, downgrading makes sense. */
 		flags &= ~ARENA_ALLOC_STYLES;
 		flags |= ARENA_BESTFIT;
 		if (!get_more_resources(arena, size, flags))
@@ -765,13 +784,13 @@ static uintptr_t __find_sufficient(uintptr_t bt_start, size_t bt_size,
 		return 0;
 	if (nocross == 0)
 		return try;
-	/* Got to deal with nocross boundaries.  If we round up from our potential
-	 * start and that is beyond our potential finish, we're OK. */
+	/* Got to deal with nocross boundaries.  If we round up from our
+	 * potential start and that is beyond our potential finish, we're OK. */
 	if (ROUNDUP(try, nocross) >= try + size)
 		return try;
-	/* The segment still might have a chance.  Perhaps we started right before a
-	 * nocross.  Let's try again, being careful of overflow.  The ROUNDUP
-	 * shouldn't trigger a wraparound. */
+	/* The segment still might have a chance.  Perhaps we started right
+	 * before a nocross.  Let's try again, being careful of overflow.  The
+	 * ROUNDUP shouldn't trigger a wraparound. */
 	try = ROUNDUP(bt_start, nocross);
 	try_size = bt_size - (try - bt_start);
 	/* Underflow of bt_size - large_number. */
@@ -791,10 +810,11 @@ static void __split_bt_at(struct arena *arena, struct btag *bt, uintptr_t at)
 	struct btag *front = __get_btag(arena);
 
 	/* We're changing bt's start, which is its key for its position in the
-	 * all_segs tree.  However, we don't need to remove and reinsert it, since
-	 * although we increased its start, we know that no BT should be between its
-	 * old start and its new start.  That's actually where the front BT will get
-	 * inserted (so long as we insert after changing bt's start). */
+	 * all_segs tree.  However, we don't need to remove and reinsert it,
+	 * since although we increased its start, we know that no BT should be
+	 * between its old start and its new start.  That's actually where the
+	 * front BT will get inserted (so long as we insert after changing bt's
+	 * start). */
 	front->status = BTAG_FREE;
 	front->start = bt->start;
 	front->size = at - bt->start;
@@ -802,9 +822,9 @@ static void __split_bt_at(struct arena *arena, struct btag *bt, uintptr_t at)
 	bt->size -= front->size;
 	__track_free_seg(arena, front);
 	__insert_btag(&arena->all_segs, front);
-	/* At this point, bt's old space in all_segs is broken into:
-	 * front: [old_start, try), bt: [try, old_end).  front is on the free list.
-	 * bt is not. */
+	/* At this point, bt's old space in all_segs is broken into: front:
+	 * [old_start, try), bt: [try, old_end).  front is on the free list.  bt
+	 * is not. */
 }
 
 /* Helper.  We want the first bt >= mindaddr, with prev < minaddr. */
@@ -841,8 +861,8 @@ static void *__xalloc_min_max(struct arena *arena, size_t size,
 		else
 			node = node->rb_right;
 	}
-	/* Now we're probably at the first start point (or there's no node).  Just
-	 * scan from here. */
+	/* Now we're probably at the first start point (or there's no node).
+	 * Just scan from here. */
 	for (/* node set */; node; node = rb_next(node)) {
 		bt = container_of(node, struct btag, all_link);
 		try = __find_sufficient(bt->start, bt->size, size, align, phase,
@@ -876,8 +896,8 @@ static void *__xalloc_from_freelists(struct arena *arena, size_t size,
 	list_idx += try_instant_fit ? 1 : 0;
 	for (int i = list_idx; i < ARENA_NR_FREE_LISTS; i++) {
 		BSD_LIST_FOREACH(bt_i, &arena->free_segs[i], misc_link) {
-			try = __find_sufficient(bt_i->start, bt_i->size, size, align,
-			                        phase, nocross);
+			try = __find_sufficient(bt_i->start, bt_i->size, size,
+						align, phase, nocross);
 			if (try) {
 				BSD_LIST_REMOVE(bt_i, misc_link);
 				break;
@@ -900,8 +920,9 @@ static void *__xalloc_nextfit(struct arena *arena, size_t size, size_t align,
 	void *ret;
 
 	/* NEXTFIT is a lot like a minaddr.  We can start from the old addr + 1,
-	 * since the implementation of that helper starts a search from minaddr.  If
-	 * it fails, we can try again from 1 (quantum, really), skipping 0. */
+	 * since the implementation of that helper starts a search from minaddr.
+	 * If it fails, we can try again from 1 (quantum, really), skipping 0.
+	 * */
 	ret = __xalloc_min_max(arena, size, align, phase, nocross,
 	                       arena->last_nextfit_alloc + arena->quantum, 0);
 	if (!ret) {
@@ -933,16 +954,18 @@ static void *xalloc_from_arena(struct arena *arena, size_t size,
 		                       (uintptr_t)minaddr, (uintptr_t)maxaddr);
 	} else {
 		if (flags & ARENA_BESTFIT) {
-			ret = __xalloc_from_freelists(arena, size, align, phase, nocross,
-			                              FALSE);
+			ret = __xalloc_from_freelists(arena, size, align, phase,
+						      nocross, FALSE);
 		} else if (flags & ARENA_NEXTFIT) {
-			ret = __xalloc_nextfit(arena, size, align, phase, nocross);
+			ret = __xalloc_nextfit(arena, size, align, phase,
+					       nocross);
 		} else {
-			ret = __xalloc_from_freelists(arena, size, align, phase, nocross,
-			                              TRUE);
+			ret = __xalloc_from_freelists(arena, size, align, phase,
+						      nocross, TRUE);
 		}
 	}
-	/* Careful, this will unlock and relock.  It's OK right before an unlock. */
+	/* Careful, this will unlock and relock.  It's OK right before an
+	 * unlock. */
 	__try_hash_resize(arena, flags, &to_free_addr, &to_free_sz);
 	spin_unlock_irqsave(&arena->lock);
 	if (to_free_addr)
@@ -960,9 +983,11 @@ void *arena_xalloc(struct arena *arena, size_t size, size_t align, size_t phase,
 	if (!size)
 		panic("Arena %s, request for zero", arena->name);
 	if (!IS_PWR2(align))
-		panic("Arena %s, non-power of two align %p", arena->name, align);
+		panic("Arena %s, non-power of two align %p", arena->name,
+		      align);
 	if (nocross && !IS_PWR2(nocross))
-		panic("Arena %s, non-power of nocross %p", arena->name, nocross);
+		panic("Arena %s, non-power of nocross %p", arena->name,
+		      nocross);
 	if (!ALIGNED(align, arena->quantum))
 		panic("Arena %s, non-aligned align %p", arena->name, align);
 	if (!ALIGNED(nocross, arena->quantum))
@@ -970,61 +995,62 @@ void *arena_xalloc(struct arena *arena, size_t size, size_t align, size_t phase,
 	if (!ALIGNED(phase, arena->quantum))
 		panic("Arena %s, non-aligned phase %p", arena->name, phase);
 	if (size + align < size)
-		panic("Arena %s, size %p + align %p overflow%p", arena->name, size,
-		      align);
+		panic("Arena %s, size %p + align %p overflow%p", arena->name,
+		      size, align);
 	if (size + phase < size)
-		panic("Arena %s, size %p + phase %p overflow%p", arena->name, size,
-		      phase);
+		panic("Arena %s, size %p + phase %p overflow%p", arena->name,
+		      size, phase);
 	if (align + phase < align)
-		panic("Arena %s, align %p + phase %p overflow%p", arena->name, align,
-		      phase);
-	/* Ok, it's a pain to import resources from a source such that we'll be able
-	 * to guarantee we make progress without stranding resources if we have
-	 * nocross or min/maxaddr.  For min/maxaddr, when we ask the source, we
-	 * aren't easily able to xalloc from their (it may depend on the afunc).
-	 * For nocross, we can't easily ask the source for the right span that
-	 * satisfies the request (again, no real xalloc).  Some constraints might
-	 * not even be possible.
+		panic("Arena %s, align %p + phase %p overflow%p", arena->name,
+		      align, phase);
+	/* Ok, it's a pain to import resources from a source such that we'll be
+	 * able to guarantee we make progress without stranding resources if we
+	 * have nocross or min/maxaddr.  For min/maxaddr, when we ask the
+	 * source, we aren't easily able to xalloc from their (it may depend on
+	 * the afunc).  For nocross, we can't easily ask the source for the
+	 * right span that satisfies the request (again, no real xalloc).  Some
+	 * constraints might not even be possible.
 	 *
-	 * If we get a span from the source and never use it, then we run a risk of
-	 * fragmenting and stranding a bunch of spans in our current arena.  Imagine
-	 * the loop where we keep asking for spans (e.g. 8 pgs) and getting
-	 * something that doesn't work.  Those 8 pgs are fragmented, and we won't
-	 * give them back to the source until we allocate and then free them
-	 * (barring some sort of reclaim callback).
+	 * If we get a span from the source and never use it, then we run a risk
+	 * of fragmenting and stranding a bunch of spans in our current arena.
+	 * Imagine the loop where we keep asking for spans (e.g. 8 pgs) and
+	 * getting something that doesn't work.  Those 8 pgs are fragmented, and
+	 * we won't give them back to the source until we allocate and then free
+	 * them (barring some sort of reclaim callback).
 	 *
 	 * Besides, I don't know if we even need/want nocross/min/maxaddr. */
 	if (arena->source && (nocross || minaddr || maxaddr))
 		panic("Arena %s, has source, can't xalloc with nocross %p, minaddr %p, or maxaddr %p",
 		      arena->name, nocross, minaddr, maxaddr);
 	while (1) {
-		ret = xalloc_from_arena(arena, size, align, phase, nocross, minaddr,
-		                        maxaddr, flags);
+		ret = xalloc_from_arena(arena, size, align, phase, nocross,
+					minaddr, maxaddr, flags);
 		if (ret)
 			return ret;
-		/* We checked earlier than no two of these overflow, so I think we don't
-		 * need to worry about multiple overflows. */
+		/* We checked earlier than no two of these overflow, so I think
+		 * we don't need to worry about multiple overflows. */
 		req_size = size + align + phase;
-		/* Note that this check isn't the same as the one we make when finding a
-		 * sufficient segment.  Here we check overflow on the requested size.
-		 * Later, we check aligned bt_start + phase.  The concern is that this
-		 * check succeeds, but the other fails.  (Say size = PGSIZE, phase =
+		/* Note that this check isn't the same as the one we make when
+		 * finding a sufficient segment.  Here we check overflow on the
+		 * requested size.  Later, we check aligned bt_start + phase.
+		 * The concern is that this check succeeds, but the other fails.
+		 * (Say size = PGSIZE, phase =
 		 * -PGSIZE -1.  req_size is very large.
 		 *
-		 * In this case, we're still fine - if our source is able to satisfy the
-		 * request, our bt_start and bt_size will be able to express that size
-		 * without wrapping. */
+		 * In this case, we're still fine - if our source is able to
+		 * satisfy the request, our bt_start and bt_size will be able to
+		 * express that size without wrapping. */
 		if (req_size < size)
-			panic("Arena %s, size %p + align %p + phase %p overflow",
+			panic("Arena %s, size %p + align %p + phase %p overflw",
 			      arena->name, size, align, phase);
 		if (!get_more_resources(arena, req_size, flags))
 			return NULL;
-		/* Our source may have given us a segment that is on the BESTFIT list,
-		 * same as with arena_alloc. */
+		/* Our source may have given us a segment that is on the BESTFIT
+		 * list, same as with arena_alloc. */
 		flags &= ~ARENA_ALLOC_STYLES;
 		flags |= ARENA_BESTFIT;
-		/* TODO: could put a check in here to make sure we don't loop forever,
-		 * in case we trip some other bug. */
+		/* TODO: could put a check in here to make sure we don't loop
+		 * forever, in case we trip some other bug. */
 	}
 }
 
@@ -1033,7 +1059,7 @@ void *arena_xalloc(struct arena *arena, size_t size, size_t align, size_t phase,
 static bool __merge_right_to_left(struct arena *arena, struct btag *left,
                                   struct btag *right)
 {
-	/* These checks will also make sure we never merge SPAN boundary tags. */
+	/* These checks will also make sure we never merge SPAN boundary tags.*/
 	if (left->status != BTAG_FREE)
 		return FALSE;
 	if (right->status != BTAG_FREE)
@@ -1100,10 +1126,11 @@ static void free_from_arena(struct arena *arena, void *addr, size_t size)
 	spin_lock_irqsave(&arena->lock);
 	bt = __untrack_alloc_seg(arena, (uintptr_t)addr);
 	if (!bt)
-		panic("Free of unallocated addr %p from arena %s", addr, arena->name);
+		panic("Free of unallocated addr %p from arena %s", addr,
+		      arena->name);
 	if (bt->size != size)
-		panic("Free of %p with wrong size %p (%p) from arena %s", addr, size,
-		      bt->size, arena->name);
+		panic("Free of %p with wrong size %p (%p) from arena %s", addr,
+		      size, bt->size, arena->name);
 	arena->amt_alloc_segs -= size;
 	__track_free_seg(arena, bt);
 	__coalesce_free_seg(arena, bt, &to_free_addr, &to_free_sz);

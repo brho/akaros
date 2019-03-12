@@ -14,13 +14,13 @@
 __BEGIN_DECLS
 
 struct wfl_entry {
-  struct wfl_entry *next;
-  void *data;
+	struct wfl_entry *next;
+	void *data;
 };
 
 struct wfl {
-  struct wfl_entry *head;
-  struct wfl_entry first;
+	struct wfl_entry *head;
+	struct wfl_entry first;
 };
 
 #define WFL_INITIALIZER(list) {&(list).first, {0, 0}}

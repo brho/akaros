@@ -49,8 +49,9 @@ static inline uintptr_t get_hwtf_pc(struct hw_trapframe *hw_tf)
 
 static inline uintptr_t get_hwtf_fp(struct hw_trapframe *hw_tf)
 {
-	/* do you even have frame pointers?  this is used for backtrace, but if you
-	 * don't use FPs, we'll need to change up our parameters or something. */
+	/* do you even have frame pointers?  this is used for backtrace, but if
+	 * you don't use FPs, we'll need to change up our parameters or
+	 * something. */
 	#warning "fix me"
 	return 0;
 	//return hw_tf->tf_rbp;
@@ -58,8 +59,9 @@ static inline uintptr_t get_hwtf_fp(struct hw_trapframe *hw_tf)
 
 static inline uintptr_t get_hwtf_sp(struct hw_trapframe *hw_tf)
 {
-	/* do you even have frame pointers?  this is used for backtrace, but if you
-	 * don't use FPs, we'll need to change up our parameters or something. */
+	/* do you even have frame pointers?  this is used for backtrace, but if
+	 * you don't use FPs, we'll need to change up our parameters or
+	 * something. */
 	#warning "fix me"
 	return 0;
 	//return hw_tf->tf_rsp;

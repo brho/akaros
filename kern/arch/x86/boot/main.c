@@ -36,8 +36,7 @@
 void readsect(void*, uint32_t);
 void readseg(uint32_t, uint32_t, uint32_t);
 
-void
-cmain(void)
+void cmain(void)
 {
 	proghdr_t *ph, *eph;
 
@@ -67,8 +66,7 @@ bad:
 
 // Read 'count' bytes at 'offset' from kernel into virtual address 'va'.
 // Might copy more than asked
-void
-readseg(uint32_t va, uint32_t count, uint32_t offset)
+void readseg(uint32_t va, uint32_t count, uint32_t offset)
 {
 	uint32_t end_va;
 
@@ -91,16 +89,14 @@ readseg(uint32_t va, uint32_t count, uint32_t offset)
 	}
 }
 
-void
-waitdisk(void)
+void waitdisk(void)
 {
 	// wait for disk ready
 	while ((inb(0x1F7) & 0xC0) != 0x40)
 		/* do nothing */;
 }
 
-void
-readsect(void *dst, uint32_t offset)
+void readsect(void *dst, uint32_t offset)
 {
 	// wait for disk to be ready
 	waitdisk();
@@ -112,14 +108,14 @@ readsect(void *dst, uint32_t offset)
 	   Offset is 28 bytes long
 	*/
 
-	outb(0x1F2, 1);				// number of sectors to read
-	outb(0x1F3, offset);			// bits 0-7 (low bits) of 28-bit offset
-	outb(0x1F4, offset >> 8);		// bits 8-15 of 28-bit offset
-	outb(0x1F5, offset >> 16);		// bits 16-23 of 28-bit offset
-	outb(0x1F6, (offset >> 24) | 0xE0);	// bits 24-27 of 28-bit offset
-						// bit 28 (= 0) means Disk 0
-						// other bits (29-31) must be set to one
-	outb(0x1F7, 0x20);			// cmd 0x20 - read sectors
+	outb(0x1F2, 1);			// number of sectors to read
+	outb(0x1F3, offset);		// bits 0-7 (low bits) of 28-bit offset
+	outb(0x1F4, offset >> 8);	// bits 8-15 of 28-bit offset
+	outb(0x1F5, offset >> 16);	// bits 16-23 of 28-bit offset
+	outb(0x1F6, (offset >> 24) | 0xE0); // bits 24-27 of 28-bit offset
+					// bit 28 (= 0) means Disk 0
+					// other bits (29-31) must be set to one
+	outb(0x1F7, 0x20);		// cmd 0x20 - read sectors
 
 	// wait for disk to be ready
 	waitdisk();

@@ -12,12 +12,13 @@ __BEGIN_DECLS
  * vthread_alloc.  You're on your own there.  Using this is a sign that we may
  * need our own 2LS for vthreads. */
 struct vthread_info {
-	uintptr_t					stacktop;
+	uintptr_t			stacktop;
 };
 
 struct vthread {
-	struct guest_thread			gth;
-	/* Don't add to this structure without changing how these are allocated. */
+	struct guest_thread		gth;
+	/* Don't add to this structure without changing how these are allocated.
+	 */
 };
 
 static struct vm_trapframe *vth_to_vmtf(struct vthread *vth)
@@ -62,8 +63,8 @@ static long raw_vmcall(long arg0, long arg1, long arg2, long arg3, long arg4,
 
 	asm volatile("vmcall"
 	             : "=a"(ret)
-	             : "a"(vmcall_nr), "D"(arg0), "S"(arg1), "d"(arg2), "c"(arg3),
-	               "r"(r8));
+	             : "a"(vmcall_nr), "D"(arg0), "S"(arg1), "d"(arg2),
+		     "c"(arg3), "r"(r8));
 	return ret;
 }
 

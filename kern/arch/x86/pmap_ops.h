@@ -23,23 +23,23 @@ static inline bool pte_walk_okay(pte_t pte)
 }
 
 /* PTE states:
- *  - present: the PTE is involved in a valid page table walk, can be used
- *  for some form of hardware access (read, write, user, etc), and with the
- *  physaddr part pointing to a physical page.
+ * - present: the PTE is involved in a valid page table walk, can be used for
+ *   some form of hardware access (read, write, user, etc), and with the
+ *   physaddr part pointing to a physical page.
  *
- * 	- mapped: the PTE is involved in some sort of mapping, e.g. a VMR.  We're
- * 	storing something in the PTE, but it is isn't necessarily present.
- * 	Currently, all mapped pages should point to an actual physical page.
- * 	All present are mapped, but not vice versa.  Mapped pages can point to a
- * 	real page, but with no access permissions, which is the main distinction
- * 	between present and mapped.
+ * - mapped: the PTE is involved in some sort of mapping, e.g. a VMR.  We're
+ *   storing something in the PTE, but it is isn't necessarily present.
+ *   Currently, all mapped pages should point to an actual physical page.  All
+ *   present are mapped, but not vice versa.  Mapped pages can point to a real
+ *   page, but with no access permissions, which is the main distinction between
+ *   present and mapped.
  *
- * 	- paged_out: we don't actually use this yet.  Since mapped vs present is
- * 	based on the PTE present bits, we'd need to use reserved bits in the PTE to
- * 	differentiate between other states.  Right now, paged_out == mapped, as far
- * 	as the code is concerned.
+ * - paged_out: we don't actually use this yet.  Since mapped vs present is
+ *   based on the PTE present bits, we'd need to use reserved bits in the PTE to
+ *   differentiate between other states.  Right now, paged_out == mapped, as far
+ *   as the code is concerned.
  *
- * 	- unmapped: completely unused. (0 value) */
+ * - unmapped: completely unused. (0 value) */
 static inline bool pte_is_present(pte_t pte)
 {
 	return kpte_is_present(pte);

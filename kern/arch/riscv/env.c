@@ -1,10 +1,10 @@
-#include <trap.h>
-#include <env.h>
-#include <assert.h>
 #include <arch/arch.h>
+#include <assert.h>
+#include <env.h>
 #include <pmap.h>
+#include <trap.h>
 
-void save_fp_state(ancillary_state_t* silly)
+void save_fp_state(ancillary_state_t *silly)
 {
 	uintptr_t sr = enable_fp();
 	uint32_t fsr = read_fsr();
@@ -46,7 +46,7 @@ void save_fp_state(ancillary_state_t* silly)
 	mtpcr(PCR_SR, sr);
 }
 
-void restore_fp_state(ancillary_state_t* silly)
+void restore_fp_state(ancillary_state_t *silly)
 {
 	uintptr_t sr = enable_fp();
 	uint32_t fsr = silly->fsr;
@@ -92,70 +92,74 @@ void init_fp_state(void)
 {
 	uintptr_t sr = enable_fp();
 
-	asm("fcvt.d.w f0, x0; fcvt.d.w f1 ,x0; fcvt.d.w f2, x0; fcvt.d.w f3, x0;");
-	asm("fcvt.d.w f4, x0; fcvt.d.w f5, x0; fcvt.d.w f6, x0; fcvt.d.w f7, x0;");
-	asm("fcvt.d.w f8, x0; fcvt.d.w f9, x0; fcvt.d.w f10,x0; fcvt.d.w f11,x0;");
-	asm("fcvt.d.w f12,x0; fcvt.d.w f13,x0; fcvt.d.w f14,x0; fcvt.d.w f15,x0;");
-	asm("fcvt.d.w f16,x0; fcvt.d.w f17,x0; fcvt.d.w f18,x0; fcvt.d.w f19,x0;");
-	asm("fcvt.d.w f20,x0; fcvt.d.w f21,x0; fcvt.d.w f22,x0; fcvt.d.w f23,x0;");
-	asm("fcvt.d.w f24,x0; fcvt.d.w f25,x0; fcvt.d.w f26,x0; fcvt.d.w f27,x0;");
-	asm("fcvt.d.w f28,x0; fcvt.d.w f29,x0; fcvt.d.w f30,x0; fcvt.d.w f31,x0;");
+	asm("fcvt.d.w f0, x0; fcvt.d.w f1 ,x0; fcvt.d.w f2, x0; fcvt.d.w f3, "
+	    "x0;");
+	asm("fcvt.d.w f4, x0; fcvt.d.w f5, x0; fcvt.d.w f6, x0; fcvt.d.w f7, "
+	    "x0;");
+	asm("fcvt.d.w f8, x0; fcvt.d.w f9, x0; fcvt.d.w f10,x0; fcvt.d.w "
+	    "f11,x0;");
+	asm("fcvt.d.w f12,x0; fcvt.d.w f13,x0; fcvt.d.w f14,x0; fcvt.d.w "
+	    "f15,x0;");
+	asm("fcvt.d.w f16,x0; fcvt.d.w f17,x0; fcvt.d.w f18,x0; fcvt.d.w "
+	    "f19,x0;");
+	asm("fcvt.d.w f20,x0; fcvt.d.w f21,x0; fcvt.d.w f22,x0; fcvt.d.w "
+	    "f23,x0;");
+	asm("fcvt.d.w f24,x0; fcvt.d.w f25,x0; fcvt.d.w f26,x0; fcvt.d.w "
+	    "f27,x0;");
+	asm("fcvt.d.w f28,x0; fcvt.d.w f29,x0; fcvt.d.w f30,x0; fcvt.d.w "
+	    "f31,x0;");
 	asm("mtfsr x0");
 
 	mtpcr(PCR_SR, sr);
 }
 
-static int
-user_mem_walk_recursive(env_t* e, uintptr_t start, size_t len,
-                        mem_walk_callback_t callback, void* arg,
-                        mem_walk_callback_t pt_callback, void* pt_arg,
-                        pte_t* pt, int level)
+static int user_mem_walk_recursive(env_t *e, uintptr_t start, size_t len,
+                                   mem_walk_callback_t callback, void *arg,
+                                   mem_walk_callback_t pt_callback,
+                                   void *pt_arg, pte_t *pt, int level)
 {
 	int ret = 0;
-	int pgshift = L1PGSHIFT - level*(L1PGSHIFT-L2PGSHIFT);
+	int pgshift = L1PGSHIFT - level * (L1PGSHIFT - L2PGSHIFT);
 	uintptr_t pgsize = 1UL << pgshift;
 
-	uintptr_t start_idx = (start >> pgshift) & (NPTENTRIES-1);
-	uintptr_t end_idx = ((start+len-1) >> pgshift) & (NPTENTRIES-1);
+	uintptr_t start_idx = (start >> pgshift) & (NPTENTRIES - 1);
+	uintptr_t end_idx = ((start + len - 1) >> pgshift) & (NPTENTRIES - 1);
 
-	for(uintptr_t idx = start_idx; idx <= end_idx; idx++)
-	{
-		uintptr_t pgaddr = ROUNDDOWN(start, pgsize) + (idx-start_idx)*pgsize;
-		pte_t* pte = &pt[idx];
+	for (uintptr_t idx = start_idx; idx <= end_idx; idx++) {
+		uintptr_t pgaddr =
+		    ROUNDDOWN(start, pgsize) + (idx - start_idx) * pgsize;
+		pte_t *pte = &pt[idx];
 
-		if(*pte & PTE_T)
-		{
-			assert(level < NPTLEVELS-1);
+		if (*pte & PTE_T) {
+			assert(level < NPTLEVELS - 1);
 			uintptr_t st = MAX(pgaddr, start);
 			size_t ln = MIN(start + len, pgaddr + pgsize) - st;
-			if((ret = user_mem_walk_recursive(e, st, ln, callback, arg,
-			                                  pt_callback, pt_arg,
-			                                  KADDR(PTD_ADDR(*pte)), level+1)))
+			if ((ret = user_mem_walk_recursive(
+			         e, st, ln, callback, arg, pt_callback, pt_arg,
+			         KADDR(PTD_ADDR(*pte)), level + 1)))
 				goto out;
-			if(pt_callback != NULL && (ret = pt_callback(e, pte, (void*)pgaddr, arg)))
+			if (pt_callback != NULL &&
+			    (ret = pt_callback(e, pte, (void *)pgaddr, arg)))
 				goto out;
-		}
-		else if(callback != NULL)
-			if((ret = callback(e, pte, (void*)pgaddr, arg)))
+		} else if (callback != NULL)
+			if ((ret = callback(e, pte, (void *)pgaddr, arg)))
 				goto out;
 	}
 out:
 	return ret;
 }
 
-int
-env_user_mem_walk(env_t* e, void* start, size_t len,
-                  mem_walk_callback_t callback, void* arg)
+int env_user_mem_walk(env_t *e, void *start, size_t len,
+                      mem_walk_callback_t callback, void *arg)
 {
 	assert(PGOFF(start) == 0 && PGOFF(len) == 0);
 	return user_mem_walk_recursive(e, (uintptr_t)start, len, callback, arg,
 	                               NULL, NULL, e->env_pgdir, 0);
 }
 
-void
-env_pagetable_free(env_t* e)
+void env_pagetable_free(env_t *e)
 {
-	int pt_free(env_t* e, pte_t* pte, void* va, void* arg)
+	int pt_free(env_t * e, pte_t * pte, void *va, void *arg)
 	{
 		if (!PAGE_PRESENT(pte))
 			return 0;
@@ -163,6 +167,6 @@ env_pagetable_free(env_t* e)
 		return 0;
 	}
 
-	assert(user_mem_walk_recursive(e, 0, KERNBASE, NULL, NULL,
-	                               pt_free, NULL, e->env_pgdir, 0) == 0);
+	assert(user_mem_walk_recursive(e, 0, KERNBASE, NULL, NULL, pt_free,
+	                               NULL, e->env_pgdir, 0) == 0);
 }

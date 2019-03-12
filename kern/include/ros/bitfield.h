@@ -28,7 +28,7 @@ struct bitfield_conf {
     uint8_t nbits;
 };
 
-#define MKBITFIELD(s, n)									\
+#define MKBITFIELD(s, n) \
     ((struct bitfield_conf) { .shift = (s), .nbits = (n) })
 
 #define BF_MKMASK(type, bfc) ((((type) 1 << bfc.nbits) - 1) << bfc.shift)
@@ -36,7 +36,7 @@ struct bitfield_conf {
 #define BF_GETFIELD(val, bfc) \
 	({ ((val) >> bfc.shift) & (((typeof(val)) 1 << bfc.nbits) - 1); })
 
-#define BF_SETFIELD(val, x, bfc)					   \
-	({ typeof(val) m = BF_MKMASK(typeof(val), bfc);	   \
-		(val) = ((val) & ~m) |						   \
+#define BF_SETFIELD(val, x, bfc)					\
+	({ typeof(val) m = BF_MKMASK(typeof(val), bfc);	 		\
+		(val) = ((val) & ~m) |					\
 			(((typeof(val)) (x) << bfc.shift) & m); })

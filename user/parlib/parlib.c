@@ -28,10 +28,11 @@ pid_t create_child(const char *exe, int argc, char *const argv[],
 		return kid;
 
 	/* Here's how we avoid infinite recursion.  We can only have ENOENT the
-	 * first time through without bailing out, since all errno paths set exe to
-	 * begin with '/'.  That includes calls from ENOEXEC, since sh_path begins
-	 * with /.  To avoid repeated calls to ENOEXEC, we just look for sh_path as
-	 * the exe, so if we have consecutive ENOEXECs, we'll bail out. */
+	 * first time through without bailing out, since all errno paths set exe
+	 * to begin with '/'.  That includes calls from ENOEXEC, since sh_path
+	 * begins with /.  To avoid repeated calls to ENOEXEC, we just look for
+	 * sh_path as the exe, so if we have consecutive ENOEXECs, we'll bail
+	 * out. */
 	switch (errno) {
 	case ENOENT:
 		if (exe[0] == '/')
@@ -49,17 +50,17 @@ pid_t create_child(const char *exe, int argc, char *const argv[],
 		/* In case someone replaces /bin/sh with a non-elf. */
 		if (!strcmp(sh_path, exe))
 			return -1;
-		/* We want enough space for the original argv, plus one entry at the
-		 * front for sh_path.  When we grab the original argv, we also need the
-		 * trailing NULL, which is at argv[argc].  That means we really want
-		 * argc + 1 entries from argv. */
+		/* We want enough space for the original argv, plus one entry at
+		 * the front for sh_path.  When we grab the original argv, we
+		 * also need the trailing NULL, which is at argv[argc].  That
+		 * means we really want argc + 1 entries from argv. */
 		sh_argv = malloc(sizeof(char *) * (argc + 2));
 		if (!sh_argv)
 			return -1;
 		memcpy(&sh_argv[1], argv, sizeof(char *) * (argc + 1));
 		sh_argv[0] = (char*)sh_path;
-		/* Replace the original argv[0] with the path to exe, which might have
-		 * been edited to include /bin/ */
+		/* Replace the original argv[0] with the path to exe, which
+		 * might have been edited to include /bin/ */
 		sh_argv[1] = (char*)exe;
 		kid = create_child(sh_path, argc + 1, sh_argv, envp);
 		free(sh_argv);

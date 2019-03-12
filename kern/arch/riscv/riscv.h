@@ -25,8 +25,8 @@ read_pc(void)
 static inline uintptr_t
 read_bp(void)
 {
-	/* frame pointer.  yes, read_bp is a shitty name.  i'll change all of them
-	 * to read_fp when you read this and implement the function.  =) */
+	/* frame pointer.  yes, read_bp is a shitty name.  i'll change all of
+	 * them to read_fp when you read this and implement the function.  =) */
 	return 0;
 }
 

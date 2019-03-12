@@ -8,11 +8,11 @@
  * send the strlen along with the d_name.  The sizes need rechecked too, since
  * they are probably wrong. */
 struct kdirent {
-	__ino64_t					d_ino;		/* inode number */
-	__off64_t					d_off;		/* offset to the next dirent */
-	unsigned short				d_reclen;	/* length of this record */
-	unsigned char				d_type;
-	char						d_name[MAX_FILENAME_SZ + 1];	/* filename */
+	__ino64_t		d_ino;		/* inode number */
+	__off64_t		d_off;		/* offset to the next dirent */
+	unsigned short		d_reclen;	/* length of this record */
+	unsigned char		d_type;
+	char			d_name[MAX_FILENAME_SZ + 1];	/* filename */
 } __attribute__((aligned(8)));
 
 /* These stat sizes should match the types in stat.h and types.h and the sizes
@@ -20,19 +20,19 @@ struct kdirent {
  * stat, we have this here so that the kernel is exporting the interface it
  * expects.  We #def stat for our own internal use at the end. */
 struct kstat {
-	__dev_t						st_dev;		/* Device.  */
-	__ino64_t					st_ino;		/* File serial number.	*/
-	__mode_t					st_mode;	/* File mode.  */
-	__nlink_t					st_nlink;	/* Link count.  */
-	__uid_t						st_uid;		/* User ID of the file's owner.	*/
-	__gid_t						st_gid;		/* Group ID of the file's group.*/
-	__dev_t						st_rdev;	/* Device number, if device.  */
-	__off64_t					st_size;	/* Size of file, in bytes.  */
-	__blksize_t					st_blksize;	/* Optimal block size for I/O.  */
-	__blkcnt64_t				st_blocks;	/* Number 512-byte blocks allocd. */
-	struct timespec				st_atim;	/* Time of last access.  */
-	struct timespec				st_mtim;	/* Time of last modification.  */
-	struct timespec				st_ctim;	/* Time of last status change.  */
+	__dev_t			st_dev;		/* Device.  */
+	__ino64_t		st_ino;		/* File serial number.	*/
+	__mode_t		st_mode;	/* File mode.  */
+	__nlink_t		st_nlink;	/* Link count.  */
+	__uid_t			st_uid;		/* User ID of the file owner */
+	__gid_t			st_gid;		/* Group ID of the file group */
+	__dev_t			st_rdev;	/* Device number, if device.  */
+	__off64_t		st_size;	/* Size of file, in bytes.  */
+	__blksize_t		st_blksize;	/* Optimal block size for I/O */
+	__blkcnt64_t		st_blocks;	/* Nr 512-byte blocks allocd. */
+	struct timespec		st_atim;	/* Time of last access.  */
+	struct timespec		st_mtim;	/* Time of last modification */
+	struct timespec		st_ctim;	/* Time of last status change */
 };
 
 /* File access modes for open and fcntl. */
@@ -41,12 +41,12 @@ struct kstat {
 #define O_EXEC			0x04		/* Open for exec */
 #define O_RDONLY		O_READ		/* Open read-only */
 #define O_WRONLY		O_WRITE		/* Open write-only */
-#define O_RDWR			(O_READ | O_WRITE)		/* Open read/write */
+#define O_RDWR			(O_READ | O_WRITE)	/* Open read/write */
 #define O_ACCMODE		0x07
 
 /* Bits OR'd into the second argument to open */
 #define O_CREAT			00000100	/* not fcntl */
-#define O_CREATE		O_CREAT		/* fucking saving space with the 'E'? */
+#define O_CREATE		O_CREAT	
 #define O_EXCL			00000200	/* not fcntl */
 #define O_NOCTTY		00000400	/* not fcntl */
 #define O_TRUNC			00001000	/* not fcntl */
@@ -61,38 +61,38 @@ struct kstat {
 #define O_NOFOLLOW		00400000	/* Do not follow links. */
 #define O_NOATIME		01000000	/* Do not set atime. */
 #define O_CLOEXEC		02000000	/* Set close_on_exec. */
-#define O_REMCLO		04000000	/* Remove on close (unsupported). */
+#define O_REMCLO		04000000	/* Remove on close. */
 
 /* Keep this value in sync with glibc (io/fcntl.h) */
-#define AT_FDCWD	-100
+#define AT_FDCWD		-100
 
-#define F_DUPFD		0	/* Duplicate file descriptor */
-#define F_GETFD		1	/* Get file descriptor flags */
-#define F_SETFD		2	/* Set file descriptor flags */
-#define F_GETFL		3	/* Get file status flags */
-#define F_SETFL		4	/* Set file status flags */
-#define F_SYNC		101	/* fsync() */
-#define F_ADVISE	102	/* posix_fadvise{,64}() */
-#define F_CHANCTL_BASE			1000
+#define F_DUPFD			0	/* Duplicate file descriptor */
+#define F_GETFD			1	/* Get file descriptor flags */
+#define F_SETFD			2	/* Set file descriptor flags */
+#define F_GETFL			3	/* Get file status flags */
+#define F_SETFL			4	/* Set file status flags */
+#define F_SYNC			101	/* fsync() */
+#define F_ADVISE		102	/* posix_fadvise{,64}() */
+#define F_CHANCTL_BASE		1000
 
 /* We don't need a GET_FL.  The caller has the chan / FID.  If you have the
  * chan, you already have the flags.  It's not like when you have an FD and
  * don't (yet) have the Unix struct file. */
-#define CCTL_SET_FL				(F_CHANCTL_BASE + 0)
-#define CCTL_SYNC				(F_CHANCTL_BASE + 1)
-#define CCTL_DEBUG				(F_CHANCTL_BASE + 2)
+#define CCTL_SET_FL		(F_CHANCTL_BASE + 0)
+#define CCTL_SYNC		(F_CHANCTL_BASE + 1)
+#define CCTL_DEBUG		(F_CHANCTL_BASE + 2)
 
 /* For F_[GET|SET]FD */
-#define FD_CLOEXEC	1
+#define FD_CLOEXEC		1
 #define FD_VALID_FLAGS (FD_CLOEXEC)
 
 /* Advise to `posix_fadvise'.  */
-#define POSIX_FADV_NORMAL		0	/* No further special treatment */
-#define POSIX_FADV_RANDOM		1	/* Expect random page references */
+#define POSIX_FADV_NORMAL	0	/* No further special treatment */
+#define POSIX_FADV_RANDOM	1	/* Expect random page references */
 #define POSIX_FADV_SEQUENTIAL	2	/* Expect sequential page references */
-#define POSIX_FADV_WILLNEED		3	/* Will need these pages */
-#define POSIX_FADV_DONTNEED		4	/* Don't need these pages */
-#define POSIX_FADV_NOREUSE		5	/* Data will be accessed once */
+#define POSIX_FADV_WILLNEED	3	/* Will need these pages */
+#define POSIX_FADV_DONTNEED	4	/* Don't need these pages */
+#define POSIX_FADV_NOREUSE	5	/* Data will be accessed once */
 
 /* TODO: have userpsace use our stuff from bits/stats.h */
 #ifdef ROS_KERNEL
@@ -149,8 +149,8 @@ struct kstat {
 
 /* Non-standard bits */
 #define __S_NONSTD		077000000	/* Magic Akaros bits */
-#define __S_READABLE	001000000	/* File is readable */
-#define __S_WRITABLE	002000000	/* File is writable */
+#define __S_READABLE		001000000	/* File is readable */
+#define __S_WRITABLE		002000000	/* File is writable */
 
 /* Test macros for non-standard bits */
 #define S_READABLE(mode)	(((mode) & __S_READABLE) != 0)

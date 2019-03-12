@@ -48,29 +48,29 @@ typedef unsigned long uintreg_t;
  * that we can round down uint64_t, without chopping off the top 32 bits. */
 #define ROUNDDOWN(a, n)                                                        \
 ({                                                                             \
-	typeof(a) __b;                                                             \
-	if (sizeof(a) == 8) {                                                      \
-		uint64_t __a = (uint64_t) (a);                                         \
-		__b = (typeof(a)) (__a - __a % (n));                                   \
-	} else {                                                                   \
-		uintptr_t __a = (uintptr_t) (a);                                       \
-		__b = (typeof(a)) (__a - __a % (n));                                   \
-	}                                                                          \
-	__b;                                                                       \
+	typeof(a) __b;                                                         \
+	if (sizeof(a) == 8) {                                                  \
+		uint64_t __a = (uint64_t) (a);                                 \
+		__b = (typeof(a)) (__a - __a % (n));                           \
+	} else {                                                               \
+		uintptr_t __a = (uintptr_t) (a);                               \
+		__b = (typeof(a)) (__a - __a % (n));                           \
+	}                                                                      \
+	__b;                                                                   \
 })
 
 /* Round up to the nearest multiple of n */
 #define ROUNDUP(a, n)                                                          \
 ({                                                                             \
-	typeof(a) __b;                                                             \
-	if (sizeof(a) == 8) {                                                      \
-		uint64_t __n = (uint64_t) (n);                                         \
-		__b = (typeof(a)) (ROUNDDOWN((uint64_t) (a) + __n - 1, __n));          \
-	} else {                                                                   \
-		uintptr_t __n = (uintptr_t) (n);                                       \
-		__b = (typeof(a)) (ROUNDDOWN((uintptr_t) (a) + __n - 1, __n));         \
-	}                                                                          \
-	__b;                                                                       \
+	typeof(a) __b;                                                         \
+	if (sizeof(a) == 8) {                                                  \
+		uint64_t __n = (uint64_t) (n);                                 \
+		__b = (typeof(a)) (ROUNDDOWN((uint64_t) (a) + __n - 1, __n));  \
+	} else {                                                               \
+		uintptr_t __n = (uintptr_t) (n);                               \
+		__b = (typeof(a)) (ROUNDDOWN((uintptr_t) (a) + __n - 1, __n)); \
+	}                                                                      \
+	__b;                                                                   \
 })
 
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
@@ -88,7 +88,9 @@ static inline uintptr_t LOG2_DOWN(uintptr_t value)
 static inline uintptr_t LOG2_UP(uintptr_t value)
 {
 	uintptr_t ret = LOG2_DOWN(value);
-	ret += 0 != (value ^ ((uintptr_t) 1 << ret));  // Add 1 if a lower bit set
+
+	// Add 1 if a lower bit set
+	ret += 0 != (value ^ ((uintptr_t) 1 << ret));
 	return ret;
 }
 
@@ -117,38 +119,39 @@ static inline bool mult_will_overflow_u64(uint64_t a, uint64_t b)
 
 /* Return the container/struct holding the object 'ptr' points to */
 #define container_of(ptr, type, member) ({                                     \
-	(type*)((char*)ptr - offsetof(type, member));                             \
+	(type*)((char*)ptr - offsetof(type, member));                         \
 })
 
 /* Makes sure func is run exactly once.  Can handle concurrent callers, and
  * other callers spin til the func is complete. */
 #define run_once(func)                                                         \
 do {                                                                           \
-	static bool ran_once = FALSE;                                              \
-	static bool is_running = FALSE;                                            \
-	if (!ran_once) {                                                           \
-		/* fetch and set TRUE, without a header or test_and_set weirdness */   \
-		if (!__sync_fetch_and_or(&is_running, TRUE)) {                         \
-			/* we won the race and get to run the func */                      \
-			func;                                                              \
-			wmb();	/* don't let the ran_once write pass previous writes */    \
-			ran_once = TRUE;                                                   \
-		} else {                                                               \
-			/* someone else won, wait til they are done to break out */        \
-			while (!ran_once)                                                  \
-				cpu_relax();                                                   \
-		}                                                                      \
-	}                                                                          \
+	static bool ran_once = FALSE;                                          \
+	static bool is_running = FALSE;                                        \
+	if (!ran_once) {                                                       \
+		/* fetch and set TRUE, w/o a header or test_and_set weirdness*/\
+		if (!__sync_fetch_and_or(&is_running, TRUE)) {                 \
+			/* we won the race and get to run the func */          \
+			func;                                                  \
+			/* don't let the ran_once write pass previous writes */\
+			wmb();                                                 \
+			ran_once = TRUE;                                       \
+		} else {                                                       \
+			/* someone else woni */                                \
+			while (!ran_once)                                      \
+				cpu_relax();                                   \
+		}                                                              \
+	}                                                                      \
 } while (0)
 
 /* Unprotected, single-threaded version, makes sure func is run exactly once */
 #define run_once_racy(func)                                                    \
 do {                                                                           \
-	static bool ran_once = FALSE;                                              \
-	if (!ran_once) {                                                           \
-		func;                                                                  \
-		ran_once = TRUE;                                                       \
-	}                                                                          \
+	static bool ran_once = FALSE;                                          \
+	if (!ran_once) {                                                       \
+		func;                                                          \
+		ran_once = TRUE;                                               \
+	}                                                                      \
 } while (0)
 
 #ifdef ROS_KERNEL

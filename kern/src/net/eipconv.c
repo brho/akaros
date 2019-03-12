@@ -147,7 +147,7 @@ void printcname(void (*putch) (int, void **), void **putdat, struct cname *c)
 
 void printchan(void (*putch) (int, void **), void **putdat, struct chan *c)
 {
-	if (! c)
+	if (!c)
 		return;
 	printfmt(putch, putdat, "(%p): ", c);
 	printfmt(putch, putdat, "%slocked ", spin_locked(&c->lock) ? "":"un");
@@ -173,7 +173,8 @@ void printchan(void (*putch) (int, void **), void **putdat, struct chan *c)
 	printfmt(putch, putdat, "mountid %p ", c->mountid);
 	printfmt(putch, putdat, "mntcache %p ", c->mcp);
 	printfmt(putch, putdat, "mux %p ", c->mux);
-	if (c->mux && c->mux->c) 	printfmt(putch, putdat, "mux->c %p ", c->mux->c);
+	if (c->mux && c->mux->c) 
+		printfmt(putch, putdat, "mux->c %p ", c->mux->c);
 	printfmt(putch, putdat, "aux %p ", c->aux);
 	printfmt(putch, putdat, "mchan %p ", c->mchan);
 	printfmt(putch, putdat, "mqid %p ");

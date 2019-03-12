@@ -51,10 +51,10 @@ struct IPICMP {
 	Ip6hdr;
 	ICMPpkt;
 */
-	uint8_t vcf[4];				// version:4, traffic class:8, flow label:20
-	uint8_t ploadlen[2];		// payload length: packet length - 40
-	uint8_t proto;				// next header type
-	uint8_t ttl;				// hop limit
+	uint8_t vcf[4];		// version:4, traffic class:8, flow label:20
+	uint8_t ploadlen[2];	// payload length: packet length - 40
+	uint8_t proto;		// next header type
+	uint8_t ttl;		// hop limit
 	uint8_t src[IPaddrlen];
 	uint8_t dst[IPaddrlen];
 	uint8_t type;
@@ -67,10 +67,10 @@ struct IPICMP {
 
 struct NdiscC {
 	//IPICMP;
-	uint8_t vcf[4];				// version:4, traffic class:8, flow label:20
-	uint8_t ploadlen[2];		// payload length: packet length - 40
-	uint8_t proto;				// next header type
-	uint8_t ttl;				// hop limit
+	uint8_t vcf[4];		// version:4, traffic class:8, flow label:20
+	uint8_t ploadlen[2];	// payload length: packet length - 40
+	uint8_t proto;		// next header type
+	uint8_t ttl;		// hop limit
 	uint8_t src[IPaddrlen];
 	uint8_t dst[IPaddrlen];
 	uint8_t type;
@@ -84,10 +84,10 @@ struct NdiscC {
 
 struct Ndpkt {
 	//NdiscC;
-	uint8_t vcf[4];				// version:4, traffic class:8, flow label:20
-	uint8_t ploadlen[2];		// payload length: packet length - 40
-	uint8_t proto;				// next header type
-	uint8_t ttl;				// hop limit
+	uint8_t vcf[4];		// version:4, traffic class:8, flow label:20
+	uint8_t ploadlen[2];	// payload length: packet length - 40
+	uint8_t proto;		// next header type
+	uint8_t ttl;		// hop limit
 	uint8_t src[IPaddrlen];
 	uint8_t dst[IPaddrlen];
 	uint8_t type;
@@ -99,9 +99,9 @@ struct Ndpkt {
 	uint8_t target[IPaddrlen];
 
 	uint8_t otype;
-	uint8_t olen;				// length in units of 8 octets(incl type, code),
+	uint8_t olen;		// length in units of 8 octets(incl type, code),
 	// 1 for IEEE 802 addresses
-	uint8_t lnaddr[6];			// link-layer address
+	uint8_t lnaddr[6];	// link-layer address
 };
 
 enum {
@@ -253,6 +253,7 @@ static void set_cksum(struct block *bp)
 static struct block *newIPICMP(int packetlen)
 {
 	struct block *nbp;
+
 	nbp = block_alloc(packetlen, MEM_WAIT);
 	nbp->wp += packetlen;
 	memset(nbp->rp, 0, packetlen);
@@ -389,10 +390,8 @@ static struct block *mkechoreply6(struct block *bp)
  * 	and tuni == TARG_UNI => neighbor reachability.
  */
 
-void icmpns(struct Fs *f,
-            uint8_t *src, int suni,
-            uint8_t *targ, int tuni,
-            uint8_t *mac)
+void icmpns(struct Fs *f, uint8_t *src, int suni, uint8_t *targ, int tuni,
+	    uint8_t *mac)
 {
 	struct block *nbp;
 	struct Ndpkt *np;
@@ -489,9 +488,11 @@ void icmphostunr(struct Fs *f, struct Ipifc *ifc,
 
 	rlock(&ifc->rwlock);
 	if (ipv6anylocal(ifc, np->src)) {
-		netlog(f, Logicmp, "send icmphostunr -> s%I d%I\n", p->src, p->dst);
+		netlog(f, Logicmp, "send icmphostunr -> s%I d%I\n",
+		       p->src, p->dst);
 	} else {
-		netlog(f, Logicmp, "icmphostunr fail -> s%I d%I\n", p->src, p->dst);
+		netlog(f, Logicmp, "icmphostunr fail -> s%I d%I\n",
+		       p->src, p->dst);
 		runlock(&ifc->rwlock);
 		freeblist(nbp);
 		goto freebl;
@@ -536,11 +537,11 @@ void icmpttlexceeded6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	np = (struct IPICMP *)nbp->rp;
 
 	if (ipv6anylocal(ifc, np->src)) {
-		netlog(f, Logicmp, "send icmpttlexceeded6 -> s%I d%I\n", p->src,
-		       p->dst);
+		netlog(f, Logicmp, "send icmpttlexceeded6 -> s%I d%I\n",
+		       p->src, p->dst);
 	} else {
-		netlog(f, Logicmp, "icmpttlexceeded6 fail -> s%I d%I\n", p->src,
-		       p->dst);
+		netlog(f, Logicmp, "icmpttlexceeded6 fail -> s%I d%I\n",
+		       p->src, p->dst);
 		return;
 	}
 
@@ -575,10 +576,12 @@ void icmppkttoobig6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	np = (struct IPICMP *)nbp->rp;
 
 	if (!ipv6anylocal(ifc, np->src)) {
-		netlog(f, Logicmp, "icmppkttoobig6 fail -> s%I d%I\n", p->src, p->dst);
+		netlog(f, Logicmp, "icmppkttoobig6 fail -> s%I d%I\n",
+		       p->src, p->dst);
 		return;
 	}
-	netlog(f, Logicmp, "send icmppkttoobig6 -> s%I d%I\n", p->src, p->dst);
+	netlog(f, Logicmp, "send icmppkttoobig6 -> s%I d%I\n",
+	       p->src, p->dst);
 
 	memmove(np->dst, p->src, IPaddrlen);
 	np->type = PacketTooBigV6;
@@ -652,78 +655,81 @@ static int valid(struct Proto *icmp, struct Ipifc *ifc,
 		}
 
 		switch (p->type) {
-			case NbrSolicit:
-			case NbrAdvert:
-				np = (struct Ndpkt *)p;
-				if (isv6mcast(np->target)) {
-					ipriv->stats[TargetErrs6]++;
-					goto err;
-				}
-				if (optexsts(np) && (np->olen == 0)) {
-					ipriv->stats[OptlenErrs6]++;
-					goto err;
-				}
+		case NbrSolicit:
+		case NbrAdvert:
+			np = (struct Ndpkt *)p;
+			if (isv6mcast(np->target)) {
+				ipriv->stats[TargetErrs6]++;
+				goto err;
+			}
+			if (optexsts(np) && (np->olen == 0)) {
+				ipriv->stats[OptlenErrs6]++;
+				goto err;
+			}
 
-				if (p->type == NbrSolicit) {
-					if (ipcmp(np->src, v6Unspecified) == 0) {
-						if (!issmcast(np->dst) || optexsts(np)) {
-							ipriv->stats[AddrmxpErrs6]++;
-							goto err;
-						}
-					}
-				}
-
-				if (p->type == NbrAdvert) {
-					if ((isv6mcast(np->dst)) && (nhgets(np->icmpid) & Sflag)) {
+			if (p->type == NbrSolicit) {
+				if (ipcmp(np->src, v6Unspecified) == 0) {
+					if (!issmcast(np->dst) || optexsts(np))
+					{
 						ipriv->stats[AddrmxpErrs6]++;
 						goto err;
 					}
 				}
-				break;
+			}
 
-			case RouterAdvert:
-				if (pktsz - sizeof(struct ip6hdr) < 16) {
-					ipriv->stats[HlenErrs6]++;
+			if (p->type == NbrAdvert) {
+				if ((isv6mcast(np->dst)) &&
+				    (nhgets(np->icmpid) & Sflag)) {
+					ipriv->stats[AddrmxpErrs6]++;
 					goto err;
 				}
-				if (!islinklocal(p->src)) {
-					ipriv->stats[RouterAddrErrs6]++;
-					goto err;
-				}
-				sz = sizeof(struct IPICMP) + 8;
-				while ((sz + 1) < pktsz) {
-					osz = *(packet + sz + 1);
-					if (osz <= 0) {
-						ipriv->stats[OptlenErrs6]++;
-						goto err;
-					}
-					sz += 8 * osz;
-				}
-				break;
+			}
+			break;
 
-			case RouterSolicit:
-				if (pktsz - sizeof(struct ip6hdr) < 8) {
-					ipriv->stats[HlenErrs6]++;
-					goto err;
-				}
-				unsp = (ipcmp(p->src, v6Unspecified) == 0);
-				sz = sizeof(struct IPICMP) + 8;
-				while ((sz + 1) < pktsz) {
-					osz = *(packet + sz + 1);
-					if ((osz <= 0) || (unsp && (*(packet + sz) == slladd))) {
-						ipriv->stats[OptlenErrs6]++;
-						goto err;
-					}
-					sz += 8 * osz;
-				}
-				break;
-
-			case RedirectV6:
-				//to be filled in
-				break;
-
-			default:
+		case RouterAdvert:
+			if (pktsz - sizeof(struct ip6hdr) < 16) {
+				ipriv->stats[HlenErrs6]++;
 				goto err;
+			}
+			if (!islinklocal(p->src)) {
+				ipriv->stats[RouterAddrErrs6]++;
+				goto err;
+			}
+			sz = sizeof(struct IPICMP) + 8;
+			while ((sz + 1) < pktsz) {
+				osz = *(packet + sz + 1);
+				if (osz <= 0) {
+					ipriv->stats[OptlenErrs6]++;
+					goto err;
+				}
+				sz += 8 * osz;
+			}
+			break;
+
+		case RouterSolicit:
+			if (pktsz - sizeof(struct ip6hdr) < 8) {
+				ipriv->stats[HlenErrs6]++;
+				goto err;
+			}
+			unsp = (ipcmp(p->src, v6Unspecified) == 0);
+			sz = sizeof(struct IPICMP) + 8;
+			while ((sz + 1) < pktsz) {
+				osz = *(packet + sz + 1);
+				if ((osz <= 0) ||
+				    (unsp && (*(packet + sz) == slladd))) {
+					ipriv->stats[OptlenErrs6]++;
+					goto err;
+				}
+				sz += 8 * osz;
+			}
+			break;
+
+		case RedirectV6:
+			//to be filled in
+			break;
+
+		default:
+			goto err;
 		}
 	}
 
@@ -780,17 +786,37 @@ static void icmpiput6(struct Proto *icmp, struct Ipifc *ipifc, struct block *bp)
 		goto raise;
 
 	switch (p->type) {
-		case EchoRequestV6:
-			r = mkechoreply6(bp);
-			ipriv->out[EchoReply]++;
-			ipoput6(icmp->f, r, 0, MAXTTL, DFLTTOS, NULL);
-			break;
+	case EchoRequestV6:
+		r = mkechoreply6(bp);
+		ipriv->out[EchoReply]++;
+		ipoput6(icmp->f, r, 0, MAXTTL, DFLTTOS, NULL);
+		break;
 
-		case UnreachableV6:
-			if (p->code > 4)
-				msg = unreachcode[icmp6_unkn_code];
-			else
-				msg = unreachcode[p->code];
+	case UnreachableV6:
+		if (p->code > 4)
+			msg = unreachcode[icmp6_unkn_code];
+		else
+			msg = unreachcode[p->code];
+
+		bp->rp += sizeof(struct IPICMP);
+		if (blocklen(bp) < 8) {
+			ipriv->stats[LenErrs6]++;
+			goto raise;
+		}
+		p = (struct IPICMP *)bp->rp;
+		pr = Fsrcvpcolx(icmp->f, p->proto);
+		if (pr != NULL && pr->advise != NULL) {
+			(*pr->advise) (pr, bp, msg);
+			return;
+		}
+
+		bp->rp -= sizeof(struct IPICMP);
+		goticmpkt6(icmp, bp, 0);
+		break;
+
+	case TimeExceedV6:
+		if (p->code == 0) {
+			snprintf(m2, sizeof(m2), "ttl exceeded at %I", p->src);
 
 			bp->rp += sizeof(struct IPICMP);
 			if (blocklen(bp) < 8) {
@@ -800,100 +826,82 @@ static void icmpiput6(struct Proto *icmp, struct Ipifc *ipifc, struct block *bp)
 			p = (struct IPICMP *)bp->rp;
 			pr = Fsrcvpcolx(icmp->f, p->proto);
 			if (pr != NULL && pr->advise != NULL) {
-				(*pr->advise) (pr, bp, msg);
+				(*pr->advise) (pr, bp, m2);
 				return;
 			}
-
 			bp->rp -= sizeof(struct IPICMP);
-			goticmpkt6(icmp, bp, 0);
-			break;
+		}
 
-		case TimeExceedV6:
-			if (p->code == 0) {
-				snprintf(m2, sizeof(m2), "ttl exceeded at %I", p->src);
+		goticmpkt6(icmp, bp, 0);
+		break;
 
-				bp->rp += sizeof(struct IPICMP);
-				if (blocklen(bp) < 8) {
-					ipriv->stats[LenErrs6]++;
-					goto raise;
+	case RouterAdvert:
+	case RouterSolicit:
+		/* using lsrc as a temp, munge hdr for goticmp6
+		   memmove(lsrc, p->src, IPaddrlen);
+		   memmove(p->src, p->dst, IPaddrlen);
+		   memmove(p->dst, lsrc, IPaddrlen); */
+
+		goticmpkt6(icmp, bp, p->type);
+		break;
+
+	case NbrSolicit:
+		np = (struct Ndpkt *)p;
+		pktflags = 0;
+		switch (targettype(icmp->f, ipifc, np->target)) {
+			case t_unirany:
+				pktflags |= Oflag;
+				/* fall through */
+
+			case t_uniproxy:
+				if (ipcmp(np->src, v6Unspecified) != 0) {
+					arpenter(icmp->f, V6, np->src,
+						 np->lnaddr, 8 * np->olen - 2,
+						 0);
+					pktflags |= Sflag;
 				}
-				p = (struct IPICMP *)bp->rp;
-				pr = Fsrcvpcolx(icmp->f, p->proto);
-				if (pr != NULL && pr->advise != NULL) {
-					(*pr->advise) (pr, bp, m2);
-					return;
-				}
-				bp->rp -= sizeof(struct IPICMP);
-			}
-
-			goticmpkt6(icmp, bp, 0);
-			break;
-
-		case RouterAdvert:
-		case RouterSolicit:
-			/* using lsrc as a temp, munge hdr for goticmp6
-			   memmove(lsrc, p->src, IPaddrlen);
-			   memmove(p->src, p->dst, IPaddrlen);
-			   memmove(p->dst, lsrc, IPaddrlen); */
-
-			goticmpkt6(icmp, bp, p->type);
-			break;
-
-		case NbrSolicit:
-			np = (struct Ndpkt *)p;
-			pktflags = 0;
-			switch (targettype(icmp->f, ipifc, np->target)) {
-				case t_unirany:
-					pktflags |= Oflag;
-					/* fall through */
-
-				case t_uniproxy:
-					if (ipcmp(np->src, v6Unspecified) != 0) {
-						arpenter(icmp->f, V6, np->src, np->lnaddr,
-								 8 * np->olen - 2, 0);
-						pktflags |= Sflag;
-					}
-					if (ipv6local(ipifc, lsrc)) {
-						icmpna(icmp->f, lsrc,
-							   (ipcmp(np->src, v6Unspecified) ==
-								0) ? v6allnodesL : np->src, np->target,
-							   ipifc->mac, pktflags);
-					} else
-						freeblist(bp);
-					break;
-
-				case t_unitent:
-					/* not clear what needs to be done. send up
-					 * an icmp mesg saying don't use this address? */
-
-				default:
+				if (ipv6local(ipifc, lsrc)) {
+					icmpna(icmp->f, lsrc,
+					       (ipcmp(np->src, v6Unspecified)
+						== 0) ? v6allnodesL : np->src,
+					       np->target, ipifc->mac,
+					       pktflags);
+				} else
 					freeblist(bp);
-			}
+				break;
 
-			break;
+			case t_unitent:
+				/* not clear what needs to be done. send up an
+				 * icmp mesg saying don't use this address? */
 
-		case NbrAdvert:
-			np = (struct Ndpkt *)p;
+			default:
+				freeblist(bp);
+		}
 
-			/* if the target address matches one of the local interface
-			 * address and the local interface address has tentative bit set,
-			 * then insert into ARP table. this is so the duplication address
-			 * detection part of ipconfig can discover duplication through
-			 * the arp table
-			 */
-			lifc = iplocalonifc(ipifc, np->target);
-			if (lifc && lifc->tentative)
-				refresh = 0;
-			arpenter(icmp->f, V6, np->target, np->lnaddr, 8 * np->olen - 2,
-					 refresh);
-			freeblist(bp);
-			break;
+		break;
 
-		case PacketTooBigV6:
+	case NbrAdvert:
+		np = (struct Ndpkt *)p;
 
-		default:
-			goticmpkt6(icmp, bp, 0);
-			break;
+		/* if the target address matches one of the local interface
+		 * address and the local interface address has tentative bit
+		 * set, then insert into ARP table. this is so the duplication
+		 * address detection part of ipconfig can discover duplication
+		 * through the arp table
+		 */
+		lifc = iplocalonifc(ipifc, np->target);
+		if (lifc && lifc->tentative)
+			refresh = 0;
+		arpenter(icmp->f, V6, np->target, np->lnaddr, 8 * np->olen - 2,
+				 refresh);
+		freeblist(bp);
+		break;
+
+	case PacketTooBigV6:
+
+	default:
+		goticmpkt6(icmp, bp, 0);
+		break;
 	}
 	return;
 
@@ -915,10 +923,11 @@ int icmpstats6(struct Proto *icmp6, char *buf, int len)
 		p = seprintf(p, e, "%s: %u\n", statnames6[i], priv->stats[i]);
 	for (i = 0; i <= Maxtype6; i++) {
 		if (icmpnames6[i])
-			p = seprintf(p, e, "%s: %u %u\n", icmpnames6[i], priv->in[i],
-						 priv->out[i]);
+			p = seprintf(p, e, "%s: %u %u\n", icmpnames6[i],
+				     priv->in[i], priv->out[i]);
 		else
-			p = seprintf(p, e, "%d: %u %u\n", i, priv->in[i], priv->out[i]);
+			p = seprintf(p, e, "%d: %u %u\n", i, priv->in[i],
+				     priv->out[i]);
 	}
 	return p - buf;
 }

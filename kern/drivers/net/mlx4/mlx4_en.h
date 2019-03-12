@@ -284,8 +284,8 @@ struct mlx4_en_tx_ring {
 } ____cacheline_aligned_in_smp;
 
 struct mlx4_poke_args {
-	struct ether			*edev;
-	struct mlx4_en_priv		*priv;
+	struct ether		*edev;
+	struct mlx4_en_priv	*priv;
 	struct mlx4_en_tx_ring	*ring;
 };
 

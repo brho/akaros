@@ -7,20 +7,20 @@
  * in the LICENSE file.
  */
 
-#include <slab.h>
+#include <acpi.h>
+#include <assert.h>
+#include <cpio.h>
+#include <error.h>
 #include <kmalloc.h>
 #include <kref.h>
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
-#include <error.h>
-#include <cpio.h>
-#include <pmap.h>
-#include <smp.h>
 #include <net/ip.h>
 #include <ns.h>
-#include <acpi.h>
+#include <pmap.h>
+#include <slab.h>
 #include <slice.h>
+#include <smp.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "../timers/hpet.h"
 
@@ -43,21 +43,20 @@
  * Qpretty, at any level, will print the pretty form for that level and all
  * descendants.
  */
-enum {
-	Qroot = 0,
+enum { Qroot = 0,
 
-	// The type is the qid.path mod NQtypes.
-	Qdir = 0,
-	Qpretty,
-	Qraw,
-	Qtbl,
-	NQtypes,
+       // The type is the qid.path mod NQtypes.
+       Qdir = 0,
+       Qpretty,
+       Qraw,
+       Qtbl,
+       NQtypes,
 
-	QIndexShift = 8,
-	QIndexMask = (1 << QIndexShift) - 1,
+       QIndexShift = 8,
+       QIndexMask = (1 << QIndexShift) - 1,
 };
 
-#define ATABLEBUFSZ	ROUNDUP(sizeof(struct Atable), KMALLOC_ALIGNMENT)
+#define ATABLEBUFSZ ROUNDUP(sizeof(struct Atable), KMALLOC_ALIGNMENT)
 
 static uint64_t lastpath;
 static struct slice emptyslice;
@@ -78,28 +77,27 @@ static char *devname(void)
  * interpreter.
  */
 static struct cmdtab ctls[] = {
-	{CMregion, "region", 6},
-	{CMgpe, "gpe", 3},
+    {CMregion, "region", 6},
+    {CMgpe, "gpe", 3},
 };
 
-static struct Facs *facs;		/* Firmware ACPI control structure */
-static struct Fadt *fadt;		/* Fixed ACPI description to reach ACPI regs */
+static struct Facs *facs; /* Firmware ACPI control structure */
+static struct Fadt *fadt; /* Fixed ACPI description to reach ACPI regs */
 static struct Atable *root;
-static struct Xsdt *xsdt;		/* XSDT table */
-static struct Atable *tfirst;	/* loaded DSDT/SSDT/... tables */
-static struct Atable *tlast;	/* pointer to last table */
-struct Atable *apics;			/* APIC info */
-struct Atable *srat;			/* System resource affinity used by physalloc */
+static struct Xsdt *xsdt;     /* XSDT table */
+static struct Atable *tfirst; /* loaded DSDT/SSDT/... tables */
+static struct Atable *tlast;  /* pointer to last table */
+struct Atable *apics;         /* APIC info */
+struct Atable *srat;          /* System resource affinity used by physalloc */
 struct Atable *dmar;
-static struct Slit *slit;		/* Sys locality info table used by scheduler */
-static struct Atable *mscttbl;		/* Maximum system characteristics table */
-static struct Reg *reg;			/* region used for I/O */
-static struct Gpe *gpes;		/* General purpose events */
+static struct Slit *slit;      /* Sys locality info table used by scheduler */
+static struct Atable *mscttbl; /* Maximum system characteristics table */
+static struct Reg *reg;        /* region used for I/O */
+static struct Gpe *gpes;       /* General purpose events */
 static int ngpes;
 
 static char *regnames[] = {
-	"mem", "io", "pcicfg", "embed",
-	"smb", "cmos", "pcibar", "ipmi",
+    "mem", "io", "pcicfg", "embed", "smb", "cmos", "pcibar", "ipmi",
 };
 
 /*
@@ -121,9 +119,8 @@ static struct Acpilist *acpilists;
  * isomorphic to directories in the file system namespace; this code
  * ensures that invariant.
  */
-struct Atable *mkatable(struct Atable *parent,
-                        int type, char *name, uint8_t *raw,
-                        size_t rawsize, size_t addsize)
+struct Atable *mkatable(struct Atable *parent, int type, char *name,
+                        uint8_t *raw, size_t rawsize, size_t addsize)
 {
 	void *m;
 	struct Atable *t;
@@ -139,7 +136,7 @@ struct Atable *mkatable(struct Atable *parent,
 	t->rawsize = rawsize;
 	t->raw = raw;
 	strlcpy(t->name, name, sizeof(t->name));
-	mkqid(&t->qid,  (lastpath << QIndexShift) + Qdir, 0, QTDIR);
+	mkqid(&t->qid, (lastpath << QIndexShift) + Qdir, 0, QTDIR);
 	mkqid(&t->rqid, (lastpath << QIndexShift) + Qraw, 0, 0);
 	mkqid(&t->pqid, (lastpath << QIndexShift) + Qpretty, 0, 0);
 	mkqid(&t->tqid, (lastpath << QIndexShift) + Qtbl, 0, 0);
@@ -157,13 +154,13 @@ struct Atable *finatable(struct Atable *t, struct slice *slice)
 	n = slice_len(slice);
 	t->nchildren = n;
 	t->children = (struct Atable **)slice_finalize(slice);
-	dirs = kreallocarray(NULL, n + NQtypes, sizeof(struct dirtab),
-	                     MEM_WAIT);
+	dirs =
+	    kreallocarray(NULL, n + NQtypes, sizeof(struct dirtab), MEM_WAIT);
 	assert(dirs != NULL);
-	dirs[0] = (struct dirtab){ ".",      t->qid,   0, 0555 };
-	dirs[1] = (struct dirtab){ "pretty", t->pqid,  0, 0444 };
-	dirs[2] = (struct dirtab){ "raw",    t->rqid,  0, 0444 };
-	dirs[3] = (struct dirtab){ "table",  t->tqid,  0, 0444 };
+	dirs[0] = (struct dirtab){".", t->qid, 0, 0555};
+	dirs[1] = (struct dirtab){"pretty", t->pqid, 0, 0444};
+	dirs[2] = (struct dirtab){"raw", t->rqid, 0, 0444};
+	dirs[3] = (struct dirtab){"table", t->tqid, 0, 0444};
 	for (size_t i = 0; i < n; i++) {
 		strlcpy(dirs[i + NQtypes].name, t->children[i]->name, KNAMELEN);
 		dirs[i + NQtypes].qid = t->children[i]->qid;
@@ -190,7 +187,7 @@ static void dumpxsdt(void);
 
 static char *acpiregstr(int id)
 {
-	static char buf[20];		/* BUG */
+	static char buf[20]; /* BUG */
 
 	if (id >= 0 && id < ARRAY_SIZE(regnames))
 		return regnames[id];
@@ -212,49 +209,49 @@ static int acpiregid(char *s)
  */
 static uint8_t mget8(uintptr_t p, void *unused)
 {
-	uint8_t *cp = (uint8_t *) p;
+	uint8_t *cp = (uint8_t *)p;
 	return *cp;
 }
 
 static void mset8(uintptr_t p, uint8_t v, void *unused)
 {
-	uint8_t *cp = (uint8_t *) p;
+	uint8_t *cp = (uint8_t *)p;
 	*cp = v;
 }
 
 static uint16_t mget16(uintptr_t p, void *unused)
 {
-	uint16_t *cp = (uint16_t *) p;
+	uint16_t *cp = (uint16_t *)p;
 	return *cp;
 }
 
 static void mset16(uintptr_t p, uint16_t v, void *unused)
 {
-	uint16_t *cp = (uint16_t *) p;
+	uint16_t *cp = (uint16_t *)p;
 	*cp = v;
 }
 
 static uint32_t mget32(uintptr_t p, void *unused)
 {
-	uint32_t *cp = (uint32_t *) p;
+	uint32_t *cp = (uint32_t *)p;
 	return *cp;
 }
 
 static void mset32(uintptr_t p, uint32_t v, void *unused)
 {
-	uint32_t *cp = (uint32_t *) p;
+	uint32_t *cp = (uint32_t *)p;
 	*cp = v;
 }
 
 static uint64_t mget64(uintptr_t p, void *unused)
 {
-	uint64_t *cp = (uint64_t *) p;
+	uint64_t *cp = (uint64_t *)p;
 	return *cp;
 }
 
 static void mset64(uintptr_t p, uint64_t v, void *unused)
 {
-	uint64_t *cp = (uint64_t *) p;
+	uint64_t *cp = (uint64_t *)p;
 	*cp = v;
 }
 
@@ -346,30 +343,20 @@ static void cfgset32(uintptr_t p, uint32_t v, void *r)
 	pcidev_write32(&pcidev, p, v);
 }
 
-static struct Regio memio = {
-	NULL,
-	mget8, mset8, mget16, mset16,
-	mget32, mset32, mget64, mset64
-};
+static struct Regio memio = {NULL,   mget8,  mset8,  mget16, mset16,
+                             mget32, mset32, mget64, mset64};
 
-static struct Regio ioio = {
-	NULL,
-	ioget8, ioset8, ioget16, ioset16,
-	ioget32, ioset32, NULL, NULL
-};
+static struct Regio ioio = {NULL,    ioget8,  ioset8, ioget16, ioset16,
+                            ioget32, ioset32, NULL,   NULL};
 
-static struct Regio cfgio = {
-	NULL,
-	cfgget8, cfgset8, cfgget16, cfgset16,
-	cfgget32, cfgset32, NULL, NULL
-};
+static struct Regio cfgio = {NULL,     cfgget8,  cfgset8, cfgget16, cfgset16,
+                             cfgget32, cfgset32, NULL,    NULL};
 
 /*
  * Copy memory, 1/2/4/8-bytes at a time, to/from a region.
  */
-static long
-regcpy(struct Regio *dio, uintptr_t da, struct Regio *sio,
-	   uintptr_t sa, long len, int align)
+static long regcpy(struct Regio *dio, uintptr_t da, struct Regio *sio,
+                   uintptr_t sa, long len, int align)
 {
 	int n, i;
 
@@ -379,25 +366,25 @@ regcpy(struct Regio *dio, uintptr_t da, struct Regio *sio,
 	n = len / align;
 	for (i = 0; i < n; i++) {
 		switch (align) {
-			case 1:
-				printd("cpy8 %#p %#p\n", da, sa);
-				dio->set8(da, sio->get8(sa, sio->arg), dio->arg);
-				break;
-			case 2:
-				printd("cpy16 %#p %#p\n", da, sa);
-				dio->set16(da, sio->get16(sa, sio->arg), dio->arg);
-				break;
-			case 4:
-				printd("cpy32 %#p %#p\n", da, sa);
-				dio->set32(da, sio->get32(sa, sio->arg), dio->arg);
-				break;
-			case 8:
-				printd("cpy64 %#p %#p\n", da, sa);
-				warn("Not doing set64 for some reason, fix me!");
-				//  dio->set64(da, sio->get64(sa, sio->arg), dio->arg);
-				break;
-			default:
-				panic("regcpy: align bug");
+		case 1:
+			printd("cpy8 %#p %#p\n", da, sa);
+			dio->set8(da, sio->get8(sa, sio->arg), dio->arg);
+			break;
+		case 2:
+			printd("cpy16 %#p %#p\n", da, sa);
+			dio->set16(da, sio->get16(sa, sio->arg), dio->arg);
+			break;
+		case 4:
+			printd("cpy32 %#p %#p\n", da, sa);
+			dio->set32(da, sio->get32(sa, sio->arg), dio->arg);
+			break;
+		case 8:
+			printd("cpy64 %#p %#p\n", da, sa);
+			warn("Not doing set64 for some reason, fix me!");
+			//  dio->set64(da, sio->get64(sa, sio->arg), dio->arg);
+			break;
+		default:
+			panic("regcpy: align bug");
 		}
 		da += align;
 		sa += align;
@@ -414,8 +401,8 @@ static long regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 	struct Regio rio;
 	uintptr_t rp;
 
-	printd("reg%s %s %#p %#p %#lx sz=%d\n",
-		   iswr ? "out" : "in", r->name, p, off, len, r->accsz);
+	printd("reg%s %s %#p %#p %#lx sz=%d\n", iswr ? "out" : "in", r->name, p,
+	       off, len, r->accsz);
 	rp = 0;
 	if (off + len > r->len) {
 		printd("regio: access outside limits");
@@ -426,36 +413,36 @@ static long regio(struct Reg *r, void *p, uint32_t len, uintptr_t off, int iswr)
 		return 0;
 	}
 	switch (r->spc) {
-		case Rsysmem:
-			if (r->p == NULL)
-				r->p = KADDR_NOCHECK(r->base);
-			if (r->p == NULL)
-				error(EFAIL, "regio: vmap/KADDR failed");
-			rp = (uintptr_t) r->p + off;
-			rio = memio;
-			break;
-		case Rsysio:
-			rp = r->base + off;
-			rio = ioio;
-			break;
-		case Rpcicfg:
-			rp = r->base + off;
-			rio = cfgio;
-			rio.arg = r;
-			break;
-		case Rpcibar:
-		case Rembed:
-		case Rsmbus:
-		case Rcmos:
-		case Ripmi:
-		case Rfixedhw:
-			printd("regio: reg %s not supported\n", acpiregstr(r->spc));
-			error(EFAIL, "region not supported");
+	case Rsysmem:
+		if (r->p == NULL)
+			r->p = KADDR_NOCHECK(r->base);
+		if (r->p == NULL)
+			error(EFAIL, "regio: vmap/KADDR failed");
+		rp = (uintptr_t)r->p + off;
+		rio = memio;
+		break;
+	case Rsysio:
+		rp = r->base + off;
+		rio = ioio;
+		break;
+	case Rpcicfg:
+		rp = r->base + off;
+		rio = cfgio;
+		rio.arg = r;
+		break;
+	case Rpcibar:
+	case Rembed:
+	case Rsmbus:
+	case Rcmos:
+	case Ripmi:
+	case Rfixedhw:
+		printd("regio: reg %s not supported\n", acpiregstr(r->spc));
+		error(EFAIL, "region not supported");
 	}
 	if (iswr)
-		regcpy(&rio, rp, &memio, (uintptr_t) p, len, r->accsz);
+		regcpy(&rio, rp, &memio, (uintptr_t)p, len, r->accsz);
 	else
-		regcpy(&memio, (uintptr_t) p, &rio, rp, len, r->accsz);
+		regcpy(&memio, (uintptr_t)p, &rio, rp, len, r->accsz);
 	return len;
 }
 
@@ -489,7 +476,8 @@ static void *sdtmap(uintptr_t pa, size_t *n, int cksum)
 	}
 	*n = l32get(sdt->length);
 	if (!*n) {
-		printk("sdt has zero length: pa = %p, sig = %.4s\n", pa, sdt->sig);
+		printk("sdt has zero length: pa = %p, sig = %.4s\n", pa,
+		       sdt->sig);
 		return NULL;
 	}
 	if (cksum != 0 && sdtchecksum(sdt, *n) != 0) {
@@ -560,59 +548,75 @@ static char *dumpfadt(char *start, char *end, struct Fadt *fp)
 	start = seprintf(start, end, "acpi: FADT@%p\n", fp);
 	start = seprintf(start, end, "acpi: fadt: facs: $%p\n", fp->facs);
 	start = seprintf(start, end, "acpi: fadt: dsdt: $%p\n", fp->dsdt);
-	start = seprintf(start, end, "acpi: fadt: pmprofile: $%p\n", fp->pmprofile);
+	start =
+	    seprintf(start, end, "acpi: fadt: pmprofile: $%p\n", fp->pmprofile);
 	start = seprintf(start, end, "acpi: fadt: sciint: $%p\n", fp->sciint);
 	start = seprintf(start, end, "acpi: fadt: smicmd: $%p\n", fp->smicmd);
+	start = seprintf(start, end, "acpi: fadt: acpienable: $%p\n",
+	                 fp->acpienable);
+	start = seprintf(start, end, "acpi: fadt: acpidisable: $%p\n",
+	                 fp->acpidisable);
 	start =
-		seprintf(start, end, "acpi: fadt: acpienable: $%p\n", fp->acpienable);
+	    seprintf(start, end, "acpi: fadt: s4biosreq: $%p\n", fp->s4biosreq);
 	start =
-		seprintf(start, end, "acpi: fadt: acpidisable: $%p\n", fp->acpidisable);
-	start = seprintf(start, end, "acpi: fadt: s4biosreq: $%p\n", fp->s4biosreq);
-	start = seprintf(start, end, "acpi: fadt: pstatecnt: $%p\n", fp->pstatecnt);
+	    seprintf(start, end, "acpi: fadt: pstatecnt: $%p\n", fp->pstatecnt);
+	start = seprintf(start, end, "acpi: fadt: pm1aevtblk: $%p\n",
+	                 fp->pm1aevtblk);
+	start = seprintf(start, end, "acpi: fadt: pm1bevtblk: $%p\n",
+	                 fp->pm1bevtblk);
+	start = seprintf(start, end, "acpi: fadt: pm1acntblk: $%p\n",
+	                 fp->pm1acntblk);
+	start = seprintf(start, end, "acpi: fadt: pm1bcntblk: $%p\n",
+	                 fp->pm1bcntblk);
 	start =
-		seprintf(start, end, "acpi: fadt: pm1aevtblk: $%p\n", fp->pm1aevtblk);
+	    seprintf(start, end, "acpi: fadt: pm2cntblk: $%p\n", fp->pm2cntblk);
 	start =
-		seprintf(start, end, "acpi: fadt: pm1bevtblk: $%p\n", fp->pm1bevtblk);
-	start =
-		seprintf(start, end, "acpi: fadt: pm1acntblk: $%p\n", fp->pm1acntblk);
-	start =
-		seprintf(start, end, "acpi: fadt: pm1bcntblk: $%p\n", fp->pm1bcntblk);
-	start = seprintf(start, end, "acpi: fadt: pm2cntblk: $%p\n", fp->pm2cntblk);
-	start = seprintf(start, end, "acpi: fadt: pmtmrblk: $%p\n", fp->pmtmrblk);
+	    seprintf(start, end, "acpi: fadt: pmtmrblk: $%p\n", fp->pmtmrblk);
 	start = seprintf(start, end, "acpi: fadt: gpe0blk: $%p\n", fp->gpe0blk);
 	start = seprintf(start, end, "acpi: fadt: gpe1blk: $%p\n", fp->gpe1blk);
-	start = seprintf(start, end, "acpi: fadt: pm1evtlen: $%p\n", fp->pm1evtlen);
-	start = seprintf(start, end, "acpi: fadt: pm1cntlen: $%p\n", fp->pm1cntlen);
-	start = seprintf(start, end, "acpi: fadt: pm2cntlen: $%p\n", fp->pm2cntlen);
-	start = seprintf(start, end, "acpi: fadt: pmtmrlen: $%p\n", fp->pmtmrlen);
 	start =
-		seprintf(start, end, "acpi: fadt: gpe0blklen: $%p\n", fp->gpe0blklen);
+	    seprintf(start, end, "acpi: fadt: pm1evtlen: $%p\n", fp->pm1evtlen);
 	start =
-		seprintf(start, end, "acpi: fadt: gpe1blklen: $%p\n", fp->gpe1blklen);
+	    seprintf(start, end, "acpi: fadt: pm1cntlen: $%p\n", fp->pm1cntlen);
+	start =
+	    seprintf(start, end, "acpi: fadt: pm2cntlen: $%p\n", fp->pm2cntlen);
+	start =
+	    seprintf(start, end, "acpi: fadt: pmtmrlen: $%p\n", fp->pmtmrlen);
+	start = seprintf(start, end, "acpi: fadt: gpe0blklen: $%p\n",
+	                 fp->gpe0blklen);
+	start = seprintf(start, end, "acpi: fadt: gpe1blklen: $%p\n",
+	                 fp->gpe1blklen);
 	start = seprintf(start, end, "acpi: fadt: gp1base: $%p\n", fp->gp1base);
 	start = seprintf(start, end, "acpi: fadt: cstcnt: $%p\n", fp->cstcnt);
-	start = seprintf(start, end, "acpi: fadt: plvl2lat: $%p\n", fp->plvl2lat);
-	start = seprintf(start, end, "acpi: fadt: plvl3lat: $%p\n", fp->plvl3lat);
-	start = seprintf(start, end, "acpi: fadt: flushsz: $%p\n", fp->flushsz);
 	start =
-		seprintf(start, end, "acpi: fadt: flushstride: $%p\n", fp->flushstride);
+	    seprintf(start, end, "acpi: fadt: plvl2lat: $%p\n", fp->plvl2lat);
+	start =
+	    seprintf(start, end, "acpi: fadt: plvl3lat: $%p\n", fp->plvl3lat);
+	start = seprintf(start, end, "acpi: fadt: flushsz: $%p\n", fp->flushsz);
+	start = seprintf(start, end, "acpi: fadt: flushstride: $%p\n",
+	                 fp->flushstride);
 	start = seprintf(start, end, "acpi: fadt: dutyoff: $%p\n", fp->dutyoff);
-	start = seprintf(start, end, "acpi: fadt: dutywidth: $%p\n", fp->dutywidth);
+	start =
+	    seprintf(start, end, "acpi: fadt: dutywidth: $%p\n", fp->dutywidth);
 	start = seprintf(start, end, "acpi: fadt: dayalrm: $%p\n", fp->dayalrm);
 	start = seprintf(start, end, "acpi: fadt: monalrm: $%p\n", fp->monalrm);
 	start = seprintf(start, end, "acpi: fadt: century: $%p\n", fp->century);
-	start =
-		seprintf(start, end, "acpi: fadt: iapcbootarch: $%p\n",
-				 fp->iapcbootarch);
+	start = seprintf(start, end, "acpi: fadt: iapcbootarch: $%p\n",
+	                 fp->iapcbootarch);
 	start = seprintf(start, end, "acpi: fadt: flags: $%p\n", fp->flags);
 	start = dumpGas(start, end, "acpi: fadt: resetreg: ", &fp->resetreg);
-	start = seprintf(start, end, "acpi: fadt: resetval: $%p\n", fp->resetval);
+	start =
+	    seprintf(start, end, "acpi: fadt: resetval: $%p\n", fp->resetval);
 	start = seprintf(start, end, "acpi: fadt: xfacs: %p\n", fp->xfacs);
 	start = seprintf(start, end, "acpi: fadt: xdsdt: %p\n", fp->xdsdt);
-	start = dumpGas(start, end, "acpi: fadt: xpm1aevtblk:", &fp->xpm1aevtblk);
-	start = dumpGas(start, end, "acpi: fadt: xpm1bevtblk:", &fp->xpm1bevtblk);
-	start = dumpGas(start, end, "acpi: fadt: xpm1acntblk:", &fp->xpm1acntblk);
-	start = dumpGas(start, end, "acpi: fadt: xpm1bcntblk:", &fp->xpm1bcntblk);
+	start =
+	    dumpGas(start, end, "acpi: fadt: xpm1aevtblk:", &fp->xpm1aevtblk);
+	start =
+	    dumpGas(start, end, "acpi: fadt: xpm1bevtblk:", &fp->xpm1bevtblk);
+	start =
+	    dumpGas(start, end, "acpi: fadt: xpm1acntblk:", &fp->xpm1acntblk);
+	start =
+	    dumpGas(start, end, "acpi: fadt: xpm1bcntblk:", &fp->xpm1bcntblk);
 	start = dumpGas(start, end, "acpi: fadt: xpm2cntblk:", &fp->xpm2cntblk);
 	start = dumpGas(start, end, "acpi: fadt: xpmtmrblk:", &fp->xpmtmrblk);
 	start = dumpGas(start, end, "acpi: fadt: xgpe0blk:", &fp->xgpe0blk);
@@ -620,8 +624,8 @@ static char *dumpfadt(char *start, char *end, struct Fadt *fp)
 	return start;
 }
 
-static struct Atable *parsefadt(struct Atable *parent,
-								char *name, uint8_t *p, size_t rawsize)
+static struct Atable *parsefadt(struct Atable *parent, char *name, uint8_t *p,
+                                size_t rawsize)
 {
 	struct Atable *t;
 	struct Fadt *fp;
@@ -697,7 +701,7 @@ static struct Atable *parsefadt(struct Atable *parent,
 	else
 		loadfacs(fp->facs);
 
-	if (fp->xdsdt == (uint64_t)fp->dsdt)	/* acpica */
+	if (fp->xdsdt == (uint64_t)fp->dsdt) /* acpica */
 		loaddsdt(fp->xdsdt);
 	else
 		loaddsdt(fp->dsdt);
@@ -716,14 +720,16 @@ static char *dumpmsct(char *start, char *end, struct Atable *table)
 	if (!msct)
 		return start;
 
-	start = seprintf(start, end, "acpi: msct: %d doms %d clkdoms %#p maxpa\n",
-					 msct->ndoms, msct->nclkdoms, msct->maxpa);
+	start =
+	    seprintf(start, end, "acpi: msct: %d doms %d clkdoms %#p maxpa\n",
+	             msct->ndoms, msct->nclkdoms, msct->maxpa);
 	for (int i = 0; i < table->nchildren; i++) {
 		struct Atable *domtbl = table->children[i]->tbl;
 		struct Mdom *st = domtbl->tbl;
 
-		start = seprintf(start, end, "\t[%d:%d] %d maxproc %#p maxmmem\n",
-						 st->start, st->end, st->maxproc, st->maxmem);
+		start =
+		    seprintf(start, end, "\t[%d:%d] %d maxproc %#p maxmmem\n",
+		             st->start, st->end, st->maxproc, st->maxmem);
 	}
 	start = seprintf(start, end, "\n");
 
@@ -734,8 +740,8 @@ static char *dumpmsct(char *start, char *end, struct Atable *table)
  * XXX: should perhaps update our idea of available memory.
  * Else we should remove this code.
  */
-static struct Atable *parsemsct(struct Atable *parent,
-                                char *name, uint8_t *raw, size_t rawsize)
+static struct Atable *parsemsct(struct Atable *parent, char *name, uint8_t *raw,
+                                size_t rawsize)
 {
 	struct Atable *t;
 	uint8_t *r, *re;
@@ -806,35 +812,37 @@ static char *dumpsrat(char *start, char *end, struct Atable *table)
 		if (st == NULL)
 			continue;
 		switch (st->type) {
-			case SRlapic:
-				start =
-					seprintf(start, end,
-							 "\tlapic: dom %d apic %d sapic %d clk %d\n",
-							 st->lapic.dom, st->lapic.apic, st->lapic.sapic,
-							 st->lapic.clkdom);
-				break;
-			case SRmem:
-				start = seprintf(start, end, "\tmem: dom %d %#p %#p %c%c\n",
-								 st->mem.dom, st->mem.addr, st->mem.len,
-								 st->mem.hplug ? 'h' : '-',
-								 st->mem.nvram ? 'n' : '-');
-				break;
-			case SRlx2apic:
-				start =
-					seprintf(start, end, "\tlx2apic: dom %d apic %d clk %d\n",
-							 st->lx2apic.dom, st->lx2apic.apic,
-							 st->lx2apic.clkdom);
-				break;
-			default:
-				start = seprintf(start, end, "\t<unknown srat entry>\n");
+		case SRlapic:
+			start = seprintf(
+			    start, end,
+			    "\tlapic: dom %d apic %d sapic %d clk %d\n",
+			    st->lapic.dom, st->lapic.apic, st->lapic.sapic,
+			    st->lapic.clkdom);
+			break;
+		case SRmem:
+			start =
+			    seprintf(start, end, "\tmem: dom %d %#p %#p %c%c\n",
+			             st->mem.dom, st->mem.addr, st->mem.len,
+			             st->mem.hplug ? 'h' : '-',
+			             st->mem.nvram ? 'n' : '-');
+			break;
+		case SRlx2apic:
+			start = seprintf(start, end,
+			                 "\tlx2apic: dom %d apic %d clk %d\n",
+			                 st->lx2apic.dom, st->lx2apic.apic,
+			                 st->lx2apic.clkdom);
+			break;
+		default:
+			start =
+			    seprintf(start, end, "\t<unknown srat entry>\n");
 		}
 	}
 	start = seprintf(start, end, "\n");
 	return start;
 }
 
-static struct Atable *parsesrat(struct Atable *parent,
-                                char *name, uint8_t *p, size_t rawsize)
+static struct Atable *parsesrat(struct Atable *parent, char *name, uint8_t *p,
+                                size_t rawsize)
 {
 
 	struct Atable *t, *tt, *tail;
@@ -861,43 +869,44 @@ static struct Atable *parsesrat(struct Atable *parent,
 		st = tt->tbl;
 		st->type = p[0];
 		switch (st->type) {
-			case SRlapic:
-				st->lapic.dom = p[2] | p[9] << 24 | p[10] << 16 | p[11] << 8;
-				st->lapic.apic = p[3];
-				st->lapic.sapic = p[8];
-				st->lapic.clkdom = l32get(p + 12);
-				if (l32get(p + 4) == 0) {
-					kfree(tt);
-					tt = NULL;
-				}
-				break;
-			case SRmem:
-				st->mem.dom = l32get(p + 2);
-				st->mem.addr = l64get(p + 8);
-				st->mem.len = l64get(p + 16);
-				flags = l32get(p + 28);
-				if ((flags & 1) == 0) {	/* not enabled */
-					kfree(tt);
-					tt = NULL;
-				} else {
-					st->mem.hplug = flags & 2;
-					st->mem.nvram = flags & 4;
-				}
-				break;
-			case SRlx2apic:
-				st->lx2apic.dom = l32get(p + 4);
-				st->lx2apic.apic = l32get(p + 8);
-				st->lx2apic.clkdom = l32get(p + 16);
-				if (l32get(p + 12) == 0) {
-					kfree(tt);
-					tt = NULL;
-				}
-				break;
-			default:
-				printd("unknown SRAT structure\n");
+		case SRlapic:
+			st->lapic.dom =
+			    p[2] | p[9] << 24 | p[10] << 16 | p[11] << 8;
+			st->lapic.apic = p[3];
+			st->lapic.sapic = p[8];
+			st->lapic.clkdom = l32get(p + 12);
+			if (l32get(p + 4) == 0) {
 				kfree(tt);
 				tt = NULL;
-				break;
+			}
+			break;
+		case SRmem:
+			st->mem.dom = l32get(p + 2);
+			st->mem.addr = l64get(p + 8);
+			st->mem.len = l64get(p + 16);
+			flags = l32get(p + 28);
+			if ((flags & 1) == 0) { /* not enabled */
+				kfree(tt);
+				tt = NULL;
+			} else {
+				st->mem.hplug = flags & 2;
+				st->mem.nvram = flags & 4;
+			}
+			break;
+		case SRlx2apic:
+			st->lx2apic.dom = l32get(p + 4);
+			st->lx2apic.apic = l32get(p + 8);
+			st->lx2apic.clkdom = l32get(p + 16);
+			if (l32get(p + 12) == 0) {
+				kfree(tt);
+				tt = NULL;
+			}
+			break;
+		default:
+			printd("unknown SRAT structure\n");
+			kfree(tt);
+			tt = NULL;
+			break;
 		}
 		if (tt != NULL) {
 			finatable_nochildren(tt);
@@ -917,9 +926,8 @@ static char *dumpslit(char *start, char *end, struct Slit *sl)
 		return start;
 	start = seprintf(start, end, "acpi slit:\n");
 	for (i = 0; i < sl->rowlen * sl->rowlen; i++) {
-		start = seprintf(start, end,
-						 "slit: %ux\n",
-						 sl->e[i / sl->rowlen][i % sl->rowlen].dist);
+		start = seprintf(start, end, "slit: %ux\n",
+		                 sl->e[i / sl->rowlen][i % sl->rowlen].dist);
 	}
 	start = seprintf(start, end, "\n");
 	return start;
@@ -934,8 +942,8 @@ static int cmpslitent(void *v1, void *v2)
 	return se1->dist - se2->dist;
 }
 
-static struct Atable *parseslit(struct Atable *parent,
-                                char *name, uint8_t *raw, size_t rawsize)
+static struct Atable *parseslit(struct Atable *parent, char *name, uint8_t *raw,
+                                size_t rawsize)
 {
 	struct Atable *t;
 	uint8_t *r, *re;
@@ -989,25 +997,16 @@ int pickcore(int mycolor, int index)
 	return color * ncorepercol + index % ncorepercol;
 }
 
-static char *polarity[4] = {
-	"polarity/trigger like in ISA",
-	"active high",
-	"BOGUS POLARITY",
-	"active low"
-};
+static char *polarity[4] = {"polarity/trigger like in ISA", "active high",
+                            "BOGUS POLARITY", "active low"};
 
-static char *trigger[] = {
-	"BOGUS TRIGGER",
-	"edge",
-	"BOGUS TRIGGER",
-	"level"
-};
+static char *trigger[] = {"BOGUS TRIGGER", "edge", "BOGUS TRIGGER", "level"};
 
 static char *printiflags(char *start, char *end, int flags)
 {
 
-	return seprintf(start, end, "[%s,%s]",
-					polarity[flags & AFpmask], trigger[(flags & AFtmask) >> 2]);
+	return seprintf(start, end, "[%s,%s]", polarity[flags & AFpmask],
+	                trigger[(flags & AFtmask) >> 2]);
 }
 
 static char *dumpmadt(char *start, char *end, struct Atable *apics)
@@ -1027,72 +1026,71 @@ static char *dumpmadt(char *start, char *end, struct Atable *apics)
 		struct Apicst *st = apic->tbl;
 
 		switch (st->type) {
-			case ASlapic:
-				start =
-					seprintf(start, end, "\tlapic pid %d id %d\n",
-							 st->lapic.pid, st->lapic.id);
-				break;
-			case ASioapic:
-			case ASiosapic:
-				start =
-					seprintf(start, end,
-							 "\tioapic id %d addr %p ibase %d\n",
-							 st->ioapic.id, st->ioapic.addr, st->ioapic.ibase);
-				break;
-			case ASintovr:
-				start =
-					seprintf(start, end, "\tintovr irq %d intr %d flags $%p",
-							 st->intovr.irq, st->intovr.intr, st->intovr.flags);
-				start = printiflags(start, end, st->intovr.flags);
-				start = seprintf(start, end, "\n");
-				break;
-			case ASnmi:
-				start = seprintf(start, end, "\tnmi intr %d flags $%p\n",
-								 st->nmi.intr, st->nmi.flags);
-				break;
-			case ASlnmi:
-				start =
-					seprintf(start, end, "\tlnmi pid %d lint %d flags $%p\n",
-							 st->lnmi.pid, st->lnmi.lint, st->lnmi.flags);
-				break;
-			case ASlsapic:
-				start =
-					seprintf(start, end,
-							 "\tlsapic pid %d id %d eid %d puid %d puids %s\n",
-							 st->lsapic.pid, st->lsapic.id, st->lsapic.eid,
-							 st->lsapic.puid, st->lsapic.puids);
-				break;
-			case ASintsrc:
-				start =
-					seprintf(start, end,
-							 "\tintr type %d pid %d peid %d iosv %d intr %d %#x\n",
-							 st->type, st->intsrc.pid, st->intsrc.peid,
-							 st->intsrc.iosv, st->intsrc.intr,
-							 st->intsrc.flags);
-				start = printiflags(start, end, st->intsrc.flags);
-				start = seprintf(start, end, "\n");
-				break;
-			case ASlx2apic:
-				start =
-					seprintf(start, end, "\tlx2apic puid %d id %d\n",
-							 st->lx2apic.puid, st->lx2apic.id);
-				break;
-			case ASlx2nmi:
-				start =
-					seprintf(start, end, "\tlx2nmi puid %d intr %d flags $%p\n",
-							 st->lx2nmi.puid, st->lx2nmi.intr,
-							 st->lx2nmi.flags);
-				break;
-			default:
-				start = seprintf(start, end, "\t<unknown madt entry>\n");
+		case ASlapic:
+			start = seprintf(start, end, "\tlapic pid %d id %d\n",
+			                 st->lapic.pid, st->lapic.id);
+			break;
+		case ASioapic:
+		case ASiosapic:
+			start = seprintf(
+			    start, end, "\tioapic id %d addr %p ibase %d\n",
+			    st->ioapic.id, st->ioapic.addr, st->ioapic.ibase);
+			break;
+		case ASintovr:
+			start = seprintf(
+			    start, end, "\tintovr irq %d intr %d flags $%p",
+			    st->intovr.irq, st->intovr.intr, st->intovr.flags);
+			start = printiflags(start, end, st->intovr.flags);
+			start = seprintf(start, end, "\n");
+			break;
+		case ASnmi:
+			start =
+			    seprintf(start, end, "\tnmi intr %d flags $%p\n",
+			             st->nmi.intr, st->nmi.flags);
+			break;
+		case ASlnmi:
+			start = seprintf(
+			    start, end, "\tlnmi pid %d lint %d flags $%p\n",
+			    st->lnmi.pid, st->lnmi.lint, st->lnmi.flags);
+			break;
+		case ASlsapic:
+			start = seprintf(
+			    start, end,
+			    "\tlsapic pid %d id %d eid %d puid %d puids %s\n",
+			    st->lsapic.pid, st->lsapic.id, st->lsapic.eid,
+			    st->lsapic.puid, st->lsapic.puids);
+			break;
+		case ASintsrc:
+			start = seprintf(start, end,
+			                 "\tintr type %d pid %d peid %d iosv "
+			                 "%d intr %d %#x\n",
+			                 st->type, st->intsrc.pid,
+			                 st->intsrc.peid, st->intsrc.iosv,
+			                 st->intsrc.intr, st->intsrc.flags);
+			start = printiflags(start, end, st->intsrc.flags);
+			start = seprintf(start, end, "\n");
+			break;
+		case ASlx2apic:
+			start =
+			    seprintf(start, end, "\tlx2apic puid %d id %d\n",
+			             st->lx2apic.puid, st->lx2apic.id);
+			break;
+		case ASlx2nmi:
+			start = seprintf(
+			    start, end, "\tlx2nmi puid %d intr %d flags $%p\n",
+			    st->lx2nmi.puid, st->lx2nmi.intr, st->lx2nmi.flags);
+			break;
+		default:
+			start =
+			    seprintf(start, end, "\t<unknown madt entry>\n");
 		}
 	}
 	start = seprintf(start, end, "\n");
 	return start;
 }
 
-static struct Atable *parsemadt(struct Atable *parent,
-                                char *name, uint8_t *p, size_t size)
+static struct Atable *parsemadt(struct Atable *parent, char *name, uint8_t *p,
+                                size_t size)
 {
 	struct Atable *t, *tt, *tail;
 	uint8_t *pe;
@@ -1117,100 +1115,104 @@ static struct Atable *parsemadt(struct Atable *parent,
 		st = tt->tbl;
 		st->type = p[0];
 		switch (st->type) {
-			case ASlapic:
-				st->lapic.pid = p[2];
-				st->lapic.id = p[3];
-				if (l32get(p + 4) == 0) {
-					kfree(tt);
-					tt = NULL;
-				}
-				break;
-			case ASioapic:
-				st->ioapic.id = id = p[2];
-				st->ioapic.addr = l32get(p + 4);
-				st->ioapic.ibase = l32get(p + 8);
-				/* ioapic overrides any ioapic entry for the same id */
-				for (int i = 0; i < slice_len(&slice); i++) {
-					l = ((struct Atable *)slice_get(&slice, i))->tbl;
-					if (l->type == ASiosapic && l->iosapic.id == id) {
-						st->ioapic = l->iosapic;
-						/* we leave it linked; could be removed */
-						break;
-					}
-				}
-				break;
-			case ASintovr:
-				st->intovr.irq = p[3];
-				st->intovr.intr = l32get(p + 4);
-				st->intovr.flags = l16get(p + 8);
-				break;
-			case ASnmi:
-				st->nmi.flags = l16get(p + 2);
-				st->nmi.intr = l32get(p + 4);
-				break;
-			case ASlnmi:
-				st->lnmi.pid = p[2];
-				st->lnmi.flags = l16get(p + 3);
-				st->lnmi.lint = p[5];
-				break;
-			case ASladdr:
-				/* This is for 64 bits, perhaps we should not
-				 * honor it on 32 bits.
-				 */
-				mt->lapicpa = l64get(p + 8);
-				break;
-			case ASiosapic:
-				id = st->iosapic.id = p[2];
-				st->iosapic.ibase = l32get(p + 4);
-				st->iosapic.addr = l64get(p + 8);
-				/* iosapic overrides any ioapic entry for the same id */
-				for (int i = 0; i < slice_len(&slice); i++) {
-					l = ((struct Atable*)slice_get(&slice, i))->tbl;
-					if (l->type == ASioapic && l->ioapic.id == id) {
-						l->ioapic = st->iosapic;
-						kfree(tt);
-						tt = NULL;
-						break;
-					}
-				}
-				break;
-			case ASlsapic:
-				st->lsapic.pid = p[2];
-				st->lsapic.id = p[3];
-				st->lsapic.eid = p[4];
-				st->lsapic.puid = l32get(p + 12);
-				if (l32get(p + 8) == 0) {
-					kfree(tt);
-					tt = NULL;
-				} else
-					kstrdup(&st->lsapic.puids, (char *)p + 16);
-				break;
-			case ASintsrc:
-				st->intsrc.flags = l16get(p + 2);
-				st->type = p[4];
-				st->intsrc.pid = p[5];
-				st->intsrc.peid = p[6];
-				st->intsrc.iosv = p[7];
-				st->intsrc.intr = l32get(p + 8);
-				st->intsrc.any = l32get(p + 12);
-				break;
-			case ASlx2apic:
-				st->lx2apic.id = l32get(p + 4);
-				st->lx2apic.puid = l32get(p + 12);
-				if (l32get(p + 8) == 0) {
-					kfree(tt);
-					tt = NULL;
-				}
-				break;
-			case ASlx2nmi:
-				st->lx2nmi.flags = l16get(p + 2);
-				st->lx2nmi.puid = l32get(p + 4);
-				st->lx2nmi.intr = p[8];
-				break;
-			default:
-				printd("unknown APIC structure\n");
+		case ASlapic:
+			st->lapic.pid = p[2];
+			st->lapic.id = p[3];
+			if (l32get(p + 4) == 0) {
 				kfree(tt);
 				tt = NULL;
+			}
+			break;
+		case ASioapic:
+			st->ioapic.id = id = p[2];
+			st->ioapic.addr = l32get(p + 4);
+			st->ioapic.ibase = l32get(p + 8);
+			/* ioapic overrides any ioapic entry for the same id */
+			for (int i = 0; i < slice_len(&slice); i++) {
+				l = ((struct Atable *)slice_get(&slice, i))
+				        ->tbl;
+				if (l->type == ASiosapic &&
+				    l->iosapic.id == id) {
+					st->ioapic = l->iosapic;
+					/* we leave it linked; could be removed
+					 */
+					break;
+				}
+			}
+			break;
+		case ASintovr:
+			st->intovr.irq = p[3];
+			st->intovr.intr = l32get(p + 4);
+			st->intovr.flags = l16get(p + 8);
+			break;
+		case ASnmi:
+			st->nmi.flags = l16get(p + 2);
+			st->nmi.intr = l32get(p + 4);
+			break;
+		case ASlnmi:
+			st->lnmi.pid = p[2];
+			st->lnmi.flags = l16get(p + 3);
+			st->lnmi.lint = p[5];
+			break;
+		case ASladdr:
+			/* This is for 64 bits, perhaps we should not
+			 * honor it on 32 bits.
+			 */
+			mt->lapicpa = l64get(p + 8);
+			break;
+		case ASiosapic:
+			id = st->iosapic.id = p[2];
+			st->iosapic.ibase = l32get(p + 4);
+			st->iosapic.addr = l64get(p + 8);
+			/* iosapic overrides any ioapic entry for the same id */
+			for (int i = 0; i < slice_len(&slice); i++) {
+				l = ((struct Atable *)slice_get(&slice, i))
+				        ->tbl;
+				if (l->type == ASioapic && l->ioapic.id == id) {
+					l->ioapic = st->iosapic;
+					kfree(tt);
+					tt = NULL;
+					break;
+				}
+			}
+			break;
+		case ASlsapic:
+			st->lsapic.pid = p[2];
+			st->lsapic.id = p[3];
+			st->lsapic.eid = p[4];
+			st->lsapic.puid = l32get(p + 12);
+			if (l32get(p + 8) == 0) {
+				kfree(tt);
+				tt = NULL;
+			} else
+				kstrdup(&st->lsapic.puids, (char *)p + 16);
+			break;
+		case ASintsrc:
+			st->intsrc.flags = l16get(p + 2);
+			st->type = p[4];
+			st->intsrc.pid = p[5];
+			st->intsrc.peid = p[6];
+			st->intsrc.iosv = p[7];
+			st->intsrc.intr = l32get(p + 8);
+			st->intsrc.any = l32get(p + 12);
+			break;
+		case ASlx2apic:
+			st->lx2apic.id = l32get(p + 4);
+			st->lx2apic.puid = l32get(p + 12);
+			if (l32get(p + 8) == 0) {
+				kfree(tt);
+				tt = NULL;
+			}
+			break;
+		case ASlx2nmi:
+			st->lx2nmi.flags = l16get(p + 2);
+			st->lx2nmi.puid = l32get(p + 4);
+			st->lx2nmi.intr = p[8];
+			break;
+		default:
+			printd("unknown APIC structure\n");
+			kfree(tt);
+			tt = NULL;
 		}
 		if (tt != NULL) {
 			finatable_nochildren(tt);
@@ -1222,8 +1224,8 @@ static struct Atable *parsemadt(struct Atable *parent,
 	return apics;
 }
 
-static struct Atable *parsedmar(struct Atable *parent,
-                                char *name, uint8_t *raw, size_t rawsize)
+static struct Atable *parsedmar(struct Atable *parent, char *name, uint8_t *raw,
+                                size_t rawsize)
 {
 	struct Atable *t, *tt;
 	int i;
@@ -1238,8 +1240,8 @@ static struct Atable *parsedmar(struct Atable *parent,
 	/* count the entries */
 	for (nentry = 0, off = 48; off < rawsize; nentry++) {
 		dslen = l16get(raw + off + 2);
-		printk("acpi DMAR: entry %d is addr %p (0x%x/0x%x)\n",
-		       nentry, raw + off, l16get(raw + off), dslen);
+		printk("acpi DMAR: entry %d is addr %p (0x%x/0x%x)\n", nentry,
+		       raw + off, l16get(raw + off), dslen);
 		off = off + dslen;
 	}
 	printk("DMAR: %d entries\n", nentry);
@@ -1267,12 +1269,12 @@ static struct Atable *parsedmar(struct Atable *parent,
 		nscope = 0;
 		for (int o = off + 16; o < (off + dslen); o += dhlen) {
 			nscope++;
-			dhlen = *(raw + o + 1);	// Single byte length.
+			dhlen = *(raw + o + 1); // Single byte length.
 			npath += ((dhlen - 6) / 2);
 		}
 		tt = mkatable(t, DRHD, buf, raw + off, dslen,
 		              sizeof(struct Drhd) + 2 * npath +
-		              nscope * sizeof(struct DevScope));
+		                  nscope * sizeof(struct DevScope));
 		flags = *(raw + off + 4);
 		drhd = tt->tbl;
 		drhd->all = flags & 1;
@@ -1280,8 +1282,8 @@ static struct Atable *parsedmar(struct Atable *parent,
 		drhd->rba = l64get(raw + off + 8);
 		drhd->nscope = nscope;
 		drhd->scopes = (void *)drhd + sizeof(struct Drhd);
-		pathp = (void *)drhd +
-		    sizeof(struct Drhd) + nscope * sizeof(struct DevScope);
+		pathp = (void *)drhd + sizeof(struct Drhd) +
+		        nscope * sizeof(struct DevScope);
 		for (int i = 0, o = off + 16; i < nscope; i++) {
 			struct DevScope *ds = &drhd->scopes[i];
 
@@ -1291,8 +1293,8 @@ static struct Atable *parsedmar(struct Atable *parent,
 			ds->npath = (dhlen - 6) / 2;
 			ds->paths = pathp;
 			for (int j = 0; j < ds->npath; j++)
-				ds->paths[j] = l16get(raw + o + 6 + 2*j);
-			pathp += 2*ds->npath;
+				ds->paths[j] = l16get(raw + o + 6 + 2 * j);
+			pathp += 2 * ds->npath;
 			o += dhlen;
 		}
 		/*
@@ -1312,8 +1314,8 @@ static struct Atable *parsedmar(struct Atable *parent,
 /*
  * Map the table and keep it there.
  */
-static struct Atable *parsessdt(struct Atable *parent,
-                                char *name, uint8_t *raw, size_t size)
+static struct Atable *parsessdt(struct Atable *parent, char *name, uint8_t *raw,
+                                size_t size)
 {
 	struct Atable *t;
 	struct Sdthdr *h;
@@ -1360,7 +1362,7 @@ static char *seprinttable(char *s, char *e, struct Atable *t)
 	uint8_t *p;
 	int i, n;
 
-	p = (uint8_t *)t->tbl;	/* include header */
+	p = (uint8_t *)t->tbl; /* include header */
 	n = t->rawsize;
 	s = seprintf(s, e, "%s @ %#p\n", t->name, p);
 	for (i = 0; i < n; i++) {
@@ -1406,20 +1408,14 @@ static void *rsdsearch(char *signature)
  */
 struct Parser {
 	char *sig;
-	struct Atable *(*parse)(struct Atable *parent,
-	                        char *name, uint8_t *raw, size_t rawsize);
+	struct Atable *(*parse)(struct Atable *parent, char *name, uint8_t *raw,
+	                        size_t rawsize);
 };
 
-
 static struct Parser ptable[] = {
-	{"FACP", parsefadt},
-	{"APIC", parsemadt},
-	{"DMAR", parsedmar},
-	{"SRAT", parsesrat},
-	{"SLIT", parseslit},
-	{"MSCT", parsemsct},
-	{"SSDT", parsessdt},
-	{"HPET", parsehpet},
+    {"FACP", parsefadt}, {"APIC", parsemadt}, {"DMAR", parsedmar},
+    {"SRAT", parsesrat}, {"SLIT", parseslit}, {"MSCT", parsemsct},
+    {"SSDT", parsessdt}, {"HPET", parsehpet},
 };
 
 /*
@@ -1452,8 +1448,10 @@ static void parsexsdt(struct Atable *root)
 			continue;
 		printd("acpi: %s addr %#p\n", tsig, sdt);
 		for (int j = 0; j < ARRAY_SIZE(ptable); j++) {
-			if (memcmp(sdt->sig, ptable[j].sig, sizeof(sdt->sig)) == 0) {
-				table = ptable[j].parse(root, ptable[j].sig, (void *)sdt, l);
+			if (memcmp(sdt->sig, ptable[j].sig, sizeof(sdt->sig)) ==
+			    0) {
+				table = ptable[j].parse(root, ptable[j].sig,
+				                        (void *)sdt, l);
 				if (table != NULL)
 					slice_append(&slice, table);
 				break;
@@ -1497,19 +1495,22 @@ static void parsersdptr(void)
 	root = mkatable(NULL, XSDT, devname(), NULL, 0, sizeof(struct Xsdt));
 	root->parent = root;
 
-	printd("/* RSDP */ struct Rsdp = {%08c, %x, %06c, %x, %p, %d, %p, %x}\n",
-		   rsd->signature, rsd->rchecksum, rsd->oemid, rsd->revision,
-		   *(uint32_t *)rsd->raddr, *(uint32_t *)rsd->length,
-		   *(uint32_t *)rsd->xaddr, rsd->xchecksum);
+	printd(
+	    "/* RSDP */ struct Rsdp = {%08c, %x, %06c, %x, %p, %d, %p, %x}\n",
+	    rsd->signature, rsd->rchecksum, rsd->oemid, rsd->revision,
+	    *(uint32_t *)rsd->raddr, *(uint32_t *)rsd->length,
+	    *(uint32_t *)rsd->xaddr, rsd->xchecksum);
 
 	printd("acpi: RSD PTR@ %#p, physaddr $%p length %ud %#llux rev %d\n",
-		   rsd, l32get(rsd->raddr), l32get(rsd->length),
-		   l64get(rsd->xaddr), rsd->revision);
+	       rsd, l32get(rsd->raddr), l32get(rsd->length), l64get(rsd->xaddr),
+	       rsd->revision);
 
 	if (rsd->revision >= 2) {
 		cksum = sdtchecksum(rsd, 36);
 		if (cksum != 0) {
-			printk("acpi: bad RSD checksum %d, 64 bit parser aborted\n", cksum);
+			printk("acpi: bad RSD checksum %d, 64 bit parser "
+			       "aborted\n",
+			       cksum);
 			return;
 		}
 		sdtpa = l64get(rsd->xaddr);
@@ -1517,7 +1518,9 @@ static void parsersdptr(void)
 	} else {
 		cksum = sdtchecksum(rsd, 20);
 		if (cksum != 0) {
-			printk("acpi: bad RSD checksum %d, 32 bit parser aborted\n", cksum);
+			printk("acpi: bad RSD checksum %d, 32 bit parser "
+			       "aborted\n",
+			       cksum);
 			return;
 		}
 		sdtpa = l32get(rsd->raddr);
@@ -1533,18 +1536,18 @@ static void parsersdptr(void)
 		printk("acpi: sdtmap failed\n");
 		return;
 	}
-	if ((xsdt->p[0] != 'R' && xsdt->p[0] != 'X')
-		|| memcmp(xsdt->p + 1, "SDT", 3) != 0) {
-		printd("acpi: xsdt sig: %c%c%c%c\n",
-		       xsdt->p[0], xsdt->p[1], xsdt->p[2], xsdt->p[3]);
+	if ((xsdt->p[0] != 'R' && xsdt->p[0] != 'X') ||
+	    memcmp(xsdt->p + 1, "SDT", 3) != 0) {
+		printd("acpi: xsdt sig: %c%c%c%c\n", xsdt->p[0], xsdt->p[1],
+		       xsdt->p[2], xsdt->p[3]);
 		xsdt = NULL;
 		return;
 	}
 	xsdt->asize = asize;
 	printd("acpi: XSDT %#p\n", xsdt);
 	parsexsdt(root);
-	atableindex = kreallocarray(NULL, lastpath, sizeof(struct Atable *),
-	                            MEM_WAIT);
+	atableindex =
+	    kreallocarray(NULL, lastpath, sizeof(struct Atable *), MEM_WAIT);
 	assert(atableindex != NULL);
 	makeindex(root);
 }
@@ -1558,10 +1561,11 @@ static struct Sdthdr *xsdt_find_tbl(struct Sdthdr *xsdt, const char *sig,
 	physaddr_t sdt_pa;
 	struct Sdthdr *sdt;
 
-	ptr_tbl = (uint8_t*)xsdt + sizeof(struct Sdthdr);
+	ptr_tbl = (uint8_t *)xsdt + sizeof(struct Sdthdr);
 	ptr_tbl_len = l32get(xsdt->length) - sizeof(struct Sdthdr);
 	for (int i = 0; i < ptr_tbl_len; i += addr_size) {
-		sdt_pa = (addr_size == 8) ? l64get(ptr_tbl + i) : l32get(ptr_tbl + i);
+		sdt_pa = (addr_size == 8) ? l64get(ptr_tbl + i)
+		                          : l32get(ptr_tbl + i);
 		sdt = KADDR_NOCHECK(sdt_pa);
 		if (memcmp(sdt->sig, sig, sizeof(sdt->sig)) == 0)
 			return sdt;
@@ -1576,7 +1580,7 @@ static int madt_get_nr_cores(struct Sdthdr *madt)
 	size_t entry_len;
 	int nr_cores = 0;
 
-	p = (uint8_t*)madt;
+	p = (uint8_t *)madt;
 	madt_end = p + l32get(madt->length);
 	for (p += 44; p < madt_end; p += entry_len) {
 		entry_len = p[1];
@@ -1611,11 +1615,11 @@ int get_early_num_cores(void)
 	}
 
 	xsdt = KADDR_NOCHECK(sdtpa);
-	xsdt_buf = (uint8_t*)xsdt;
-	if ((xsdt_buf[0] != 'R' && xsdt_buf[0] != 'X')
-		|| memcmp(xsdt_buf + 1, "SDT", 3) != 0) {
-		panic("acpi: xsdt sig: %c%c%c%c\n",
-		       xsdt_buf[0], xsdt_buf[1], xsdt_buf[2], xsdt_buf[3]);
+	xsdt_buf = (uint8_t *)xsdt;
+	if ((xsdt_buf[0] != 'R' && xsdt_buf[0] != 'X') ||
+	    memcmp(xsdt_buf + 1, "SDT", 3) != 0) {
+		panic("acpi: xsdt sig: %c%c%c%c\n", xsdt_buf[0], xsdt_buf[1],
+		      xsdt_buf[2], xsdt_buf[3]);
 	}
 	madt = xsdt_find_tbl(xsdt, "APIC", asize);
 	assert(madt);
@@ -1646,14 +1650,14 @@ static struct Atable *genatable(struct chan *c)
 }
 
 static int acpigen(struct chan *c, char *name, struct dirtab *tab, int ntab,
-				   int i, struct dir *dp)
+                   int i, struct dir *dp)
 {
 	struct Atable *a = genatable(c);
 
 	if (i == DEVDOTDOT) {
 		assert((c->qid.path & QIndexMask) == Qdir);
-		devdir(c, a->parent->qid, a->parent->name, 0, eve.name, DMDIR | 0555,
-		       dp);
+		devdir(c, a->parent->qid, a->parent->name, 0, eve.name,
+		       DMDIR | 0555, dp);
 		return 1;
 	}
 	return devgen(c, name, a->cdirs, a->nchildren + NQtypes, i, dp);
@@ -1664,8 +1668,8 @@ static int acpigen(struct chan *c, char *name, struct dirtab *tab, int ntab,
  */
 static void dumpxsdt(void)
 {
-	printk("xsdt: len = %lu, asize = %lu, p = %p\n",
-	       xsdt->len, xsdt->asize, xsdt->p);
+	printk("xsdt: len = %lu, asize = %lu, p = %p\n", xsdt->len, xsdt->asize,
+	       xsdt->p);
 }
 
 static char *dumpGas(char *start, char *end, char *prefix, struct Gas *g)
@@ -1673,34 +1677,32 @@ static char *dumpGas(char *start, char *end, char *prefix, struct Gas *g)
 	start = seprintf(start, end, "%s", prefix);
 
 	switch (g->spc) {
-		case Rsysmem:
-		case Rsysio:
-		case Rembed:
-		case Rsmbus:
-		case Rcmos:
-		case Rpcibar:
-		case Ripmi:
-			start = seprintf(start, end, "[%s ", regnames[g->spc]);
-			break;
-		case Rpcicfg:
-			start = seprintf(start, end, "[pci ");
-			start =
-				seprintf(start, end, "dev %#p ",
-						 (uint32_t)(g->addr >> 32) & 0xFFFF);
-			start =
-				seprintf(start, end, "fn %#p ",
-						 (uint32_t)(g->addr & 0xFFFF0000) >> 16);
-			start =
-				seprintf(start, end, "adr %#p ", (uint32_t)(g->addr & 0xFFFF));
-			break;
-		case Rfixedhw:
-			start = seprintf(start, end, "[hw ");
-			break;
-		default:
-			start = seprintf(start, end, "[spc=%#p ", g->spc);
+	case Rsysmem:
+	case Rsysio:
+	case Rembed:
+	case Rsmbus:
+	case Rcmos:
+	case Rpcibar:
+	case Ripmi:
+		start = seprintf(start, end, "[%s ", regnames[g->spc]);
+		break;
+	case Rpcicfg:
+		start = seprintf(start, end, "[pci ");
+		start = seprintf(start, end, "dev %#p ",
+		                 (uint32_t)(g->addr >> 32) & 0xFFFF);
+		start = seprintf(start, end, "fn %#p ",
+		                 (uint32_t)(g->addr & 0xFFFF0000) >> 16);
+		start = seprintf(start, end, "adr %#p ",
+		                 (uint32_t)(g->addr & 0xFFFF));
+		break;
+	case Rfixedhw:
+		start = seprintf(start, end, "[hw ");
+		break;
+	default:
+		start = seprintf(start, end, "[spc=%#p ", g->spc);
 	}
-	start = seprintf(start, end, "off %d len %d addr %#p sz%d]",
-					 g->off, g->len, g->addr, g->accsz);
+	start = seprintf(start, end, "off %d len %d addr %#p sz%d]", g->off,
+	                 g->len, g->addr, g->accsz);
 	start = seprintf(start, end, "\n");
 	return start;
 }
@@ -1711,26 +1713,26 @@ static unsigned int getbanked(uintptr_t ra, uintptr_t rb, int sz)
 
 	r = 0;
 	switch (sz) {
-		case 1:
-			if (ra != 0)
-				r |= inb(ra);
-			if (rb != 0)
-				r |= inb(rb);
-			break;
-		case 2:
-			if (ra != 0)
-				r |= inw(ra);
-			if (rb != 0)
-				r |= inw(rb);
-			break;
-		case 4:
-			if (ra != 0)
-				r |= inl(ra);
-			if (rb != 0)
-				r |= inl(rb);
-			break;
-		default:
-			printd("getbanked: wrong size\n");
+	case 1:
+		if (ra != 0)
+			r |= inb(ra);
+		if (rb != 0)
+			r |= inb(rb);
+		break;
+	case 2:
+		if (ra != 0)
+			r |= inw(ra);
+		if (rb != 0)
+			r |= inw(rb);
+		break;
+	case 4:
+		if (ra != 0)
+			r |= inl(ra);
+		if (rb != 0)
+			r |= inl(rb);
+		break;
+	default:
+		printd("getbanked: wrong size\n");
 	}
 	return r;
 }
@@ -1741,26 +1743,26 @@ static unsigned int setbanked(uintptr_t ra, uintptr_t rb, int sz, int v)
 
 	r = -1;
 	switch (sz) {
-		case 1:
-			if (ra != 0)
-				outb(ra, v);
-			if (rb != 0)
-				outb(rb, v);
-			break;
-		case 2:
-			if (ra != 0)
-				outw(ra, v);
-			if (rb != 0)
-				outw(rb, v);
-			break;
-		case 4:
-			if (ra != 0)
-				outl(ra, v);
-			if (rb != 0)
-				outl(rb, v);
-			break;
-		default:
-			printd("setbanked: wrong size\n");
+	case 1:
+		if (ra != 0)
+			outb(ra, v);
+		if (rb != 0)
+			outb(rb, v);
+		break;
+	case 2:
+		if (ra != 0)
+			outw(ra, v);
+		if (rb != 0)
+			outw(rb, v);
+		break;
+	case 4:
+		if (ra != 0)
+			outl(ra, v);
+		if (rb != 0)
+			outl(rb, v);
+		break;
+	default:
+		printd("setbanked: wrong size\n");
 	}
 	return r;
 }
@@ -1780,7 +1782,8 @@ static void setpm1sts(unsigned int v)
 static unsigned int getpm1sts(void)
 {
 	assert(fadt != NULL);
-	return getbanked(fadt->pm1aevtblk, fadt->pm1bevtblk, fadt->pm1evtlen / 2);
+	return getbanked(fadt->pm1aevtblk, fadt->pm1bevtblk,
+	                 fadt->pm1evtlen / 2);
 }
 
 static unsigned int getpm1en(void)
@@ -1947,7 +1950,7 @@ static struct chan *acpiattach(char *spec)
 }
 
 static struct walkqid *acpiwalk(struct chan *c, struct chan *nc, char **name,
-								unsigned int nname)
+                                unsigned int nname)
 {
 	/*
 	 * Note that devwalk hard-codes a test against the location of 'devgen',
@@ -2118,8 +2121,7 @@ static size_t acpiwrite(struct chan *c, void *a, size_t n, off64_t off)
 
 struct {
 	char *(*pretty)(struct Atable *atbl, char *start, char *end, void *arg);
-} acpisw[NACPITBLS] = {
-};
+} acpisw[NACPITBLS] = {};
 
 static char *pretty(struct Atable *atbl, char *start, char *end, void *arg)
 {
@@ -2143,21 +2145,21 @@ static char *raw(struct Atable *atbl, char *start, char *end, void *unused_arg)
 }
 
 struct dev acpidevtab __devtab = {
-	.name = "acpi",
+    .name = "acpi",
 
-	.reset = devreset,
-	.init = devinit,
-	.shutdown = devshutdown,
-	.attach = acpiattach,
-	.walk = acpiwalk,
-	.stat = acpistat,
-	.open = acpiopen,
-	.create = devcreate,
-	.close = acpiclose,
-	.read = acpiread,
-	.bread = devbread,
-	.write = acpiwrite,
-	.bwrite = devbwrite,
-	.remove = devremove,
-	.wstat = devwstat,
+    .reset = devreset,
+    .init = devinit,
+    .shutdown = devshutdown,
+    .attach = acpiattach,
+    .walk = acpiwalk,
+    .stat = acpistat,
+    .open = acpiopen,
+    .create = devcreate,
+    .close = acpiclose,
+    .read = acpiread,
+    .bread = devbread,
+    .write = acpiwrite,
+    .bwrite = devbwrite,
+    .remove = devremove,
+    .wstat = devwstat,
 };

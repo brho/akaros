@@ -12,10 +12,12 @@ static unsigned int x86_cstate;
 void cpu_halt(void)
 {
 	if (cpu_has_feat(CPU_FEAT_X86_MWAIT)) {
-		/* TODO: since we're monitoring anyway, x86 could use monitor/mwait for
-		 * KMSGs, instead of relying on IPIs.  (Maybe only for ROUTINE). */
+		/* TODO: since we're monitoring anyway, x86 could use
+		 * monitor/mwait for KMSGs, instead of relying on IPIs.  (Maybe
+		 * only for ROUTINE). */
 		asm volatile("monitor" : : "a"(KERNBASE), "c"(0), "d"(0));
-		asm volatile("sti; mwait" : : "c"(0x0), "a"(x86_cstate) : "memory");
+		asm volatile("sti; mwait" : : "c"(0x0), "a"(x86_cstate)
+			     : "memory");
 	} else {
 		asm volatile("sti; hlt" : : : "memory");
 	}
@@ -28,13 +30,15 @@ void cpu_halt(void)
 void cpu_halt_notif_pending(struct preempt_data *vcpd)
 {
 	if (cpu_has_feat(CPU_FEAT_X86_MWAIT))
-		asm volatile("monitor" : : "a"(&vcpd->notif_pending), "c"(0), "d"(0));
+		asm volatile("monitor" :
+			     : "a"(&vcpd->notif_pending), "c"(0), "d"(0));
 	if (vcpd->notif_pending)
 		return;
-	/* Note we don't use the ecx=1 setting - we actually want to sti so that we
-	 * handle the IRQ and not just wake from it. */
+	/* Note we don't use the ecx=1 setting - we actually want to sti so that
+	 * we handle the IRQ and not just wake from it. */
 	if (cpu_has_feat(CPU_FEAT_X86_MWAIT))
-		asm volatile("sti; mwait" : : "c"(0x0), "a"(x86_cstate) : "memory");
+		asm volatile("sti; mwait" :
+			     : "c"(0x0), "a"(x86_cstate) : "memory");
 	else
 		asm volatile("sti; hlt" : : : "memory");
 	disable_irq();
@@ -44,9 +48,9 @@ void set_pstate(unsigned int pstate)
 {
 	uint64_t perf_ctl;
 
-	/* This MSR was introduced in 0f_03 (family/model), so checking cpuid should
-	 * suffice.  Though my Qemu says it is a later generation and still fails to
-	 * support it (patches pending, I hear). */
+	/* This MSR was introduced in 0f_03 (family/model), so checking cpuid
+	 * should suffice.  Though my Qemu says it is a later generation and
+	 * still fails to support it (patches pending, I hear). */
 	if (read_msr_safe(MSR_IA32_PERF_CTL, &perf_ctl))
 		return;
 	/* The p-state ratio is actually at 15:8, AFAIK, for both PERF_CTL and
@@ -65,7 +69,8 @@ void set_fastest_pstate(void)
 	 * lieu of a full per-model driver, we can just take a peak. */
 	if (read_msr_safe(MSR_TURBO_RATIO_LIMIT, &turbo_ratio_limit))
 		return;
-	/* The lowest byte is the max turbo ratio achievable by one active core. */
+	/* The lowest byte is the max turbo ratio achievable by one active core.
+	 */
 	set_pstate(turbo_ratio_limit & 0xff);
 }
 
@@ -91,8 +96,8 @@ unsigned int get_actual_pstate(void)
 
 void set_cstate(unsigned int cstate)
 {
-	/* No real need to lock for an assignment.  Any core can set this, and other
-	 * cores will notice the next time they halt. */
+	/* No real need to lock for an assignment.  Any core can set this, and
+	 * other cores will notice the next time they halt. */
 	x86_cstate = cstate;
 }
 

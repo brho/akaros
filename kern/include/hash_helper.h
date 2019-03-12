@@ -7,10 +7,10 @@
 #pragma once
 
 struct hash_helper {
-	unsigned int				nr_hash_lists;
-	unsigned int				nr_hash_bits;
-	size_t						nr_items;
-	size_t						load_limit;
+	unsigned int			nr_hash_lists;
+	unsigned int			nr_hash_bits;
+	size_t				nr_items;
+	size_t				load_limit;
 };
 
 #define HASH_MAX_LOAD_FACTOR(size) ((size * 13) / 20)

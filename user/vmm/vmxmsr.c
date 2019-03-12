@@ -179,8 +179,8 @@ static int apic_icr_write(struct guest_thread *vm_thread,
 		break;
 	case 0x5:	/* INIT */
 	case 0x6:	/* SIPI */
-		/* We don't use INIT/SIPI for SMP boot.  The guest is still allowed to
-		 * try to make them for now. */
+		/* We don't use INIT/SIPI for SMP boot.  The guest is still
+		 * allowed to try to make them for now. */
 		break;
 	default:
 		fprintf(stderr, "Unsupported IPI type %d!\n", type);
@@ -215,9 +215,9 @@ static int apic_timer_write(struct guest_thread *gth,
 	timer_waiter = (struct alarm_waiter*)gth->user_data;
 
 	/* This is a precaution on my part, in case the guest tries to look at
-	 * the current count on the lapic. I wanted it to be something other than
-	 * 0 just in case. The current count will never be right short of us
-	 * properly emulating it. */
+	 * the current count on the lapic. I wanted it to be something other
+	 * than 0 just in case. The current count will never be right short of
+	 * us properly emulating it. */
 	((uint32_t *)(gpci->vapic_addr))[0x39] = initial_count;
 
 	if (!timer_waiter)
@@ -247,11 +247,14 @@ static int emsr_apic(struct guest_thread *vm_thread,
 
 	if (opcode == EXIT_REASON_MSR_READ) {
 		if (vm_tf->tf_rcx != MSR_LAPIC_ICR) {
-			vm_tf->tf_rax = ((uint32_t *)(gpci->vapic_addr))[apic_offset];
+			vm_tf->tf_rax =
+				((uint32_t*)(gpci->vapic_addr))[apic_offset];
 			vm_tf->tf_rdx = 0;
 		} else {
-			vm_tf->tf_rax = ((uint32_t *)(gpci->vapic_addr))[apic_offset];
-			vm_tf->tf_rdx = ((uint32_t *)(gpci->vapic_addr))[apic_offset + 1];
+			vm_tf->tf_rax =
+				((uint32_t*)(gpci->vapic_addr))[apic_offset];
+			vm_tf->tf_rdx =
+				((uint32_t*)(gpci->vapic_addr))[apic_offset +1];
 		}
 	} else {
 		switch (vm_tf->tf_rcx) {
@@ -267,7 +270,7 @@ static int emsr_apic(struct guest_thread *vm_thread,
 			break;
 		default:
 			((uint32_t *)(gpci->vapic_addr))[apic_offset] =
-		                                       (uint32_t)(vm_tf->tf_rax);
+				(uint32_t)(vm_tf->tf_rax);
 		}
 	}
 	return 0;

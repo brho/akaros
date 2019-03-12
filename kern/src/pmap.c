@@ -23,9 +23,9 @@
 #include <arena.h>
 #include <init.h>
 
-physaddr_t max_pmem = 0;	/* Total amount of physical memory (bytes) */
-physaddr_t max_paddr = 0;	/* Maximum addressable physical address */
-size_t max_nr_pages = 0;	/* Number of addressable physical memory pages */
+physaddr_t max_pmem = 0;  /* Total amount of physical memory (bytes) */
+physaddr_t max_paddr = 0; /* Maximum addressable physical address */
+size_t max_nr_pages = 0;  /* Number of addressable physical memory pages */
 struct page *pages = 0;
 struct multiboot_info *multiboot_kaddr = 0;
 uintptr_t boot_freemem = 0;
@@ -68,11 +68,11 @@ void pmem_init(struct multiboot_info *mbi)
 {
 	mboot_detect_memory(mbi);
 	mboot_print_mmap(mbi);
-	/* adjust the max memory based on the mmaps, since the old detection doesn't
-	 * help much on 64 bit systems */
+	/* adjust the max memory based on the mmaps, since the old detection
+	 * doesn't help much on 64 bit systems */
 	mboot_foreach_mmap(mbi, adjust_max_pmem, 0);
-	/* KERN_VMAP_TOP - KERNBASE is the max amount of virtual addresses we can
-	 * use for the physical memory mapping (aka - the KERNBASE mapping).
+	/* KERN_VMAP_TOP - KERNBASE is the max amount of virtual addresses we
+	 * can use for the physical memory mapping (aka - the KERNBASE mapping).
 	 * Should't be an issue on 64b, but is usually for 32 bit. */
 	max_paddr = MIN(max_pmem, KERN_VMAP_TOP - KERNBASE);
 	/* Note not all of this memory is free. */
@@ -80,13 +80,15 @@ void pmem_init(struct multiboot_info *mbi)
 	printk("Max physical RAM (appx, bytes): %lu\n", max_pmem);
 	printk("Max addressable physical RAM (appx): %lu\n", max_paddr);
 	printk("Highest page number (including reserved): %lu\n", max_nr_pages);
-	/* We should init the page structs, but zeroing happens to work, except for
-	 * the sems.  Those are init'd by the page cache before they are used. */
+	/* We should init the page structs, but zeroing happens to work, except
+	 * for the sems.  Those are init'd by the page cache before they are
+	 * used. */
 	pages = (struct page*)boot_zalloc(max_nr_pages * sizeof(struct page),
 	                                  PGSIZE);
 	base_arena_init(mbi);
-	/* kpages will use some of the basic slab caches.  kmem_cache_init needs to
-	 * not do memory allocations (which it doesn't, and it can base_alloc()). */
+	/* kpages will use some of the basic slab caches.  kmem_cache_init needs
+	 * to not do memory allocations (which it doesn't, and it can
+	 * base_alloc()). */
 	kmem_cache_init();
 	kpages_arena_init();
 	printk("Base arena total mem: %lu\n", arena_amt_total(base_arena));
@@ -132,13 +134,16 @@ static void boot_alloc_init(void)
 	mboot_foreach_mmap(multiboot_kaddr, set_largest_freezone, &boot_zone);
 	if (boot_zone) {
 		boot_zone_start = (uintptr_t)KADDR(boot_zone->addr);
-		/* one issue for 32b is that the boot_zone_end could be beyond max_paddr
-		 * and even wrap-around.  Do the min check as a uint64_t.  The result
-		 * should be a safe, unwrapped 32/64b when cast to physaddr_t. */
-		boot_zone_end = (uintptr_t)KADDR(MIN(boot_zone->addr + boot_zone->len,
-		                                 (uint64_t)max_paddr));
-		/* using KERNBASE (kva, btw) which covers the kernel and anything before
-		 * it (like the stuff below EXTPHYSMEM on x86) */
+		/* one issue for 32b is that the boot_zone_end could be beyond
+		 * max_paddr and even wrap-around.  Do the min check as a
+		 * uint64_t.  The result should be a safe, unwrapped 32/64b when
+		 * cast to physaddr_t. */
+		boot_zone_end = (uintptr_t)KADDR(MIN(boot_zone->addr +
+						     boot_zone->len,
+						     (uint64_t)max_paddr));
+		/* using KERNBASE (kva, btw) which covers the kernel and
+		 * anything before it (like the stuff below EXTPHYSMEM on x86)
+		 */
 		if (regions_collide_unsafe(KERNBASE, end_kva,
 		                           boot_zone_start, boot_zone_end))
 			boot_freemem = end_kva;
@@ -149,8 +154,8 @@ static void boot_alloc_init(void)
 		boot_freemem = end_kva;
 		boot_freelimit = max_paddr + KERNBASE;
 	}
-	printd("boot_zone: %p, paddr base: 0x%llx, paddr len: 0x%llx\n", boot_zone,
-	       boot_zone ? boot_zone->addr : 0,
+	printd("boot_zone: %p, paddr base: 0x%llx, paddr len: 0x%llx\n",
+	       boot_zone, boot_zone ? boot_zone->addr : 0,
 	       boot_zone ? boot_zone->len : 0);
 	printd("boot_freemem: %p, boot_freelimit %p\n", boot_freemem,
 	       boot_freelimit);
@@ -178,7 +183,7 @@ void *boot_alloc(size_t amt, size_t align)
 	printd("boot alloc from %p to %p\n", retval, boot_freemem);
 	/* multiboot info probably won't ever conflict with our boot alloc */
 	if (mboot_region_collides(multiboot_kaddr, retval, boot_freemem))
-		panic("boot allocation could clobber multiboot info!  Get help!");
+		panic("boot allocation could clobber multiboot info!");
 	return (void*)retval;
 }
 
@@ -227,6 +232,7 @@ void *boot_zalloc(size_t amt, size_t align)
 int page_insert(pgdir_t pgdir, struct page *page, void *va, int perm)
 {
 	pte_t pte = pgdir_walk(pgdir, va, 1);
+
 	if (!pte_walk_okay(pte))
 		return -ENOMEM;
 	/* Leftover from older times, but we no longer suppor this: */
@@ -247,7 +253,8 @@ int page_insert(pgdir_t pgdir, struct page *page, void *va, int perm)
  *
  * @param[in]  pgdir     the page directory from which we should do the lookup
  * @param[in]  va        the virtual address of the page we are looking up
- * @param[out] pte_store the address of the page table entry for the returned page
+ * @param[out] pte_store the address of the page table entry for the returned
+ * 			 page
  *
  * @return PAGE the page mapped at virtual address 'va'
  * @return NULL No mapping exists at virtual address 'va', or it's paged out
@@ -255,6 +262,7 @@ int page_insert(pgdir_t pgdir, struct page *page, void *va, int perm)
 page_t *page_lookup(pgdir_t pgdir, void *va, pte_t *pte_store)
 {
 	pte_t pte = pgdir_walk(pgdir, va, 0);
+
 	if (!pte_walk_okay(pte) || !pte_is_mapped(pte))
 		return 0;
 	if (pte_store)
@@ -294,9 +302,9 @@ void page_remove(pgdir_t pgdir, void *va)
 		return;
 
 	if (pte_is_mapped(pte)) {
-		/* TODO: (TLB) need to do a shootdown, inval sucks.  And might want to
-		 * manage the TLB / free pages differently. (like by the caller).
-		 * Careful about the proc/memory lock here. */
+		/* TODO: (TLB) need to do a shootdown, inval sucks.  And might
+		 * want to manage the TLB / free pages differently. (like by the
+		 * caller).  Careful about the proc/memory lock here. */
 		page = pa2page(pte_get_paddr(pte));
 		pte_clear(pte);
 		tlb_invalidate(pgdir, va);
@@ -337,9 +345,9 @@ void tlb_shootdown_global(void)
 	tlb_flush_global();
 	if (booting)
 		return;
-	/* TODO: consider a helper for broadcast messages, though note that we're
-	 * doing our flush immediately, which our caller expects from us before it
-	 * returns. */
+	/* TODO: consider a helper for broadcast messages, though note that
+	 * we're doing our flush immediately, which our caller expects from us
+	 * before it returns. */
 	for (int i = 0; i < num_cores; i++) {
 		if (i == core_id())
 			continue;

@@ -48,9 +48,10 @@ static struct chan *mem_attach(char *spec)
 }
 
 static struct walkqid *mem_walk(struct chan *c, struct chan *nc, char **name,
-								unsigned int nname)
+				unsigned int nname)
 {
-	return devwalk(c, nc, name, nname, mem_dir, ARRAY_SIZE(mem_dir), devgen);
+	return devwalk(c, nc, name, nname, mem_dir, ARRAY_SIZE(mem_dir),
+		       devgen);
 }
 
 static size_t mem_stat(struct chan *c, uint8_t *db, size_t n)
@@ -182,7 +183,8 @@ static void fetch_slab_stats(struct kmem_cache *kc, struct sized_alloc *sza)
 			j++;
 		longest_hash_chain = MAX(longest_hash_chain, j);
 	}
-	sza_printf(sza, "Nr hash %d, empty hash: %d, longest hash %d, loadlim %d\n",
+	sza_printf(sza,
+		   "Nr hash %d, empty hash: %d, longest hash %d, loadlim %d\n",
 	           kc->hh.nr_hash_lists, empty_hash_chain,
 	           longest_hash_chain, kc->hh.load_limit);
 	spin_unlock_irqsave(&kc->cache_lock);

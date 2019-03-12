@@ -35,8 +35,8 @@ static char *cpu_state_names[NR_CPU_STATES] =
 
 struct per_cpu_info {
 #ifdef CONFIG_X86
-	uintptr_t stacktop;			/* must be first */
-	int coreid;					/* must be second */
+	uintptr_t stacktop;		/* must be first */
+	int coreid;			/* must be second */
 	int nmi_status;
 	uintptr_t nmi_worker_stacktop;
 	int vmx_enabled;
@@ -47,10 +47,10 @@ struct per_cpu_info {
 	// cur_proc should be valid on all cores that are not management cores.
 	struct proc *cur_proc;		/* which process context is loaded */
 	struct proc *owning_proc;	/* proc owning the core / cur_ctx */
-	uint32_t owning_vcoreid;	/* vcoreid of owning proc (if applicable */
+	uint32_t owning_vcoreid;	/* of owning proc, if applicable */
 	struct user_context *cur_ctx;	/* user ctx we came in on (can be 0) */
 	struct user_context actual_ctx;	/* storage for cur_ctx */
-	uint32_t __ctx_depth;		/* don't access directly.  see trap.h. */
+	uint32_t __ctx_depth;		/* don't access directly.  see trap.h.*/
 	int __lock_checking_enabled;/* == 1, enables spinlock depth checking */
 	struct kthread *cur_kthread;/* tracks the running kernel context */
 	struct kthread *spare;		/* useful when restarting */
@@ -115,9 +115,9 @@ int smp_call_wait(handler_wrapper_t *wrapper);
 
 /* PCPUI Trace Rings: */
 struct pcpu_trace_event {
-	int							type;
-	int							arg0;
-	uint64_t					arg1;
+	int				type;
+	int				arg0;
+	uint64_t			arg1;
 };
 
 /* If you want to add a type, use the next available number, increment NR_TYPES,
@@ -132,11 +132,11 @@ struct pcpu_trace_event {
 
 # define pcpui_trace_kmsg(pcpui, pc)                                           \
 {                                                                              \
-	struct pcpu_trace_event *e = get_trace_slot_racy(&pcpui->traces);          \
-	if (e) {                                                                   \
-		e->type = PCPUI_TR_TYPE_KMSG;                                          \
-		e->arg1 = pc;                                                          \
-	}                                                                          \
+	struct pcpu_trace_event *e = get_trace_slot_racy(&pcpui->traces);      \
+	if (e) {                                                               \
+		e->type = PCPUI_TR_TYPE_KMSG;                                  \
+		e->arg1 = pc;                                                  \
+	}                                                                      \
 }
 
 #else
@@ -150,12 +150,12 @@ struct pcpu_trace_event {
 
 # define pcpui_trace_locks(pcpui, lock)                                        \
 {                                                                              \
-	struct pcpu_trace_event *e = get_trace_slot_overwrite(&pcpui->traces);     \
-	if (e) {                                                                   \
-		e->type = PCPUI_TR_TYPE_LOCKS;                                         \
-		e->arg0 = (int)tsc2usec(read_tsc());                                   \
-		e->arg1 = (uintptr_t)lock;                                             \
-	}                                                                          \
+	struct pcpu_trace_event *e = get_trace_slot_overwrite(&pcpui->traces); \
+	if (e) {                                                               \
+		e->type = PCPUI_TR_TYPE_LOCKS;                                 \
+		e->arg0 = (int)tsc2usec(read_tsc());                           \
+		e->arg1 = (uintptr_t)lock;                                     \
+	}                                                                      \
 }
 
 #else
@@ -165,7 +165,7 @@ struct pcpu_trace_event {
 #endif /* CONFIG_TRACE_LOCKS */
 
 void smp_do_in_cores(const struct core_set *cset, void (*func)(void *),
-					 void *opaque);
+		     void *opaque);
 
 /* Run the handlers for all events in a pcpui ring.  Can run on all cores, or
  * just one core.  'type' selects which event type is handled (0 for all). */

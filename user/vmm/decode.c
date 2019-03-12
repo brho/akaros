@@ -49,16 +49,18 @@ int debug_decode = 0;
 
 static char *modrmreg[] = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi"};
 
-// Since we at most have to decode less than half of each instruction, I'm trying to be dumb here.
+// Since we at most have to decode less than half of each instruction, I'm
+// trying to be dumb here.
 // Fortunately, for me, that's not hard.
-// I'm trying to avoid the whole Big Fun of full instruction decode, and in most of these
-// cases we only have to know register, address, operation size, and instruction length.
+// I'm trying to avoid the whole Big Fun of full instruction decode, and in most
+// of these cases we only have to know register, address, operation size, and
+// instruction length.
 // The ugly messiness of the SIB and all that are not yet needed. Maybe they
 // never will be.
 
 // Target size -- 1, 2, 4, or 8 bytes. We have yet to see 64 bytes.
-// TODO: if we ever see it, test the prefix. Since this only supports the low 1M,
-// that's not likely.
+// TODO: if we ever see it, test the prefix. Since this only supports the low
+// 1M, that's not likely.
 static int target(void *insn, int *store)
 {
 	*store = 0;
@@ -84,18 +86,19 @@ static int target(void *insn, int *store)
 		break;
 	case 0x89:
 	case 0x8b:
-		// TODO: To really know, for sure, that this is 32 bit, we'd likely have
-		//       to check the segment descriptor for the guest's current code
-		//       segment in it's GDT. The D flag (bit 22) determines whether the
-		//       instruction is using 32 or 16-bit operand size. I'm just going
-		//       to assume the flag is set (meaning 32 bit operands) for now, in
-		//       order to make virtio work. But really we should check if we
-		//       want to know for sure. Note that this hack (changing the below
-		//       line) only applies to mov instructions.
+		// TODO: To really know, for sure, that this is 32 bit, we'd
+		// likely have to check the segment descriptor for the guest's
+		// current code segment in it's GDT. The D flag (bit 22)
+		// determines whether the instruction is using 32 or 16-bit
+		// operand size. I'm just going to assume the flag is set
+		// (meaning 32 bit operands) for now, in order to make virtio
+		// work. But really we should check if we want to know for sure.
+		// Note that this hack (changing the below line) only applies to
+		// mov instructions.
 		//
-		//       And I think there's also a prefix you can use to switch the
-		//       instruction to 16-bit addressing
-		//       (address-size override prefix?)
+		//       And I think there's also a prefix you can use to switch
+		//       the instruction to 16-bit addressing (address-size
+		//       override prefix?)
 		s = 4;
 		break;
 	case 0x81:
@@ -107,8 +110,9 @@ static int target(void *insn, int *store)
 				s = 2;
 				break;
 			default:
-				fprintf(stderr, "can't get size of %02x/%04x @ %p\n", *byte,
-				        *word, byte);
+				fprintf(stderr,
+					"can't get size of %02x/%04x @ %p\n",
+					*byte, *word, byte);
 				return -1;
 		}
 		break;
@@ -144,7 +148,8 @@ static int target(void *insn, int *store)
 		*store = !(*byte & 2);
 		break;
 	default:
-		fprintf(stderr, "%s: Can't happen. rip is: %p\n", __func__, byte);
+		fprintf(stderr, "%s: Can't happen. rip is: %p\n", __func__,
+			byte);
 		break;
 	}
 	return s;
@@ -207,12 +212,14 @@ static int insize(void *rip)
 	return advance;
 }
 
-// This is a very limited function. It's only here to manage virtio-mmio and low memory
-// pointer loads. I am hoping it won't grow with time. The intent is that we enter it with
-// and EPT fault from a region that is deliberately left unbacked by any memory. We return
-// enough info to let you emulate the operation if you want. Because we have the failing physical
-// address (gpa) the decode is far simpler because we only need to find the register, how many bytes
-// to move, and how big the instruction is. I thought about bringing in emulate.c from kvm from xen,
+// This is a very limited function. It's only here to manage virtio-mmio and low
+// memory pointer loads. I am hoping it won't grow with time. The intent is that
+// we enter it with and EPT fault from a region that is deliberately left
+// unbacked by any memory.
+// We return enough info to let you emulate the operation if you want. Because
+// we have the failing physical address (gpa) the decode is far simpler because
+// we only need to find the register, how many bytes to move, and how big the
+// instruction is. I thought about bringing in emulate.c from kvm from xen,
 // but it has way more stuff than we need.
 // gpa is a pointer to the gpa.
 // int is the reg index which we can use for printing info.
@@ -251,7 +258,8 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
 	*advance = insize(rip_gpa);
 
 	uint16_t ins = *(uint16_t *)(rip_gpa +
-	    ((rip_gpa[0] == 0x44) || (rip_gpa[0] == 0x0f) || (rip_gpa[0] == 0x41)));
+	    ((rip_gpa[0] == 0x44) || (rip_gpa[0] == 0x0f) || (rip_gpa[0] ==
+							      0x41)));
 
 	DPRINTF("ins is %04x\n", ins);
 
@@ -314,12 +322,13 @@ int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
 	/* Handle movz{b,w}X.  Zero the destination. */
 	if ((rip_gpa[0] == 0x0f) && (rip_gpa[1] == 0xb6)) {
 		/* movzb.
-		 * TODO: figure out if the destination size is 16 or 32 bits.  Linux
-		 * doesn't call this yet, so it's not urgent. */
+		 * TODO: figure out if the destination size is 16 or 32 bits.
+		 * Linux doesn't call this yet, so it's not urgent. */
 		return -1;
 	}
 	if ((rip_gpa[0] == 0x0f) && (rip_gpa[1] == 0xb7)) {
-		/* movzwl.  Destination is 32 bits, unless we had the rex prefix */
+		/* movzwl.  Destination is 32 bits, unless we had the rex prefix
+		 * */
 		**regp &= ~((1ULL << 32) - 1);
 	}
 	return 0;

@@ -77,24 +77,24 @@ int __gethostbyname2_r(const char *name, int af, struct hostent *ret,
 
 	/* construct the query, always expect an ip# back */
 	switch (t) {
-		case Tsys:
-			csmsg_len = snprintf(buf, buflen, "!sys=%s ip=*", name);
-			break;
-		case Tdom:
-			csmsg_len = snprintf(buf, buflen, "!dom=%s ip=*", name);
-			break;
-		case Tip:
-			csmsg_len = snprintf(buf, buflen, "!ip=%s", name);
-			break;
-		default:
-			/* we can't get here, but want to be safe for changes to
-			 * _sock_ipattr() */
-			close(fd);
-			*result = 0;
-			return -EINVAL;
+	case Tsys:
+		csmsg_len = snprintf(buf, buflen, "!sys=%s ip=*", name);
+		break;
+	case Tdom:
+		csmsg_len = snprintf(buf, buflen, "!dom=%s ip=*", name);
+		break;
+	case Tip:
+		csmsg_len = snprintf(buf, buflen, "!ip=%s", name);
+		break;
+	default:
+		/* we can't get here, but want to be safe for changes to
+		 * _sock_ipattr() */
+		close(fd);
+		*result = 0;
+		return -EINVAL;
 	}
-	/* we don't update buflen, since we're just going to reuse the space after
-	 * our nptr/aptr/addr/etc. */
+	/* we don't update buflen, since we're just going to reuse the space
+	 * after our nptr/aptr/addr/etc. */
 	if (csmsg_len >= buflen) {
 		close(fd);
 		*result = 0;

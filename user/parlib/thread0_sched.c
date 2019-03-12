@@ -64,7 +64,7 @@ struct uthread *thread0_uth;
  * don't actually attach this mgmt info to it.  But since we just have one
  * thread, it doesn't matter. */
 struct thread0_info {
-	bool						is_blocked;
+	bool				is_blocked;
 };
 static struct thread0_info thread0_info;
 static struct event_queue *sysc_evq;
@@ -90,7 +90,8 @@ void thread0_sched_init(void)
 	ret = posix_memalign((void**)&thread0_uth, __alignof__(struct uthread),
 	                     sizeof(struct uthread));
 	assert(!ret);
-	memset(thread0_uth, 0, sizeof(struct uthread));	/* aggressively 0 for bugs*/
+	/* aggressively 0 for bugs*/
+	memset(thread0_uth, 0, sizeof(struct uthread));
 	memset(&thread0_info, 0, sizeof(thread0_info));
 	/* we don't care about the message, so don't bother with a UCQ */
 	sysc_evq = get_eventq(EV_MBOX_BITMAP);
@@ -207,8 +208,9 @@ static void thread0_sync_enqueue(struct uthread *uth, uth_sync_t *s)
 static struct uthread *thread0_sync_get_next(uth_sync_t *s)
 {
 	if (thread0_info.is_blocked) {
-		/* Note we don't clear is_blocked.  Runnable does that, which should be
-		 * called before the next get_next (since we have only one thread). */
+		/* Note we don't clear is_blocked.  Runnable does that, which
+		 * should be called before the next get_next (since we have only
+		 * one thread). */
 		return thread0_uth;
 	} else {
 		return NULL;

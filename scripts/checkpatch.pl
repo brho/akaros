@@ -11,7 +11,7 @@
 #   Copyright (c) 2015 Google Inc
 #   Barret Rhoden <brho@cs.berkeley.edu>
 #
-# - Added a tab_length parameter, set it to 4
+# - Added a tab_length parameter, set it to 8
 # - Set tree = 0, since we do not have a Linux kernel tree
 # - No KERN_ checks for printk
 # - ENOSYS can be used in more places
@@ -79,7 +79,7 @@ my $conststructsfile = "$D/const_structs.checkpatch";
 my $typedefsfile = "";
 my $color = "auto";
 my $allow_c99_comments = 1;
-my $tab_length = 4;
+my $tab_length = 8;
 
 sub help {
 	my ($exitcode) = @_;
@@ -3434,28 +3434,28 @@ sub process {
 # Checks which may be anchored in the context.
 #
 
-## Check for switch () and associated case and default
-## statements should be at the same indent.
-#		if ($line=~/\bswitch\s*\(.*\)/) {
-#			my $err = '';
-#			my $sep = '';
-#			my @ctx = ctx_block_outer($linenr, $realcnt);
-#			shift(@ctx);
-#			for my $ctx (@ctx) {
-#				my ($clen, $cindent) = line_stats($ctx);
-#				if ($ctx =~ /^\+\s*(case\s+|default:)/ &&
-#							$indent != $cindent) {
-#					$err .= "$sep$ctx\n";
-#					$sep = '';
-#				} else {
-#					$sep = "[...]\n";
-#				}
-#			}
-#			if ($err ne '') {
-#				ERROR("SWITCH_CASE_INDENT_LEVEL",
-#				      "switch and case should be at the same indent\n$hereline$err");
-#			}
-#		}
+# Check for switch () and associated case and default
+# statements should be at the same indent.
+		if ($line=~/\bswitch\s*\(.*\)/) {
+			my $err = '';
+			my $sep = '';
+			my @ctx = ctx_block_outer($linenr, $realcnt);
+			shift(@ctx);
+			for my $ctx (@ctx) {
+				my ($clen, $cindent) = line_stats($ctx);
+				if ($ctx =~ /^\+\s*(case\s+|default:)/ &&
+							$indent != $cindent) {
+					$err .= "$sep$ctx\n";
+					$sep = '';
+				} else {
+					$sep = "[...]\n";
+				}
+			}
+			if ($err ne '') {
+				ERROR("SWITCH_CASE_INDENT_LEVEL",
+				      "switch and case should be at the same indent\n$hereline$err");
+			}
+		}
 
 # if/while/etc brace do not go on next line, unless defining a do while loop,
 # or if that brace on the next line is for something else

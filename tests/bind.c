@@ -13,7 +13,7 @@
 #include <ros/syscall.h>
 
 /* The naming for the args in bind is messy historically.  We do:
- * 		bind src_path onto_path
+ * 	bind src_path onto_path
  * plan9 says bind NEW OLD, where new is *src*, and old is *onto*.
  * Linux says mount --bind OLD NEW, where OLD is *src* and NEW is *onto*. */
 int main(int argc, char *argv[])

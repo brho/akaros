@@ -30,7 +30,7 @@
 #define PCI_DEV_VEND_REG	0x00	/* for the 32 bit read of dev/vend */
 #define PCI_VENDID_REG		0x00
 #define PCI_DEVID_REG		0x02
-#define PCI_CMD_REG			0x04
+#define PCI_CMD_REG		0x04
 #define PCI_STATUS_REG		0x06
 #define PCI_REVID_REG		0x08
 #define PCI_PROGIF_REG		0x09
@@ -47,7 +47,7 @@
 #define PCI_BAR3_STD		0x1c
 #define PCI_BAR4_STD		0x20
 #define PCI_BAR5_STD		0x24
-#define PCI_BAR_OFF			0x04
+#define PCI_BAR_OFF		0x04
 #define PCI_CARDBUS_STD		0x28
 #define PCI_SUBSYSVEN_STD	0x2c
 #define PCI_SUBSYSID_STD	0x2e
@@ -60,10 +60,10 @@
 /* Config space for header type 0x01 (PCI-PCI bridge) */
 /* None of these have been used, so if you use them, check them against
  * http://wiki.osdev.org/PCI#PCI_Device_Structure */
-#define PCI_BAR0_BR			0x10
-#define PCI_BAR1_BR			0x14
-#define PCI_BUS1_BR			0x18
-#define PCI_BUS2_BR			0x19
+#define PCI_BAR0_BR		0x10
+#define PCI_BAR1_BR		0x14
+#define PCI_BUS1_BR		0x18
+#define PCI_BUS2_BR		0x19
 #define PCI_SUBBUS_BR		0x1a
 #define PCI_LATTIM2_BR		0x1b
 #define PCI_IOBASE_BR		0x1c
@@ -113,7 +113,7 @@
 #define PCI_CMD_BUS_MAS		(1 << 2)
 #define PCI_CMD_SPC_CYC		(1 << 3)
 #define PCI_CMD_WR_EN		(1 << 4)
-#define PCI_CMD_VGA			(1 << 5)
+#define PCI_CMD_VGA		(1 << 5)
 #define PCI_CMD_PAR_ERR		(1 << 6)
 /* #define PCI_CMD_XXX		(1 << 7) Reserved */
 #define PCI_CMD_SERR		(1 << 8)
@@ -136,68 +136,68 @@
 #define PCI_ST_PAR_ERR		(1 << 15)
 
 /* BARS: Base Address Registers */
-#define PCI_BAR_IO			0x1			/* 1 == IO, 0 == Mem */
+#define PCI_BAR_IO		0x1	/* 1 == IO, 0 == Mem */
 #define PCI_BAR_IO_MASK		0xfffffffc
 #define PCI_BAR_MEM_MASK	0xfffffff0
 #define PCI_MEMBAR_TYPE 	(3 << 1)
 #define PCI_MEMBAR_32BIT 	0x0
-#define PCI_MEMBAR_RESV 	0x2			/* type 0x1 shifted to MEMBAR_TYPE */
-#define PCI_MEMBAR_64BIT 	0x4			/* type 0x2 shifted to MEMBAR_TYPE */
+#define PCI_MEMBAR_RESV 	0x2	/* type 0x1 shifted to MEMBAR_TYPE */
+#define PCI_MEMBAR_64BIT 	0x4	/* type 0x2 shifted to MEMBAR_TYPE */
 
-#define PCI_MAX_BUS			256
-#define PCI_MAX_DEV			32
+#define PCI_MAX_BUS		256
+#define PCI_MAX_DEV		32
 #define PCI_MAX_FUNC		8
 
 // Run the PCI Code to loop over the PCI BARs. For now we don't use the BARs,
 // dont check em.
-#define CHECK_BARS			0
+#define CHECK_BARS		0
 
-#define MAX_PCI_BAR			6
+#define MAX_PCI_BAR		6
 
 /* Nothing yet, but this helps with Linux drivers. */
 struct device {
 };
 
 struct pci_bar {
-	uint32_t					raw_bar;
-	uint32_t					pio_base;
-	uint32_t					mmio_base32;
-	uint64_t					mmio_base64;
-	uint32_t					mmio_sz;
+	uint32_t			raw_bar;
+	uint32_t			pio_base;
+	uint32_t			mmio_base32;
+	uint64_t			mmio_base64;
+	uint32_t			mmio_sz;
 };
 
 struct pci_device {
-	STAILQ_ENTRY(pci_device)	all_dev;	/* list of all devices */
-	SLIST_ENTRY(pci_device)		irq_dev;	/* list of all devs off an irq */
-	char						name[9];
-	spinlock_t					lock;
-	void						*dev_data;	/* device private pointer */
-	struct device				device;
-	bool						in_use;		/* prevent double discovery */
-	uint8_t						bus;
-	uint8_t						dev;
-	uint8_t						func;
-	uint16_t					dev_id;
-	uint16_t					ven_id;
-	uint8_t						irqline;
-	uint8_t						irqpin;
-	char						*header_type;
-	uint8_t						class;
-	uint8_t						subclass;
-	uint8_t						progif;
-	bool						msi_ready;
-	uint32_t					msi_msg_addr_hi;
-	uint32_t					msi_msg_addr_lo;
-	uint32_t					msi_msg_data;
-	uint8_t						nr_bars;
-	struct pci_bar				bar[MAX_PCI_BAR];
-	uint32_t					caps[PCI_CAP_ID_MAX + 1];
-	uintptr_t					msix_tbl_paddr;
-	uintptr_t					msix_tbl_vaddr;
-	uintptr_t					msix_pba_paddr;
-	uintptr_t					msix_pba_vaddr;
-	unsigned int				msix_nr_vec;
-	bool						msix_ready;
+	STAILQ_ENTRY(pci_device)	all_dev; /* list of all devices */
+	SLIST_ENTRY(pci_device)		irq_dev; /* list of all devs on irq */
+	char				name[9];
+	spinlock_t			lock;
+	void				*dev_data; /* device private pointer */
+	struct device			device;
+	bool				in_use;	/* prevent double discovery */
+	uint8_t				bus;
+	uint8_t				dev;
+	uint8_t				func;
+	uint16_t			dev_id;
+	uint16_t			ven_id;
+	uint8_t				irqline;
+	uint8_t				irqpin;
+	char				*header_type;
+	uint8_t				class;
+	uint8_t				subclass;
+	uint8_t				progif;
+	bool				msi_ready;
+	uint32_t			msi_msg_addr_hi;
+	uint32_t			msi_msg_addr_lo;
+	uint32_t			msi_msg_data;
+	uint8_t				nr_bars;
+	struct pci_bar			bar[MAX_PCI_BAR];
+	uint32_t			caps[PCI_CAP_ID_MAX + 1];
+	uintptr_t			msix_tbl_paddr;
+	uintptr_t			msix_tbl_vaddr;
+	uintptr_t			msix_pba_paddr;
+	uintptr_t			msix_pba_vaddr;
+	unsigned int			msix_nr_vec;
+	bool				msix_ready;
 };
 
 struct msix_entry {
@@ -205,11 +205,11 @@ struct msix_entry {
 };
 
 struct msix_irq_vector {
-	struct pci_device *pcidev;
-	struct msix_entry *entry;
-	uint32_t addr_lo;
-	uint32_t addr_hi;
-	uint32_t data;
+	struct pci_device 		*pcidev;
+	struct msix_entry 		*entry;
+	uint32_t 			addr_lo;
+	uint32_t 			addr_hi;
+	uint32_t 			data;
 };
 
 /* List of all discovered devices */

@@ -30,12 +30,12 @@ struct tree_filesystem;
  *   the tree.  They are never increffed, only rcu-read.
  */
 struct walk_cache {
-	spinlock_t					lru_lock;
-	struct list_head			lru;
-	spinlock_t					ht_lock;
-	struct hash_helper			hh;		/* parts are rcu-read */
-	struct hlist_head			*ht;
-	struct hlist_head			static_ht[HASH_INIT_SZ];
+	spinlock_t			lru_lock;
+	struct list_head		lru;
+	spinlock_t			ht_lock;
+	struct hash_helper		hh;		/* parts are rcu-read */
+	struct hlist_head		*ht;
+	struct hlist_head		static_ht[HASH_INIT_SZ];
 };
 
 /* All ops that operate on a parent have the parent qlocked.
@@ -69,19 +69,21 @@ struct tree_file_ops {
 	void (*free)(struct tree_file *tf);
 	void (*unlink)(struct tree_file *parent, struct tree_file *child);
 	void (*lookup)(struct tree_file *parent, struct tree_file *child);
-	void (*create)(struct tree_file *parent, struct tree_file *child, int perm);
+	void (*create)(struct tree_file *parent, struct tree_file *child,
+		       int perm);
 	void (*rename)(struct tree_file *tf, struct tree_file *old_parent,
-	               struct tree_file *new_parent, const char *name, int flags);
+	               struct tree_file *new_parent, const char *name,
+		       int flags);
 	bool (*has_children)(struct tree_file *parent);
 };
 
 struct tree_filesystem {
-	struct walk_cache			wc;
+	struct walk_cache		wc;
 	struct tree_file_ops		tf_ops;
-	struct fs_file_ops			fs_ops;
-	qlock_t						rename_mtx;
-	struct tree_file			*root;
-	void						*priv;
+	struct fs_file_ops		fs_ops;
+	qlock_t				rename_mtx;
+	struct tree_file		*root;
+	void				*priv;
 };
 
 /* The tree_file is an fs_file (i.e. the first struct field) that exists in a
@@ -157,25 +159,25 @@ struct tree_filesystem {
  * - Qlocking multiple files that aren't parent->child requires the rename_mtx
  */
 struct tree_file {
-	struct fs_file				file;
-	spinlock_t					lifetime;
-	int							flags;
-	struct kref					kref;
-	struct rcu_head				rcu;
-	struct tree_file			*parent;		/* rcu protected */
-	struct hlist_node			hash;			/* rcu protected */
-	struct list_head			siblings;
-	struct list_head			children;
-	struct list_head			lru;
-	bool						can_have_children;
+	struct fs_file			file;
+	spinlock_t			lifetime;
+	int				flags;
+	struct kref			kref;
+	struct rcu_head			rcu;
+	struct tree_file		*parent;	/* rcu protected */
+	struct hlist_node		hash;		/* rcu protected */
+	struct list_head		siblings;
+	struct list_head		children;
+	struct list_head		lru;
+	bool				can_have_children;
 	struct tree_filesystem		*tfs;
 };
 
-#define TF_F_DISCONNECTED		(1 << 0)
-#define TF_F_NEGATIVE			(1 << 1)
-#define TF_F_ON_LRU				(1 << 2)
-#define TF_F_IS_ROOT			(1 << 3)
-#define TF_F_HAS_BEEN_USED		(1 << 4)
+#define TF_F_DISCONNECTED	(1 << 0)
+#define TF_F_NEGATIVE		(1 << 1)
+#define TF_F_ON_LRU		(1 << 2)
+#define TF_F_IS_ROOT		(1 << 3)
+#define TF_F_HAS_BEEN_USED	(1 << 4)
 
 /* Devices can put their tree_files / fs_files whereever they want.  For now,
  * all of them will use aux.  We can make ops for this if we need it. */

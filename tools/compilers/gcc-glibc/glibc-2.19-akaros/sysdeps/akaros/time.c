@@ -43,7 +43,8 @@ void subtract_timespecs(struct timespec *diff, const struct timespec *minuend,
 	if (minuend->tv_nsec < subtrahend->tv_nsec)
 		borrow_amt = 1000000000;
 	diff->tv_nsec = borrow_amt + minuend->tv_nsec - subtrahend->tv_nsec;
-	diff->tv_sec = minuend->tv_sec - subtrahend->tv_sec - (borrow_amt ? 1 : 0);
+	diff->tv_sec = minuend->tv_sec - subtrahend->tv_sec
+		       - (borrow_amt ? 1 : 0);
 }
 
 /* Declared in parlib/timing.h */
@@ -62,8 +63,9 @@ uint64_t tsc_to_epoch_nsec(uint64_t tsc)
 
 uint64_t epoch_nsec(void)
 {
-	/* in case we get called before the constructor.  it's a little racy, but
-	 * this all happens when we're single threaded.  for those curious, this
-	 * seems to happen a lot due to the proliferation of gettimeofday calls. */
+	/* in case we get called before the constructor.  it's a little racy,
+	 * but this all happens when we're single threaded.  for those curious,
+	 * this seems to happen a lot due to the proliferation of gettimeofday
+	 * calls. */
 	return tsc_to_epoch_nsec(read_tsc());
 }

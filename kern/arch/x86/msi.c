@@ -27,35 +27,35 @@ enum {
 };
 
 enum {
-	/* MSI address format
-	 *
-	 * +31----------------------20+19----------12+11--------4+--3--+--2--+1---0+
-	 * |       0xfee              | Dest APIC ID |  Reserved | RH  | DM  |  XX |
-	 * +--------------------------+--------------+-----------+-----+-----+-----+
-	 *
-	 * RH: Redirection Hint
-	 * DM: Destinatio Mode
-	 * XX: Probably reserved, set to 0
-	 */
-	Msiabase		= 0xfee00000u,
-	Msiadest		= 1<<12,		/* same as 63:56 of apic vector */
+/* MSI address format
+ *
+ * +31----------------------20+19----------12+11--------4+--3--+--2--+1---0+
+ * |       0xfee              | Dest APIC ID |  Reserved | RH  | DM  |  XX |
+ * +--------------------------+--------------+-----------+-----+-----+-----+
+ *
+ * RH: Redirection Hint
+ * DM: Destinatio Mode
+ * XX: Probably reserved, set to 0
+ */
+	Msiabase	= 0xfee00000u,
+	Msiadest	= 1<<12,	/* same as 63:56 of apic vector */
 	Msiaedest	= 1<<4,		/* same as 55:48 of apic vector */
 	Msialowpri	= 1<<3,		/* redirection hint */
 	Msialogical	= 1<<2,
 
-	/* MSI data format
-	 * +63-------------------------------------------------------------------32+
-	 * |                          Reserved                                     |
-	 * +-------------------------------+-15-+-14-+--------+10----8+7----------0+
-	 * |          Reserved             | TM | Lv | Reserv | Dmode |   Vector   |
-	 * +-------------------------------+----+----+--------+-------+------------+
-	 *
-	 * Dmode: delivery mode (like APIC/LVT messages).  Usually 000 (Fixed).
-	 * TM: Trigger mode (0 Edge, 1 Level)
-	 * Lv: Level assert (0 Deassert, 1 Assert)
-	 *
-	 *
-	 * for more info, check intel's SDMv3 (grep message signal) */
+/* MSI data format
+ * +63-------------------------------------------------------------------32+
+ * |                          Reserved                                     |
+ * +-------------------------------+-15-+-14-+--------+10----8+7----------0+
+ * |          Reserved             | TM | Lv | Reserv | Dmode |   Vector   |
+ * +-------------------------------+----+----+--------+-------+------------+
+ *
+ * Dmode: delivery mode (like APIC/LVT messages).  Usually 000 (Fixed).
+ * TM: Trigger mode (0 Edge, 1 Level)
+ * Lv: Level assert (0 Deassert, 1 Assert)
+ *
+ *
+ * for more info, check intel's SDMv3 (grep message signal) */
 	Msidlevel	= 1<<15,
 	Msidassert	= 1<<14,
 	Msidmode	= 1<<8,		/* 3 bits; delivery mode */
@@ -66,7 +66,7 @@ enum{
 	/* msi capabilities */
 	Vmask		= 1<<8,	/* Vectors can be masked. Optional. */
 	Cap64		= 1<<7, /* 64-bit addresses. Optional. */
-	Mmesgmsk	= 7<<4, /* Mask for # of messages allowed. See 6.8.1.3 */
+	Mmesgmsk	= 7<<4, /* Mask for # of messages allowed. See 6.8.1.3*/
 	Mmcap		= 7<<1, /* # of messages the function can support. */
 	Msienable	= 1<<0, /* Enable. */
 	/* msix capabilities */
@@ -103,8 +103,8 @@ static int msi_blacklist(struct pci_device *p)
 static int msix_blacklist(struct pci_device *p)
 {
 	switch (p->ven_id << 16 | p->dev_id) {
-//		case 0x11ab << 16 | 0x6485:	/* placeholder */
-			return -1;
+//	case 0x11ab << 16 | 0x6485:	/* placeholder */
+		return -1;
 	}
 	return 0;
 }
@@ -112,14 +112,15 @@ static int msix_blacklist(struct pci_device *p)
 static uint32_t msi_make_addr_lo(uint64_t vec)
 {
 	unsigned int dest, lopri, logical;
+
 	/* The destination is the traditional 8-bit APIC id is in 63:56 of the
 	 * vector.  Later we may need to deal with extra destination bits
 	 * (Msiaedest, in this code).  I haven't seen anything in the Intel SDM
 	 * about using Msiaedest (the bits are reserved) */
 	dest = vec >> 56;
-	/* lopri is rarely set, and intel doesn't recommend using it.  with msi, the
-	 * lopri field is actually a redirection hint, and also must be set when
-	 * sending logical messages. */
+	/* lopri is rarely set, and intel doesn't recommend using it.  with msi,
+	 * the lopri field is actually a redirection hint, and also must be set
+	 * when sending logical messages. */
 	lopri = (vec & 0x700) == MTlp;
 	logical = (vec & Lm) != 0;
 	if (logical)
@@ -131,10 +132,11 @@ static uint32_t msi_make_addr_lo(uint64_t vec)
 static uint32_t msi_make_data(uint64_t vec)
 {
 	unsigned int deliv_mode;
+
 	deliv_mode = (vec >> 8) & 7;
-	/* We can only specify the lower 16 bits of the MSI message, the rest gets
-	 * forced to 0 by the device.  MSI-X can use the full 32 bits.  We're
-	 * assuming edge triggered here. */
+	/* We can only specify the lower 16 bits of the MSI message, the rest
+	 * gets forced to 0 by the device.  MSI-X can use the full 32 bits.
+	 * We're assuming edge triggered here. */
 	return Msidmode * deliv_mode | ((unsigned int)vec & 0xff);
 }
 
@@ -155,15 +157,16 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 		return -1;
 	}
 	if (p->msi_ready) {
-		/* only allowing one enable of MSI per device (not supporting multiple
-		 * vectors) */
+		/* only allowing one enable of MSI per device (not supporting
+		 * multiple vectors) */
 		printk("MSI: MSI is already enabled, aborting\n");
 		spin_unlock_irqsave(&p->lock);
 		return -1;
 	}
 	p->msi_ready = TRUE;
 
-	/* Get the offset of the MSI capability in the function's config space. */
+	/* Get the offset of the MSI capability in the function's config space.
+	 */
 	c = msicap(p);
 	if (!c) {
 		spin_unlock_irqsave(&p->lock);
@@ -207,11 +210,11 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 	if(f & Vmask)
 		pcidev_write32(p, c + datao + 4, 0);
 
-	/* Now write the control bits back, with the Mmesg mask (which is a power of
-	 * 2) set to 0 (meaning one vector only).  Note we still haven't enabled
-	 * MSI.  Will do that when we unmask.  According to the spec, we're not
-	 * supposed to use the Msienable bit to mask the IRQ, though I don't see how
-	 * we can mask on non-Vmask-supported HW. */
+	/* Now write the control bits back, with the Mmesg mask (which is a
+	 * power of 2) set to 0 (meaning one vector only).  Note we still
+	 * haven't enabled MSI.  Will do that when we unmask.  According to the
+	 * spec, we're not supposed to use the Msienable bit to mask the IRQ,
+	 * though I don't see how we can mask on non-Vmask-supported HW. */
 	printd("write @ %d %04lx\n",c + 2, f);
 	pcidev_write16(p, c + 2, f);
 	spin_unlock_irqsave(&p->lock);
@@ -268,7 +271,6 @@ static int __pci_msix_init(struct pci_device *p)
 	}
 	if (msix_blacklist(p) != 0)
 		return -1;
-	/* Get the offset of the MSI capability in the function's config space. */
 	c = msixcap(p);
 	if (c == 0)
 		return -1;
@@ -287,7 +289,8 @@ static int __pci_msix_init(struct pci_device *p)
 		return -1;
 	}
 	p->msix_nr_vec = (f & Msixtblsize) + 1;
-	p->msix_tbl_vaddr = vmap_pmem_nocache(p->msix_tbl_paddr, p->msix_nr_vec *
+	p->msix_tbl_vaddr = vmap_pmem_nocache(p->msix_tbl_paddr,
+					      p->msix_nr_vec *
 	                                      sizeof(struct msix_entry));
 	if (!p->msix_tbl_vaddr) {
 		pcidev_write16(p, c + 2, f & ~Msixenable);
@@ -300,12 +303,12 @@ static int __pci_msix_init(struct pci_device *p)
 		pcidev_write16(p, c + 2, f & ~Msixenable);
 		printk("MSI-X: unable to vmap the PBA!\n");
 		vunmap_vmem(p->msix_tbl_paddr,
-	                p->msix_nr_vec * sizeof(struct msix_entry));
+			    p->msix_nr_vec * sizeof(struct msix_entry));
 		return -1;
 	}
-	/* they should all be masked already, but remasking just in case.  likewise,
-	 * we need to 0 out the data, since we'll use the lower byte later when
-	 * determining if an msix vector is free or not. */
+	/* they should all be masked already, but remasking just in case.
+	 * likewise, we need to 0 out the data, since we'll use the lower byte
+	 * later when determining if an msix vector is free or not. */
 	entry = (struct msix_entry*)p->msix_tbl_vaddr;
 	for (int i = 0; i < p->msix_nr_vec; i++, entry++) {
 		__msix_mask_entry(entry);
@@ -349,8 +352,8 @@ struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec)
 		spin_unlock_irqsave(&p->lock);
 		return 0;
 	}
-	/* find an unused slot (no apic_vector assigned).  later, we might want to
-	 * point back to the irq_hs for each entry.  not a big deal now. */
+	/* find an unused slot (no apic_vector assigned).  later, we might want
+	 * to point back to the irq_hs for each entry.  not a big deal now. */
 	entry = (struct msix_entry*)p->msix_tbl_vaddr;
 	for (i = 0; i < p->msix_nr_vec; i++, entry++)
 		if (!(read_mmreg32((uintptr_t)&entry->data) & 0xff))
@@ -388,6 +391,7 @@ void pci_dump_msix_table(struct pci_device *p)
 void pci_msi_mask(struct pci_device *p)
 {
 	unsigned int c, f;
+
 	c = msicap(p);
 	assert(c);
 
@@ -400,6 +404,7 @@ void pci_msi_mask(struct pci_device *p)
 void pci_msi_unmask(struct pci_device *p)
 {
 	unsigned int c, f;
+
 	c = msicap(p);
 	assert(c);
 
@@ -412,6 +417,7 @@ void pci_msi_unmask(struct pci_device *p)
 void pci_msi_route(struct pci_device *p, int dest)
 {
 	unsigned int c, f;
+
 	c = msicap(p);
 	assert(c);
 

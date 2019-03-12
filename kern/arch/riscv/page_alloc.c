@@ -7,11 +7,11 @@
  * Kevin Klues <klueska@cs.berkeley.edu>
  */
 
-#include <sys/queue.h>
-#include <page_alloc.h>
-#include <pmap.h>
 #include <kmalloc.h>
 #include <multiboot.h>
+#include <page_alloc.h>
+#include <pmap.h>
+#include <sys/queue.h>
 
 void base_arena_init(struct multiboot_info *mbi)
 {
@@ -26,8 +26,8 @@ void base_arena_init(struct multiboot_info *mbi)
 	first_invalid_page = ROUNDUP(boot_freelimit, PGSIZE);
 	assert(first_invalid_page == max_nr_pages * PGSIZE);
 
-	base_arena = arena_builder(base_pg, "base", PGSIZE, NULL, NULL, NULL,
-	                           0);
+	base_arena =
+	    arena_builder(base_pg, "base", PGSIZE, NULL, NULL, NULL, 0);
 	arena_add(base_arena, KADDR(first_free_page),
 	          first_invalid_page - first_free_page, MEM_WAIT);
 }

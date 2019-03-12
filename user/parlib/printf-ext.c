@@ -6,7 +6,7 @@
  * (in early init code), and the others need to be requested.
  *
  * To register, for example %i for ipaddr, call:
- * 		register_printf_specifier('i', printf_ipaddr, printf_ipaddr_info);
+ * 	register_printf_specifier('i', printf_ipaddr, printf_ipaddr_info);
  *
  * __printf_ipaddr, printf_ipmask, and printf_ethaddr adapted from Inferno's
  * eipconvtest.c.  Their copyright:
@@ -105,7 +105,8 @@ int printf_ipaddr_info(const struct printf_info* info, size_t n, int *argtypes,
 		argtypes[0] = PA_POINTER;
 		size[0] = sizeof(uint8_t*);
 	}
-	/* returns the nr of args required by the format string, no matter what */
+	/* returns the nr of args required by the format string, no matter what
+	 */
 	return 1;
 }
 
@@ -160,10 +161,11 @@ int printf_ethaddr(FILE *stream, const struct printf_info *info,
                    const void *const *args)
 {
 	uint8_t *e = *(uint8_t**)args[0];
+
 	if (!e)
 		e = "\0\0\0\0\0\0";
-	return fprintf(stream, "%02x:%02x:%02x:%02x:%02x:%02x", e[0], e[1], e[2],
-	               e[3], e[4], e[5]);
+	return fprintf(stream, "%02x:%02x:%02x:%02x:%02x:%02x",
+		       e[0], e[1], e[2], e[3], e[4], e[5]);
 }
 
 int printf_ethaddr_info(const struct printf_info* info, size_t n, int *argtypes,

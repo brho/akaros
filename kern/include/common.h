@@ -44,31 +44,32 @@
  * other callers spin til the func is complete. */
 #define run_once(func)                                                         \
 do {                                                                           \
-	static bool ran_once = FALSE;                                              \
-	static bool is_running = FALSE;                                            \
-	if (!ran_once) {                                                           \
-		/* fetch and set TRUE, without a header or test_and_set weirdness */   \
-		if (!__sync_fetch_and_or(&is_running, TRUE)) {                         \
-			/* we won the race and get to run the func */                      \
-			func;                                                              \
-			wmb();	/* don't let the ran_once write pass previous writes */    \
-			ran_once = TRUE;                                                   \
-		} else {                                                               \
-			/* someone else won, wait til they are done to break out */        \
-			while (!ran_once)                                                  \
-				cpu_relax();                                                   \
-		}                                                                      \
-	}                                                                          \
+	static bool ran_once = FALSE;                                          \
+	static bool is_running = FALSE;                                        \
+	if (!ran_once) {                                                       \
+		/* fetch and set TRUE, w/o a header or test_and_set weirdness*/\
+		if (!__sync_fetch_and_or(&is_running, TRUE)) {                 \
+			/* we won the race and get to run the func */          \
+			func;                                                  \
+			/* don't let the ran_once write pass previous writes */\
+			wmb();                                                 \
+			ran_once = TRUE;                                       \
+		} else {                                                       \
+			/* someone else won */                                 \
+			while (!ran_once)                                      \
+				cpu_relax();                                   \
+		}                                                              \
+	}                                                                      \
 } while (0)
 
 /* Unprotected, single-threaded version, makes sure func is run exactly once */
 #define run_once_racy(func)                                                    \
 do {                                                                           \
-	static bool ran_once = FALSE;                                              \
-	if (!ran_once) {                                                           \
-		func;                                                                  \
-		ran_once = TRUE;                                                       \
-	}                                                                          \
+	static bool ran_once = FALSE;                                          \
+	if (!ran_once) {                                                       \
+		func;                                                          \
+		ran_once = TRUE;                                               \
+	}                                                                      \
 } while (0)
 
 #ifndef __ASSEMBLER__

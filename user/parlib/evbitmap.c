@@ -31,7 +31,7 @@ bool get_evbitmap_msg(struct evbitmap *evbm, struct event_msg *ev_msg)
 		for (int i = 0; i < MAX_NR_EVENT; i++) {
 			if (GET_BITMASK_BIT(evbm->bitmap, i)) {
 				CLR_BITMASK_BIT_ATOMIC(evbm->bitmap, i);
-				/* bit messages are empty except for the type. */
+				/* bit messages are empty except for the type */
 				memset(ev_msg, 0, sizeof(struct event_msg));
 				ev_msg->ev_type = i;
 				return TRUE;
@@ -39,7 +39,8 @@ bool get_evbitmap_msg(struct evbitmap *evbm, struct event_msg *ev_msg)
 		}
 		/* If we made it here, then the bitmap might be empty. */
 		evbm->check_bits = FALSE;
-		wrmb();	/* check_bits written before we check for it being clear */
+		/* check_bits written before we check for it being clear */
+		wrmb();
 		if (BITMASK_IS_CLEAR(evbm->bitmap, MAX_NR_EVENT))
 			return FALSE;
 		cmb();

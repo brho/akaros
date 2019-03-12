@@ -75,8 +75,7 @@ static char *network, *target;
 void lost(Req*, void*);
 void reply(Req*, void*);
 
-static void
-usage(void)
+static void usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s [-6alq] [-s msgsize] [-i millisecs] [-n #pings] dest\n",
@@ -84,24 +83,21 @@ usage(void)
 	exit(1);
 }
 
-static void
-prlost4(uint16_t seq, void *v)
+static void prlost4(uint16_t seq, void *v)
 {
 	struct ip4hdr *ip4 = v;
 
 	printf("lost %u: %i -> %i\n", seq, ip4->src, ip4->dst);
 }
 
-static void
-prlost6(uint16_t seq, void *v)
+static void prlost6(uint16_t seq, void *v)
 {
 	struct ip6hdr *ip6 = v;
 
 	printf("lost %u: %i -> %i\n", seq, ip6->src, ip6->dst);
 }
 
-static void
-prreply4(Req *r, void *v)
+static void prreply4(Req *r, void *v)
 {
 	struct ip4hdr *ip4 = v;
 
@@ -110,8 +106,7 @@ prreply4(Req *r, void *v)
 		r->ttl);
 }
 
-static void
-prreply6(Req *r, void *v)
+static void prreply6(Req *r, void *v)
 {
 	struct ip6hdr *ip6 = v;
 
@@ -136,16 +131,14 @@ static struct proto v6pr = {
 static struct proto *proto = &v4pr;
 
 
-struct icmphdr *
-geticmp(void *v)
+struct icmphdr *geticmp(void *v)
 {
 	char *p = v;
 
 	return (struct icmphdr *)(p + proto->iphdrsz);
 }
 
-void
-clean(uint16_t seq, int64_t now, void *v)
+void clean(uint16_t seq, int64_t now, void *v)
 {
 	int ttl;
 	Req **l, *r;
@@ -200,8 +193,7 @@ static uint8_t loopbackmask[IPaddrlen] = {
  * that isn't the friggin loopback address.
  * deprecate link-local and multicast addresses.
  */
-static int
-myipvnaddr(uint8_t *ip, struct proto *proto, char *net)
+static int myipvnaddr(uint8_t *ip, struct proto *proto, char *net)
 {
 	int ipisv4, wantv4;
 	struct ipifc *nifc;
@@ -232,8 +224,7 @@ myipvnaddr(uint8_t *ip, struct proto *proto, char *net)
 	return ipcmp(ip, IPnoaddr) == 0? -1: 0;
 }
 
-void
-sender(int fd, int msglen, int interval, int n)
+void sender(int fd, int msglen, int interval, int n)
 {
 	int i, extra;
 	uint16_t seq;
@@ -298,8 +289,7 @@ sender(int fd, int msglen, int interval, int n)
 	done = 1;
 }
 
-void
-rcvr(int fd, int msglen, int interval, int nmsg)
+void rcvr(int fd, int msglen, int interval, int nmsg)
 {
 	int i, n, munged;
 	uint16_t x;
@@ -316,7 +306,8 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 	while(lostmsgs+rcvdmsgs < nmsg){
 		/* arm to wake ourselves if the read doesn't connect in time */
 		set_awaiter_rel(&waiter, 1000 *
-		                ((nmsg - lostmsgs - rcvdmsgs) * interval + waittime));
+		                ((nmsg - lostmsgs - rcvdmsgs) * interval
+				 + waittime));
 		set_alarm(&waiter);
 		n = read(fd, buf, BUFSIZE);
 		/* cancel immediately, so future syscalls don't get aborted */
@@ -324,9 +315,10 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 
 		now = read_tsc();
 		if(n <= 0){	/* read interrupted - time to go */
-			/* Faking time being a minute in the future, so clean marks our
-			 * message as lost.  Note this will also end up cancelling any other
-			 * pending replies that would have expired by then.  Whatever. */
+			/* Faking time being a minute in the future, so clean
+			 * marks our message as lost.  Note this will also end
+			 * up cancelling any other pending replies that would
+			 * have expired by then.  Whatever. */
 			clean(0, now + MINUTETSC, NULL);
 			continue;
 		}
@@ -343,7 +335,7 @@ rcvr(int fd, int msglen, int interval, int nmsg)
 			printf("corrupted reply\n");
 		x = nhgets(icmp->seq);
 		if(icmp->type != proto->echoreply || icmp->code != 0) {
-			printf("bad type/code/sequence %d/%d/%d (want %d/%d/%d)\n",
+			printf("bad type/code/seq %d/%d/%d (want %d/%d/%d)\n",
 				icmp->type, icmp->code, x,
 				proto->echoreply, 0, x);
 			continue;
@@ -620,8 +612,7 @@ int main(int argc, char **argv)
  * receive loop, blocking all future receivers, so that their times include the
  * printf time.  This isn't a huge issue, since the sender sleeps between each
  * one, and hopefully the print is done when the sender fires again. */
-void
-reply(Req *r, void *v)
+void reply(Req *r, void *v)
 {
 	r->rtt /= 1000LL;
 	sum += r->rtt;
@@ -632,12 +623,12 @@ reply(Req *r, void *v)
 			(*proto->prreply)(r, v);
 		else
 			printf("%3d: rtt %5lld usec, avg rtt %5lld usec, ttl = %d\n",
-				r->seq - firstseq, r->rtt, sum/rcvdmsgs, r->ttl);
+				r->seq - firstseq, r->rtt, sum/rcvdmsgs,
+				r->ttl);
 	r->replied = 1;
 }
 
-void
-lost(Req *r, void *v)
+void lost(Req *r, void *v)
 {
 	if(!quiet)
 		if(addresses && v != NULL)

@@ -14,28 +14,28 @@
 static int all, multiple;
 
 char *argv0;
-#define	ARGBEGIN	for((argv0||(argv0=*argv)),argv++,argc--;\
-			    argv[0] && argv[0][0]=='-' && argv[0][1];\
-			    argc--, argv++) {\
-				char *_args, *_argt;\
-				char _argc;		\
-				_args = &argv[0][1];\
-				if(_args[0]=='-' && _args[1]==0){\
-					argc--; argv++; break;\
-				}\
-				_argc = _args[0];\
-				while(*_args && _args++)\
-					switch(_argc)
-#define	ARGEND		/*SET(_argt);USED(_argt,_argc,_args);}USED(argv, argc);*/}
-#define	ARGF()		(_argt=_args, _args="",\
-				(*_argt? _argt: argv[1]? (argc--, *++argv): 0))
-#define	EARGF(x)	(_argt=_args, _args="",\
-				(*_argt? _argt: argv[1]? (argc--, *++argv): ((x), abort(), (char*)0)))
+#define	ARGBEGIN \
+	for((argv0||(argv0=*argv)),argv++,argc--;\
+	    argv[0] && argv[0][0]=='-' && argv[0][1];\
+	    argc--, argv++) {\
+		char *_args, *_argt;\
+		char _argc;		\
+		_args = &argv[0][1];\
+		if(_args[0]=='-' && _args[1]==0){\
+			argc--; argv++; break;\
+		}\
+		_argc = _args[0];\
+		while(*_args && _args++)\
+			switch(_argc)
+#define	ARGEND	/*SET(_argt);USED(_argt,_argc,_args);}USED(argv, argc);*/}
+#define	ARGF()	(_argt=_args, _args="",\
+	(*_argt? _argt: argv[1]? (argc--, *++argv): 0))
+#define	EARGF(x)(_argt=_args, _args="",\
+	(*_argt? _argt: argv[1]? (argc--, *++argv): ((x), abort(), (char*)0)))
 
-#define	ARGC()		_argc
+#define	ARGC()	_argc
 
-void
-usage(void)
+void usage(void)
 {
 	fprintf(stderr, "usage: query [-am] [-f ndbfile] attr value "
 		"[returned-attr [reps]]\n");
@@ -44,16 +44,14 @@ usage(void)
 }
 
 /* print values of nt's attributes matching rattr */
-static void
-prmatch(struct ndbtuple *nt, char *rattr)
+static void prmatch(struct ndbtuple *nt, char *rattr)
 {
 	for(; nt; nt = nt->entry)
 		if (strcmp(nt->attr, rattr) == 0)
 			printf("%s\n", nt->val);
 }
 
-void
-search(struct ndb *db, char *attr, char *val, char *rattr)
+void search(struct ndb *db, char *attr, char *val, char *rattr)
 {
 	char *p;
 	struct ndbs s;

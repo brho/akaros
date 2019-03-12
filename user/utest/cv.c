@@ -12,11 +12,11 @@ TEST_SUITE("CV");
 /* <--- Begin definition of test cases ---> */
 
 struct common_args {
-	uth_cond_var_t				*cv;
-	uth_mutex_t					*mtx;
-	bool						flag;
-	unsigned int				wait_sleep;
-	unsigned int				sig_sleep;
+	uth_cond_var_t			*cv;
+	uth_mutex_t			*mtx;
+	bool				flag;
+	unsigned int			wait_sleep;
+	unsigned int			sig_sleep;
 };
 
 #define PTH_TEST_TRUE			(void*)1
@@ -41,9 +41,9 @@ void *__cv_signaller(void *arg)
 	args->flag = TRUE;
 	uth_mutex_unlock(args->mtx);
 	/* We can actually signal outside the mutex if we want.  Remember the
-	 * invariant: whenever the flag is set from FALSE to TRUE, all waiters that
-	 * saw FALSE are on the CV's waitqueue.  That's true even after we unlock
-	 * the mutex. */
+	 * invariant: whenever the flag is set from FALSE to TRUE, all waiters
+	 * that saw FALSE are on the CV's waitqueue.  That's true even after we
+	 * unlock the mutex. */
 	uth_cond_var_signal(args->cv);
 	return PTH_TEST_TRUE;
 }
@@ -57,9 +57,9 @@ void *__cv_broadcaster(void *arg)
 	args->flag = TRUE;
 	uth_mutex_unlock(args->mtx);
 	/* We can actually signal outside the mutex if we want.  Remember the
-	 * invariant: whenever the flag is set from FALSE to TRUE, all waiters that
-	 * saw FALSE are on the CV's waitqueue.  That's true even after we unlock
-	 * the mutex. */
+	 * invariant: whenever the flag is set from FALSE to TRUE, all waiters
+	 * that saw FALSE are on the CV's waitqueue.  That's true even after we
+	 * unlock the mutex. */
 	uth_cond_var_broadcast(args->cv);
 	return PTH_TEST_TRUE;
 }
@@ -203,7 +203,8 @@ bool test_signal_no_mutex(void)
 
 		ret = pthread_create(&waiter, 0, __cv_waiter_no_mutex, args);
 		UT_ASSERT(!ret);
-		ret = pthread_create(&signaller, 0, __cv_signaller_no_mutex, args);
+		ret = pthread_create(&signaller, 0, __cv_signaller_no_mutex,
+				     args);
 		UT_ASSERT(!ret);
 		ret = pthread_join(waiter, &wait_join);
 		UT_ASSERT(!ret);
@@ -231,7 +232,8 @@ bool test_broadcast_no_mutex(void)
 	args->sig_sleep = 1000;
 
 	for (int i = 0; i < NR_WAITERS; i++) {
-		ret = pthread_create(&waiters[i], 0, __cv_waiter_no_mutex, args);
+		ret = pthread_create(&waiters[i], 0, __cv_waiter_no_mutex,
+				     args);
 		UT_ASSERT(!ret);
 	}
 	ret = pthread_create(&bcaster, 0, __cv_broadcaster_no_mutex, args);
@@ -372,7 +374,8 @@ bool test_semaphore_timeout(void)
 	got_it = uth_semaphore_timed_down(&sem, timeout);
 	UT_ASSERT(got_it);
 
-	/* Second time we still hold the sem and would block and should time out. */
+	/* Second time we still hold the sem and would block and should time
+	 * out. */
 	UT_ASSERT(sem.count == 0);
 	ret = clock_gettime(CLOCK_REALTIME, timeout);
 	UT_ASSERT(!ret);
@@ -427,7 +430,8 @@ bool test_cv_recurse_timeout(void)
 	UT_ASSERT(r_mtx.count == 3);
 	UT_ASSERT(r_mtx.mtx.count == 0);
 
-	/* Unlock our three locks, then make sure the semaphore/mtx is unlocked. */
+	/* Unlock our three locks, then make sure the semaphore/mtx is unlocked.
+	 */
 	uth_recurse_mutex_unlock(&r_mtx);
 	uth_recurse_mutex_unlock(&r_mtx);
 	uth_recurse_mutex_unlock(&r_mtx);
@@ -532,7 +536,6 @@ int num_utests = sizeof(utests) / sizeof(struct utest);
 
 int main(int argc, char *argv[])
 {
-	// Run test suite passing it all the args as whitelist of what tests to run.
 	char **whitelist = &argv[1];
 	int whitelist_len = argc - 1;
 

@@ -51,8 +51,8 @@ static struct {
 	spinlock_t lock;
 	struct io_map *map;
 	struct io_map *free;
-	struct io_map maps[32];				// some initial free maps
-	qlock_t ql;					// lock for reading map
+	struct io_map maps[32];		// some initial free maps
+	qlock_t ql;			// lock for reading map
 } iomap;
 
 enum {
@@ -99,13 +99,14 @@ static struct address_range msr_rd_wlist[] = {
 };
 static struct address_range msr_wr_wlist[] = {
 	ADDRESS_RANGE(MSR_IA32_PERFCTR0,
-				  MSR_IA32_PERFCTR0 + MSR_MAX_VAR_COUNTERS - 1),
+		      MSR_IA32_PERFCTR0 + MSR_MAX_VAR_COUNTERS - 1),
 	ADDRESS_RANGE(MSR_ARCH_PERFMON_EVENTSEL0,
-				  MSR_ARCH_PERFMON_EVENTSEL0 + MSR_MAX_VAR_COUNTERS - 1),
+		      MSR_ARCH_PERFMON_EVENTSEL0 + MSR_MAX_VAR_COUNTERS - 1),
 	ADDRESS_RANGE(MSR_IA32_PERF_CTL, MSR_IA32_PERF_CTL),
 	ADDRESS_RANGE(MSR_CORE_PERF_FIXED_CTR0,
-				  MSR_CORE_PERF_FIXED_CTR0 + MSR_MAX_FIX_COUNTERS - 1),
-	ADDRESS_RANGE(MSR_CORE_PERF_FIXED_CTR_CTRL, MSR_CORE_PERF_GLOBAL_OVF_CTRL),
+		      MSR_CORE_PERF_FIXED_CTR0 + MSR_MAX_FIX_COUNTERS - 1),
+	ADDRESS_RANGE(MSR_CORE_PERF_FIXED_CTR_CTRL,
+		      MSR_CORE_PERF_GLOBAL_OVF_CTRL),
 	ADDRESS_RANGE(MSR_IA32_MPERF, MSR_IA32_APERF),
 };
 int gdbactive = 0;
@@ -150,7 +151,8 @@ int ioalloc(int port, int size, int align, char *tag)
 			map = *l;
 			if (map->end <= port)
 				continue;
-			if (map->reserved && map->start == port && map->end == port + size) {
+			if (map->reserved && map->start == port &&
+			    map->end == port + size) {
 				map->reserved = 0;
 				spin_unlock(&(&iomap)->lock);
 				return map->start;
@@ -393,73 +395,73 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 	ktop = kptr + usize;
 	error_assert(EBADMSG, (kptr + 1) <= ktop);
 	switch (*kptr++) {
-		case PERFMON_CMD_COUNTER_OPEN: {
-			int ped;
-			struct perfmon_event pev;
-			struct core_set cset;
+	case PERFMON_CMD_COUNTER_OPEN: {
+		int ped;
+		struct perfmon_event pev;
+		struct core_set cset;
 
-			error_assert(EBADMSG, (kptr + 3 * sizeof(uint64_t)) <= ktop);
-			perfmon_init_event(&pev);
-			kptr = get_le_u64(kptr, &pev.event);
-			kptr = get_le_u64(kptr, &pev.flags);
-			kptr = get_le_u64(kptr, &pev.trigger_count);
-			kptr = get_le_u64(kptr, &pev.user_data);
-			kptr = arch_read_core_set(&cset, kptr, ktop);
+		error_assert(EBADMSG, (kptr + 3 * sizeof(uint64_t)) <= ktop);
+		perfmon_init_event(&pev);
+		kptr = get_le_u64(kptr, &pev.event);
+		kptr = get_le_u64(kptr, &pev.flags);
+		kptr = get_le_u64(kptr, &pev.trigger_count);
+		kptr = get_le_u64(kptr, &pev.user_data);
+		kptr = arch_read_core_set(&cset, kptr, ktop);
 
-			ped = perfmon_open_event(&cset, pc->ps, &pev);
+		ped = perfmon_open_event(&cset, pc->ps, &pev);
 
-			pc->resp_size = sizeof(uint32_t);
-			pc->resp = kmalloc(pc->resp_size, MEM_WAIT);
-			put_le_u32(pc->resp, (uint32_t) ped);
-			break;
-		}
-		case PERFMON_CMD_COUNTER_STATUS: {
-			uint32_t ped;
-			uint8_t *rptr;
-			struct perfmon_status *pef;
+		pc->resp_size = sizeof(uint32_t);
+		pc->resp = kmalloc(pc->resp_size, MEM_WAIT);
+		put_le_u32(pc->resp, (uint32_t) ped);
+		break;
+	}
+	case PERFMON_CMD_COUNTER_STATUS: {
+		uint32_t ped;
+		uint8_t *rptr;
+		struct perfmon_status *pef;
 
-			error_assert(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
-			kptr = get_le_u32(kptr, &ped);
+		error_assert(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
+		kptr = get_le_u32(kptr, &ped);
 
-			pef = perfmon_get_event_status(pc->ps, (int) ped);
+		pef = perfmon_get_event_status(pc->ps, (int) ped);
 
-			pc->resp_size = sizeof(uint32_t) + num_cores * sizeof(uint64_t);
-			pc->resp = kmalloc(pc->resp_size, MEM_WAIT);
-			rptr = put_le_u32(pc->resp, num_cores);
-			for (int i = 0; i < num_cores; i++)
-				rptr = put_le_u64(rptr, pef->cores_values[i]);
+		pc->resp_size = sizeof(uint32_t) + num_cores * sizeof(uint64_t);
+		pc->resp = kmalloc(pc->resp_size, MEM_WAIT);
+		rptr = put_le_u32(pc->resp, num_cores);
+		for (int i = 0; i < num_cores; i++)
+			rptr = put_le_u64(rptr, pef->cores_values[i]);
 
-			perfmon_free_event_status(pef);
-			break;
-		}
-		case PERFMON_CMD_COUNTER_CLOSE: {
-			uint32_t ped;
+		perfmon_free_event_status(pef);
+		break;
+	}
+	case PERFMON_CMD_COUNTER_CLOSE: {
+		uint32_t ped;
 
-			error_assert(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
-			kptr = get_le_u32(kptr, &ped);
+		error_assert(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
+		kptr = get_le_u32(kptr, &ped);
 
-			perfmon_close_event(pc->ps, (int) ped);
-			break;
-		}
-		case PERFMON_CMD_CPU_CAPS: {
-			uint8_t *rptr;
-			struct perfmon_cpu_caps pcc;
+		perfmon_close_event(pc->ps, (int) ped);
+		break;
+	}
+	case PERFMON_CMD_CPU_CAPS: {
+		uint8_t *rptr;
+		struct perfmon_cpu_caps pcc;
 
-			perfmon_get_cpu_caps(&pcc);
+		perfmon_get_cpu_caps(&pcc);
 
-			pc->resp_size = 6 * sizeof(uint32_t);
-			pc->resp = kmalloc(pc->resp_size, MEM_WAIT);
+		pc->resp_size = 6 * sizeof(uint32_t);
+		pc->resp = kmalloc(pc->resp_size, MEM_WAIT);
 
-			rptr = put_le_u32(pc->resp, pcc.perfmon_version);
-			rptr = put_le_u32(rptr, pcc.proc_arch_events);
-			rptr = put_le_u32(rptr, pcc.bits_x_counter);
-			rptr = put_le_u32(rptr, pcc.counters_x_proc);
-			rptr = put_le_u32(rptr, pcc.bits_x_fix_counter);
-			rptr = put_le_u32(rptr, pcc.fix_counters_x_proc);
-			break;
-		}
-		default:
-			error(EINVAL, "Invalid perfmon command: 0x%x", kptr[-1]);
+		rptr = put_le_u32(pc->resp, pcc.perfmon_version);
+		rptr = put_le_u32(rptr, pcc.proc_arch_events);
+		rptr = put_le_u32(rptr, pcc.bits_x_counter);
+		rptr = put_le_u32(rptr, pcc.counters_x_proc);
+		rptr = put_le_u32(rptr, pcc.bits_x_fix_counter);
+		rptr = put_le_u32(rptr, pcc.fix_counters_x_proc);
+		break;
+	}
+	default:
+		error(EINVAL, "Invalid perfmon command: 0x%x", kptr[-1]);
 	}
 	poperror();
 	qunlock(&pc->resp_lock);
@@ -472,12 +474,12 @@ static struct chan *archopen(struct chan *c, int omode)
 {
 	c = devopen(c, omode, archdir, Qmax, devgen);
 	switch ((uint32_t) c->qid.path) {
-		case Qperf:
-			if (!perfmon_supported())
-				error(ENODEV, "perf is not supported");
-			assert(!c->aux);
-			c->aux = arch_create_perf_context();
-			break;
+	case Qperf:
+		if (!perfmon_supported())
+			error(ENODEV, "perf is not supported");
+		assert(!c->aux);
+		c->aux = arch_create_perf_context();
+		break;
 	}
 
 	return c;
@@ -486,12 +488,12 @@ static struct chan *archopen(struct chan *c, int omode)
 static void archclose(struct chan *c)
 {
 	switch ((uint32_t) c->qid.path) {
-		case Qperf:
-			if (c->aux) {
-				arch_free_perf_context((struct perf_context *) c->aux);
-				c->aux = NULL;
-			}
-			break;
+	case Qperf:
+		if (c->aux) {
+			arch_free_perf_context((struct perf_context *) c->aux);
+			c->aux = NULL;
+		}
+		break;
 	}
 }
 
@@ -508,96 +510,99 @@ static size_t archread(struct chan *c, void *a, size_t n, off64_t offset)
 	struct msr_value msrv;
 
 	switch ((uint32_t) c->qid.path) {
-		case Qdir:
-			return devdirread(c, a, n, archdir, Qmax, devgen);
-		case Qgdb:
-			p = gdbactive ? "1" : "0";
-			return readstr(offset, a, n, p);
-		case Qiob:
-			port = offset;
-			checkport(offset, offset + n);
-			for (p = a; port < offset + n; port++)
-				*p++ = inb(port);
-			return n;
-		case Qiow:
-			if (n & 1)
-				error(EINVAL, ERROR_FIXME);
-			checkport(offset, offset + n);
-			sp = a;
-			for (port = offset; port < offset + n; port += 2)
-				*sp++ = inw(port);
-			return n;
-		case Qiol:
-			if (n & 3)
-				error(EINVAL, ERROR_FIXME);
-			checkport(offset, offset + n);
-			lp = a;
-			for (port = offset; port < offset + n; port += 4)
-				*lp++ = inl(port);
-			return n;
-		case Qioalloc:
-			break;
-		case Qrealmem:
-			return readmem(offset, a, n, KADDR(0), REAL_MEM_SIZE);
-		case Qmsr:
-			if (!address_range_find(msr_rd_wlist, ARRAY_SIZE(msr_rd_wlist),
-			                        (uintptr_t) offset))
-				error(EPERM, "MSR 0x%x not in read whitelist", offset);
-			core_set_init(&cset);
-			core_set_fill_available(&cset);
-			msr_set_address(&msra, (uint32_t) offset);
-			values = kzmalloc(num_cores * sizeof(uint64_t),
-					  MEM_WAIT);
-			if (!values)
-				error(ENOMEM, ERROR_FIXME);
-			msr_set_values(&msrv, values, num_cores);
+	case Qdir:
+		return devdirread(c, a, n, archdir, Qmax, devgen);
+	case Qgdb:
+		p = gdbactive ? "1" : "0";
+		return readstr(offset, a, n, p);
+	case Qiob:
+		port = offset;
+		checkport(offset, offset + n);
+		for (p = a; port < offset + n; port++)
+			*p++ = inb(port);
+		return n;
+	case Qiow:
+		if (n & 1)
+			error(EINVAL, ERROR_FIXME);
+		checkport(offset, offset + n);
+		sp = a;
+		for (port = offset; port < offset + n; port += 2)
+			*sp++ = inw(port);
+		return n;
+	case Qiol:
+		if (n & 3)
+			error(EINVAL, ERROR_FIXME);
+		checkport(offset, offset + n);
+		lp = a;
+		for (port = offset; port < offset + n; port += 4)
+			*lp++ = inl(port);
+		return n;
+	case Qioalloc:
+		break;
+	case Qrealmem:
+		return readmem(offset, a, n, KADDR(0), REAL_MEM_SIZE);
+	case Qmsr:
+		if (!address_range_find(msr_rd_wlist, ARRAY_SIZE(msr_rd_wlist),
+		                        (uintptr_t) offset))
+			error(EPERM, "MSR 0x%x not in read whitelist", offset);
+		core_set_init(&cset);
+		core_set_fill_available(&cset);
+		msr_set_address(&msra, (uint32_t) offset);
+		values = kzmalloc(num_cores * sizeof(uint64_t),
+				  MEM_WAIT);
+		if (!values)
+			error(ENOMEM, ERROR_FIXME);
+		msr_set_values(&msrv, values, num_cores);
 
-			err = msr_cores_read(&cset, &msra, &msrv);
+		err = msr_cores_read(&cset, &msra, &msrv);
 
-			if (likely(!err)) {
-				if (n >= num_cores * sizeof(uint64_t)) {
-					if (!memcpy_to_user_errno(current, a, values,
-					                          num_cores * sizeof(uint64_t)))
-						n = num_cores * sizeof(uint64_t);
-					else
-						n = -1;
-				} else {
-					kfree(values);
-					error(ERANGE, "Not enough space for MSR read");
-				}
-			} else {
-				switch (-err) {
-				case (EFAULT):
-					error(-err, "read_msr() faulted on MSR 0x%x", offset);
-				case (ERANGE):
-					error(-err, "Not enough space for MSR read");
-				};
-				error(-err, "MSR read failed");
-			}
-			kfree(values);
-			return n;
-		case Qperf: {
-			struct perf_context *pc = (struct perf_context *) c->aux;
-
-			assert(pc);
-			qlock(&pc->resp_lock);
-			if (pc->resp && ((size_t) offset < pc->resp_size)) {
-				n = MIN(n, (long) pc->resp_size - (long) offset);
-				if (memcpy_to_user_errno(current, a, pc->resp + offset, n))
+		if (likely(!err)) {
+			if (n >= num_cores * sizeof(uint64_t)) {
+				if (!memcpy_to_user_errno(current, a, values,
+				                          num_cores *
+							  sizeof(uint64_t)))
+					n = num_cores * sizeof(uint64_t);
+				else
 					n = -1;
 			} else {
-				n = 0;
+				kfree(values);
+				error(ERANGE, "Not enough space for MSR read");
 			}
-			qunlock(&pc->resp_lock);
-
-			return n;
-		case Qcstate:
-			return readnum_hex(offset, a, n, get_cstate(), NUMSIZE32);
-		case Qpstate:
-			return readnum_hex(offset, a, n, get_pstate(), NUMSIZE32);
+		} else {
+			switch (-err) {
+			case (EFAULT):
+				error(-err, "read_msr() faulted on MSR 0x%x",
+				      offset);
+			case (ERANGE):
+				error(-err, "Not enough space for MSR read");
+			};
+			error(-err, "MSR read failed");
 		}
-		default:
-			error(EINVAL, ERROR_FIXME);
+		kfree(values);
+		return n;
+	case Qperf: {
+		struct perf_context *pc = (struct perf_context *) c->aux;
+
+		assert(pc);
+		qlock(&pc->resp_lock);
+		if (pc->resp && ((size_t) offset < pc->resp_size)) {
+			n = MIN(n, (long) pc->resp_size - (long) offset);
+			if (memcpy_to_user_errno(current, a, pc->resp + offset,
+						 n))
+				n = -1;
+		} else {
+			n = 0;
+		}
+		qunlock(&pc->resp_lock);
+
+		return n;
+	case Qcstate:
+		return readnum_hex(offset, a, n, get_cstate(), NUMSIZE32);
+	case Qpstate:
+		return readnum_hex(offset, a, n, get_pstate(), NUMSIZE32);
+	}
+	default:
+		error(EINVAL, ERROR_FIXME);
 	}
 
 	if ((buf = kzmalloc(n, 0)) == NULL)
@@ -607,18 +612,19 @@ static size_t archread(struct chan *c, void *a, size_t n, off64_t offset)
 	offset = offset / Linelen;
 
 	switch ((uint32_t) c->qid.path) {
-		case Qioalloc:
-			spin_lock(&(&iomap)->lock);
-			for (map = iomap.map; n > 0 && map != NULL; map = map->next) {
-				if (offset-- > 0)
-					continue;
-				snprintf(p, n * Linelen, "%#8p %#8p %-12.12s\n", map->start,
-				         map->end - 1, map->tag);
-				p += Linelen;
-				n--;
-			}
-			spin_unlock(&(&iomap)->lock);
-			break;
+	case Qioalloc:
+		spin_lock(&(&iomap)->lock);
+		for (map = iomap.map; n > 0 && map != NULL; map = map->next) {
+			if (offset-- > 0)
+				continue;
+			snprintf(p, n * Linelen, "%#8p %#8p %-12.12s\n",
+				 map->start,
+			         map->end - 1, map->tag);
+			p += Linelen;
+			n--;
+		}
+		spin_unlock(&(&iomap)->lock);
+		break;
 	}
 
 	n = p - buf;
@@ -666,77 +672,78 @@ static size_t archwrite(struct chan *c, void *a, size_t n, off64_t offset)
 	struct msr_value msrv;
 
 	switch ((uint32_t) c->qid.path) {
-		case Qgdb:
-			p = a;
-			if (n != 1)
-				error(EINVAL, "Gdb: Write one byte, '1' or '0'");
-			if (*p == '1')
-				gdbactive = 1;
-			else if (*p == '0')
-				gdbactive = 0;
-			else
-				error(EINVAL, "Gdb: must be 1 or 0");
-			return 1;
-		case Qiob:
-			p = a;
-			checkport(offset, offset + n);
-			for (port = offset; port < offset + n; port++)
-				outb(port, *p++);
-			return n;
-		case Qiow:
-			if (n & 1)
-				error(EINVAL, ERROR_FIXME);
-			checkport(offset, offset + n);
-			sp = a;
-			for (port = offset; port < offset + n; port += 2)
-				outw(port, *sp++);
-			return n;
-		case Qiol:
-			if (n & 3)
-				error(EINVAL, ERROR_FIXME);
-			checkport(offset, offset + n);
-			lp = a;
-			for (port = offset; port < offset + n; port += 4)
-				outl(port, *lp++);
-			return n;
-		case Qmsr:
-			if (!address_range_find(msr_wr_wlist, ARRAY_SIZE(msr_wr_wlist),
-			                        (uintptr_t) offset))
-				error(EPERM, "MSR 0x%x not in write whitelist", offset);
-			if (n != sizeof(uint64_t))
-				error(EINVAL, "Tried to write more than a u64 (%p)", n);
-			if (memcpy_from_user_errno(current, &value, a, sizeof(value)))
-				return -1;
-
-			core_set_init(&cset);
-			core_set_fill_available(&cset);
-			msr_set_address(&msra, (uint32_t) offset);
-			msr_set_value(&msrv, value);
-
-			err = msr_cores_write(&cset, &msra, &msrv);
-			if (unlikely(err)) {
-				switch (-err) {
-				case (EFAULT):
-					error(-err, "write_msr() faulted on MSR 0x%x", offset);
-				case (ERANGE):
-					error(-err, "Not enough space for MSR write");
-				};
-				error(-err, "MSR write failed");
-			}
-			return sizeof(uint64_t);
-		case Qperf: {
-			struct perf_context *pc = (struct perf_context *) c->aux;
-
-			assert(pc);
-
-			return arch_perf_write(pc, a, n);
-		}
-		case Qcstate:
-			return cstate_write(a, n, 0);
-		case Qpstate:
-			return pstate_write(a, n, 0);
-		default:
+	case Qgdb:
+		p = a;
+		if (n != 1)
+			error(EINVAL, "Gdb: Write one byte, '1' or '0'");
+		if (*p == '1')
+			gdbactive = 1;
+		else if (*p == '0')
+			gdbactive = 0;
+		else
+			error(EINVAL, "Gdb: must be 1 or 0");
+		return 1;
+	case Qiob:
+		p = a;
+		checkport(offset, offset + n);
+		for (port = offset; port < offset + n; port++)
+			outb(port, *p++);
+		return n;
+	case Qiow:
+		if (n & 1)
 			error(EINVAL, ERROR_FIXME);
+		checkport(offset, offset + n);
+		sp = a;
+		for (port = offset; port < offset + n; port += 2)
+			outw(port, *sp++);
+		return n;
+	case Qiol:
+		if (n & 3)
+			error(EINVAL, ERROR_FIXME);
+		checkport(offset, offset + n);
+		lp = a;
+		for (port = offset; port < offset + n; port += 4)
+			outl(port, *lp++);
+		return n;
+	case Qmsr:
+		if (!address_range_find(msr_wr_wlist, ARRAY_SIZE(msr_wr_wlist),
+		                        (uintptr_t) offset))
+			error(EPERM, "MSR 0x%x not in write whitelist", offset);
+		if (n != sizeof(uint64_t))
+			error(EINVAL, "Tried to write more than a u64 (%p)", n);
+		if (memcpy_from_user_errno(current, &value, a, sizeof(value)))
+			return -1;
+
+		core_set_init(&cset);
+		core_set_fill_available(&cset);
+		msr_set_address(&msra, (uint32_t) offset);
+		msr_set_value(&msrv, value);
+
+		err = msr_cores_write(&cset, &msra, &msrv);
+		if (unlikely(err)) {
+			switch (-err) {
+			case (EFAULT):
+				error(-err, "write_msr() faulted on MSR 0x%x",
+				      offset);
+			case (ERANGE):
+				error(-err, "Not enough space for MSR write");
+			};
+			error(-err, "MSR write failed");
+		}
+		return sizeof(uint64_t);
+	case Qperf: {
+		struct perf_context *pc = (struct perf_context *) c->aux;
+
+		assert(pc);
+
+		return arch_perf_write(pc, a, n);
+	}
+	case Qcstate:
+		return cstate_write(a, n, 0);
+	case Qpstate:
+		return pstate_write(a, n, 0);
+	default:
+		error(EINVAL, ERROR_FIXME);
 	}
 	return 0;
 }

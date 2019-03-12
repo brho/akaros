@@ -14,11 +14,12 @@
 static inline uintptr_t get_caller_pc(void)
 {
 	unsigned long *ebp = (unsigned long*)read_bp();
+
 	if (!ebp)
 		return 0;
 	/* this is part of the way back into the call() instruction's bytes
-	 * eagle-eyed readers should be able to explain why this is good enough, and
-	 * retaddr (just *(ebp + 1) is not) */
+	 * eagle-eyed readers should be able to explain why this is good enough,
+	 * and retaddr (just *(ebp + 1) is not) */
 	return *(ebp + 1) - 1;
 }
 

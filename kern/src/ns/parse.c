@@ -54,7 +54,8 @@ static int ncmdfield(char *p, int n)
 	ep = p + n;
 	white = 1;	/* first text will start field */
 	while (p < ep) {
-		nwhite = (strchr(" \t\r\n", *p++ & 0xFF) != 0);	/* UTF is irrelevant */
+		/* UTF is irrelevant */
+		nwhite = (strchr(" \t\r\n", *p++ & 0xFF) != 0);
 		if (white && !nwhite)	/* beginning of field */
 			nf++;
 		white = nwhite;
@@ -74,7 +75,8 @@ struct cmdbuf *parsecmd(char *p, int n)
 
 	nf = ncmdfield(p, n);
 
-	/* allocate Cmdbuf plus string pointers plus copy of string including \0 */
+	/* allocate Cmdbuf plus string pointers plus copy of string including \0
+	 */
 	sp = kzmalloc(sizeof(*cb) + nf * sizeof(char *) + n + 1, 0);
 	cb = (struct cmdbuf *)sp;
 	cb->f = (char **)(&cb[1]);

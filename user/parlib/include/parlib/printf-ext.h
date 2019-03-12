@@ -6,7 +6,7 @@
  * (in early init code), and the others need to be requested.
  *
  * To register, for example %i for ipaddr, call:
- * 		register_printf_specifier('i', printf_ipaddr, printf_ipaddr_info);
+ * 	register_printf_specifier('i', printf_ipaddr, printf_ipaddr_info);
  */
 
 #pragma once

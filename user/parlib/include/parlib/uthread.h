@@ -11,38 +11,38 @@
 
 __BEGIN_DECLS
 
-#define UTHREAD_DONT_MIGRATE		0x001 /* don't move to another vcore */
-#define UTHREAD_SAVED				0x002 /* uthread's state is in utf */
-#define UTHREAD_FPSAVED				0x004 /* uthread's FP state is in uth->as */
-#define UTHREAD_IS_THREAD0			0x008 /* thread0: glibc's main() thread */
+#define UTHREAD_DONT_MIGRATE	0x001 /* don't move to another vcore */
+#define UTHREAD_SAVED		0x002 /* uthread's state is in utf */
+#define UTHREAD_FPSAVED		0x004 /* uthread's FP state is in uth->as */
+#define UTHREAD_IS_THREAD0	0x008 /* thread0: glibc's main() thread */
 
 /* Thread States */
 #define UT_RUNNING		1
-#define UT_NOT_RUNNING	2
+#define UT_NOT_RUNNING		2
 
 /* Externally blocked thread reasons (for uthread_has_blocked()) */
-#define UTH_EXT_BLK_MUTEX			1
-#define UTH_EXT_BLK_EVENTQ			2
-#define UTH_EXT_BLK_YIELD			3
-#define UTH_EXT_BLK_MISC			4
+#define UTH_EXT_BLK_MUTEX	1
+#define UTH_EXT_BLK_EVENTQ	2
+#define UTH_EXT_BLK_YIELD	3
+#define UTH_EXT_BLK_MISC	4
 
 /* One per joiner, usually kept on the stack. */
 struct uth_join_kicker {
-	struct kref					kref;
-	struct uthread				*joiner;
+	struct kref			kref;
+	struct uthread			*joiner;
 };
 
 /* Join states, stored in the join_ctl */
-#define UTH_JOIN_DETACHED		1
-#define UTH_JOIN_JOINABLE		2
-#define UTH_JOIN_HAS_JOINER		3
-#define UTH_JOIN_EXITED			4
+#define UTH_JOIN_DETACHED	1
+#define UTH_JOIN_JOINABLE	2
+#define UTH_JOIN_HAS_JOINER	3
+#define UTH_JOIN_EXITED		4
 
 /* One per uthread, to encapsulate all the join fields. */
 struct uth_join_ctl {
-	atomic_t					state;
-	void						*retval;
-	void						**retval_loc;
+	atomic_t			state;
+	void				*retval;
+	void				**retval_loc;
 	struct uth_join_kicker 		*kicker;
 };
 
@@ -60,7 +60,7 @@ struct uthread {
 	int notif_disabled_depth;
 	TAILQ_ENTRY(uthread) sync_next;
 	struct syscall *sysc;	/* syscall we're blocking on, if any */
-	struct syscall local_sysc;	/* for when we don't want to use the stack */
+	struct syscall local_sysc; /* for when we don't want to use the stack */
 	void (*yield_func)(struct uthread*, void*);
 	void *yield_arg;
 	int err_no;
@@ -82,7 +82,7 @@ extern __thread struct uthread *current_uthread;
  * of the toolchain.  libgomp and probably c++ threads care about the size of
  * objects that contain uth_sync_t. */
 typedef struct __uth_sync_opaque {
-	uint8_t						foo[sizeof(uintptr_t) * 2];
+	uint8_t foo[sizeof(uintptr_t) * 2];
 } __attribute__ ((aligned(sizeof(uintptr_t)))) uth_sync_t;
 
 /* 2LS-independent synchronization code (e.g. uthread mutexes) uses these
@@ -140,13 +140,13 @@ void uthread_mcp_init(void);
  * retvals, etc). */
 
 struct uth_thread_attr {
-	bool want_tls;		/* default, no */
-	bool detached;		/* default, no */
+	bool				want_tls;	/* default, no */
+	bool				detached;	/* default, no */
 };
 
 struct uth_join_request {
-	struct uthread				*uth;
-	void						**retval_loc;
+	struct uthread			*uth;
+	void				**retval_loc;
 };
 
 /* uthread_init() does the uthread initialization of a uthread that the caller
@@ -218,19 +218,19 @@ static inline bool uthread_is_thread0(struct uthread *uth)
 
 #define uthread_set_tls_var(uth, name, val)                                    \
 ({                                                                             \
-	typeof(val) __val = val;                                                   \
-	begin_access_tls_vars(((struct uthread*)(uth))->tls_desc);                 \
-	name = __val;                                                              \
-	end_access_tls_vars();                                                     \
+	typeof(val) __val = val;                                              \
+	begin_access_tls_vars(((struct uthread*)(uth))->tls_desc);            \
+	name = __val;                                                         \
+	end_access_tls_vars();                                                \
 })
 
 #define uthread_get_tls_var(uth, name)                                         \
 ({                                                                             \
-	typeof(name) val;                                                          \
-	begin_access_tls_vars(((struct uthread*)(uth))->tls_desc);                 \
-	val = name;                                                                \
-	end_access_tls_vars();                                                     \
-	val;                                                                       \
+	typeof(name) val;                                                     \
+	begin_access_tls_vars(((struct uthread*)(uth))->tls_desc);            \
+	val = name;                                                           \
+	end_access_tls_vars();                                                \
+	val;                                                                  \
 })
 
 /* Uthread Mutexes / CVs / etc. */
@@ -242,36 +242,36 @@ typedef struct uth_cond_var uth_cond_var_t;
 typedef struct uth_rwlock uth_rwlock_t;
 
 struct uth_semaphore {
-	parlib_once_t				once_ctl;
-	unsigned int				count;
+	parlib_once_t			once_ctl;
+	unsigned int			count;
 	struct spin_pdr_lock		lock;
-	uth_sync_t					sync_obj;
+	uth_sync_t			sync_obj;
 };
 #define UTH_SEMAPHORE_INIT(n) { PARLIB_ONCE_INIT, (n) }
 #define UTH_MUTEX_INIT { PARLIB_ONCE_INIT }
 
 struct uth_recurse_mutex {
-	parlib_once_t				once_ctl;
-	uth_mutex_t					mtx;
-	struct uthread				*lockholder;
-	unsigned int				count;
+	parlib_once_t			once_ctl;
+	uth_mutex_t			mtx;
+	struct uthread			*lockholder;
+	unsigned int			count;
 };
 #define UTH_RECURSE_MUTEX_INIT { PARLIB_ONCE_INIT }
 
 struct uth_cond_var {
-	parlib_once_t				once_ctl;
+	parlib_once_t			once_ctl;
 	struct spin_pdr_lock		lock;
-	uth_sync_t					sync_obj;
+	uth_sync_t			sync_obj;
 };
 #define UTH_COND_VAR_INIT { PARLIB_ONCE_INIT }
 
 struct uth_rwlock {
-	parlib_once_t				once_ctl;
+	parlib_once_t			once_ctl;
 	struct spin_pdr_lock		lock;
-	unsigned int				nr_readers;
-	bool						has_writer;
-	uth_sync_t					readers;
-	uth_sync_t					writers;
+	unsigned int			nr_readers;
+	bool				has_writer;
+	uth_sync_t			readers;
+	uth_sync_t			writers;
 };
 #define UTH_RWLOCK_INIT { PARLIB_ONCE_INIT }
 

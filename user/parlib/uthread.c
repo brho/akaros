@@ -37,7 +37,7 @@ static void __ros_uth_syscall_blockon(struct syscall *sysc);
 static void uthread_init_thread0(struct uthread *uthread)
 {
 	assert(uthread);
-	/* Save a pointer to thread0's tls region (the glibc one) into its tcb */
+	/* Save a pointer to thread0's tls region (the glibc one) into its tcb*/
 	uthread->tls_desc = get_tls_desc();
 	/* Save a pointer to the uthread in its own TLS */
 	current_uthread = uthread;
@@ -85,43 +85,45 @@ void uthread_mcp_init()
 	parlib_init_once_racy(return);
 
 	/* Doing this after the init_once check, since we don't want to let the
-	 * process/2LS change their mind about being an MCP or not once they have
-	 * multiple threads.
+	 * process/2LS change their mind about being an MCP or not once they
+	 * have multiple threads.
 	 *
 	 * The reason is that once you set "MCP please" on, you could get
 	 * interrupted into VC ctx, say for a syscall completion, and then make
 	 * decisions based on the fact that you're an MCP (e.g., unblocking a
 	 * uthread, asking for vcores, etc), even though you are not an MCP.
-	 * Arguably, these things could happen for signals too, but all of this is
-	 * less likely than if we have multiple threads.
+	 * Arguably, these things could happen for signals too, but all of this
+	 * is less likely than if we have multiple threads.
 	 *
 	 * Also, we could just abort here, since they shouldn't be calling
 	 * mcp_init() if they don't want to be an MCP. */
 	if (!parlib_wants_to_be_mcp)
 		return;
 
-	/* Receive preemption events.  Note that this merely tells the kernel how to
-	 * send the messages, and does not necessarily provide storage space for the
-	 * messages.  What we're doing is saying that all PREEMPT and CHECK_MSGS
-	 * events should be spammed to vcores that are running, preferring whatever
-	 * the kernel thinks is appropriate.  And IPI them.
+	/* Receive preemption events.  Note that this merely tells the kernel
+	 * how to send the messages, and does not necessarily provide storage
+	 * space for the messages.  What we're doing is saying that all PREEMPT
+	 * and CHECK_MSGS events should be spammed to vcores that are running,
+	 * preferring whatever the kernel thinks is appropriate.  And IPI them.
 	 *
 	 * It is critical that these are either SPAM_PUB or INDIR|SPAM_INDIR, so
 	 * that yielding vcores do not miss the preemption messages. */
 	register_ev_handler(EV_VCORE_PREEMPT, handle_vc_preempt, 0);
 	register_ev_handler(EV_CHECK_MSGS, handle_vc_indir, 0);
-	preempt_ev_q = get_eventq_slim();	/* small ev_q, mostly a vehicle for flags */
-	preempt_ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC | EVENT_VCORE_APPRO |
-							 EVENT_VCORE_MUST_RUN | EVENT_WAKEUP;
-	/* Tell the kernel to use the ev_q (it's settings) for the two types.  Note
-	 * that we still have two separate handlers.  We just want the events
-	 * delivered in the same way.  If we ever want to have a big_event_q with
-	 * INDIRs, we could consider using separate ones. */
+	/* small ev_q, mostly a vehicle for flags */
+	preempt_ev_q = get_eventq_slim();
+	preempt_ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC |
+				 EVENT_VCORE_APPRO | EVENT_VCORE_MUST_RUN |
+				 EVENT_WAKEUP;
+	/* Tell the kernel to use the ev_q (it's settings) for the two types.
+	 * Note that we still have two separate handlers.  We just want the
+	 * events delivered in the same way.  If we ever want to have a
+	 * big_event_q with INDIRs, we could consider using separate ones. */
 	register_kevent_q(preempt_ev_q, EV_VCORE_PREEMPT);
 	register_kevent_q(preempt_ev_q, EV_CHECK_MSGS);
 	printd("[user] registered %08p (flags %08p) for preempt messages\n",
 	       preempt_ev_q, preempt_ev_q->ev_flags);
-	/* Get ourselves into _M mode.  Could consider doing this elsewhere... */
+	/* Get ourselves into _M mode.  Could consider doing this elsewhere. */
 	vcore_change_to_m();
 }
 
@@ -131,6 +133,7 @@ static void scp_vcctx_ready(void)
 {
 	struct preempt_data *vcpd = vcpd_of(0);
 	long old_flags;
+
 	/* the CAS is a bit overkill; keeping it around in case people use this
 	 * code in other situations. */
 	do {
@@ -169,18 +172,19 @@ static void __attribute__((constructor)) uthread_lib_ctor(void)
 		return;
 	/* Need to make sure vcore_lib_init() runs first */
 	vcore_lib_init();
-	/* Instead of relying on ctors for the specific 2LS, we make sure they are
-	 * called next.  They will call uthread_2ls_init().
+	/* Instead of relying on ctors for the specific 2LS, we make sure they
+	 * are called next.  They will call uthread_2ls_init().
 	 *
-	 * The potential issue here is that C++ ctors might make use of the GCC/C++
-	 * threading callbacks, which require the full 2LS.  There's no linkage
-	 * dependency  between C++ and the specific 2LS, so there's no way to be
-	 * sure the 2LS actually turned on before we started calling into it.
+	 * The potential issue here is that C++ ctors might make use of the
+	 * GCC/C++ threading callbacks, which require the full 2LS.  There's no
+	 * linkage dependency  between C++ and the specific 2LS, so there's no
+	 * way to be sure the 2LS actually turned on before we started calling
+	 * into it.
 	 *
-	 * Hopefully, the uthread ctor was called in time, since the GCC threading
-	 * functions link against parlib.  Note that, unlike parlib-compat.c, there
-	 * are no stub functions available to GCC that could get called by
-	 * accident and prevent the linkage. */
+	 * Hopefully, the uthread ctor was called in time, since the GCC
+	 * threading functions link against parlib.  Note that, unlike
+	 * parlib-compat.c, there are no stub functions available to GCC that
+	 * could get called by accident and prevent the linkage. */
 	sched_ops->sched_init();
 }
 
@@ -240,14 +244,14 @@ void uthread_2ls_init(struct uthread *uthread,
 	ros_errstr_loc = __ros_errstr_loc;
 	register_ev_handler(EV_EVENT, handle_ev_ev, 0);
 	cmb();
-	/* Now that we're ready (I hope) to operate as a full process, we tell the
-	 * kernel.  We must set vcctx and blockon atomically with respect to
+	/* Now that we're ready (I hope) to operate as a full process, we tell
+	 * the kernel.  We must set vcctx and blockon atomically with respect to
 	 * syscalls, meaning no syscalls in between. */
 	scp_vcctx_ready();
-	/* Change our blockon from glibc's internal one to the regular one, which
-	 * uses vcore context and works for SCPs (with or without 2LS) and MCPs.
-	 * Now that we told the kernel we are ready to utilize vcore context, we
-	 * need our blocking syscalls to utilize it as well. */
+	/* Change our blockon from glibc's internal one to the regular one,
+	 * which uses vcore context and works for SCPs (with or without 2LS) and
+	 * MCPs.  Now that we told the kernel we are ready to utilize vcore
+	 * context, we need our blocking syscalls to utilize it as well. */
 	ros_syscall_blockon = __ros_uth_syscall_blockon;
 	cmb();
 	init_posix_signals();
@@ -266,41 +270,44 @@ void __attribute__((noreturn)) uthread_vcore_entry(void)
 	/* Should always have notifications disabled when coming in here. */
 	assert(!notif_is_enabled(vcoreid));
 	assert(in_vcore_context());
-	/* It's possible to have our FPSAVED already, e.g. any vcore reentry (refl
-	 * fault, some preemption handling, etc) if cur_uth wasn't reset.  In those
-	 * cases, the FP state should be the same in the processor and in the uth,
-	 * so we might be able to drop the FPSAVED check/branch. */
+	/* It's possible to have our FPSAVED already, e.g. any vcore reentry
+	 * (refl fault, some preemption handling, etc) if cur_uth wasn't reset.
+	 * In those cases, the FP state should be the same in the processor and
+	 * in the uth, so we might be able to drop the FPSAVED check/branch. */
 	if (current_uthread && !(current_uthread->flags & UTHREAD_FPSAVED) &&
 	    !cur_uth_is_sw_ctx()) {
 		save_fp_state(&current_uthread->as);
 		current_uthread->flags |= UTHREAD_FPSAVED;
 	}
-	/* If someone is stealing our uthread (from when we were preempted before),
-	 * we can't touch our uthread.  But we might be the last vcore around, so
-	 * we'll handle preemption events (spammed to our public mbox).
+	/* If someone is stealing our uthread (from when we were preempted
+	 * before), we can't touch our uthread.  But we might be the last vcore
+	 * around, so we'll handle preemption events (spammed to our public
+	 * mbox).
 	 *
-	 * It's important that we only check/handle one message per loop, otherwise
-	 * we could get stuck in a ping-pong scenario with a recoverer (maybe). */
+	 * It's important that we only check/handle one message per loop,
+	 * otherwise we could get stuck in a ping-pong scenario with a recoverer
+	 * (maybe). */
 	while (atomic_read(&vcpd->flags) & VC_UTHREAD_STEALING) {
-		/* Note we're handling INDIRs and other public messages while someone
-		 * is stealing our uthread.  Remember that those event handlers cannot
-		 * touch cur_uth, as it is "vcore business". */
+		/* Note we're handling INDIRs and other public messages while
+		 * someone is stealing our uthread.  Remember that those event
+		 * handlers cannot touch cur_uth, as it is "vcore business". */
 		handle_one_mbox_msg(&vcpd->ev_mbox_public);
 		cpu_relax();
 	}
-	/* If we have a current uthread that is DONT_MIGRATE, pop it real quick and
-	 * let it disable notifs (like it wants to).  Other than dealing with
-	 * preemption events (or other INDIRs), we shouldn't do anything in vc_ctx
-	 * when we have a DONT_MIGRATE uthread. */
+	/* If we have a current uthread that is DONT_MIGRATE, pop it real quick
+	 * and let it disable notifs (like it wants to).  Other than dealing
+	 * with preemption events (or other INDIRs), we shouldn't do anything in
+	 * vc_ctx when we have a DONT_MIGRATE uthread. */
 	if (current_uthread && (current_uthread->flags & UTHREAD_DONT_MIGRATE))
 		__run_current_uthread_raw();
-	/* Check and see if we wanted ourselves to handle a remote VCPD mbox.  Want
-	 * to do this after we've handled STEALING and DONT_MIGRATE. */
+	/* Check and see if we wanted ourselves to handle a remote VCPD mbox.
+	 * Want to do this after we've handled STEALING and DONT_MIGRATE. */
 	try_handle_remote_mbox();
 	/* Otherwise, go about our usual vcore business (messages, etc). */
 	handle_events(vcoreid);
 	__check_preempt_pending(vcoreid);
-	assert(in_vcore_context());	/* double check, in case an event changed it */
+	/* double check, in case an event changed it */
+	assert(in_vcore_context());
 	sched_ops->sched_entry();
 	assert(0); /* 2LS sched_entry should never return */
 }
@@ -323,12 +330,13 @@ void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr)
 	new_thread->flags = 0;
 	new_thread->sysc = NULL;
 	/* the utf holds the GP context of the uthread (set by the 2LS earlier).
-	 * There is no FP context to be restored yet.  We only save the FPU when we
-	 * were interrupted off a core. */
+	 * There is no FP context to be restored yet.  We only save the FPU when
+	 * we were interrupted off a core. */
 	new_thread->flags |= UTHREAD_SAVED;
 	new_thread->notif_disabled_depth = 0;
-	/* TODO: on a reinit, if they changed whether or not they want TLS, we'll
-	 * have issues (checking tls_desc, assert in allocate_tls, maybe more). */
+	/* TODO: on a reinit, if they changed whether or not they want TLS,
+	 * we'll have issues (checking tls_desc, assert in allocate_tls, maybe
+	 * more). */
 	if (attr && attr->want_tls) {
 		/* Get a TLS.  If we already have one, reallocate/refresh it */
 		if (new_thread->tls_desc)
@@ -338,9 +346,9 @@ void uthread_init(struct uthread *new_thread, struct uth_thread_attr *attr)
 		assert(!ret);
 		begin_access_tls_vars(new_thread->tls_desc);
 		current_uthread = new_thread;
-		/* ctypes stores locale info in TLS.  we need this only once per TLS, so
-		 * we don't have to do it here, but it is convenient since we already
-		 * loaded the uthread's TLS. */
+		/* ctypes stores locale info in TLS.  we need this only once per
+		 * TLS, so we don't have to do it here, but it is convenient
+		 * since we already loaded the uthread's TLS. */
 		extern void __ctype_init(void);
 		__ctype_init();
 		end_access_tls_vars();
@@ -387,9 +395,9 @@ void uthread_paused(struct uthread *uthread)
 {
 	/* Call out to the 2LS to let it know the uthread was paused for some
 	 * reason, but it is ok to resume it now. */
-    assert(uthread->state == UT_NOT_RUNNING);
-    assert(sched_ops->thread_paused);
-    sched_ops->thread_paused(uthread);
+	assert(uthread->state == UT_NOT_RUNNING);
+	assert(sched_ops->thread_paused);
+	sched_ops->thread_paused(uthread);
 }
 
 /* Need to have this as a separate, non-inlined function since we clobber the
@@ -406,8 +414,8 @@ __uthread_yield(void)
 	uthread->flags &= ~UTHREAD_DONT_MIGRATE;
 	uthread->state = UT_NOT_RUNNING;
 	/* Any locks that were held before the yield must be unlocked in the
-	 * callback.  That callback won't get a chance to update our disabled depth.
-	 * This sets us up for the next time the uthread runs. */
+	 * callback.  That callback won't get a chance to update our disabled
+	 * depth.  This sets us up for the next time the uthread runs. */
 	assert(uthread->notif_disabled_depth <= 1);
 	uthread->notif_disabled_depth = 0;
 	/* Do whatever the yielder wanted us to do */
@@ -415,7 +423,8 @@ __uthread_yield(void)
 	uthread->yield_func(uthread, uthread->yield_arg);
 	/* Make sure you do not touch uthread after that func call */
 	/* Leave the current vcore completely */
-	/* TODO: if the yield func can return a failure, we can abort the yield */
+	/* TODO: if the yield func can return a failure, we can abort the yield
+	 */
 	current_uthread = NULL;
 	/* Go back to the entry point, where we can handle notifications or
 	 * reschedule someone. */
@@ -435,65 +444,76 @@ void uthread_yield(bool save_state, void (*yield_func)(struct uthread*, void*),
                    void *yield_arg)
 {
 	struct uthread *uthread = current_uthread;
-	volatile bool yielding = TRUE; /* signal to short circuit when restarting */
+	volatile bool yielding = TRUE; /* signal to short circuit on restart */
 	assert(!in_vcore_context());
 	assert(uthread->state == UT_RUNNING);
-	/* Pass info to ourselves across the uth_yield -> __uth_yield transition. */
+	/* Pass info to ourselves across the uth_yield -> __uth_yield
+	 * transition. */
 	uthread->yield_func = yield_func;
 	uthread->yield_arg = yield_arg;
-	/* Don't migrate this thread to another vcore, since it depends on being on
-	 * the same vcore throughout (once it disables notifs).  The race is that we
-	 * read vcoreid, then get interrupted / migrated before disabling notifs. */
+	/* Don't migrate this thread to another vcore, since it depends on being
+	 * on the same vcore throughout (once it disables notifs).  The race is
+	 * that we read vcoreid, then get interrupted / migrated before
+	 * disabling notifs. */
 	uthread->flags |= UTHREAD_DONT_MIGRATE;
 	cmb();	/* don't let DONT_MIGRATE write pass the vcoreid read */
 	uint32_t vcoreid = vcore_id();
+
 	printd("[U] Uthread %08p is yielding on vcore %d\n", uthread, vcoreid);
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
-	/* once we do this, we might miss a notif_pending, so we need to enter vcore
-	 * entry later.  Need to disable notifs so we don't get in weird loops with
-	 * save_user_ctx() and pop_user_ctx(). */
+
+	/* once we do this, we might miss a notif_pending, so we need to enter
+	 * vcore entry later.  Need to disable notifs so we don't get in weird
+	 * loops with save_user_ctx() and pop_user_ctx(). */
 	disable_notifs(vcoreid);
 	/* take the current state and save it into t->utf when this pthread
-	 * restarts, it will continue from right after this, see yielding is false,
-	 * and short ciruit the function.  Don't do this if we're dying. */
+	 * restarts, it will continue from right after this, see yielding is
+	 * false, and short ciruit the function.  Don't do this if we're dying.
+	 * */
 	if (save_state) {
-		/* Need to signal this before we actually save, since save_user_ctx
-		 * returns() twice (once now, once when woken up) */
+		/* Need to signal this before we actually save, since
+		 * save_user_ctx returns() twice (once now, once when woken up)
+		 */
 		uthread->flags |= UTHREAD_SAVED;
 		save_user_ctx(&uthread->u_ctx);
 	}
-	cmb();	/* Force reread of yielding. Technically save_user_ctx() suffices*/
+	/* Force reread of yielding. Technically save_user_ctx() suffices*/
+	cmb();
 	/* Restart path doesn't matter if we're dying */
 	if (!yielding)
 		goto yield_return_path;
-	/* From here on down is only executed on the save path (not the wake up) */
+	/* From here on down is only executed on the save path (not the wake up)
+	 */
 	yielding = FALSE; /* for when it starts back up */
 	/* TODO: remove this when all arches support SW contexts */
 	if (save_state && (uthread->u_ctx.type != ROS_SW_CTX)) {
 		save_fp_state(&uthread->as);
 		uthread->flags |= UTHREAD_FPSAVED;
 	}
-	/* Change to the transition context (both TLS (if applicable) and stack). */
+	/* Change to the transition context (both TLS (if applicable) and
+	 * stack). */
 	if (__uthread_has_tls(uthread)) {
 		set_tls_desc(get_vcpd_tls_desc(vcoreid));
 		begin_safe_access_tls_vars();
 		assert(current_uthread == uthread);
-		/* If this assert fails, see the note in uthread_track_thread0 */
+		/* If this assert fails, see the note in uthread_track_thread0
+		 */
 		assert(in_vcore_context());
 		end_safe_access_tls_vars();
 	} else {
-		/* Since uthreads and vcores share TLS (it's always the vcore's TLS, the
-		 * uthread one just bootstraps from it), we need to change our state at
-		 * boundaries between the two 'contexts' */
+		/* Since uthreads and vcores share TLS (it's always the vcore's
+		 * TLS, the uthread one just bootstraps from it), we need to
+		 * change our state at boundaries between the two 'contexts' */
 		__vcore_context = TRUE;
 	}
-	/* After this, make sure you don't use local variables.  Also, make sure the
-	 * compiler doesn't use them without telling you (TODO).
+	/* After this, make sure you don't use local variables.  Also, make sure
+	 * the compiler doesn't use them without telling you (TODO).
 	 *
-	 * In each arch's set_stack_pointer, make sure you subtract off as much room
-	 * as you need to any local vars that might be pushed before calling the
-	 * next function, or for whatever other reason the compiler/hardware might
-	 * walk up the stack a bit when calling a noreturn function. */
+	 * In each arch's set_stack_pointer, make sure you subtract off as much
+	 * room as you need to any local vars that might be pushed before
+	 * calling the next function, or for whatever other reason the
+	 * compiler/hardware might walk up the stack a bit when calling a
+	 * noreturn function. */
 	set_stack_pointer((void*)vcpd->vcore_stack);
 	/* Finish exiting in another function. */
 	__uthread_yield();
@@ -536,8 +556,9 @@ void __attribute__((noreturn)) uthread_sleep_forever(void)
 void uthread_cleanup(struct uthread *uthread)
 {
 	printd("[U] thread %08p on vcore %d is DYING!\n", uthread, vcore_id());
-	/* we alloc and manage the TLS, so lets get rid of it, except for thread0.
-	 * glibc owns it.  might need to keep it around for a full exit() */
+	/* we alloc and manage the TLS, so lets get rid of it, except for
+	 * thread0.  glibc owns it.  might need to keep it around for a full
+	 * exit() */
 	if (__uthread_has_tls(uthread) && !(uthread->flags & UTHREAD_IS_THREAD0))
 		__uthread_free_tls(uthread);
 }
@@ -567,9 +588,9 @@ static void __ros_uth_syscall_blockon(struct syscall *sysc)
 		__ros_vcore_ctx_syscall_blockon(sysc);
 		return;
 	}
-	/* At this point, we know we're a uthread.  If we're a DONT_MIGRATE uthread,
-	 * then it's disabled notifs and is basically in vcore context, enough so
-	 * that it can't call into the 2LS. */
+	/* At this point, we know we're a uthread.  If we're a DONT_MIGRATE
+	 * uthread, then it's disabled notifs and is basically in vcore context,
+	 * enough so that it can't call into the 2LS. */
 	assert(current_uthread);
 	if (current_uthread->flags & UTHREAD_DONT_MIGRATE) {
 		assert(!notif_is_enabled(vcore_id()));	/* catch bugs */
@@ -596,8 +617,8 @@ void __block_uthread_on_async_sysc(struct uthread *uth)
 {
 	assert(in_vcore_context());
 	uth->sysc = &uth->local_sysc;
-	/* If a DONT_MIGRATE issued a syscall that blocks, we gotta spin, same as
-	 * with the usual blockon. */
+	/* If a DONT_MIGRATE issued a syscall that blocks, we gotta spin, same
+	 * as with the usual blockon. */
 	if (uth->flags & UTHREAD_DONT_MIGRATE) {
 		__ros_vcore_ctx_syscall_blockon(uth->sysc);
 		uth->sysc = 0;
@@ -613,6 +634,7 @@ void __block_uthread_on_async_sysc(struct uthread *uth)
 void highjack_current_uthread(struct uthread *uthread)
 {
 	uint32_t vcoreid = vcore_id();
+
 	assert(uthread != current_uthread);
 	current_uthread->state = UT_NOT_RUNNING;
 	uthread->state = UT_RUNNING;
@@ -666,7 +688,8 @@ struct uthread *stop_current_uthread(void)
 		uth->u_ctx = vcpd->uthread_ctx;
 		uth->flags |= UTHREAD_SAVED;
 	}
-	if ((uth->u_ctx.type != ROS_SW_CTX) && !(uth->flags & UTHREAD_FPSAVED)) {
+	if ((uth->u_ctx.type != ROS_SW_CTX) && !(uth->flags & UTHREAD_FPSAVED))
+	{
 		save_fp_state(&uth->as);
 		uth->flags |= UTHREAD_FPSAVED;
 	}
@@ -688,9 +711,9 @@ void __attribute__((noreturn)) run_current_uthread(void)
 	assert(current_uthread->state == UT_RUNNING);
 	/* Uth was already running, should not have been saved */
 	assert(!(current_uthread->flags & UTHREAD_SAVED));
-	/* SW CTX FP wasn't saved, but HW/VM was.  There might be some case where
-	 * a VMTF hadn't run yet, and thus wasn't interrupted, but it shouldn't have
-	 * made it to be current_uthread. */
+	/* SW CTX FP wasn't saved, but HW/VM was.  There might be some case
+	 * where a VMTF hadn't run yet, and thus wasn't interrupted, but it
+	 * shouldn't have made it to be current_uthread. */
 	if (cur_uth_is_sw_ctx())
 		assert(!(current_uthread->flags & UTHREAD_FPSAVED));
 	else
@@ -699,12 +722,13 @@ void __attribute__((noreturn)) run_current_uthread(void)
 	       current_uthread);
 	if (has_refl_fault(&vcpd->uthread_ctx)) {
 		clear_refl_fault(&vcpd->uthread_ctx);
-		/* we preemptively copy out and make non-running, so that there is a
-		 * consistent state for the handler.  it can then block the uth or
-		 * whatever. */
+		/* we preemptively copy out and make non-running, so that there
+		 * is a consistent state for the handler.  it can then block the
+		 * uth or whatever. */
 		uth = stop_current_uthread();
 		handle_refl_fault(uth, &vcpd->uthread_ctx);
-		/* we abort no matter what.  up to the 2LS to reschedule the thread */
+		/* we abort no matter what.  up to the 2LS to reschedule the
+		 * thread */
 		set_stack_pointer((void*)vcpd->vcore_stack);
 		vcore_entry();
 	}
@@ -739,8 +763,8 @@ void __attribute__((noreturn)) run_uthread(struct uthread *uthread)
 	assert(!current_uthread);
 	assert(uthread->state == UT_NOT_RUNNING);
 	assert(uthread->flags & UTHREAD_SAVED);
-	/* For HW CTX, FPSAVED must match UTH SAVE (and both be on here).  For SW,
-	 * FP should never be saved. */
+	/* For HW CTX, FPSAVED must match UTH SAVE (and both be on here).  For
+	 * SW, FP should never be saved. */
 	switch (uthread->u_ctx.type) {
 	case ROS_HW_CTX:
 		assert(uthread->flags & UTHREAD_FPSAVED);
@@ -749,27 +773,30 @@ void __attribute__((noreturn)) run_uthread(struct uthread *uthread)
 		assert(!(uthread->flags & UTHREAD_FPSAVED));
 		break;
 	case ROS_VM_CTX:
-		/* Don't care.  This gives it the state of the vcore when it starts up.
-		 * If we care about leaking FPU / XMM state, we can create a new one for
-		 * every VM TF (or vthread reuse). */
+		/* Don't care.  This gives it the state of the vcore when it
+		 * starts up.  If we care about leaking FPU / XMM state, we can
+		 * create a new one for every VM TF (or vthread reuse). */
 		break;
 	}
 	if (has_refl_fault(&uthread->u_ctx)) {
 		clear_refl_fault(&uthread->u_ctx);
 		handle_refl_fault(uthread, &uthread->u_ctx);
-		/* we abort no matter what.  up to the 2LS to reschedule the thread */
+		/* we abort no matter what.  up to the 2LS to reschedule the
+		 * thread */
 		set_stack_pointer((void*)vcpd->vcore_stack);
 		vcore_entry();
 	}
 	uthread->state = UT_RUNNING;
-	/* Save a ptr to the uthread we'll run in the transition context's TLS */
+	/* Save a ptr to the uthread we'll run in the transition context's TLS
+	 */
 	current_uthread = uthread;
 	if (uthread->flags & UTHREAD_FPSAVED) {
 		uthread->flags &= ~UTHREAD_FPSAVED;
 		restore_fp_state(&uthread->as);
 	}
 	set_uthread_tls(uthread, vcoreid);
-	/* the uth's context will soon be in the cpu (or VCPD), no longer saved */
+	/* the uth's context will soon be in the cpu (or VCPD), no longer saved
+	 */
 	uthread->flags &= ~UTHREAD_SAVED;
 	pop_user_ctx(&uthread->u_ctx, vcoreid);
 	assert(0);
@@ -782,12 +809,13 @@ static void __run_current_uthread_raw(void)
 {
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
+
 	if (has_refl_fault(&vcpd->uthread_ctx)) {
 		printf("Raw / DONT_MIGRATE uthread took a fault, exiting.\n");
 		exit(-1);
 	}
-	/* We need to manually say we have a notif pending, so we eventually return
-	 * to vcore context.  (note the kernel turned it off for us) */
+	/* We need to manually say we have a notif pending, so we eventually
+	 * return to vcore context.  (note the kernel turned it off for us) */
 	vcpd->notif_pending = TRUE;
 	assert(!(current_uthread->flags & UTHREAD_SAVED));
 	if (current_uthread->flags & UTHREAD_FPSAVED) {
@@ -837,24 +865,25 @@ static void copyout_uthread(struct preempt_data *vcpd, struct uthread *uthread,
 	uthread->u_ctx = vcpd->uthread_ctx;
 	uthread->flags |= UTHREAD_SAVED;
 	printd("VC %d copying out uthread %08p\n", vcore_id(), uthread);
-	/* Software contexts do not need FP state, nor should we think it has any */
+	/* Software contexts do not need FP state, nor should we think it has
+	 * any */
 	if (uthread->u_ctx.type == ROS_SW_CTX) {
 		assert(!(uthread->flags & UTHREAD_FPSAVED));
 		return;
 	}
-	/* We might have aggressively saved for non-SW ctx in vc_entry before we got
-	 * to the event handler. */
+	/* We might have aggressively saved for non-SW ctx in vc_entry before we
+	 * got to the event handler. */
 	if (uthread->flags & UTHREAD_FPSAVED) {
-		/* If this fails, we're remote.  But the target vcore should not be in
-		 * uth context (which is when we'd be stealing a uthread) with FPSAVED,
-		 * just like how it shouldn't have GP saved. */
+		/* If this fails, we're remote.  But the target vcore should not
+		 * be in uth context (which is when we'd be stealing a uthread)
+		 * with FPSAVED, just like how it shouldn't have GP saved. */
 		assert(vcore_local);
 		return;
 	}
 	/* When we're dealing with the uthread running on our own vcore, the FP
-	 * state is in the actual FPU, not VCPD.  It might also be in VCPD, but it
-	 * will always be in the FPU (the kernel maintains this for us, in the event
-	 * we were preempted since the uthread was last running). */
+	 * state is in the actual FPU, not VCPD.  It might also be in VCPD, but
+	 * it will always be in the FPU (the kernel maintains this for us, in
+	 * the event we were preempted since the uthread was last running). */
 	if (vcore_local)
 		save_fp_state(&uthread->as);
 	else
@@ -897,18 +926,19 @@ bool __check_preempt_pending(uint32_t vcoreid)
 		retval = TRUE;
 		if (sched_ops->preempt_pending)
 			sched_ops->preempt_pending();
-		/* If we still have a cur_uth, copy it out and hand it back to the 2LS
-		 * before yielding. */
+		/* If we still have a cur_uth, copy it out and hand it back to
+		 * the 2LS before yielding. */
 		if (current_uthread) {
-			__uthread_pause(vcpd_of(vcoreid), current_uthread, TRUE);
+			__uthread_pause(vcpd_of(vcoreid), current_uthread,
+					TRUE);
 			current_uthread = 0;
 		}
-		/* vcore_yield tries to yield, and will pop back up if this was a spurious
-		 * preempt_pending or if it handled an event.  For now, we'll just keep
-		 * trying to yield so long as a preempt is coming in.  Eventually, we'll
-		 * handle all of our events and yield, or else the preemption will hit
-		 * and someone will recover us (at which point we'll break out of the
-		 * loop) */
+		/* vcore_yield tries to yield, and will pop back up if this was
+		 * a spurious preempt_pending or if it handled an event.  For
+		 * now, we'll just keep trying to yield so long as a preempt is
+		 * coming in.  Eventually, we'll handle all of our events and
+		 * yield, or else the preemption will hit and someone will
+		 * recover us (at which point we'll break out of the loop) */
 		while (__procinfo.vcoremap[vcoreid].preempt_pending) {
 			vcore_yield(TRUE);
 			cpu_relax();
@@ -927,7 +957,9 @@ void uth_disable_notifs(void)
 			if (current_uthread->notif_disabled_depth++)
 				goto out;
 			current_uthread->flags |= UTHREAD_DONT_MIGRATE;
-			cmb();	/* don't issue the flag write before the vcore_id() read */
+			/* don't issue the flag write before the vcore_id() read
+			 */
+			cmb();
 		}
 		disable_notifs(vcore_id());
 	}
@@ -1001,10 +1033,10 @@ static void handle_indirs(uint32_t rem_vcoreid)
 {
 	long old_flags;
 	struct preempt_data *rem_vcpd = vcpd_of(rem_vcoreid);
-	/* Turn off their message reception if they are still preempted.  If they
-	 * are no longer preempted, we do nothing - they will handle their own
-	 * messages.  Turning off CAN_RCV will route this vcore's messages to
-	 * fallback vcores (if those messages were 'spammed'). */
+	/* Turn off their message reception if they are still preempted.  If
+	 * they are no longer preempted, we do nothing - they will handle their
+	 * own messages.  Turning off CAN_RCV will route this vcore's messages
+	 * to fallback vcores (if those messages were 'spammed'). */
 	do {
 		old_flags = atomic_read(&rem_vcpd->flags);
 		while (old_flags & VC_K_LOCK)
@@ -1037,47 +1069,48 @@ static void __change_vcore(uint32_t rem_vcoreid, bool enable_my_notif)
 static void change_to_vcore(struct preempt_data *vcpd, uint32_t rem_vcoreid)
 {
 	bool were_handling_remotes;
+
 	/* Unlikely, but if we have no uthread we can just change.  This is the
-	 * check, sync, then really check pattern: we can only really be sure about
-	 * current_uthread after we check STEALING. */
+	 * check, sync, then really check pattern: we can only really be sure
+	 * about current_uthread after we check STEALING. */
 	if (!current_uthread) {
-		/* there might be an issue with doing this while someone is recovering.
-		 * once they 0'd it, we should be good to yield.  just a bit dangerous.
-		 * */
+		/* there might be an issue with doing this while someone is
+		 * recovering.  once they 0'd it, we should be good to yield.
+		 * just a bit dangerous. */
 		were_handling_remotes = ev_might_not_return();
-		__change_vcore(rem_vcoreid, TRUE);	/* noreturn on success */
+		__change_vcore(rem_vcoreid, TRUE);/* noreturn on success */
 		goto out_we_returned;
 	}
-	/* Note that the reason we need to check STEALING is because we can get into
-	 * vcore context and slip past that check in vcore_entry when we are
-	 * handling a preemption message.  Anytime preemption recovery cares about
-	 * the calling vcore's cur_uth, it needs to be careful about STEALING.  But
-	 * it is safe to do the check up above (if it's 0, it won't concurrently
-	 * become non-zero).
+	/* Note that the reason we need to check STEALING is because we can get
+	 * into vcore context and slip past that check in vcore_entry when we
+	 * are handling a preemption message.  Anytime preemption recovery cares
+	 * about the calling vcore's cur_uth, it needs to be careful about
+	 * STEALING.  But it is safe to do the check up above (if it's 0, it
+	 * won't concurrently become non-zero).
 	 *
 	 * STEALING might be turned on at any time.  Whoever turns it on will do
 	 * nothing if we are online or were in vc_ctx.  So if it is on, we can't
-	 * touch current_uthread til it is turned off (not sure what state they saw
-	 * us in).  We could spin here til they unset STEALING (since they will
-	 * soon), but there is a chance they were preempted, so we need to make
-	 * progress by doing a sys_change_vcore(). */
+	 * touch current_uthread til it is turned off (not sure what state they
+	 * saw us in).  We could spin here til they unset STEALING (since they
+	 * will soon), but there is a chance they were preempted, so we need to
+	 * make progress by doing a sys_change_vcore(). */
 	/* Crap, someone is stealing (unlikely).  All we can do is change. */
 	if (atomic_read(&vcpd->flags) & VC_UTHREAD_STEALING) {
 		__change_vcore(rem_vcoreid, FALSE);	/* returns on success */
 		return;
 	}
 	cmb();
-	/* Need to recheck, in case someone stole it and finished before we checked
-	 * VC_UTHREAD_STEALING. */
+	/* Need to recheck, in case someone stole it and finished before we
+	 * checked VC_UTHREAD_STEALING. */
 	if (!current_uthread) {
 		were_handling_remotes = ev_might_not_return();
-		__change_vcore(rem_vcoreid, TRUE);	/* noreturn on success */
+		__change_vcore(rem_vcoreid, TRUE); 	/* noreturn on success*/
 		goto out_we_returned;
 	}
-	/* Need to make sure we don't have a DONT_MIGRATE (very rare, someone would
-	 * have to steal from us to get us to handle a preempt message, and then had
-	 * to finish stealing (and fail) fast enough for us to miss the previous
-	 * check). */
+	/* Need to make sure we don't have a DONT_MIGRATE (very rare, someone
+	 * would have to steal from us to get us to handle a preempt message,
+	 * and then had to finish stealing (and fail) fast enough for us to miss
+	 * the previous check). */
 	if (current_uthread->flags & UTHREAD_DONT_MIGRATE) {
 		__change_vcore(rem_vcoreid, FALSE);	/* returns on success */
 		return;
@@ -1087,7 +1120,7 @@ static void change_to_vcore(struct preempt_data *vcpd, uint32_t rem_vcoreid)
 	__uthread_pause(vcpd, current_uthread, TRUE);
 	current_uthread = 0;
 	were_handling_remotes = ev_might_not_return();
-	__change_vcore(rem_vcoreid, TRUE);		/* noreturn on success */
+	__change_vcore(rem_vcoreid, TRUE);		/* noreturn on success*/
 	/* Fall-through to out_we_returned */
 out_we_returned:
 	ev_we_returned(were_handling_remotes);
@@ -1107,15 +1140,15 @@ static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type,
 	bool cant_migrate = FALSE;
 
 	assert(in_vcore_context());
-	/* Just drop messages about ourselves.  They are old.  If we happen to be
-	 * getting preempted right now, there's another message out there about
-	 * that. */
+	/* Just drop messages about ourselves.  They are old.  If we happen to
+	 * be getting preempted right now, there's another message out there
+	 * about that. */
 	if (rem_vcoreid == vcoreid)
 		return;
 	printd("Vcore %d was preempted (i'm %d), it's flags %08p!\n",
 	       ev_msg->ev_arg2, vcoreid, rem_vcpd->flags);
-	/* Spin til the kernel is done with flags.  This is how we avoid handling
-	 * the preempt message before the preemption. */
+	/* Spin til the kernel is done with flags.  This is how we avoid
+	 * handling the preempt message before the preemption. */
 	while (atomic_read(&rem_vcpd->flags) & VC_K_LOCK)
 		cpu_relax();
 	/* If they aren't preempted anymore, just return (optimization). */
@@ -1129,20 +1162,21 @@ static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type,
 		change_to_vcore(vcpd, rem_vcoreid);
 		return;	/* in case it returns.  we've done our job recovering */
 	}
-	/* So now it looks like they were not in vcore context.  We want to steal
-	 * the uthread.  Set stealing, then doublecheck everything.  If stealing
-	 * fails, someone else is stealing and we can just leave.  That other vcore
-	 * who is stealing will check the VCPD/INDIRs when it is done. */
+	/* So now it looks like they were not in vcore context.  We want to
+	 * steal the uthread.  Set stealing, then doublecheck everything.  If
+	 * stealing fails, someone else is stealing and we can just leave.  That
+	 * other vcore who is stealing will check the VCPD/INDIRs when it is
+	 * done. */
 	if (!start_uth_stealing(rem_vcpd))
 		return;
-	/* Now we're stealing.  Double check everything.  A change in preempt status
-	 * or notif_disable status means the vcore has since restarted.  The vcore
-	 * may or may not have started after we set STEALING.  If it didn't, we'll
-	 * need to bail out (but still check messages, since above we assumed the
-	 * uthread stealer handles the VCPD/INDIRs).  Since the vcore is running, we
-	 * don't need to worry about handling the message any further.  Future
-	 * preemptions will generate another message, so we can ignore getting the
-	 * uthread or anything like that. */
+	/* Now we're stealing.  Double check everything.  A change in preempt
+	 * status or notif_disable status means the vcore has since restarted.
+	 * The vcore may or may not have started after we set STEALING.  If it
+	 * didn't, we'll need to bail out (but still check messages, since above
+	 * we assumed the uthread stealer handles the VCPD/INDIRs).  Since the
+	 * vcore is running, we don't need to worry about handling the message
+	 * any further.  Future preemptions will generate another message, so we
+	 * can ignore getting the uthread or anything like that. */
 	printd("VC %d recovering %d, trying to steal uthread\n", vcoreid,
 	       rem_vcoreid);
 	if (!(atomic_read(&rem_vcpd->flags) & VC_PREEMPTED))
@@ -1150,14 +1184,14 @@ static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type,
 	/* Might be preempted twice quickly, and the second time had notifs
 	 * disabled.
 	 *
-	 * Also note that the second preemption event had another
-	 * message sent, which either we or someone else will deal with.  And also,
-	 * we don't need to worry about how we are stealing still and plan to
-	 * abort.  If another vcore handles that second preemption message, either
-	 * the original vcore is in vc ctx or not.  If so, we bail out and the
+	 * Also note that the second preemption event had another message sent,
+	 * which either we or someone else will deal with.  And also, we don't
+	 * need to worry about how we are stealing still and plan to abort.  If
+	 * another vcore handles that second preemption message, either the
+	 * original vcore is in vc ctx or not.  If so, we bail out and the
 	 * second preemption handling needs to change_to.  If not, we aren't
-	 * bailing out, and we'll handle the preemption as normal, and the second
-	 * handler will bail when it fails to steal. */
+	 * bailing out, and we'll handle the preemption as normal, and the
+	 * second handler will bail when it fails to steal. */
 	if (rem_vcpd->notif_disabled)
 		goto out_stealing;
 	/* At this point, we're clear to try and steal the uthread.  We used to
@@ -1166,22 +1200,23 @@ static void handle_vc_preempt(struct event_msg *ev_msg, unsigned int ev_type,
 	rem_cur_uth = get_tlsvar_linaddr(rem_vcoreid, current_uthread);
 	uthread_to_steal = *rem_cur_uth;
 	if (uthread_to_steal) {
-		/* Extremely rare: they have a uthread, but it can't migrate.  So we'll
-		 * need to change to them. */
+		/* Extremely rare: they have a uthread, but it can't migrate.
+		 * So we'll need to change to them. */
 		if (uthread_to_steal->flags & UTHREAD_DONT_MIGRATE) {
-			printd("VC %d recovering %d, can't migrate uthread!\n", vcoreid,
-			       rem_vcoreid);
+			printd("VC %d recovering %d, can't migrate uthread!\n",
+			       vcoreid, rem_vcoreid);
 			stop_uth_stealing(rem_vcpd);
 			change_to_vcore(vcpd, rem_vcoreid);
-			return;	/* in case it returns.  we've done our job recovering */
+			/* in case it returns.  we've done our job recovering */
+			return;
 		} else {
 			*rem_cur_uth = 0;
 			/* we're clear to steal it */
-			printd("VC %d recovering %d, uthread %08p stolen\n", vcoreid,
-			       rem_vcoreid, uthread_to_steal);
+			printd("VC %d recovering %d, uthread %08p stolen\n",
+			       vcoreid, rem_vcoreid, uthread_to_steal);
 			__uthread_pause(rem_vcpd, uthread_to_steal, FALSE);
-			/* can't let the cur_uth = 0 write and any writes from __uth_pause()
-			 * to pass stop_uth_stealing. */
+			/* can't let the cur_uth = 0 write and any writes from
+			 * __uth_pause() to pass stop_uth_stealing. */
 			wmb();
 		}
 	}
@@ -1241,8 +1276,8 @@ static void __uthread_free_tls(struct uthread *uthread)
 
 bool uth_2ls_is_multithreaded(void)
 {
-	/* thread 0 is single threaded.  For the foreseeable future, every other 2LS
-	 * will be multithreaded. */
+	/* thread 0 is single threaded.  For the foreseeable future, every other
+	 * 2LS will be multithreaded. */
 	extern struct schedule_ops thread0_2ls_ops;
 
 	return sched_ops != &thread0_2ls_ops;
@@ -1258,9 +1293,9 @@ struct uthread *uthread_create(void *(*func)(void *), void *arg)
  *
  * What are the valid state changes?
  *
- * 		JOINABLE   -> DETACHED (only by detach())
- * 		JOINABLE   -> HAS_JOINER (only by join())
- * 		JOINABLE   -> EXITED (only by uth_2ls_thread_exit())
+ * 	JOINABLE   -> DETACHED (only by detach())
+ * 	JOINABLE   -> HAS_JOINER (only by join())
+ * 	JOINABLE   -> EXITED (only by uth_2ls_thread_exit())
  *
  * That's it.  The initial state is either JOINABLE or DETACHED. */
 void uthread_detach(struct uthread *uth)
@@ -1277,7 +1312,8 @@ void uthread_detach(struct uthread *uth)
 		case UTH_JOIN_DETACHED:
 			panic("Uth %p has already been detached!", uth);
 		case UTH_JOIN_HAS_JOINER:
-			panic("Uth %p has a pending joiner, can't detach!", uth);
+			panic("Uth %p has a pending joiner, can't detach!",
+			      uth);
 		};
 		assert(old_state == UTH_JOIN_JOINABLE);
 	} while (!atomic_cas(&jc->state, old_state, UTH_JOIN_DETACHED));
@@ -1317,17 +1353,18 @@ static void __uth_2ls_thread_exit_cb(struct uthread *uth, void *retval)
 			sched_ops->thread_exited(uth);
 			return;
 		case UTH_JOIN_JOINABLE:
-			/* This write is harmless and idempotent; we can lose the race and
-			 * still be safe.  Assuming we don't, the joiner will look here for
-			 * the retval.  It's temporary storage since we don't know the final
-			 * retval location (since join hasn't happened yet). */
+			/* This write is harmless and idempotent; we can lose
+			 * the race and still be safe.  Assuming we don't, the
+			 * joiner will look here for the retval.  It's temporary
+			 * storage since we don't know the final retval location
+			 * (since join hasn't happened yet). */
 			jc->retval = retval;
 			break;
 		};
 		assert(old_state == UTH_JOIN_JOINABLE);
 	} while (!atomic_cas(&jc->state, old_state, UTH_JOIN_EXITED));
-	/* We were joinable, now we have exited.  A detacher or joiner will trigger
-	 * thread_exited. */
+	/* We were joinable, now we have exited.  A detacher or joiner will
+	 * trigger thread_exited. */
 }
 
 /* 2LSs call this when their threads are exiting.  The 2LS will regain control
@@ -1349,8 +1386,8 @@ static void join_one(struct uthread *uth, struct uth_join_kicker *jk,
 	long old_state;
 
 	/* We can safely write to the join_ctl, even if we don't end up setting
-	 * HAS_JOINER.  There's only supposed to be one joiner, and if not, we'll
-	 * catch the bad state. */
+	 * HAS_JOINER.  There's only supposed to be one joiner, and if not,
+	 * we'll catch the bad state. */
 	jc->retval_loc = retval_loc;
 	jc->kicker = jk;
 	do {
@@ -1383,7 +1420,8 @@ static void __uth_join_cb(struct uthread *uth, void *arg)
 
 static void kicker_release(struct kref *k)
 {
-	struct uth_join_kicker *jk = container_of(k, struct uth_join_kicker, kref);
+	struct uth_join_kicker *jk = container_of(k, struct uth_join_kicker,
+						  kref);
 
 	uthread_runnable(jk->joiner);
 }
@@ -1423,8 +1461,9 @@ static void __uth_sched_yield_cb(struct uthread *uth, void *arg)
 void uthread_sched_yield(void)
 {
 	if (!uth_2ls_is_multithreaded()) {
-		/* We're an SCP with no other threads, so we want to yield to other
-		 * processes.  For SCPs, this will yield to the OS/other procs. */
+		/* We're an SCP with no other threads, so we want to yield to
+		 * other processes.  For SCPs, this will yield to the OS/other
+		 * procs. */
 		syscall(SYS_proc_yield, TRUE);
 		return;
 	}

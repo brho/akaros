@@ -18,4 +18,4 @@ struct address_range {
 int address_range_validate(const struct address_range *ars, size_t count);
 int address_range_init(struct address_range *ars, size_t count);
 const struct address_range *address_range_find(const struct address_range *ars,
-											   size_t count, uintptr_t addr);
+					       size_t count, uintptr_t addr);

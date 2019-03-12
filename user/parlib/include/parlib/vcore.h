@@ -16,7 +16,7 @@ __BEGIN_DECLS
 void __attribute__((noreturn)) vcore_entry(void);
 extern __thread bool __vcore_context;
 extern __thread int __vcoreid;
-extern __thread struct syscall __vcore_one_sysc;	/* see sys_change_vcore */
+extern __thread struct syscall __vcore_one_sysc; /* see sys_change_vcore */
 
 /* Arch specific entry from the kernel */
 void __attribute__((noreturn)) __kernel_vcore_entry(void);
@@ -62,9 +62,9 @@ void vcore_wake(uint32_t vcoreid, bool force_ipi);
 /* This works so long as we don't dlopen parlib (which we never do) */
 #define get_tlsvar_linaddr(_vcoreid, _var)                                     \
 ({                                                                             \
-	uintptr_t vc_tls_desc = (uintptr_t)get_vcpd_tls_desc(_vcoreid);            \
-	uintptr_t var_off = (uintptr_t)&_var - (uintptr_t)get_tls_desc();          \
-	(typeof(_var) *)(vc_tls_desc + var_off);                                   \
+	uintptr_t vc_tls_desc = (uintptr_t)get_vcpd_tls_desc(_vcoreid);        \
+	uintptr_t var_off = (uintptr_t)&_var - (uintptr_t)get_tls_desc();      \
+	(typeof(_var) *)(vc_tls_desc + var_off);                               \
 })
 
 /* Static inlines */
@@ -118,6 +118,7 @@ static inline bool vcore_is_mapped(uint32_t vcoreid)
 static inline bool vcore_is_preempted(uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
+
 	return atomic_read(&vcpd->flags) & VC_PREEMPTED;
 }
 
@@ -183,6 +184,7 @@ static inline uint64_t vcore_account_uptime_ticks(uint32_t vcoreid)
 	uint64_t resume = __procinfo.vcoremap[vcoreid].resume_ticks; 
 	uint64_t total = __procinfo.vcoremap[vcoreid].total_ticks; 
 	uint64_t now = read_tsc();
+
 	return now - resume + total;
 }
 
@@ -233,12 +235,12 @@ static inline int get_pcoreid(void)
  * of a "TLS cmb()". */
 #define begin_safe_access_tls_vars()                                           \
 {                                                                              \
-	void __attribute__((noinline, optimize("O0")))                             \
-	safe_access_tls_var_internal() {                                           \
-		asm("");                                                               \
+	void __attribute__((noinline, optimize("O0")))                         \
+	safe_access_tls_var_internal() {                                       \
+		asm("");                                                       \
 
 #define end_safe_access_tls_vars()                                             \
-	} safe_access_tls_var_internal();                                          \
+	} safe_access_tls_var_internal();                                      \
 }
 
 #endif // __PIC__
@@ -247,79 +249,81 @@ static inline int get_pcoreid(void)
  * uthread or vcore context.  Pairs with end_access_tls_vars(). */
 #define begin_access_tls_vars(tls_desc)                                        \
 {                                                                              \
-	struct uthread *caller;                                                    \
-	uint32_t vcoreid;                                                          \
-	void *temp_tls_desc;                                                       \
-	bool invcore = in_vcore_context();                                         \
-	if (!invcore) {                                                            \
-		caller = current_uthread;                                              \
-		/* If you have no current_uthread, you might be called too early in the
-		 * process's lifetime.  Make sure something like uthread_slim_init() has
-		 * been run. */                                                        \
-		assert(caller);                                                        \
-		/* We need to disable notifs here (in addition to not migrating), since
-		 * we could get interrupted when we're in the other TLS, and when the
-		 * vcore restarts us, it will put us in our old TLS, not the one we were
-		 * in when we were interrupted.  We need to not migrate, since once we
-		 * know the vcoreid, we depend on being on the same vcore throughout.*/\
-		caller->flags |= UTHREAD_DONT_MIGRATE;                                 \
-		/* Not concerned about cross-core memory ordering, so no CPU mbs needed.
-		 * The cmb is to prevent the compiler from issuing the vcore read before
-		 * the DONT_MIGRATE write. */                                          \
-		cmb();                                                                 \
-		vcoreid = vcore_id();                                                  \
-		disable_notifs(vcoreid);                                               \
-	} else { /* vcore context */                                               \
-		vcoreid = vcore_id();                                                  \
-	}                                                                          \
-	temp_tls_desc = get_tls_desc();                                            \
-	set_tls_desc(tls_desc);                                                    \
+	struct uthread *caller;                                                \
+	uint32_t vcoreid;                                                      \
+	void *temp_tls_desc;                                                   \
+	bool invcore = in_vcore_context();                                     \
+	if (!invcore) {                                                        \
+		caller = current_uthread;                                      \
+		/* If you have no current_uthread, you might be called too early
+		 * in the process's lifetime.  Make sure something like
+		 * uthread_slim_init() has been run. */                        \
+		assert(caller);                                                \
+		/* We need to disable notifs here (in addition to not
+		 * migrating), since we could get interrupted when we're in the
+		 * other TLS, and when the vcore restarts us, it will put us in
+		 * our old TLS, not the one we were in when we were interrupted.
+		 * We need to not migrate, since once we know the vcoreid, we
+		 * depend on being on the same vcore throughout.*/             \
+		caller->flags |= UTHREAD_DONT_MIGRATE;                         \
+		/* Not concerned about cross-core memory ordering, so no CPU mbs
+		 * needed.  The cmb is to prevent the compiler from issuing the
+		 * vcore read before the DONT_MIGRATE write. */                \
+		cmb();                                                         \
+		vcoreid = vcore_id();                                          \
+		disable_notifs(vcoreid);                                       \
+	} else { /* vcore context */                                           \
+		vcoreid = vcore_id();                                          \
+	}                                                                      \
+	temp_tls_desc = get_tls_desc();                                        \
+	set_tls_desc(tls_desc);                                                \
 	begin_safe_access_tls_vars();
 
 #define end_access_tls_vars()                                                  \
-	end_safe_access_tls_vars();                                                \
-	set_tls_desc(temp_tls_desc);                                               \
-	if (!invcore) {                                                            \
-		/* Note we reenable migration before enabling notifs, which is reverse
-		 * from how we disabled notifs.  We must enabling migration before
-		 * enabling notifs.  See 6c7fb12 and 5e4825eb4 for details. */         \
-		caller->flags &= ~UTHREAD_DONT_MIGRATE;                                \
-		cmb();	/* turn off DONT_MIGRATE before enabling notifs */             \
-		enable_notifs(vcoreid);                                                \
-	}                                                                          \
+	end_safe_access_tls_vars();                                            \
+	set_tls_desc(temp_tls_desc);                                           \
+	if (!invcore) {                                                        \
+		/* Note we reenable migration before enabling notifs, which is
+		 * reverse from how we disabled notifs.  We must enabling
+		 * migration before enabling notifs.  See 6c7fb12 and 5e4825eb4
+		 * for details. */                                             \
+		caller->flags &= ~UTHREAD_DONT_MIGRATE;                        \
+		cmb();	/* turn off DONT_MIGRATE before enabling notifs */     \
+		enable_notifs(vcoreid);                                        \
+	}                                                                      \
 }
 
 #define safe_set_tls_var(name, val)                                            \
 ({                                                                             \
-	begin_safe_access_tls_vars();                                              \
-	name = val;                                                                \
-	end_safe_access_tls_vars();                                                \
+	begin_safe_access_tls_vars();                                          \
+	name = val;                                                            \
+	end_safe_access_tls_vars();                                            \
 })
 
 #define safe_get_tls_var(name)                                                 \
 ({                                                                             \
-	typeof(name) __val;                                                        \
-	begin_safe_access_tls_vars();                                              \
-	__val = name;                                                              \
-	end_safe_access_tls_vars();                                                \
-	__val;                                                                     \
+	typeof(name) __val;                                                    \
+	begin_safe_access_tls_vars();                                          \
+	__val = name;                                                          \
+	end_safe_access_tls_vars();                                            \
+	__val;                                                                 \
 })
 
 #define vcore_set_tls_var(name, val)                                           \
 ({                                                                             \
-	typeof(val) __val = val;                                                   \
-	begin_access_tls_vars(get_vcpd_tls_desc(vcoreid));                         \
-	name = __val;                                                              \
-	end_access_tls_vars();                                                     \
+	typeof(val) __val = val;                                               \
+	begin_access_tls_vars(get_vcpd_tls_desc(vcoreid));                     \
+	name = __val;                                                          \
+	end_access_tls_vars();                                                 \
 })
 
 #define vcore_get_tls_var(name)                                                \
 ({                                                                             \
-	typeof(name) val;                                                          \
-	begin_access_tls_vars(get_vcpd_tls_desc(vcoreid));                         \
-	val = name;                                                                \
-	end_access_tls_vars();                                                     \
-	val;                                                                       \
+	typeof(name) val;                                                      \
+	begin_access_tls_vars(get_vcpd_tls_desc(vcoreid));                     \
+	val = name;                                                            \
+	end_access_tls_vars();                                                 \
+	val;                                                                   \
 })
 
 __END_DECLS

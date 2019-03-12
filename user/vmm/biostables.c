@@ -78,11 +78,11 @@ struct acpi_madt_io_apic
 	         .id = 0, .address = 0xfec00000, .global_irq_base = 0};
 
 struct acpi_madt_interrupt_override isor[] = {
-	/* From the ACPI Specification Version 6.1: For example, if your machine has
-	 * the ISA Programmable Interrupt Timer (PIT) connected to ISA IRQ 0, but in
-	 * APIC mode, it is connected to I/O APIC interrupt input 2, then you would
-	 * need an Interrupt Source Override where the source entry is ‘0’
-	 * and the Global System Interrupt is ‘2.’ */
+	/* From the ACPI Specification Version 6.1: For example, if your machine
+	 * has the ISA Programmable Interrupt Timer (PIT) connected to ISA IRQ
+	 * 0, but in APIC mode, it is connected to I/O APIC interrupt input 2,
+	 * then you would need an Interrupt Source Override where the source
+	 * entry is ‘0’ and the Global System Interrupt is ‘2.’ */
 };
 
 void lowmem(void)
@@ -112,6 +112,7 @@ static uint8_t acpi_tb_checksum(uint8_t *buffer, uint32_t length)
 static void gencsum(uint8_t *target, void *data, int len)
 {
 	uint8_t csum;
+
 	// blast target to zero so it does not get counted
 	// (it might be in the struct we checksum) And, yes, it is, goodness.
 	fprintf(stderr, "gencsum %p target %p source %d bytes\n", target, data,
@@ -181,8 +182,8 @@ void *setup_biostables(struct virtual_machine *vm,
 
 
 	// The low 1m is so we can fill in bullshit like ACPI.
-	// And, sorry, due to the STUPID format of the RSDP for now we need the low
-	// 1M.
+	// And, sorry, due to the STUPID format of the RSDP for now we need the
+	// low 1M.
 	low1m = mmap((int*)4096, MiB-4096, PROT_READ | PROT_WRITE,
 	             MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	if (low1m != (void *)4096) {
@@ -221,7 +222,7 @@ void *setup_biostables(struct virtual_machine *vm,
 	/* Check extended checksum if table version >= 2 */
 	gencsum(&r->extended_checksum, r, ACPI_RSDP_XCHECKSUM_LENGTH);
 	if ((rsdp.revision >= 2) &&
-	    (acpi_tb_checksum((uint8_t *) r, ACPI_RSDP_XCHECKSUM_LENGTH) != 0)) {
+	    (acpi_tb_checksum((uint8_t*)r, ACPI_RSDP_XCHECKSUM_LENGTH) != 0)) {
 		fprintf(stderr, "RSDP has bad checksum v2\n");
 		exit(1);
 	}

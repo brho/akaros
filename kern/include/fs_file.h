@@ -76,19 +76,19 @@ struct fs_file_ops {
 	bool (*can_grow_to)(struct fs_file *f, size_t len);
 };
 
-#define FSF_DIRTY				(1 << 1)
+#define FSF_DIRTY		(1 << 1)
 
 struct fs_file {
-	struct dir					dir;
-	int							flags;
-	qlock_t						qlock;
-	struct fs_file_ops			*ops;
-	struct page_map				*pm;
-	void						*priv;
+	struct dir			dir;
+	int				flags;
+	qlock_t				qlock;
+	struct fs_file_ops		*ops;
+	struct page_map			*pm;
+	void				*priv;
 
 	/* optional inline storage */
-	char						static_name[KNAMELEN];	/* for dir->name */
-	struct page_map				static_pm;				/* for pm */
+	char				static_name[KNAMELEN];	/* dir->name */
+	struct page_map			static_pm;		/* for pm */
 	/* we need to be aligned to 64 bytes for the linker tables. */
 } __attribute__ ((aligned(64)));
 
@@ -115,10 +115,10 @@ void fs_file_init_dir(struct fs_file *f, int dir_type, int dir_dev,
 void fs_file_copy_from_dir(struct fs_file *f, struct dir *dir);
 void cleanup_fs_file(struct fs_file *f);
 
-#define FSF_ATIME				(1 << 0)
-#define FSF_BTIME				(1 << 1)
-#define FSF_CTIME				(1 << 2)
-#define FSF_MTIME				(1 << 3)
+#define FSF_ATIME		(1 << 0)
+#define FSF_BTIME		(1 << 1)
+#define FSF_CTIME		(1 << 2)
+#define FSF_MTIME		(1 << 3)
 
 void __set_acmtime_to(struct fs_file *f, int which, struct timespec *t);
 void __set_acmtime(struct fs_file *f, int which);

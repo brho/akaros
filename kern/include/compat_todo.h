@@ -23,7 +23,7 @@ static inline int eaddrcmp(uint8_t *x, uint8_t *y)
 
 
 
-struct mdio_if_info {			// need to interface with mii stuff?
+struct mdio_if_info {		// need to interface with mii stuff?
 };
 struct sk_buff {		// block
 };

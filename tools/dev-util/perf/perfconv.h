@@ -5,9 +5,9 @@
  * Converts kprof profiler files into Linux perf ones. The Linux Perf file
  * format has bee illustrated here:
  *
- *	 https://lwn.net/Articles/644919/
- *	 https://openlab-mu-internal.web.cern.ch/openlab-mu-internal/03_Documents/
- *			 3_Technical_Documents/Technical_Reports/2011/Urs_Fassler_report.pdf
+ * https://lwn.net/Articles/644919/
+ * https://openlab-mu-internal.web.cern.ch/openlab-mu-internal/03_Documents/
+ *	 3_Technical_Documents/Technical_Reports/2011/Urs_Fassler_report.pdf
  *
  */
 
@@ -75,4 +75,4 @@ void perfconv_set_dbglevel(int level, struct perfconv_context *cctx);
 void perfconv_add_kernel_mmap(struct perfconv_context *cctx);
 void perfconv_add_kernel_buildid(struct perfconv_context *cctx);
 void perfconv_process_input(struct perfconv_context *cctx, FILE *input,
-							FILE *output);
+			    FILE *output);

@@ -16,7 +16,7 @@
 #include <event.h>
 #include <umem.h>
 
-void devtabreset()
+void devtabreset(void)
 {
 	ERRSTACK(1);
 	volatile int i;
@@ -33,7 +33,7 @@ void devtabreset()
 	poperror();
 }
 
-void devtabinit()
+void devtabinit(void)
 {
 	ERRSTACK(1);
 	volatile int i;
@@ -44,16 +44,17 @@ void devtabinit()
 		return;
 	}
 	for (i = 0; &devtab[i] < __devtabend; i++) {
-		/* if we have errors, check the align of struct dev and objdump */
+		/* if we have errors, check the align of struct dev and objdump
+		 */
 		printd("i %d, '%s', dev %p, init %p\n", i, devtab[i].name,
-				&devtab[i], devtab[i].init);
+		       &devtab[i], devtab[i].init);
 		if (devtab[i].init)
 			devtab[i].init();
 	}
 	poperror();
 }
 
-void devtabshutdown()
+void devtabshutdown(void)
 {
 	int i;
 
@@ -70,6 +71,7 @@ void devtabshutdown()
 struct dev *devtabget(const char *name, int user)
 {
 	int i = devno(name, user);
+
 	if (i > 0)
 		return &devtab[i];
 

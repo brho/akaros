@@ -11,8 +11,8 @@
 
 static void __attribute__((noreturn)) proc_pop_hwtf(struct hw_trapframe *tf)
 {
-	/* for both HW and SW, note we pass an offset into the TF, beyond the fs and
-	 * gs bases */
+	/* for both HW and SW, note we pass an offset into the TF, beyond the fs
+	 * and gs bases */
 	if (x86_hwtf_is_partial(tf)) {
 		swap_gs();
 	} else {
@@ -53,9 +53,9 @@ static void __attribute__((noreturn)) proc_pop_swtf(struct sw_trapframe *tf)
 		write_gsbase(tf->tf_gsbase);
 		write_fsbase(tf->tf_fsbase);
 	}
-	/* We need to 0 out any registers that aren't part of the sw_tf and that we
-	 * won't use/clobber on the out-path.  While these aren't part of the sw_tf,
-	 * we also don't want to leak any kernel register content. */
+	/* We need to 0 out any registers that aren't part of the sw_tf and that
+	 * we won't use/clobber on the out-path.  While these aren't part of the
+	 * sw_tf, we also don't want to leak any kernel register content. */
 	asm volatile (".globl __asm_pop_swtf_start;"
 	              "__asm_pop_swtf_start:    "
 	              "movq %0, %%rsp;          "
@@ -126,18 +126,21 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	 * context, but be on a new stack.  set_stack_top() doesn't really know
 	 * about the VMCS. */
 	vmcs_write(HOST_RSP, pcpui->stacktop);
-	/* cr2 is not part of the VMCS state; we need to save/restore it manually */
+	/* cr2 is not part of the VMCS state; we need to save/restore it
+	 * manually */
 	lcr2(tf->tf_cr2);
 	vmcs_write(VM_ENTRY_INTR_INFO_FIELD, tf->tf_trap_inject);
-	/* Someone may have tried poking the guest and posting an IRQ, but the IPI
-	 * missed (concurrent vmexit).  In these cases, the 'outstanding
-	 * notification' bit should still be set, and we can resend the IPI.  This
-	 * will arrive after we vmenter, since IRQs are currently disabled. */
+	/* Someone may have tried poking the guest and posting an IRQ, but the
+	 * IPI missed (concurrent vmexit).  In these cases, the 'outstanding
+	 * notification' bit should still be set, and we can resend the IPI.
+	 * This will arrive after we vmenter, since IRQs are currently disabled.
+	 * */
 	if (test_bit(VMX_POSTED_OUTSTANDING_NOTIF, gpc->posted_irq_desc))
 		send_self_ipi(I_POKE_GUEST);
-	/* The first time a VMCS is started after being loaded, it must be launched.
-	 * Subsequent starts must be resumes.  Once the VMCS is cleared, we start
-	 * with a launch again.  Note this is the VMCS, not the GPC unload. */
+	/* The first time a VMCS is started after being loaded, it must be
+	 * launched.  Subsequent starts must be resumes.  Once the VMCS is
+	 * cleared, we start with a launch again.  Note this is the VMCS, not
+	 * the GPC unload. */
 	if (gpc->should_vmresume) {
 		tf->tf_flags |= VMCTX_FL_VMRESUME;
 	} else {
@@ -145,14 +148,14 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 		gpc->should_vmresume = TRUE;
 	}
 	/* vmlaunch/resume can fail, so we need to be able to return from this.
-	 * Thus we can't clobber rsp via the popq style of setting the registers.
-	 * Likewise, we don't want to lose rbp via the clobber list.
+	 * Thus we can't clobber rsp via the popq style of setting the
+	 * registers.  Likewise, we don't want to lose rbp via the clobber list.
 	 *
 	 * Partial contexts have already been launched, so we resume them. */
 	asm volatile (".globl __asm_pop_vmtf_start;"
 	              "__asm_pop_vmtf_start:     "
 	              "testl $"STRINGIFY(VMCTX_FL_VMRESUME)", %c[flags](%0);"
-	              "pushq %%rbp;              "	/* save in case we fail */
+	              "pushq %%rbp;              " /* save in case we fail */
 	              "movq %c[rbx](%0), %%rbx;  "
 	              "movq %c[rcx](%0), %%rcx;  "
 	              "movq %c[rdx](%0), %%rdx;  "
@@ -167,12 +170,12 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	              "movq %c[r13](%0), %%r13;  "
 	              "movq %c[r14](%0), %%r14;  "
 	              "movq %c[r15](%0), %%r15;  "
-	              "movq %c[rax](%0), %%rax;  "	/* clobber our *tf last */
-	              "jnz 1f;                   "	/* jump if resume */
-	              ASM_VMX_VMLAUNCH";         "	/* non-resume gets launched */
+	              "movq %c[rax](%0), %%rax;  " /* clobber our *tf last */
+	              "jnz 1f;                   " /* jump if resume */
+	              ASM_VMX_VMLAUNCH";         " /* non-resume gets launched*/
 	              "jmp 2f;                   "
 	              "1: "ASM_VMX_VMRESUME";    "
-	              "2: popq %%rbp;            "	/* vmlaunch failed */
+	              "2: popq %%rbp;            " /* vmlaunch failed */
 	              ".globl __asm_pop_vmtf_end;"
 	              "__asm_pop_vmtf_end:       "
 	              :
@@ -195,20 +198,20 @@ static void __attribute__((noreturn)) proc_pop_vmtf(struct vm_trapframe *tf)
 	                [flags]"i"(offsetof(struct vm_trapframe, tf_flags))
 	              : "cc", "memory", "rbx", "rcx", "rdx", "rsi", "rdi",
 	                "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15");
-	/* vmlaunch/resume failed.  It could be for a few reasons, including things
-	 * like launching instead of resuming, not having a VMCS loaded, failing a
-	 * host-state area check, etc.  Those are kernel problems.
+	/* vmlaunch/resume failed.  It could be for a few reasons, including
+	 * things like launching instead of resuming, not having a VMCS loaded,
+	 * failing a host-state area check, etc.  Those are kernel problems.
 	 *
-	 * The user should not be able to trigger these problems.  The user could
-	 * trigger a problem loading the guest-state area, such as a non-canonical
-	 * address for RIP.  Those sorts of errors should appear to be a normal
-	 * vmexit with some flags set.
+	 * The user should not be able to trigger these problems.  The user
+	 * could trigger a problem loading the guest-state area, such as a
+	 * non-canonical address for RIP.  Those sorts of errors should appear
+	 * to be a normal vmexit with some flags set.
 	 *
 	 * Any failed vmlaunch/resume is likely a kernel bug, but we'll still
 	 * reflect it to the user for debugability.
 	 *
-	 * Also we should always have a non-shadow VMCS, so ZF should be 1 and we
-	 * can read the error register. */
+	 * Also we should always have a non-shadow VMCS, so ZF should be 1 and
+	 * we can read the error register. */
 	assert(read_flags() & FL_ZF);
 	tf->tf_exit_reason = EXIT_REASON_VMENTER_FAILED;
 	tf->tf_exit_qual = vmcs_read(VM_INSTRUCTION_ERROR);
@@ -240,32 +243,36 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
                    uintptr_t stack_top, uintptr_t tls_desc)
 {
 	struct sw_trapframe *sw_tf = &ctx->tf.sw_tf;
-	/* zero the entire structure for any type, prevent potential disclosure */
+
+	/* zero the entire structure for any type, prevent potential disclosure
+	 */
 	memset(ctx, 0, sizeof(struct user_context));
 	ctx->type = ROS_SW_CTX;
 	/* Stack pointers in x86 C functions need to be such that adding or
-	 * subtracting 8 will result in 16 byte alignment (AMD64 ABI), which we call
-	 * an odd-8-byte alignment.  The reason is so that input arguments (on the
-	 * stack) are 16 byte aligned.  The extra 8 bytes is the retaddr, pushed on
-	 * the stack.  Compilers know they can subtract 8 to get 16 byte alignment
-	 * for instructions like movaps.
+	 * subtracting 8 will result in 16 byte alignment (AMD64 ABI), which we
+	 * call an odd-8-byte alignment.  The reason is so that input arguments
+	 * (on the stack) are 16 byte aligned.  The extra 8 bytes is the
+	 * retaddr, pushed on the stack.  Compilers know they can subtract 8 to
+	 * get 16 byte alignment for instructions like movaps.
 	 *
-	 * However, the kernel will start contexts at 16 byte aligned stacks.  This
-	 * is because glibc's _start (in ASM) expects this.  Parlib x86's vcore
-	 * entry does the same.
+	 * However, the kernel will start contexts at 16 byte aligned stacks.
+	 * This is because glibc's _start (in ASM) expects this.  Parlib x86's
+	 * vcore entry does the same.
 	 *
-	 * We init contexts for both an elf startup as well as vcore entry.  It is
-	 * up to the caller (including the user) to make sure the stack is aligned
-	 * properly.  elf.c doesn't know about these concerns, so if it messes up,
-	 * there's nothing we can really do, since the args are just wrong.  ld will
-	 * fail immediately though, so we'll find out quickly. */
+	 * We init contexts for both an elf startup as well as vcore entry.  It
+	 * is up to the caller (including the user) to make sure the stack is
+	 * aligned properly.  elf.c doesn't know about these concerns, so if it
+	 * messes up, there's nothing we can really do, since the args are just
+	 * wrong.  ld will fail immediately though, so we'll find out quickly.
+	 * */
 	sw_tf->tf_rsp = stack_top;
 	sw_tf->tf_rip = entryp;
 	sw_tf->tf_rbp = 0;	/* for potential backtraces */
 	sw_tf->tf_mxcsr = 0x00001f80;	/* x86 default mxcsr */
 	sw_tf->tf_fpucw = 0x037f;		/* x86 default FP CW */
-	/* Coupled closely with user's entry.S.  id is the vcoreid, which entry.S
-	 * uses to determine what to do.  vcoreid == 0 is the main core/context. */
+	/* Coupled closely with user's entry.S.  id is the vcoreid, which
+	 * entry.S uses to determine what to do.  vcoreid == 0 is the main
+	 * core/context. */
 	sw_tf->tf_rbx = vcoreid;
 	sw_tf->tf_fsbase = tls_desc;
 	proc_secure_ctx(ctx);
@@ -286,8 +293,8 @@ static void proc_secure_hwtf(struct hw_trapframe *tf)
 	/* Always 1: interrupts */
 	tf->tf_rflags |= FL_IF;
 	/* Always 0: IOPL must be set to 0.  VM (virtual 8086) probably doesn't
-	 * matter - SDM says it can't get modified via iret anyways.  VIF and VIP
-	 * are also virtual-8086 mode stuff.  Supposedly NT is settable by
+	 * matter - SDM says it can't get modified via iret anyways.  VIF and
+	 * VIP are also virtual-8086 mode stuff.  Supposedly NT is settable by
 	 * userspace, but there's no good reason for it.  Rather be paranoid. */
 	tf->tf_rflags &= ~(FL_IOPL_MASK | FL_VM | FL_NT | FL_VIF | FL_VIP);
 	tf->tf_rflags |= FL_RSVD_1;
@@ -301,26 +308,26 @@ static void proc_secure_swtf(struct sw_trapframe *tf)
 	enforce_user_canon(&tf->tf_fsbase);
 	enforce_user_canon(&tf->tf_rip);
 	enforce_user_canon(&tf->tf_rsp);
-	/* The kernel doesn't actually load the mxcsr or the fpucw, but we can still
-	 * sanitize it in case we ever do load it. */
+	/* The kernel doesn't actually load the mxcsr or the fpucw, but we can
+	 * still sanitize it in case we ever do load it. */
 	tf->tf_mxcsr &= MXCSR_RSVD_0;
 	x86_swtf_clear_partial(tf);
 }
 
 static void proc_secure_vmtf(struct vm_trapframe *tf)
 {
-	/* The user can say whatever it wants for the bulk of the TF.  If they mess
-	 * up something in the guest-area, it'll be treated like a vmexit.  There
-	 * are a few things in the TF that we use on the kernel side.
+	/* The user can say whatever it wants for the bulk of the TF.  If they
+	 * mess up something in the guest-area, it'll be treated like a vmexit.
+	 * There are a few things in the TF that we use on the kernel side.
 	 *
-	 * If guest_pcoreid is bad (not a guest_pcore), we'll fail to load the GPC
-	 * and reflect the fault to userspace.
+	 * If guest_pcoreid is bad (not a guest_pcore), we'll fail to load the
+	 * GPC and reflect the fault to userspace.
 	 *
-	 * Regarding tf_flags, some are informational for the user, some are used
-	 * for our own use in the kernel.
+	 * Regarding tf_flags, some are informational for the user, some are
+	 * used for our own use in the kernel.
 	 * - VMCTX_FL_PARTIAL: We clear this below
-	 * - VMCTX_FL_VMRESUME: Used to temporarily carry a bool in pop_vmtf, but we
-	 *   never trust the value in the VM TF.
+	 * - VMCTX_FL_VMRESUME: Used to temporarily carry a bool in pop_vmtf,
+	 *   but we never trust the value in the VM TF.
 	 * These are write-only from the kernel and passed to the user:
 	 * - VMCTX_FL_HAS_FAULT
 	 * - VMCTX_FL_EPT_VMR_BACKED */
@@ -340,8 +347,9 @@ void proc_secure_ctx(struct user_context *ctx)
 		proc_secure_vmtf(&ctx->tf.vm_tf);
 		break;
 	default:
-		/* If we aren't another ctx type, we're assuming (and forcing) a HW ctx.
-		 * If this is somehow fucked up, userspace should die rather quickly. */
+		/* If we aren't another ctx type, we're assuming (and forcing) a
+		 * HW ctx.  If this is somehow fucked up, userspace should die
+		 * rather quickly. */
 		ctx->type = ROS_HW_CTX;
 		proc_secure_hwtf(&ctx->tf.hw_tf);
 	}

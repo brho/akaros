@@ -46,22 +46,22 @@ void mboot_detect_memory(struct multiboot_info *mbi)
 	size_t basemem;
 	size_t extmem;
 	if (!(mbi->flags & MULTIBOOT_INFO_MEMORY)) {
-		printk("No BIOS memory info from multiboot, crash impending!\n");
+		printk("No BIOS memory info from multiboot, crash impending\n");
 		return;
 	}
-	/* mem_lower and upper are measured in KB.  They are 32 bit values, so we're
-	 * limited to 4TB total. */
+	/* mem_lower and upper are measured in KB.  They are 32 bit values, so
+	 * we're limited to 4TB total. */
 	basemem = ROUNDDOWN((size_t)mbi->mem_lower * 1024, PGSIZE);
-	/* On 32 bit, This shift << 10 could cause us to lose some memory, but we
-	 * weren't going to access it anyways (won't go beyond ~1GB) */
+	/* On 32 bit, This shift << 10 could cause us to lose some memory, but
+	 * we weren't going to access it anyways (won't go beyond ~1GB) */
 	extmem = ROUNDDOWN((size_t)mbi->mem_upper * 1024, PGSIZE);
-	/* Calculate the maximum physical address based on whether or not there is
-	 * any extended memory. */
+	/* Calculate the maximum physical address based on whether or not there
+	 * is any extended memory. */
 	if (extmem) {
 		max_bios_mem = EXTPHYSMEM + extmem;
-		/* On 32 bit, if we had enough RAM that adding a little wrapped us
-		 * around, we'll back off a little and run with just extmem amount (in
-		 * essence, subtracing 1MB). */
+		/* On 32 bit, if we had enough RAM that adding a little wrapped
+		 * us around, we'll back off a little and run with just extmem
+		 * amount (in essence, subtracing 1MB). */
 		if (max_bios_mem < extmem)
 			max_bios_mem = extmem;
 	} else {
@@ -72,8 +72,8 @@ void mboot_detect_memory(struct multiboot_info *mbi)
 	       extmem / 1024);
 	printk("Maximum directly addressable base and extended memory: %luK\n",
 	       max_bios_addr / 1024);
-	/* Take a first stab at the max pmem, in case there are no memory mappings
-	 * (like in riscv) */
+	/* Take a first stab at the max pmem, in case there are no memory
+	 * mappings (like in riscv) */
 	max_pmem = max_bios_mem;
 }
 
@@ -85,16 +85,18 @@ void mboot_foreach_mmap(struct multiboot_info *mbi, mboot_foreach_t func,
 		printd("No memory mapping info from multiboot\n");
 		return;
 	}
-	mmap_b = (struct multiboot_mmap_entry*)((size_t)mbi->mmap_addr + KERNBASE);
-	mmap_e = (struct multiboot_mmap_entry*)((size_t)mbi->mmap_addr + KERNBASE
-	                                   + mbi->mmap_length);
+	mmap_b = (struct multiboot_mmap_entry*)((size_t)mbi->mmap_addr +
+						KERNBASE);
+	mmap_e = (struct multiboot_mmap_entry*)((size_t)mbi->mmap_addr +
+						KERNBASE + mbi->mmap_length);
 	printd("mmap_addr = %p, mmap_length = %p\n", mbi->mmap_addr,
 	       mbi->mmap_length);
 	/* Note when we incremement mmap_i, we add in the value of size... */
 	for (mmap_i = mmap_b;
 	     mmap_i < mmap_e;
-	     mmap_i = (struct multiboot_mmap_entry*)((void*)mmap_i + mmap_i->size
-	                                             + sizeof(mmap_i->size))) {
+	     mmap_i = (struct multiboot_mmap_entry*)((void*)mmap_i +
+						     mmap_i->size +
+						     sizeof(mmap_i->size))) {
 		func(mmap_i, data);
 	}
 }
@@ -117,15 +119,13 @@ void mboot_print_mmap(struct multiboot_info *mbi)
 bool mboot_region_collides(struct multiboot_info *mbi, uintptr_t base,
                            uintptr_t end)
 {
-	if (regions_collide_unsafe((uintptr_t)mbi,
-	                           (uintptr_t)mbi + sizeof(struct multiboot_info),
-	                           base, end))
+	if (regions_collide_unsafe((uintptr_t)mbi, (uintptr_t)mbi +
+				   sizeof(struct multiboot_info), base, end))
 		return TRUE;
 	if (mboot_has_mmaps(mbi)) {
 		if (regions_collide_unsafe((uintptr_t)mbi->mmap_addr + KERNBASE,
-		                           (uintptr_t)mbi->mmap_addr + KERNBASE
-		                                                     + mbi->mmap_length,
-		                           base, end))
+					   (uintptr_t)mbi->mmap_addr + KERNBASE
+					   + mbi->mmap_length, base, end))
 			return TRUE;
 	}
 	return FALSE;

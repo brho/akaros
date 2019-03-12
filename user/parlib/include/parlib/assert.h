@@ -16,21 +16,21 @@ void _assert_failed(const char *file, int line, const char *msg)
 
 #define panic(...) _panic(__FILE__, __LINE__, __VA_ARGS__)
 
-#define assert(x)	                                                           \
-	do {                                                                       \
-		if (!(x))                                                              \
-			_assert_failed(__FILE__, __LINE__, #x);                            \
-	} while (0)
+#define assert(x)	                                                       \
+do {                                                                           \
+	if (!(x))                                                              \
+		_assert_failed(__FILE__, __LINE__, #x);                        \
+} while (0)
 
 /* This is better than glibc's assert_perror(), but in the interest of not
  * causing confusion, I'll rename ours. */
 #define parlib_assert_perror(x)                                                \
-	do {                                                                       \
-		if (!(x)) {                                                            \
-			perror("");                                                        \
-			_assert_failed(__FILE__, __LINE__, #x);                            \
-		}                                                                      \
-	} while (0)
+do {                                                                           \
+	if (!(x)) {                                                            \
+		perror("");                                                    \
+		_assert_failed(__FILE__, __LINE__, #x);                        \
+	}                                                                      \
+} while (0)
 
 // parlib_static_assert(x) will generate a compile-time error if 'x' is false.
 #define parlib_static_assert(x)	switch (x) case 0: case (x):

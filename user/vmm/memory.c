@@ -67,7 +67,8 @@ void *init_e820map(struct virtual_machine *vm, struct boot_params *bp)
 	if (memstart < RESERVED) {
 		bp->e820_map[bp->e820_entries].addr = memstart;
 		if (memstart + memsize > RESERVED)
-			bp->e820_map[bp->e820_entries].size = RESERVED - memstart;
+			bp->e820_map[bp->e820_entries].size = RESERVED -
+				                              memstart;
 		else
 			bp->e820_map[bp->e820_entries].size = memsize;
 		lowmem = bp->e820_map[bp->e820_entries].size;
@@ -146,7 +147,8 @@ void mmap_memory(struct virtual_machine *vm, uintptr_t memstart, size_t memsize)
 	              PROT_READ | PROT_WRITE | PROT_EXEC,
 	              MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 	if (r1 != (void *)memstart) {
-		fprintf(stderr, "Low region: Could not mmap 0x%lx bytes at 0x%lx\n",
+		fprintf(stderr,
+			"Low region: Could not mmap 0x%lx bytes at 0x%lx\n",
 		        memsize, memstart);
 		exit(1);
 	}
@@ -198,7 +200,7 @@ void *populate_stack(uintptr_t *stack, int argc, char *argv[],
                          int envc, char *envp[],
                          int auxc, struct elf_aux auxv[])
 {
-	/* Function to get the lengths of the argument and environment strings. */
+	/* Func to get the lengths of the argument and environment strings. */
 	int get_lens(int argc, char *argv[], int arg_lens[])
 	{
 		int total = 0;
@@ -234,9 +236,9 @@ void *populate_stack(uintptr_t *stack, int argc, char *argv[],
 		return offset;
 	}
 
-	/* Start tracking the size of the buffer necessary to hold all of our data
-	 * on the stack. Preallocate space for argc, argv, envp, and auxv in this
-	 * buffer. */
+	/* Start tracking the size of the buffer necessary to hold all of our
+	 * data on the stack. Preallocate space for argc, argv, envp, and auxv
+	 * in this buffer. */
 	int bufsize = 0;
 
 	bufsize += 1 * sizeof(size_t);
@@ -254,7 +256,8 @@ void *populate_stack(uintptr_t *stack, int argc, char *argv[],
 	fprintf(stderr, "Bufsize for pointers, argc, and strings is %d\n",
 	        bufsize);
 
-	/* Adjust bufsize so that our buffer will ultimately be 16 byte aligned. */
+	/* Adjust bufsize so that our buffer will ultimately be 16 byte aligned.
+	 */
 	bufsize = (bufsize + 15) & ~0xf;
 	fprintf(stderr,
 	        "Bufsize for pointers, argc, and strings is rounded is %d\n",

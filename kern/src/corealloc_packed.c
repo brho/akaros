@@ -27,8 +27,8 @@ struct sched_pnode {
 	enum pnode_type type;
 	struct sched_pnode *parent;
 
-	/* Refcount is used to track how many cores have been allocated beneath the
-	 * current node in the hierarchy. */
+	/* Refcount is used to track how many cores have been allocated beneath
+	 * the current node in the hierarchy. */
 	int refcount;
 
 	/* All nodes except cores have children. Cores have a sched_pcore. */
@@ -119,16 +119,18 @@ static void init_nodes(int type, int num, int nchildren)
 		if (n->type == CORE) {
 			n->sched_pcore = &all_pcores[n->id];
 			n->sched_pcore->sched_pnode = n;
-			n->sched_pcore->core_info = &cpu_topology_info.core_list[n->id];
+			n->sched_pcore->core_info =
+				&cpu_topology_info.core_list[n->id];
 			n->sched_pcore->alloc_proc = NULL;
 			n->sched_pcore->prov_proc = NULL;
 		}
-		/* Otherwise initialize the children field, updating the parent of all
-		 * children to the current node. This assumes the children have already
-		 * been initialized (i.e. init_nodes() must be called iteratively from
-		 * the bottom-up). */
+		/* Otherwise initialize the children field, updating the parent
+		 * of all children to the current node. This assumes the
+		 * children have already been initialized (i.e. init_nodes()
+		 * must be called iteratively from the bottom-up). */
 		if (n->type != CORE) {
-			n->children = &node_lookup[child_node_type(type)][i * nchildren];
+			n->children =
+			    &node_lookup[child_node_type(type)][i * nchildren];
 			for (int j = 0; j < nchildren; j++)
 				n->children[j].parent = n;
 		}
@@ -235,7 +237,8 @@ static int cumulative_core_distance(struct sched_pcore *c,
 	struct sched_pcore *temp = NULL;
 
 	TAILQ_FOREACH(temp, &cl, alloc_next) {
-		d += core_distance[c->core_info->core_id][temp->core_info->core_id];
+		d += core_distance[c->core_info->core_id]
+			          [temp->core_info->core_id];
 	}
 	return d;
 }
@@ -267,8 +270,9 @@ static struct sched_pcore *find_first_core(struct proc *p)
 	int best_refcount;
 
 	/* Find the best, first provisioned core if there are any. Even if the
-	 * whole machine is allocated, we still give out provisioned cores, because
-	 * they will be revoked from their current owner if necessary. */
+	 * whole machine is allocated, we still give out provisioned cores,
+	 * because they will be revoked from their current owner if necessary.
+	 */
 	c = find_first_provisioned_core(p);
 	if (c != NULL)
 		return c;
@@ -279,9 +283,9 @@ static struct sched_pcore *find_first_core(struct proc *p)
 	if (bestn->refcount == num_descendants[MACHINE][CORE])
 		return NULL;
 
-	/* Otherwise, we know at least one core is still available, so let's find
-	 * the best one to allocate first. We start at NUMA, and loop through the
-	 * topology to find it. */
+	/* Otherwise, we know at least one core is still available, so let's
+	 * find the best one to allocate first. We start at NUMA, and loop
+	 * through the topology to find it. */
 	for (int i = NUMA; i >= CORE; i--) {
 		nodes = bestn->children;
 		best_refcount = total_nodes;
@@ -306,7 +310,8 @@ static struct sched_pcore *find_first_core(struct proc *p)
  * already own. If no cores are available we return NULL.*/
 static struct sched_pcore *find_closest_provisioned_core(struct proc *p)
 {
-	struct sched_pcore_tailq provisioned = p->ksched_data.crd.prov_not_alloc_me;
+	struct sched_pcore_tailq provisioned =
+		p->ksched_data.crd.prov_not_alloc_me;
 	struct sched_pcore_tailq allocated = p->ksched_data.crd.alloc_me;
 	struct sched_pcore *bestc = NULL;
 	struct sched_pcore *c = NULL;
@@ -392,8 +397,10 @@ void __track_core_alloc(struct proc *p, uint32_t pcoreid)
 	spc->alloc_proc = p;
 	/* if the pcore is prov to them and now allocated, move lists */
 	if (spc->prov_proc == p) {
-		TAILQ_REMOVE(&p->ksched_data.crd.prov_not_alloc_me, spc, prov_next);
-		TAILQ_INSERT_TAIL(&p->ksched_data.crd.prov_alloc_me, spc, prov_next);
+		TAILQ_REMOVE(&p->ksched_data.crd.prov_not_alloc_me, spc,
+			     prov_next);
+		TAILQ_INSERT_TAIL(&p->ksched_data.crd.prov_alloc_me, spc,
+				  prov_next);
 	}
 	/* Actually allocate the core, removing it from the idle core list. */
 	TAILQ_REMOVE(&idlecores, spc, alloc_next);
@@ -414,10 +421,10 @@ void __track_core_dealloc(struct proc *p, uint32_t pcoreid)
 	/* if the pcore is prov to them and now deallocated, move lists */
 	if (spc->prov_proc == p) {
 		TAILQ_REMOVE(&p->ksched_data.crd.prov_alloc_me, spc, prov_next);
-		/* this is the victim list, which can be sorted so that we pick the
-		 * right victim (sort by alloc_proc reverse priority, etc).  In this
-		 * case, the core isn't alloc'd by anyone, so it should be the first
-		 * victim. */
+		/* this is the victim list, which can be sorted so that we pick
+		 * the right victim (sort by alloc_proc reverse priority, etc).
+		 * In this case, the core isn't alloc'd by anyone, so it should
+		 * be the first victim. */
 		TAILQ_INSERT_HEAD(&p->ksched_data.crd.prov_not_alloc_me, spc,
 		                  prov_next);
 	}
@@ -441,7 +448,8 @@ void __track_core_dealloc_bulk(struct proc *p, uint32_t *pc_arr,
  * duration of the call. */
 void __next_core_to_alloc(uint32_t pcoreid)
 {
-	printk("This function is not supported by this core allocation policy!\n");
+	printk("%s is not supported by this core allocation policy!\n",
+	       __func__);
 }
 
 /* One off function to sort the idle core list for debugging in the kernel
@@ -449,7 +457,8 @@ void __next_core_to_alloc(uint32_t pcoreid)
  * for the duration of the call. */
 void __sort_idle_cores(void)
 {
-	printk("This function is not supported by this core allocation policy!\n");
+	printk("%s is not supported by this core allocation policy!\n",
+	       __func__);
 }
 
 /* Print the map of idle cores that are still allocatable through our core
@@ -461,8 +470,9 @@ void print_idle_core_map(void)
 		struct sched_pcore *spc_i = &all_pcores[i];
 
 		if (spc_i->alloc_proc == NULL)
-			printk("Core %d, prov to %d (%p)\n", spc_i->core_info->core_id,
-			       spc_i->prov_proc ? spc_i->prov_proc->pid :
-				   0, spc_i->prov_proc);
+			printk("Core %d, prov to %d (%p)\n",
+			       spc_i->core_info->core_id,
+			       spc_i->prov_proc ? spc_i->prov_proc->pid : 0,
+			       spc_i->prov_proc);
 	}
 }

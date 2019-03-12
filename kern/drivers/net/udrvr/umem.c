@@ -55,7 +55,8 @@
 #define	ib_umem_odp_get(c, u)	({ BUG(); -1; })
 #endif	/* AKAROS */
 
-static void __ib_umem_release(struct ib_device *dev, struct ib_umem *umem, int dirty)
+static void __ib_umem_release(struct ib_device *dev, struct ib_umem *umem,
+			      int dirty)
 {
 	struct scatterlist *sg;
 	struct page *page;

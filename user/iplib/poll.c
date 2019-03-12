@@ -57,9 +57,10 @@ int ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *timeout_ts,
 			FD_SET(i, &rd_fds);
 		if (fds[i].events & POLLOUT)
 			FD_SET(i, &wr_fds);
-		/* TODO: We should be also asking for exceptions on all FDs.  But select
-		 * is spurious, so it will actually tell us we had errors on all of our
-		 * FDs, which will probably confuse programs. */
+		/* TODO: We should be also asking for exceptions on all FDs.
+		 * But select is spurious, so it will actually tell us we had
+		 * errors on all of our FDs, which will probably confuse
+		 * programs. */
 	}
 	ret = pselect(max_fd_plus_one, &rd_fds, &wr_fds, &ex_fds, timeout_ts,
 	              sigmask);

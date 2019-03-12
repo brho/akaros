@@ -54,9 +54,10 @@ void spin_lock(spinlock_t *lock)
 {
 	uint32_t coreid = core_id_early();
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
-	/* Short circuit our lock checking, so we can print or do other things to
-	 * announce the failure that require locks.  Also avoids anything else
-	 * requiring pcpui initialization. */
+
+	/* Short circuit our lock checking, so we can print or do other things
+	 * to announce the failure that require locks.  Also avoids anything
+	 * else requiring pcpui initialization. */
 	if (pcpui->__lock_checking_enabled != 1)
 		goto lock;
 	if (lock->irq_okay) {
@@ -70,7 +71,8 @@ void spin_lock(spinlock_t *lock)
 		if (!can_spinwait_noirq(pcpui)) {
 			pcpui->__lock_checking_enabled--;
 			print_kctx_depths("NOIRQ");
-			panic("Lock %p tried to spin when it shouldn't\n", lock);
+			panic("Lock %p tried to spin when it shouldn't\n",
+			      lock);
 			pcpui->__lock_checking_enabled++;
 		}
 	}
@@ -177,51 +179,57 @@ void poke(struct poke_tracker *tracker, void *arg)
 	atomic_set(&tracker->need_to_run, TRUE);
 	/* will need to repeatedly do it if someone keeps posting work */
 	do {
-		/* want an wrmb() btw posting work/need_to_run and in_progress.  the
-		 * swap provides the HW mb. just need a cmb, which we do in the loop to
-		 * cover the iterations (even though i can't imagine the compiler
-		 * reordering the check it needed to do for the branch).. */
+		/* want an wrmb() btw posting work/need_to_run and in_progress.
+		 * the swap provides the HW mb. just need a cmb, which we do in
+		 * the loop to cover the iterations (even though i can't imagine
+		 * the compiler reordering the check it needed to do for the
+		 * branch).. */
 		cmb();
-		/* poke / make sure someone does it.  if we get a TRUE (1) back, someone
-		 * is already running and will deal with the posted work.  (probably on
-		 * their next loop).  if we got a 0 back, we won the race and have the
-		 * 'lock'. */
+		/* poke / make sure someone does it.  if we get a TRUE (1) back,
+		 * someone is already running and will deal with the posted
+		 * work.  (probably on their next loop).  if we got a 0 back, we
+		 * won the race and have the 'lock'. */
 		if (atomic_swap(&tracker->run_in_progress, TRUE))
 			return;
-		/* if we're here, then we're the one who needs to run the func. */
-		/* clear the 'need to run', since we're running it now.  new users will
-		 * set it again.  this write needs to be wmb()'d after in_progress.  the
-		 * swap provided the HW mb(). */
+		/* if we're here, then we're the one who needs to run the func.
+		 * */
+		/* clear the 'need to run', since we're running it now.  new
+		 * users will set it again.  this write needs to be wmb()'d
+		 * after in_progress.  the swap provided the HW mb(). */
 		cmb();
-		atomic_set(&tracker->need_to_run, FALSE);	/* no internal HW mb */
-		/* run the actual function.  the poke sync makes sure only one caller is
-		 * in that func at a time. */
+		/* no internal HW mb */
+		atomic_set(&tracker->need_to_run, FALSE);
+		/* run the actual function.  the poke sync makes sure only one
+		 * caller is in that func at a time. */
 		assert(tracker->func);
 		tracker->func(arg);
-		wmb();	/* ensure the in_prog write comes after the run_again. */
-		atomic_set(&tracker->run_in_progress, FALSE);	/* no internal HW mb */
+		/* ensure the in_prog write comes after the run_again. */
+		wmb();
+		/* no internal HW mb */
+		atomic_set(&tracker->run_in_progress, FALSE);
 		/* in_prog write must come before run_again read */
 		wrmb();
-	} while (atomic_read(&tracker->need_to_run));	/* while there's more work*/
+	} while (atomic_read(&tracker->need_to_run));
 }
 
 // Must be called in a pair with waiton_checklist
 int commit_checklist_wait(checklist_t* list, checklist_mask_t* mask)
 {
 	assert(list->mask.size == mask->size);
-	// abort if the list is locked.  this will protect us from trying to commit
-	// and thus spin on a checklist that we are already waiting on.  it is
-	// still possible to not get the lock, but the holder is on another core.
-	// Or, bail out if we can see the list is already in use.  This check is
-	// just an optimization before we try to use the list for real.
+	// abort if the list is locked.  this will protect us from trying to
+	// commit and thus spin on a checklist that we are already waiting on.
+	// it is still possible to not get the lock, but the holder is on
+	// another core.  Or, bail out if we can see the list is already in use.
+	// This check is just an optimization before we try to use the list for
+	// real.
 	if ((checklist_is_locked(list)) || !checklist_is_clear(list))
 		return -EBUSY;
 
 	// possession of this lock means you can wait on it and set it
 	spin_lock_irqsave(&list->lock);
 	// wait til the list is available.  could have some adaptive thing here
-	// where it fails after X tries (like 500), gives up the lock, and returns
-	// an error code
+	// where it fails after X tries (like 500), gives up the lock, and
+	// returns an error code
 	while (!checklist_is_clear(list))
 		cpu_relax();
 
@@ -240,7 +248,8 @@ int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask)
 	return e;
 }
 // The deal with the lock:
-// what if two different actors are waiting on the list, but for different reasons?
+// what if two different actors are waiting on the list, but for different
+// reasons?
 // part of the problem is we are doing both set and check via the same path
 //
 // aside: we made this a lot more difficult than the usual barriers or even
@@ -250,16 +259,16 @@ int commit_checklist_nowait(checklist_t* list, checklist_mask_t* mask)
 // how about this: if we want to wait on this later, we just don't release the
 // lock.  if we release it, then we don't care who comes in and grabs and starts
 // checking the list.
-// 	- regardless, there are going to be issues with people looking for a free
-// 	item.  even if they grab the lock, they may end up waiting a while and
-// 	wantint to bail (like test for a while, give up, move on, etc).
-// 	- still limited in that only the setter can check, and only one person
-// 	can spinwait / check for completion.  if someone else tries to wait (wanting
-// 	completion), they may miss it if someone else comes in and grabs the lock
-// 	to use it for a new checklist
-// 		- if we had the ability to sleep and get woken up, we could have a
-// 		queue.  actually, we could do a queue anyway, but they all spin
-// 		and it's the bosses responsibility to *wake* them
+// - regardless, there are going to be issues with people looking for a free
+// item.  even if they grab the lock, they may end up waiting a while and
+// wantint to bail (like test for a while, give up, move on, etc).
+// - still limited in that only the setter can check, and only one person
+// can spinwait / check for completion.  if someone else tries to wait (wanting
+// completion), they may miss it if someone else comes in and grabs the lock
+// to use it for a new checklist
+// 	- if we had the ability to sleep and get woken up, we could have a
+// 	queue.  actually, we could do a queue anyway, but they all spin
+// 	and it's the bosses responsibility to *wake* them
 
 // Must be called after commit_checklist
 // Assumed we held the lock if we ever call this

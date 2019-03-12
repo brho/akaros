@@ -36,8 +36,8 @@ static ssize_t __recvfrom_udp(int fd, const struct iovec *iov, int iovcnt,
 	real_iov[0].iov_len = P9_UDP_HDR_SZ;
 	memcpy(real_iov + 1, iov, iovcnt * sizeof(struct iovec));
 	ret = readv(fd, real_iov, iovcnt + 1);
-	/* Subtracting before the check, so that we error out if we got less than
-	 * the headers needed */
+	/* Subtracting before the check, so that we error out if we got less
+	 * than the headers needed */
 	ret -= P9_UDP_HDR_SZ;
 	if (ret < 0)
 		return -1;
@@ -75,9 +75,8 @@ ssize_t __recvfrom_iov(int fd, const struct iovec *iov, int iovcnt,
 
 /* Read N bytes into BUF through socket FD from peer at address FROM (which is
  * FROMLEN bytes long).  Returns the number read or -1 for errors.  */
-ssize_t __recvfrom(int fd, void *__restrict buf, size_t n,
-				   int flags, __SOCKADDR_ARG from,
-				   socklen_t * __restrict fromlen)
+ssize_t __recvfrom(int fd, void *__restrict buf, size_t n, int flags,
+		   __SOCKADDR_ARG from, socklen_t * __restrict fromlen)
 {
 	struct iovec iov[1];
 

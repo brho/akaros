@@ -30,7 +30,8 @@ static void lpc_init_pci(struct pci_device *pcidev)
 	pmbase &= ~1; /* clear bit 0 */
 	uint32_t smi_ctl = inl(pmbase + 0x30);
 	#if 0
-	/* halt the tco timer: this busts things, and won't work with the lock on */
+	/* halt the tco timer: this busts things, and won't work with the lock
+	 * on */
 	uint16_t tco1 = inw(pmbase + 0x60 + 0x08);
 	if (tco1 & (1 << 12)) {
 		printk("\t\tTCO_LOCK is on!\n");
@@ -44,9 +45,10 @@ static void lpc_init_pci(struct pci_device *pcidev)
 	smi_ctl = inl(pmbase + 0x30);
 }
 
-void intel_lpc_init()
+void intel_lpc_init(void)
 {
 	struct pci_device *i;
+
 	STAILQ_FOREACH(i, &pci_devices, all_dev) {
 		if ((i->dev == 0x1f) && (i->func == 0x00))
 			lpc_init_pci(i);

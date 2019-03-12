@@ -121,10 +121,12 @@ static uint32_t apic_read(uint64_t offset)
 
 	uint32_t low;
 
-	DPRINTF("apic_read offset %s 0x%x\n", apicregs[offset].name, (int)offset);
+	DPRINTF("apic_read offset %s 0x%x\n", apicregs[offset].name,
+		(int)offset);
 
 	if (! apicregs[offset].mode & 1) {
-		fprintf(stderr, "Attempt to read %s, which is %s\n", apicregs[offset].name,
+		fprintf(stderr, "Attempt to read %s, which is %s\n",
+			apicregs[offset].name,
 			apicregs[offset].mode == 0 ?  "reserved" : "writeonly");
 		// panic? what to do?
 		return (uint32_t) -1;
@@ -133,7 +135,8 @@ static uint32_t apic_read(uint64_t offset)
 	// no special cases yet.
 	switch (offset) {
 	default:
-		DPRINTF("%s: return %08x\n", apicregs[offset].name, apicregs[offset].value);
+		DPRINTF("%s: return %08x\n", apicregs[offset].name,
+			apicregs[offset].value);
 		return apicregs[offset].value;
 		break;
 	}
@@ -145,10 +148,12 @@ static void apic_write(uint64_t offset, uint32_t value)
 	uint64_t val64;
 	uint32_t low, high;
 
-	DPRINTF("apic_write offset %s 0x%x value 0x%x\n", apicregs[offset].name, (int)offset, value);
+	DPRINTF("apic_write offset %s 0x%x value 0x%x\n", apicregs[offset].name,
+		(int)offset, value);
 
 	if (! apicregs[offset].mode & 2) {
-		fprintf(stderr, "Attempt to write %s, which is %s\n", apicregs[offset].name,
+		fprintf(stderr, "Attempt to write %s, which is %s\n",
+			apicregs[offset].name,
 			apicregs[offset].mode == 0 ?  "reserved" : "readonly");
 		// panic? what to do?
 		return;
@@ -180,16 +185,19 @@ int __apic_access(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
 	}
 	offset >>= 4;
 	if (offset > APIC_CONFIG) {
-		DPRINTF("Bad register offset: 0x%x and max is 0x%x\n", gpa, gpa + APIC_CONFIG);
+		DPRINTF("Bad register offset: 0x%x and max is 0x%x\n", gpa, gpa
+			+ APIC_CONFIG);
 		return -1;
 	}
 
 	if (store) {
 		apic_write(offset, *regp);
-		DPRINTF("Write: mov %s to %s @%p val %p\n", regname(destreg), apicregs[offset].name, gpa, *regp);
+		DPRINTF("Write: mov %s to %s @%p val %p\n", regname(destreg),
+			apicregs[offset].name, gpa, *regp);
 	} else {
 		*regp = apic_read(offset);
-		DPRINTF("Read: Set %s from %s @%p to %p\n", regname(destreg), apicregs[offset].name, gpa, *regp);
+		DPRINTF("Read: Set %s from %s @%p to %p\n", regname(destreg),
+			apicregs[offset].name, gpa, *regp);
 	}
 	return 0;
 }
@@ -198,6 +206,7 @@ void vapic_status_dump(FILE *f, void *vapic)
 {
 	uint32_t *p = (uint32_t *)vapic;
 	int i;
+
 	fprintf(f, "-- BEGIN APIC STATUS DUMP --\n");
 	for (i = 0x100/sizeof(*p); i < 0x180/sizeof(*p); i+=4) {
 		fprintf(f, "VISR : 0x%x: 0x%08x\n", i, p[i]);

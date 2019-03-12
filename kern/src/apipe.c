@@ -87,13 +87,15 @@ int apipe_read_locked(struct atomic_pipe *ap, void *buf, size_t nr_elem)
 	int nr_copied = 0;
 
 	for (int i = 0; i < nr_elem; i++) {
-		/* readers that call read_locked directly might have failed to check for
-		 * emptiness, so we'll double check early. */
+		/* readers that call read_locked directly might have failed to
+		 * check for emptiness, so we'll double check early. */
 		if (__ring_empty(ap->ap_wr_off, ap->ap_rd_off))
 			break;
-		/* power of 2 elements in the ring buffer, index is the lower n bits */
+		/* power of 2 elements in the ring buffer, index is the lower n
+		 * bits */
 		rd_idx = ap->ap_rd_off & (ap->ap_ring_sz - 1);
-		memcpy(buf, ap->ap_buf + rd_idx * ap->ap_elem_sz, ap->ap_elem_sz);
+		memcpy(buf, ap->ap_buf + rd_idx * ap->ap_elem_sz,
+		       ap->ap_elem_sz);
 		ap->ap_rd_off++;
 		buf += ap->ap_elem_sz;
 		nr_copied++;
@@ -112,12 +114,12 @@ int apipe_read(struct atomic_pipe *ap, void *buf, size_t nr_elem)
 	int nr_copied = 0;
 
 	spin_lock(&ap->ap_lock);
-	/* Need to wait til the priority reader is gone, and the ring isn't empty.
-	 * If we do this as two steps, (either of priority check or empty check
-	 * first), there's a chance the second one will fail, and when we sleep and
-	 * wake up, the first condition could have changed.  (An alternative would
-	 * be to block priority readers too, by promoting ourselves to a priority
-	 * reader). */
+	/* Need to wait til the priority reader is gone, and the ring isn't
+	 * empty.  If we do this as two steps, (either of priority check or
+	 * empty check first), there's a chance the second one will fail, and
+	 * when we sleep and wake up, the first condition could have changed.
+	 * (An alternative would be to block priority readers too, by promoting
+	 * ourselves to a priority reader). */
 	while (ap->ap_has_priority_reader ||
 	       __ring_empty(ap->ap_wr_off, ap->ap_rd_off)) {
 		if (!ap->ap_nr_writers) {
@@ -129,9 +131,9 @@ int apipe_read(struct atomic_pipe *ap, void *buf, size_t nr_elem)
 	}
 	/* This read call wakes up writers */
 	nr_copied = apipe_read_locked(ap, buf, nr_elem);
-	/* If the writer didn't broadcast, we'd need to wake other readers (imagine
-	 * a long queue of blocked readers, and a queue filled by one massive
-	 * write).  (same with the error case). */
+	/* If the writer didn't broadcast, we'd need to wake other readers
+	 * (imagine a long queue of blocked readers, and a queue filled by one
+	 * massive write).  (same with the error case). */
 	spin_unlock(&ap->ap_lock);
 	return nr_copied;
 }
@@ -152,9 +154,11 @@ int apipe_write(struct atomic_pipe *ap, void *buf, size_t nr_elem)
 		cpu_relax();
 	}
 	for (int i = 0; i < nr_elem; i++) {
-		/* power of 2 elements in the ring buffer, index is the lower n bits */
+		/* power of 2 elements in the ring buffer, index is the lower n
+		 * bits */
 		wr_idx = ap->ap_wr_off & (ap->ap_ring_sz - 1);
-		memcpy(ap->ap_buf + wr_idx * ap->ap_elem_sz, buf, ap->ap_elem_sz);
+		memcpy(ap->ap_buf + wr_idx * ap->ap_elem_sz, buf,
+		       ap->ap_elem_sz);
 		ap->ap_wr_off++;
 		buf += ap->ap_elem_sz;
 		nr_copied++;
@@ -162,8 +166,8 @@ int apipe_write(struct atomic_pipe *ap, void *buf, size_t nr_elem)
 			break;
 	}
 	/* We only need to wake readers, since the reader that woke us used a
-	 * broadcast.  o/w, we'd need to wake the next writer.  (same goes for the
-	 * error case). */
+	 * broadcast.  o/w, we'd need to wake the next writer.  (same goes for
+	 * the error case). */
 	__apipe_wake_readers(ap);
 	spin_unlock(&ap->ap_lock);
 	return nr_copied;
@@ -173,7 +177,8 @@ void *apipe_head(struct atomic_pipe *ap)
 {
 	if (__ring_empty(ap->ap_wr_off, ap->ap_rd_off))
 		return 0;
-	return ap->ap_buf + (ap->ap_rd_off & (ap->ap_ring_sz - 1)) * ap->ap_elem_sz;
+	return ap->ap_buf +
+	       (ap->ap_rd_off & (ap->ap_ring_sz - 1)) * ap->ap_elem_sz;
 }
 
 /*
@@ -210,10 +215,11 @@ int apipe_read_cond(struct atomic_pipe *ap,
 		ret = f(ap, arg);
 		if (ret)
 			break;
-		/* if nr_writers goes to zero, that's bad.  return -1 because they're
-		 * going to have to clean up.  We should have been able to call f once
-		 * though, to pull out any remaining elements.  The main concern here is
-		 * sleeping on the cv when no one (no writers) will wake us. */
+		/* if nr_writers goes to zero, that's bad.  return -1 because
+		 * they're going to have to clean up.  We should have been able
+		 * to call f once though, to pull out any remaining elements.
+		 * The main concern here is sleeping on the cv when no one (no
+		 * writers) will wake us. */
 		if (!ap->ap_nr_writers) {
 			ret = -1;
 			goto out;
@@ -222,13 +228,13 @@ int apipe_read_cond(struct atomic_pipe *ap,
 		cpu_relax();
 	}
 out:
-	/* All out paths need to wake other readers.  When we were woken up, there
-	 * was no broadcast sent to the other readers.  Plus, there may be other
-	 * potential priority readers. */
+	/* All out paths need to wake other readers.  When we were woken up,
+	 * there was no broadcast sent to the other readers.  Plus, there may be
+	 * other potential priority readers. */
 	ap->ap_has_priority_reader = FALSE;
 	__apipe_wake_readers(ap);
-	/* FYI, writers were woken up after an actual read.  If we had an error (ret
-	 * == -1), there should be no writers. */
+	/* FYI, writers were woken up after an actual read.  If we had an error
+	 * (ret == -1), there should be no writers. */
 	spin_unlock(&ap->ap_lock);
 	return ret;
 }

@@ -17,8 +17,8 @@ void parse_cpio_entries(void *cpio_b, size_t cpio_sz,
 		c_hdr = (struct cpio_newc_header*)(cpio_b + offset);
 		offset += sizeof(*c_hdr);
 		if (offset > cpio_sz) {
-			printk("CPIO offset %d beyond size %d, aborting.\n", offset,
-			       cpio_sz);
+			printk("CPIO offset %d beyond size %d, aborting.\n",
+			       offset, cpio_sz);
 			return;
 		}
 		if (strncmp(c_hdr->c_magic, "070701", 6)) {
@@ -34,14 +34,16 @@ void parse_cpio_entries(void *cpio_b, size_t cpio_sz,
 		c_bhdr->c_mode = (int)cpio_strntol(buf, c_hdr->c_mode, 8);
 		c_bhdr->c_uid = cpio_strntol(buf, c_hdr->c_uid, 8);
 		c_bhdr->c_gid = cpio_strntol(buf, c_hdr->c_gid, 8);
-		c_bhdr->c_nlink = (unsigned int)cpio_strntol(buf, c_hdr->c_nlink, 8);
+		c_bhdr->c_nlink = (unsigned int)cpio_strntol(buf,
+							     c_hdr->c_nlink, 8);
 		c_bhdr->c_mtime = cpio_strntol(buf, c_hdr->c_mtime, 8);
 		c_bhdr->c_filesize = cpio_strntol(buf, c_hdr->c_filesize, 8);
 		c_bhdr->c_dev_maj = cpio_strntol(buf, c_hdr->c_dev_maj, 8);
 		c_bhdr->c_dev_min = cpio_strntol(buf, c_hdr->c_dev_min, 8);
 		c_bhdr->c_rdev_maj = cpio_strntol(buf, c_hdr->c_rdev_maj, 8);
 		c_bhdr->c_rdev_min = cpio_strntol(buf, c_hdr->c_rdev_min, 8);
-		printd("File: %s: %d Bytes\n", c_bhdr->c_filename, c_bhdr->c_filesize);
+		printd("File: %s: %d Bytes\n", c_bhdr->c_filename,
+		       c_bhdr->c_filesize);
 		offset += namesize;
 		/* header + name will be padded out to 4-byte alignment */
 		offset = ROUNDUP(offset, 4);
@@ -49,8 +51,8 @@ void parse_cpio_entries(void *cpio_b, size_t cpio_sz,
 		offset += c_bhdr->c_filesize;
 		offset = ROUNDUP(offset, 4);
 		if (offset > cpio_sz) {
-			printk("CPIO offset %d beyond size %d, aborting.\n", offset,
-			       cpio_sz);
+			printk("CPIO offset %d beyond size %d, aborting.\n",
+			       offset, cpio_sz);
 			return;
 		}
 		if (cb(c_bhdr, cb_arg)) {

@@ -22,7 +22,8 @@ void send_ucq_msg(struct ucq *ucq, struct proc *p, struct event_msg *msg)
 	/* So we can try to send ucqs to _Ss before they initialize */
 	if (!ucq->ucq_ready) {
 		if (__proc_is_mcp(p))
-			warn("proc %d is _M with an uninitialized ucq %p\n", p->pid, ucq);
+			warn("proc %d is _M with an uninitialized ucq %p\n",
+			     p->pid, ucq);
 		return;
 	}
 	/* Bypass fetching/incrementing the counter if we're overflowing, helps
@@ -37,10 +38,10 @@ void send_ucq_msg(struct ucq *ucq, struct proc *p, struct event_msg *msg)
 	ucq->prod_overflow = TRUE;
 	/* Sanity check */
 	if (PGOFF(my_slot) > 3000)
-		warn("Abnormally high counter, there's probably something wrong!");
+		warn("Abnormally high counter, something is wrong!");
 grab_lock:
-	/* Lock, for this proc/ucq.  Using an irqsave, since we may want to send ucq
-	 * messages from irq context. */
+	/* Lock, for this proc/ucq.  Using an irqsave, since we may want to send
+	 * ucq messages from irq context. */
 	hash_lock_irqsave(p->ucq_hashlock, (long)ucq);
 	/* Grab a potential slot (again, preventing another DoS) */
 	my_slot = (uintptr_t)atomic_fetch_and_add(&ucq->prod_idx, 1);
@@ -51,8 +52,8 @@ grab_lock:
 	 * user-malfeasance or neglect.
 	 *
 	 * The is_user_rwaddr() check on old_page might catch addresses below
-	 * MMAP_LOWEST_VA, and we can also handle a PF, but we'll explicitly check
-	 * for 0 just to be sure (and it's a likely error). */
+	 * MMAP_LOWEST_VA, and we can also handle a PF, but we'll explicitly
+	 * check for 0 just to be sure (and it's a likely error). */
 	old_page = (struct ucq_page*)PTE_ADDR(my_slot);
 	if (!is_user_rwaddr(old_page, PGSIZE) || !old_page)
 		goto error_addr_unlock;
@@ -61,20 +62,24 @@ grab_lock:
 	new_page = (struct ucq_page*)atomic_swap(&ucq->spare_pg, 0);
 	if (!new_page) {
 		/* Warn if we have a ridiculous amount of pages in the ucq */
-		if (atomic_fetch_and_add(&ucq->nr_extra_pgs, 1) > UCQ_WARN_THRESH)
-			warn("Over %d pages in ucq %p for pid %d!\n", UCQ_WARN_THRESH,
-			     ucq, p->pid);
-		/* Giant warning: don't ask for anything other than anonymous memory at
-		 * a non-fixed location.  o/w, it may cause a TLB shootdown, which grabs
-		 * the proc_lock, and potentially deadlock the system. */
+		if (atomic_fetch_and_add(&ucq->nr_extra_pgs, 1) >
+		    UCQ_WARN_THRESH)
+			warn("Over %d pages in ucq %p for pid %d!\n",
+			     UCQ_WARN_THRESH, ucq, p->pid);
+		/* Giant warning: don't ask for anything other than anonymous
+		 * memory at a non-fixed location.  o/w, it may cause a TLB
+		 * shootdown, which grabs the proc_lock, and potentially
+		 * deadlock the system. */
 		new_page = (struct ucq_page*)do_mmap(p, 0, PGSIZE,
 		                                     PROT_READ | PROT_WRITE,
-		                                     MAP_ANONYMOUS | MAP_POPULATE |
-		                                     MAP_PRIVATE, NULL, 0);
+						     MAP_ANONYMOUS |
+						     MAP_POPULATE | MAP_PRIVATE,
+						     NULL, 0);
 		assert(new_page);
 		assert(!PGOFF(new_page));
 	} else {
-		/* If we're using the user-supplied new_page, we need to check it */
+		/* If we're using the user-supplied new_page, we need to check
+		 * it */
 		if (!is_user_rwaddr(new_page, PGSIZE) || PGOFF(new_page))
 			goto error_addr_unlock;
 	}
@@ -91,9 +96,9 @@ grab_lock:
 unlock_lock:
 	/* Clear the overflow, so new producers will try to get a slot */
 	ucq->prod_overflow = FALSE;
-	/* At this point, any normal (non-locking) producers can succeed in getting
-	 * a slot.  The ones that failed earlier will fight for the lock, then
-	 * quickly proceed when they get a good slot */
+	/* At this point, any normal (non-locking) producers can succeed in
+	 * getting a slot.  The ones that failed earlier will fight for the
+	 * lock, then quickly proceed when they get a good slot */
 	hash_unlock_irqsave(p->ucq_hashlock, (long)ucq);
 	/* Fall through to having a slot */
 have_slot:
@@ -108,8 +113,8 @@ have_slot:
 	/* Finally write the message */
 	my_msg->ev_msg = *msg;
 	wmb();
-	/* Now that the write is done, signal to the consumer that they can consume
-	 * our message (they could have been spinning on it) */
+	/* Now that the write is done, signal to the consumer that they can
+	 * consume our message (they could have been spinning on it) */
 	my_msg->ready = TRUE;
 	return;
 error_addr_unlock:
@@ -120,11 +125,10 @@ error_addr_unlock:
 	/* Fall-through to normal error out */
 error_addr:
 	warn("Invalid user address, not sending a message");
-	/* TODO: consider killing the process here.  For now, just catch it.  For
-	 * some cases, we have a slot that we never fill in, though if we had a bad
-	 * addr, none of this will work out and the kernel just needs to protect
-	 * itself. */
-	return;
+	/* TODO: consider killing the process here.  For now, just catch it.
+	 * For some cases, we have a slot that we never fill in, though if we
+	 * had a bad addr, none of this will work out and the kernel just needs
+	 * to protect itself. */
 }
 
 /* Debugging */
@@ -149,13 +153,15 @@ void print_ucq(struct proc *p, struct ucq *ucq)
 		/* only attempt to print messages on the same page */
 		if (PTE_ADDR(i) != PTE_ADDR(atomic_read(&ucq->prod_idx)))
 			break;
-		printk("Prod idx %p message ready is %p\n", i, slot2msg(i)->ready);
+		printk("Prod idx %p message ready is %p\n", i,
+		       slot2msg(i)->ready);
 	}
 	/* look at the chain, starting from cons_idx */
 	ucq_pg = (struct ucq_page*)PTE_ADDR(atomic_read(&ucq->cons_idx));
 	for (int i = 0; i < 10 && ucq_pg; i++) {
 		printk("#%02d: Cons page: %p, nr_cons: %d, next page: %p\n", i,
-		       ucq_pg, ucq_pg->header.nr_cons, ucq_pg->header.cons_next_pg);
+		       ucq_pg, ucq_pg->header.nr_cons,
+		       ucq_pg->header.cons_next_pg);
 		ucq_pg = (struct ucq_page*)(ucq_pg->header.cons_next_pg);
 	}
 	switch_back(p, old_proc);

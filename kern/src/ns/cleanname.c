@@ -64,7 +64,8 @@ char *cleanname(char *name)
 		else if (p[0] == '.' && SEP(p[1])) {
 			if (p == name)
 				erasedprefix = 1;
-			p += 1;	/* don't count the separator in case it is nul */
+			/* don't count the separator in case it is nul */
+			p += 1;
 		} else if (p[0] == '.' && p[1] == '.' && SEP(p[2])) {
 			p += 2;
 			if (q > dotdot) {	/* can backtrack */
@@ -76,8 +77,9 @@ char *cleanname(char *name)
 				*q++ = '.';
 				dotdot = q;
 			}
+			/* erased entire path via dotdot */
 			if (q == name)
-				erasedprefix = 1;	/* erased entire path via dotdot */
+				erasedprefix = 1;
 		} else {	/* real path element */
 			if (q != name + rooted)
 				*q++ = '/';
@@ -89,7 +91,8 @@ char *cleanname(char *name)
 		*q++ = '.';
 	*q = '\0';
 	if (erasedprefix && name[0] == '#') {
-		/* this was not a #x device path originally - make it not one now */
+		/* this was not a #x device path originally - make it not one
+		 * now */
 		memmove(name + 2, name, strlen(name) + 1);
 		name[0] = '.';
 		name[1] = '/';

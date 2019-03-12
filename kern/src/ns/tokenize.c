@@ -47,7 +47,8 @@ static char *qtoken(char *s)
 
 	quoting = 0;
 	t = s;	/* s is output string, t is input string */
-	while (*t != '\0' && (quoting || /*utfrune */ strchr(qsep, *t) == NULL)) {
+	while (*t != '\0' && (quoting || /*utfrune */ strchr(qsep, *t) == NULL))
+	{
 		if (*t != '\'') {
 			*s++ = *t++;
 			continue;

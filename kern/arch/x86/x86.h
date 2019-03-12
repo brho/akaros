@@ -8,62 +8,62 @@
 
 /* Model Specific Registers */
 // TODO: figure out which are intel specific, and name them accordingly
-#define IA32_APIC_BASE				0x1b
+#define IA32_APIC_BASE		0x1b
 /* These two are intel-only */
-#define IA32_FEATURE_CONTROL 		0x3a
-#define IA32_MISC_ENABLE			0x1a0
+#define IA32_FEATURE_CONTROL 	0x3a
+#define IA32_MISC_ENABLE	0x1a0
 
-#define IA32_MTRR_DEF_TYPE			0x2ff
-#define IA32_MTRR_PHYSBASE0			0x200
-#define IA32_MTRR_PHYSMASK0			0x201
-#define IA32_MTRR_PHYSBASE1			0x202
-#define IA32_MTRR_PHYSMASK1			0x203
-#define IA32_MTRR_PHYSBASE2			0x204
-#define IA32_MTRR_PHYSMASK2			0x205
-#define IA32_MTRR_PHYSBASE3			0x206
-#define IA32_MTRR_PHYSMASK3			0x207
-#define IA32_MTRR_PHYSBASE4			0x208
-#define IA32_MTRR_PHYSMASK4			0x209
-#define IA32_MTRR_PHYSBASE5			0x20a
-#define IA32_MTRR_PHYSMASK5			0x20b
-#define IA32_MTRR_PHYSBASE6			0x20c
-#define IA32_MTRR_PHYSMASK6			0x20d
-#define IA32_MTRR_PHYSBASE7			0x20e
-#define IA32_MTRR_PHYSMASK7			0x20f
+#define IA32_MTRR_DEF_TYPE	0x2ff
+#define IA32_MTRR_PHYSBASE0	0x200
+#define IA32_MTRR_PHYSMASK0	0x201
+#define IA32_MTRR_PHYSBASE1	0x202
+#define IA32_MTRR_PHYSMASK1	0x203
+#define IA32_MTRR_PHYSBASE2	0x204
+#define IA32_MTRR_PHYSMASK2	0x205
+#define IA32_MTRR_PHYSBASE3	0x206
+#define IA32_MTRR_PHYSMASK3	0x207
+#define IA32_MTRR_PHYSBASE4	0x208
+#define IA32_MTRR_PHYSMASK4	0x209
+#define IA32_MTRR_PHYSBASE5	0x20a
+#define IA32_MTRR_PHYSMASK5	0x20b
+#define IA32_MTRR_PHYSBASE6	0x20c
+#define IA32_MTRR_PHYSMASK6	0x20d
+#define IA32_MTRR_PHYSBASE7	0x20e
+#define IA32_MTRR_PHYSMASK7	0x20f
 
-#define MSR_APIC_ENABLE				0x00000800
-#define MSR_APIC_BASE_ADDRESS		0x0000000FFFFFF000
+#define MSR_APIC_ENABLE		0x00000800
+#define MSR_APIC_BASE_ADDRESS	0x0000000FFFFFF000
 
-#define IA32_EFER_MSR				0xc0000080
-# define IA32_EFER_SYSCALL			(1 << 0)
-# define IA32_EFER_IA32E_EN			(1 << 8)
-# define IA32_EFER_IA32E_ACT		(1 << 10)
-# define IA32_EFER_EXE_DIS_BIT		(1 << 11)
+#define IA32_EFER_MSR		0xc0000080
+# define IA32_EFER_SYSCALL	(1 << 0)
+# define IA32_EFER_IA32E_EN	(1 << 8)
+# define IA32_EFER_IA32E_ACT	(1 << 10)
+# define IA32_EFER_EXE_DIS_BIT	(1 << 11)
 
-#define MSR_TSC_AUX					0xc0000103
+#define MSR_TSC_AUX		0xc0000103
 
-#define MSR_FS_BASE					0xc0000100
-#define MSR_GS_BASE					0xc0000101
-#define MSR_KERN_GS_BASE			0xc0000102
+#define MSR_FS_BASE		0xc0000100
+#define MSR_GS_BASE		0xc0000101
+#define MSR_KERN_GS_BASE	0xc0000102
 
-#define MSR_STAR					0xc0000081
-#define MSR_LSTAR					0xc0000082
-#define MSR_CSTAR					0xc0000083
-#define MSR_SFMASK					0xc0000084
+#define MSR_STAR		0xc0000081
+#define MSR_LSTAR		0xc0000082
+#define MSR_CSTAR		0xc0000083
+#define MSR_SFMASK		0xc0000084
 
 /* CPUID */
-#define CPUID_PSE_SUPPORT			0x00000008
+#define CPUID_PSE_SUPPORT	0x00000008
 
 /* Arch Constants */
-#define MAX_NUM_CORES				255
+#define MAX_NUM_CORES		255
 
-#define X86_REG_BP					"rbp"
-#define X86_REG_SP					"rsp"
-#define X86_REG_IP					"rip"
-#define X86_REG_AX					"rax"
-#define X86_REG_BX					"rbx"
-#define X86_REG_CX					"rcx"
-#define X86_REG_DX					"rdx"
+#define X86_REG_BP		"rbp"
+#define X86_REG_SP		"rsp"
+#define X86_REG_IP		"rip"
+#define X86_REG_AX		"rax"
+#define X86_REG_BX		"rbx"
+#define X86_REG_CX		"rcx"
+#define X86_REG_DX		"rdx"
 
 
 /* Various flags defined: can be included from assembler. */
@@ -136,12 +136,12 @@
 /* MWAIT C-state hints.  The names might not be right for different processors.
  * For instance, the Linux idle driver for a Haswell calls the mwait for 0x10
  * "C3-HSW". */
-#define X86_MWAIT_C1			0x00
-#define X86_MWAIT_C2			0x10
-#define X86_MWAIT_C3			0x20
-#define X86_MWAIT_C4			0x30
-#define X86_MWAIT_C5			0x40
-#define X86_MWAIT_C6			0x50
+#define X86_MWAIT_C1		0x00
+#define X86_MWAIT_C2		0x10
+#define X86_MWAIT_C3		0x20
+#define X86_MWAIT_C4		0x30
+#define X86_MWAIT_C5		0x40
+#define X86_MWAIT_C6		0x50
 
 /*
  * x86-64 Task Priority Register, CR8
@@ -185,22 +185,21 @@ static inline uint64_t rxcr0(void) __attribute__((always_inline));
 
 static inline unsigned long read_flags(void) __attribute__((always_inline));
 static inline void write_eflags(unsigned long eflags)
-              __attribute__((always_inline));
+	__attribute__((always_inline));
 static inline unsigned long read_bp(void) __attribute__((always_inline));
 static inline unsigned long read_pc(void) __attribute__((always_inline));
 static inline unsigned long read_sp(void) __attribute__((always_inline));
 static inline void cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp,
                          uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)
-						               __attribute__((always_inline));
+	__attribute__((always_inline));
 static inline uint32_t cpuid_ecx(uint32_t op) __attribute__((always_inline));
 static inline uint64_t read_msr(uint32_t reg) __attribute__((always_inline));
 static inline void write_msr(uint32_t reg, uint64_t val)
-              __attribute__((always_inline));
+	__attribute__((always_inline));
 /* if we have mm64s, change the hpet helpers */
 static inline void write_mmreg8(uintptr_t reg, uint8_t val)
-							__attribute__((always_inline));
-static inline uint8_t read_mmreg8(uintptr_t reg)
-							__attribute__((always_inline));
+	__attribute__((always_inline));
+static inline uint8_t read_mmreg8(uintptr_t reg) __attribute__((always_inline));
 static inline void write_mmreg32(uintptr_t reg, uint32_t val)
               __attribute__((always_inline));
 static inline uint32_t read_mmreg32(uintptr_t reg)
@@ -217,6 +216,7 @@ unsigned int get_cstate(void);
 static inline uint8_t inb(int port)
 {
 	uint8_t data;
+
 	asm volatile("inb %w1,%0" : "=a" (data) : "d" (port));
 	return data;
 }
@@ -231,6 +231,7 @@ static inline void insb(int port, void *addr, int cnt)
 
 static inline uint16_t inw(int port)
 {
+
 	uint16_t data;
 	asm volatile("inw %w1,%0" : "=a" (data) : "d" (port));
 	return data;
@@ -246,6 +247,7 @@ static inline void insw(int port, void *addr, int cnt)
 
 static inline uint32_t inl(int port)
 {
+
 	uint32_t data;
 	asm volatile("inl %w1,%0" : "=a" (data) : "d" (port));
 	return data;
@@ -380,7 +382,7 @@ static inline int safe_lxcr0(uint64_t xcr0)
 	edx = xcr0 >> 32;
 	eax = xcr0;
 	asm volatile(ASM_STAC               ";"
-		         "1: xsetbv              ;"
+	             "1: xsetbv              ;"
 	             "2: " ASM_CLAC "        ;"
 	             ".section .fixup, \"ax\";"
 	             "3: mov %4, %0          ;"
@@ -407,6 +409,7 @@ static inline uint64_t rxcr0(void)
 static inline unsigned long read_flags(void)
 {
 	unsigned long eflags;
+
 	asm volatile("pushf; pop %0" : "=r" (eflags));
 	return eflags;
 }
@@ -419,6 +422,7 @@ static inline void write_eflags(unsigned long eflags)
 static inline unsigned long read_bp(void)
 {
 	unsigned long bp;
+
 	asm volatile("mov %%"X86_REG_BP",%0" : "=r" (bp));
 	return bp;
 }
@@ -426,6 +430,7 @@ static inline unsigned long read_bp(void)
 static inline unsigned long read_pc(void)
 {
 	unsigned long ip;
+
 	asm volatile("call 1f; 1: pop %0" : "=r"(ip));
 	return ip;
 }
@@ -433,6 +438,7 @@ static inline unsigned long read_pc(void)
 static inline unsigned long read_sp(void)
 {
 	unsigned long sp;
+
 	asm volatile("mov %%"X86_REG_SP",%0" : "=r" (sp));
 	return sp;
 }
@@ -441,6 +447,7 @@ static inline void cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp,
                          uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)
 {
 	uint32_t eax, ebx, ecx, edx;
+
 	/* Can select with both eax (info1) and ecx (info2) */
 	asm volatile("cpuid"
 		: "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
@@ -458,6 +465,7 @@ static inline void cpuid(uint32_t info1, uint32_t info2, uint32_t *eaxp,
 static inline uint32_t cpuid_ecx(uint32_t op)
 {
 	uint32_t ecx;
+
 	cpuid(op, 0, NULL, NULL, &ecx, NULL);
 	return ecx;
 }
@@ -466,6 +474,7 @@ static inline uint32_t cpuid_ecx(uint32_t op)
 static inline uint64_t read_msr(uint32_t reg)
 {
 	uint32_t edx, eax;
+
 	asm volatile("rdmsr; mfence" : "=d"(edx), "=a"(eax) : "c"(reg));
 	return (uint64_t)edx << 32 | eax;
 }
@@ -504,8 +513,8 @@ static inline void wbinvd(void)
  * with arch/arch.h and arch/apic.h */
 static inline void __cpu_relax(void)
 {
-	// in case the compiler doesn't serialize for pause, the "m" will make sure
-	// no memory is reordered around this instruction.
+	// in case the compiler doesn't serialize for pause, the "m" will make
+	// sure no memory is reordered around this instruction.
 	asm volatile("pause" : : : "memory");
 }
 

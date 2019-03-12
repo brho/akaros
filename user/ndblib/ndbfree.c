@@ -19,8 +19,7 @@
 /*
  *  free a parsed entry
  */
-void
-ndbfree(struct ndbtuple *t)
+void ndbfree(struct ndbtuple *t)
 {
 	struct ndbtuple *tn;
 
@@ -36,8 +35,7 @@ ndbfree(struct ndbtuple *t)
 /*
  *  set a value in a tuple
  */
-void
-ndbsetval(struct ndbtuple *t, char *val, int n)
+void ndbsetval(struct ndbtuple *t, char *val, int n)
 {
 	if(n < Ndbvlen){
 		if(t->val != t->valbuf){
@@ -61,8 +59,7 @@ ndbsetval(struct ndbtuple *t, char *val, int n)
 /*
  *  allocate a tuple
  */
-struct ndbtuple*
-ndbnew(char *attr, char *val)
+struct ndbtuple *ndbnew(char *attr, char *val)
 {
 	struct ndbtuple *t;
 

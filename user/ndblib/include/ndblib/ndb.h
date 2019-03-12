@@ -25,19 +25,19 @@ struct ndbcache;
  */
 struct ndb
 {
-	struct ndb		*next;
+	struct ndb	*next;
 
-	FILE	*b;		/* buffered input file */
+	FILE		*b;		/* buffered input file */
 	uint8_t		buf[256];	/* and its buffer */
 
-	uint32_t		mtime;		/* mtime of db file */
-	struct qid		qid;		/* qid of db file */
-	char		file[128];/* path name of db file */
-	uint32_t		length;		/* length of db file */
-	int		isopen;	/* true if the file is open */
+	uint32_t	mtime;		/* mtime of db file */
+	struct qid	qid;		/* qid of db file */
+	char		file[128];	/* path name of db file */
+	uint32_t	length;		/* length of db file */
+	int		isopen;		/* true if the file is open */
 
 	int		nohash;		/* don't look for hash files */
-	struct ndbhf		*hf;		/* open hash files */
+	struct ndbhf	*hf;		/* open hash files */
 
 	int		ncache;		/* size of tuple cache */
 	struct ndbcache	*cache;		/* cached entries */
@@ -48,12 +48,12 @@ struct ndb
  */
 struct ndbtuple
 {
-	char		attr[Ndbalen];		/* attribute name */
-	char		*val;			/* value(s) */
-	struct ndbtuple	*entry;			/* next tuple in this entry */
-	struct ndbtuple	*line;			/* next tuple on this line */
-	uint32_t		ptr;			/* (for the application - starts 0) */
-	char		valbuf[Ndbvlen];	/* initial allocation for value */
+	char		attr[Ndbalen];	/* attribute name */
+	char		*val;		/* value(s) */
+	struct ndbtuple	*entry;		/* next tuple in this entry */
+	struct ndbtuple	*line;		/* next tuple on this line */
+	uint32_t	ptr;		/* (for the application - starts 0) */
+	char		valbuf[Ndbvlen];/* initial allocation for value */
 };
 
 /*
@@ -99,7 +99,7 @@ struct ndbs
 {
 	struct ndb	*db;	/* data base file being searched */
 	struct ndbhf	*hf;	/* hash file being searched */
-	int	type;
+	int		type;
 	uint32_t	ptr;	/* current pointer */
 	uint32_t	ptr1;	/* next pointer */
 	struct ndbtuple *t;	/* last attribute value pair found */
@@ -110,7 +110,7 @@ struct ndbcache
 	struct ndbcache	*next;
 	char		*attr;
 	char		*val;
-	struct ndbs		s;
+	struct ndbs	s;
 	struct ndbtuple	*t;
 };
 
@@ -135,41 +135,40 @@ struct ndbcache
 
 #define NDB_IPlen 16
 
-struct ndbtuple*	csgetval(char*, char*, char*, char*, char*);
-char*		csgetvalue(char*, char*, char*, char*, struct ndbtuple**);
-struct ndbtuple*	csipinfo(char*, char*, char*, char**, int);
-struct ndbtuple*	dnsquery(char*, char*, char*);
-char*		ipattr(char*);
-struct ndb*		ndbcat(struct ndb*, struct ndb*);
-int		ndbchanged(struct ndb*);
-void		ndbclose(struct ndb*);
-struct ndbtuple*	ndbconcatenate(struct ndbtuple*, struct ndbtuple*);
-struct ndbtuple*	ndbdiscard(struct ndbtuple*, struct ndbtuple*);
-void		ndbfree(struct ndbtuple*);
-struct ndbtuple*	ndbgetipaddr(struct ndb*, char*);
-struct ndbtuple*	ndbgetval(struct ndb*,
-				  struct ndbs*, char*, char*, char*, char*);
-char*		ndbgetvalue(struct ndb*, struct ndbs*, char*, char*, char*,
-				 struct ndbtuple**);
-struct ndbtuple*	ndbfindattr(struct ndbtuple*, struct ndbtuple*, char*);
-uint32_t		ndbhash(char*, int);
-struct ndbtuple*	ndbipinfo(struct ndb*, char*, char*, char**, int);
-struct ndbtuple*	ndblookval(struct ndbtuple*,
-				   struct ndbtuple*, char*, char*);
-struct ndbtuple*	ndbnew(char*, char*);
-struct ndb*		ndbopen(char*);
-struct ndbtuple*	ndbparse(struct ndb*);
-int		ndbreopen(struct ndb*);
-struct ndbtuple*	ndbreorder(struct ndbtuple*, struct ndbtuple*);
-struct ndbtuple*	ndbsearch(struct ndb*, struct ndbs*, char*, char*);
-void		ndbsetval(struct ndbtuple*, char*, int);
-struct ndbtuple*	ndbsnext(struct ndbs*, char*, char*);
-struct ndbtuple*	ndbsubstitute(struct ndbtuple*, struct ndbtuple*,
-				      struct ndbtuple*);
-char*_ndbparsetuple(char *cp, struct ndbtuple **tp);
-struct ndbtuple*_ndbparseline(char *cp);
-//void		ndbsetmalloctag(struct ndbtuple*, uintptr_t);
-static inline void		ndbsetmalloctag(struct ndbtuple*t, uintptr_t v){}
+struct ndbtuple *csgetval(char*, char*, char*, char*, char*);
+char *csgetvalue(char*, char*, char*, char*, struct ndbtuple**);
+struct ndbtuple *csipinfo(char*, char*, char*, char**, int);
+struct ndbtuple *dnsquery(char*, char*, char*);
+char *ipattr(char*);
+struct ndb *ndbcat(struct ndb*, struct ndb*);
+int ndbchanged(struct ndb*);
+void ndbclose(struct ndb*);
+struct ndbtuple *ndbconcatenate(struct ndbtuple*, struct ndbtuple*);
+struct ndbtuple *ndbdiscard(struct ndbtuple*, struct ndbtuple*);
+void ndbfree(struct ndbtuple*);
+struct ndbtuple *ndbgetipaddr(struct ndb*, char*);
+struct ndbtuple *ndbgetval(struct ndb*, struct ndbs*, char*, char*, char*,
+			   char*);
+char *ndbgetvalue(struct ndb*, struct ndbs*, char*, char*, char*,
+		  struct ndbtuple**);
+struct ndbtuple *ndbfindattr(struct ndbtuple*, struct ndbtuple*, char*);
+uint32_t ndbhash(char*, int);
+struct ndbtuple *ndbipinfo(struct ndb*, char*, char*, char**, int);
+struct ndbtuple *ndblookval(struct ndbtuple*, struct ndbtuple*, char*, char*);
+struct ndbtuple *ndbnew(char*, char*);
+struct ndb *ndbopen(char*);
+struct ndbtuple *ndbparse(struct ndb*);
+int ndbreopen(struct ndb*);
+struct ndbtuple *ndbreorder(struct ndbtuple*, struct ndbtuple*);
+struct ndbtuple *ndbsearch(struct ndb*, struct ndbs*, char*, char*);
+void ndbsetval(struct ndbtuple*, char*, int);
+struct ndbtuple *ndbsnext(struct ndbs*, char*, char*);
+struct ndbtuple *ndbsubstitute(struct ndbtuple*, struct ndbtuple*,
+			       struct ndbtuple*);
+char *_ndbparsetuple(char *cp, struct ndbtuple **tp);
+struct ndbtuple *_ndbparseline(char *cp);
+//void ndbsetmalloctag(struct ndbtuple*, uintptr_t);
+static inline void ndbsetmalloctag(struct ndbtuple*t, uintptr_t v){}
 
 static inline uintptr_t getcallerpc(void *v){return 0;}
 static inline void setmalloctag(void *v){}

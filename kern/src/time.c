@@ -19,11 +19,11 @@ static void train_timing(void)
 	uint64_t time, diff;
 	int8_t irq_state = 0;
 
-	/* Reset this, in case we run it again.  The use of start/stop to determine
-	 * the overhead relies on timing_overhead being 0. */
+	/* Reset this, in case we run it again.  The use of start/stop to
+	 * determine the overhead relies on timing_overhead being 0. */
 	__proc_global_info.tsc_overhead = 0;
-	/* timing might use cpuid, in which case we warm it up to avoid some extra
-	 * variance */
+	/* timing might use cpuid, in which case we warm it up to avoid some
+	 * extra variance */
 	time = start_timing();
  	diff = stop_timing(time);
 	time = start_timing();
@@ -39,8 +39,8 @@ static void train_timing(void)
 	}
 	enable_irqsave(&irq_state);
 	__proc_global_info.tsc_overhead = min_overhead;
-	printk("TSC overhead (Min: %llu, Max: %llu)\n", min_overhead, max_overhead);
-}
+	printk("TSC overhead (Min: %llu, Max: %llu)\n", min_overhead,
+	       max_overhead); }
 
 /* Convenience wrapper called when a core's timer interrupt goes off.  Not to be
  * confused with global timers (like the PIC).  Do not put your code here.  If

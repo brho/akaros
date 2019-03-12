@@ -51,14 +51,15 @@ static void __wq_wrapper_delay(uint32_t srcid, long a0, long a1, long a2)
 
 static void send_work(int coreid, struct work_struct *work)
 {
-	send_kernel_message(coreid, __wq_wrapper, (long)work, 0, 0, KMSG_ROUTINE);
+	send_kernel_message(coreid, __wq_wrapper, (long)work, 0, 0,
+			    KMSG_ROUTINE);
 }
 
 static void send_work_delay(int coreid, struct delayed_work *work,
                             unsigned long delay)
 {
-	send_kernel_message(coreid, __wq_wrapper_delay, (long)work, (long)delay, 0,
-	                    KMSG_ROUTINE);
+	send_kernel_message(coreid, __wq_wrapper_delay, (long)work, (long)delay,
+			    0, KMSG_ROUTINE);
 }
 
 bool queue_work(struct workqueue_struct *wq, struct work_struct *work)

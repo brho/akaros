@@ -24,7 +24,8 @@ static bool has_refl_fault(struct user_context *ctx)
 	case ROS_SW_CTX:
 		return FALSE;
 	case ROS_VM_CTX:
-		return ctx->tf.vm_tf.tf_flags & VMCTX_FL_HAS_FAULT ? TRUE : FALSE;
+		return ctx->tf.vm_tf.tf_flags & VMCTX_FL_HAS_FAULT ? TRUE :
+			FALSE;
 	}
 	assert(0);
 }

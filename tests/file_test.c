@@ -15,6 +15,7 @@
 int main() 
 { 
 	FILE *file; 
+
 	file = fopen("/dir1/f1.txt","w+b");
 	if (file == NULL)
 		printf ("Failed to open file \n");
@@ -24,6 +25,7 @@ int main()
 	int fd = open("../../..//////dir1/test.txt", O_RDWR | O_CREAT );
 	char rbuf[256] = {0}, wbuf[256] = {0};
 	int retval;
+
 	retval = read(fd, rbuf, 16);
 	printf("Tried to read, got %d bytes of buf: %s\n", retval, rbuf);
 	strcpy(wbuf, DUMMY_STR);
@@ -55,6 +57,7 @@ int main()
 		printf("WARNING! Access error for f1.txt!\n");
 
 	struct stat st = {0};
+	//
 	//retval = stat("/bin/mhello", &st);
 	retval = fstat(fd, &st);
 	printf("Tried to stat, was told %d\n", retval);
@@ -178,8 +181,8 @@ int main()
 		printf("WARNING! failed to open hello.txt!\n");
 	retval = fchdir(fd);
 	if (!retval || errno != ENOTDIR)
-		printf("WARNING! didn't fail to fchdir to hello.txt %d %d\n", retval,
-		       errno);
+		printf("WARNING! didn't fail to fchdir to hello.txt %d %d\n",
+		       retval, errno);
 	close(fd);
 
 	/* Try a chmod() */
@@ -200,5 +203,6 @@ int main()
 	if (retval < 0)
 		printf("WARNING! rmdir failed with %d!\n", errno);
 	breakpoint();
+	return 0;
 
 }

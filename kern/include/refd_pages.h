@@ -19,9 +19,9 @@
 #include <assert.h>
 
 struct refd_pages {
-	void			*rp_kva;
-	size_t			rp_order;
-	struct kref		rp_kref;
+	void				*rp_kva;
+	size_t				rp_order;
+	struct kref			rp_kref;
 };
 
 static struct page *rp2page(struct refd_pages *rp)

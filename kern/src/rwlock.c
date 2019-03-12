@@ -45,14 +45,16 @@ void rwinit(struct rwlock *rw_lock)
 
 void rlock(struct rwlock *rw_lock)
 {
-	/* If we already have a reader, we can just increment and return.  This is
-	 * the only access to nr_readers outside the lock.  All locked uses need to
-	 * be aware that the nr could be concurrently increffed (unless it is 0). */
+	/* If we already have a reader, we can just increment and return.  This
+	 * is the only access to nr_readers outside the lock.  All locked uses
+	 * need to be aware that the nr could be concurrently increffed (unless
+	 * it is 0). */
 	if (atomic_add_not_zero(&rw_lock->nr_readers, 1))
 		return;
-	/* Here's an alternate style: the broadcaster (a writer) will up the readers
-	 * count and just wake us.  All readers just proceed, instead of fighting to
-	 * lock and up the count.  The writer 'passed' the rlock to us. */
+	/* Here's an alternate style: the broadcaster (a writer) will up the
+	 * readers count and just wake us.  All readers just proceed, instead of
+	 * fighting to lock and up the count.  The writer 'passed' the rlock to
+	 * us. */
 	spin_lock(&rw_lock->lock);
 	if (rw_lock->writing) {
 		cv_wait_and_unlock(&rw_lock->readers);
@@ -79,10 +81,11 @@ bool canrlock(struct rwlock *rw_lock)
 void runlock(struct rwlock *rw_lock)
 {
 	spin_lock(&rw_lock->lock);
-	/* sub and test will tell us if we got the refcnt to 0, atomically.  syncing
-	 * with the atomic_add_not_zero of new readers.  Since we're passing the
-	 * lock, we need to make sure someone is sleeping.  Contrast to the wunlock,
-	 * where we can just blindly broadcast and add (potentially == 0). */
+	/* sub and test will tell us if we got the refcnt to 0, atomically.
+	 * syncing with the atomic_add_not_zero of new readers.  Since we're
+	 * passing the lock, we need to make sure someone is sleeping.  Contrast
+	 * to the wunlock, where we can just blindly broadcast and add
+	 * (potentially == 0). */
 	if (atomic_sub_and_test(&rw_lock->nr_readers, 1) &&
 	        rw_lock->writers.nr_waiters) {
 		/* passing the lock to the one writer we signal. */

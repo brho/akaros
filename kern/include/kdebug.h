@@ -42,12 +42,12 @@ size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
                       size_t nr_slots);
 /* Backtraces a user PC/FP, stores results in *pcs */
 size_t backtrace_user_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
-						   size_t nr_slots);
+			   size_t nr_slots);
 /* Prints out a backtrace list, using pfunc(opaque, "line") for the printk.
  * This does a symbol lookup on the kernel binary, so it is less useful for a
  * user backtrace. */
 void print_backtrace_list(uintptr_t *pcs, size_t nr_pcs,
-						  void (*pfunc)(void *, const char *), void *opaque);
+			  void (*pfunc)(void *, const char *), void *opaque);
 void sza_print_backtrace_list(struct sized_alloc *sza, uintptr_t *pcs,
                               size_t nr_pcs);
 /* Backtraces the calling kernel context, using pfunc for printing */
@@ -75,13 +75,13 @@ int printdump(char *buf, int numprint, int buflen, uint8_t *data);
 extern bool printx_on;
 void set_printx(int mode);
 #define printx(args...)							\
-	do {											\
-		if (printx_on)								\
-			printk(args);							\
+	do {								\
+		if (printx_on)						\
+			printk(args);					\
 	} while (0)
 #define trace_printx(args...)						\
-	do {											\
-		if (printx_on)								\
+	do {								\
+		if (printx_on)						\
 			trace_printk(args);				\
 	} while (0)
 

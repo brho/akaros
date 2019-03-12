@@ -123,8 +123,8 @@ void print_kmsgs(uint32_t coreid);
  * messages can have three arguments, but the deferred function pointer counts
  * as one.  Note the arguments to the function will be treated as longs. */
 #define run_as_rkm(f, ...) do {                                                \
-	static_assert(MACRO_NR_ARGS(__VA_ARGS__) <= 2);                            \
-	PASTE(__run_as_rkm_, MACRO_NR_ARGS(__VA_ARGS__))(f, ##__VA_ARGS__);        \
+	static_assert(MACRO_NR_ARGS(__VA_ARGS__) <= 2);                        \
+	PASTE(__run_as_rkm_, MACRO_NR_ARGS(__VA_ARGS__))(f, ##__VA_ARGS__);    \
 } while (0)
 
 #define __run_as_rkm_0(f) \
@@ -143,8 +143,8 @@ void __kmsg_trampoline(uint32_t srcid, long a0, long a1, long a2);
  * user-space traps) we have.
  *
  * Some examples:
- * 		(original context in parens, +(x, y) is the change to IRQ and ktrap
- * 		depth):
+ * 	(original context in parens, +(x, y) is the change to IRQ and ktrap
+ * 	depth):
  * - syscall (user): +(0, 0)
  * - trap (user): +(0, 0)
  * - irq (user): +(1, 0)
@@ -173,13 +173,13 @@ void __kmsg_trampoline(uint32_t srcid, long a0, long a1, long a2);
  * +-------------+-------------+-------------+-------------+
  *
  */
-#define __CTX_IRQ_D_SHIFT			0
-#define __CTX_KTRAP_D_SHIFT			8
-#define __CTX_FLAG_SHIFT			24
-#define __CTX_IRQ_D_MASK			((1 << 8) - 1)
-#define __CTX_KTRAP_D_MASK			((1 << 8) - 1)
+#define __CTX_IRQ_D_SHIFT		0
+#define __CTX_KTRAP_D_SHIFT		8
+#define __CTX_FLAG_SHIFT		24
+#define __CTX_IRQ_D_MASK		((1 << 8) - 1)
+#define __CTX_KTRAP_D_MASK		((1 << 8) - 1)
 #define __CTX_NESTED_CTX_MASK		((1 << 16) - 1)
-#define __CTX_CANNOT_BLOCK			(1 << (__CTX_FLAG_SHIFT + 0))
+#define __CTX_CANNOT_BLOCK		(1 << (__CTX_FLAG_SHIFT + 0))
 
 /* Basic functions to get or change depths */
 

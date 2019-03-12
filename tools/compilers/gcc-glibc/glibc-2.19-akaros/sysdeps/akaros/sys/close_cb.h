@@ -21,7 +21,7 @@
 #pragma once
 
 struct close_cb {
-	struct close_cb				*next;
+	struct close_cb *next;
 	void (*func)(int fd);
 };
 

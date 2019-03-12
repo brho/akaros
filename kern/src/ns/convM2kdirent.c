@@ -17,8 +17,8 @@
 #include <net/ip.h>
 
 /* Special akaros edition. */
-unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd,
-						   char *strs)
+unsigned int convM2kdirent(uint8_t *buf, unsigned int nbuf, struct kdirent *kd,
+			   char *strs)
 {
 	struct dir *dir;
 	size_t conv_sz, name_sz;
@@ -29,8 +29,8 @@ unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd,
 	conv_sz = convM2D(buf, nbuf, dir, (char*)&dir[1]);
 
 	kd->d_ino = dir->qid.path;
-	kd->d_off = 0;		/* ignored for 9ns readdir */
-	kd->d_type = 0;		/* TODO: might need this; never used this in the VFS */
+	kd->d_off = 0;	/* ignored for 9ns readdir */
+	kd->d_type = 0;	/* TODO: might need this; never used this in the VFS */
 	name_sz = dir->name ? strlen(dir->name) : 0;
 	kd->d_reclen = name_sz;
 	/* Our caller should have made sure kd was big enough... */

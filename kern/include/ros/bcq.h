@@ -111,8 +111,8 @@ struct bcq_header {
 /* Functions */
 #define bcq_init(_bcq, _ele_type, _num_elems)                                  \
 ({                                                                             \
-	memset((_bcq), 0, sizeof(*(_bcq)));                                        \
-	assert((_num_elems) == ROUNDUPPWR2(_num_elems));                           \
+	memset((_bcq), 0, sizeof(*(_bcq)));                                    \
+	assert((_num_elems) == ROUNDUPPWR2(_num_elems));                       \
 })
 
 /* Num empty buffer slots in the BCQ */
@@ -132,61 +132,61 @@ struct bcq_header {
  * macro got a bit ugly, esp with the __retval hackery. */
 #define bcq_enqueue(_bcq, _elem, _num_elems, _num_fail)                        \
 ({                                                                             \
-	uint32_t __prod, __new_prod, __cons_pub, __failctr = 0;                    \
-	int __retval = 0;                                                          \
-	do {                                                                       \
-		cmb();                                                                 \
-		if (((_num_fail)) && (__failctr++ >= (_num_fail))) {                   \
-			__retval = -EFAIL;                                                 \
-			break;                                                             \
-		}                                                                      \
-		__prod = (_bcq)->hdr.prod_idx;                                         \
-		__cons_pub = (_bcq)->hdr.cons_pub_idx;                                 \
-		if (BCQ_FULL(__prod, __cons_pub, (_num_elems))) {                      \
-			__retval = -EBUSY;                                                 \
-			break;                                                             \
-		}                                                                      \
-		__new_prod = __prod + 1;                                               \
-	} while (!atomic_cas_u32(&(_bcq)->hdr.prod_idx, __prod, __new_prod));      \
-	if (!__retval) {                                                           \
-		/* from here out, __prod is the local __prod that we won */            \
-		(_bcq)->wraps[__prod & ((_num_elems)-1)].elem = *(_elem);              \
-		wmb();                                                                 \
-		(_bcq)->wraps[__prod & ((_num_elems)-1)].rdy_for_cons = TRUE;          \
-	}                                                                          \
-	__retval;                                                                  \
+	uint32_t __prod, __new_prod, __cons_pub, __failctr = 0;                \
+	int __retval = 0;                                                      \
+	do {                                                                   \
+		cmb();                                                         \
+		if (((_num_fail)) && (__failctr++ >= (_num_fail))) {           \
+			__retval = -EFAIL;                                     \
+			break;                                                 \
+		}                                                              \
+		__prod = (_bcq)->hdr.prod_idx;                                 \
+		__cons_pub = (_bcq)->hdr.cons_pub_idx;                         \
+		if (BCQ_FULL(__prod, __cons_pub, (_num_elems))) {              \
+			__retval = -EBUSY;                                     \
+			break;                                                 \
+		}                                                              \
+		__new_prod = __prod + 1;                                       \
+	} while (!atomic_cas_u32(&(_bcq)->hdr.prod_idx, __prod, __new_prod));  \
+	if (!__retval) {                                                       \
+		/* from here out, __prod is the local __prod that we won */    \
+		(_bcq)->wraps[__prod & ((_num_elems)-1)].elem = *(_elem);      \
+		wmb();                                                         \
+		(_bcq)->wraps[__prod & ((_num_elems)-1)].rdy_for_cons = TRUE;  \
+	}                                                                      \
+	__retval;                                                              \
 })
 
 /* Similar to enqueue, spin afterwards til cons_pub is our element, then
  * advance it. */
 #define bcq_dequeue(_bcq, _elem, _num_elems)                                   \
 ({                                                                             \
-	uint32_t __prod, __cons_pvt, __new_cons_pvt, __cons_pub;                   \
-	int __retval = 0;                                                          \
-	do {                                                                       \
-		cmb();                                                                 \
-		__prod = (_bcq)->hdr.prod_idx;                                         \
-		__cons_pvt = (_bcq)->hdr.cons_pvt_idx;                                 \
-		if (BCQ_NO_WORK(__prod, __cons_pvt)) {                                 \
-			__retval = -EBUSY;                                                 \
-			break;                                                             \
-		}                                                                      \
-		__new_cons_pvt = (__cons_pvt + 1);                                     \
-	} while (!atomic_cas_u32(&(_bcq)->hdr.cons_pvt_idx, __cons_pvt,            \
-	                           __new_cons_pvt));                               \
-	if (!__retval) {                                                           \
-		/* from here out, __cons_pvt is the local __cons_pvt that we won */    \
-		/* wait for the producer to finish copying it in */                    \
-		while (!(_bcq)->wraps[__cons_pvt & ((_num_elems)-1)].rdy_for_cons)     \
-			cpu_relax();                                                       \
-		*(_elem) = (_bcq)->wraps[__cons_pvt & ((_num_elems)-1)].elem;          \
-		(_bcq)->wraps[__cons_pvt & ((_num_elems)-1)].rdy_for_cons = FALSE;     \
-		/* wait til we're the cons_pub, then advance it by one */              \
-		while ((_bcq)->hdr.cons_pub_idx != __cons_pvt)                         \
-			cpu_relax_vc(vcore_id());                                          \
-		(_bcq)->hdr.cons_pub_idx = __cons_pvt + 1;                             \
-	}                                                                          \
-	__retval;                                                                  \
+	uint32_t __prod, __cons_pvt, __new_cons_pvt, __cons_pub;               \
+	int __retval = 0;                                                      \
+	do {                                                                   \
+		cmb();                                                         \
+		__prod = (_bcq)->hdr.prod_idx;                                 \
+		__cons_pvt = (_bcq)->hdr.cons_pvt_idx;                         \
+		if (BCQ_NO_WORK(__prod, __cons_pvt)) {                         \
+			__retval = -EBUSY;                                     \
+			break;                                                 \
+		}                                                              \
+		__new_cons_pvt = (__cons_pvt + 1);                             \
+	} while (!atomic_cas_u32(&(_bcq)->hdr.cons_pvt_idx, __cons_pvt,        \
+	                           __new_cons_pvt));                           \
+	if (!__retval) {                                                       \
+		/* from here out, __cons_pvt is the local __cons_pvt that we */\
+		/* won.  wait for the producer to finish copying it in */      \
+		while (!(_bcq)->wraps[__cons_pvt & ((_num_elems)-1)].rdy_for_cons) \
+			cpu_relax();                                           \
+		*(_elem) = (_bcq)->wraps[__cons_pvt & ((_num_elems)-1)].elem;  \
+		(_bcq)->wraps[__cons_pvt & ((_num_elems)-1)].rdy_for_cons = FALSE; \
+		/* wait til we're the cons_pub, then advance it by one */      \
+		while ((_bcq)->hdr.cons_pub_idx != __cons_pvt)                 \
+			cpu_relax_vc(vcore_id());                              \
+		(_bcq)->hdr.cons_pub_idx = __cons_pvt + 1;                     \
+	}                                                                      \
+	__retval;                                                              \
 })
 
 /* Checks of a bcq is empty (meaning no work), instead of trying to dequeue */

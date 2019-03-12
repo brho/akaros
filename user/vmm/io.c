@@ -38,9 +38,9 @@ struct pciconfig pcibus[] = {
 static uint32_t cf8;
 static uint32_t allones = (uint32_t)-1;
 
-/* Return a pointer to the 32-bit "register" in the "pcibus" give an address. Use cf8.
- * only for readonly access.
- * this will fail if we ever want to do writes, but we don't.
+/* Return a pointer to the 32-bit "register" in the "pcibus" give an address.
+ * Use cf8.  only for readonly access.  this will fail if we ever want to do
+ * writes, but we don't.
  */
 void regp(uint32_t **reg)
 {
@@ -114,11 +114,10 @@ static void configwrite8(uint32_t addr, uint8_t val)
 int io(struct guest_thread *vm_thread)
 {
 
-	/* Get a pointer to the memory at %rip. This is quite messy and part of the
-	 * reason we don't want to do this at all. It sucks. Would have been nice
-	 * had linux had an option to ONLY do mmio config space access, but no such
-	 * luck.
-	 */
+	/* Get a pointer to the memory at %rip. This is quite messy and part of
+	 * the reason we don't want to do this at all. It sucks. Would have been
+	 * nice had linux had an option to ONLY do mmio config space access, but
+	 * no such luck.  */
 	uint8_t *ip8 = NULL;
 	uint16_t *ip16;
 	uintptr_t ip;
@@ -163,7 +162,8 @@ int io(struct guest_thread *vm_thread)
 		 * confused people into thinking we were running
 		 * Windows 98, not Linux.
 		 */
-		printf("(out rax, edx): unhandled IO address dx @%p is 0x%x\n", ip8, edx);
+		printf("(out rax, edx): unhandled IO address dx @%p is 0x%x\n",
+		       ip8, edx);
 		return 0;
 	}
 	/* TODO: sort out these various OUT operations */
@@ -183,10 +183,10 @@ int io(struct guest_thread *vm_thread)
 			// on real hardware, an outb to 0xcf9 with bit 2 set is
 			// about as hard a reset as you can get. It yanks the
 			// reset on everything, including all the cores.  It
-			// usually happens after the kernel has done lots of work
-			// to carefully quiesce the machine but, once it happens,
-			// game is over. Hence, an exit(0) is most appropriate,
-			// since it's not an error.
+			// usually happens after the kernel has done lots of
+			// work to carefully quiesce the machine but, once it
+			// happens, game is over. Hence, an exit(0) is most
+			// appropriate, since it's not an error.
 			if (eax & (1 << 2)) {
 				printf("outb to PCI reset port with bit 2 set: time to die\n");
 				exit(0);
@@ -194,9 +194,10 @@ int io(struct guest_thread *vm_thread)
 			return 0;
 		}
 
-		/* Another case where we print a message but it's not an error. */
-		printf("out al, dx: unhandled IO address dx @%p is 0x%x\n", ip8, edx);
-		return 0;
+		/* Another case where we print a message but it's not an error.
+		 * */
+		printf("out al, dx: unhandled IO address dx @%p is 0x%x\n", ip8,
+		       edx); return 0;
 	}
 	/* Silently accept OUT imm8, al */
 	if (*ip8 == 0xe6) {

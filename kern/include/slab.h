@@ -38,42 +38,42 @@
 #define NUM_BUF_PER_SLAB 8
 #define SLAB_LARGE_CUTOFF (PGSIZE / NUM_BUF_PER_SLAB)
 
-#define KMC_NAME_SZ				32
-#define KMC_MAG_MIN_SZ			8
-#define KMC_MAG_MAX_SZ			62		/* chosen for mag size and caching */
+#define KMC_NAME_SZ		32
+#define KMC_MAG_MIN_SZ		8
+#define KMC_MAG_MAX_SZ		62	/* chosen for mag size and caching */
 
 /* Cache creation flags: */
-#define KMC_NOTOUCH				0x0001	/* Can't use source/object's memory */
-#define KMC_QCACHE				0x0002	/* Cache is an arena's qcache */
-#define KMC_NOTRACE				0x0004	/* Do not trace allocations */
-#define __KMC_USE_BUFCTL		0x1000	/* Internal use */
-#define __KMC_TRACED			0x2000	/* Internal use */
-#define __KMC_EVER_TRACED		0x3000	/* Internal use */
+#define KMC_NOTOUCH		0x0001	/* Can't use source/object's memory */
+#define KMC_QCACHE		0x0002	/* Cache is an arena's qcache */
+#define KMC_NOTRACE		0x0004	/* Do not trace allocations */
+#define __KMC_USE_BUFCTL	0x1000	/* Internal use */
+#define __KMC_TRACED		0x2000	/* Internal use */
+#define __KMC_EVER_TRACED	0x3000	/* Internal use */
 
 struct kmem_magazine {
 	SLIST_ENTRY(kmem_magazine)	link;
-	unsigned int				nr_rounds;
-	void						*rounds[KMC_MAG_MAX_SZ];
+	unsigned int			nr_rounds;
+	void				*rounds[KMC_MAG_MAX_SZ];
 } __attribute__((aligned(ARCH_CL_SIZE)));
 SLIST_HEAD(kmem_mag_slist, kmem_magazine);
 
 struct kmem_pcpu_cache {
-	int8_t						irq_state;
-	unsigned int				magsize;
+	int8_t				irq_state;
+	unsigned int			magsize;
 	struct kmem_magazine		*loaded;
 	struct kmem_magazine		*prev;
-	size_t						nr_allocs_ever;
+	size_t				nr_allocs_ever;
 } __attribute__((aligned(ARCH_CL_SIZE)));
 
 struct kmem_depot {
-	spinlock_t					lock;
+	spinlock_t			lock;
 	struct kmem_mag_slist		not_empty;
 	struct kmem_mag_slist		empty;
-	unsigned int				magsize;
-	unsigned int				nr_empty;
-	unsigned int				nr_not_empty;
-	unsigned int				busy_count;
-	uint64_t					busy_start;
+	unsigned int			magsize;
+	unsigned int			nr_empty;
+	unsigned int			nr_not_empty;
+	unsigned int			busy_count;
+	uint64_t			busy_start;
 };
 
 struct kmem_slab;
@@ -102,18 +102,18 @@ struct kmem_slab {
 TAILQ_HEAD(kmem_slab_list, kmem_slab);
 
 struct kmem_trace {
-	void						*obj;
-	struct hlist_node			hash;
-	size_t						nr_pcs;
-	uintptr_t					pcs[MAX_BT_DEPTH];
-	char						str[60];
+	void				*obj;
+	struct hlist_node		hash;
+	size_t				nr_pcs;
+	uintptr_t			pcs[MAX_BT_DEPTH];
+	char				str[60];
 };
 
 struct kmem_trace_ht {
-	spinlock_t					lock;
-	struct hash_helper			hh;
-	struct hlist_head			*ht;
-	struct hlist_head			static_ht[HASH_INIT_SZ];
+	spinlock_t			lock;
+	struct hash_helper		hh;
+	struct hlist_head		*ht;
+	struct hlist_head		static_ht[HASH_INIT_SZ];
 };
 
 /* Actual cache */

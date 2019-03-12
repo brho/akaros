@@ -19,9 +19,9 @@ extern bool vnet_snoop;
 /* Style of IP addressing, default off (qemu)
  *
  * For qemu-style networking:
- * 		guest_ip = 10.0.2.15, mask = 255.255.255.0, router = 10.0.2.2.
+ * 	guest_ip = 10.0.2.15, mask = 255.255.255.0, router = 10.0.2.2.
  * For real-addr networking:
- * 		guest_ip = host_v4, mask = host_mask, router = host_router
+ * 	guest_ip = host_v4, mask = host_mask, router = host_router
  * In either case, the guest sees the *real* DNS server. */
 extern bool vnet_real_ip_addrs;
 

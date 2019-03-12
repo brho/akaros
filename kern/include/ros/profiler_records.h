@@ -29,7 +29,7 @@ struct proftype_user_trace64 {
 	uint64_t trace[0];
 } __attribute__((packed));
 
-#define PROFTYPE_PID_MMAP64		3
+#define PROFTYPE_PID_MMAP64	3
 
 struct proftype_pid_mmap64 {
 	uint64_t tstamp;

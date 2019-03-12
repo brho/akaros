@@ -57,15 +57,16 @@ static inline int get_os_coreid(int hw_coreid)
 static inline int numa_id(void)
 {
 	int os_coreid = os_coreid_lookup[lapic_get_id()];
+
 	return cpu_topology_info.core_list[os_coreid].numa_id;
 }
 
 static inline int core_id(void)
 {
 	int coreid;
-	/* assuming we're right after stacktop.  gs base is the pcpui struct, but we
-	 * don't have access to the pcpui struct or to the extern per_cpu_info here,
-	 * due to include loops. */
+	/* assuming we're right after stacktop.  gs base is the pcpui struct,
+	 * but we don't have access to the pcpui struct or to the extern
+	 * per_cpu_info here, due to include loops. */
 	asm volatile ("movl %%gs:8, %0" : "=r"(coreid));
 	return coreid;
 }
@@ -74,6 +75,7 @@ static inline int core_id(void)
 static inline int core_id_early(void)
 {
 	extern bool core_id_ready;
+
 	if (!core_id_ready)
 		return 0;
 	return core_id();

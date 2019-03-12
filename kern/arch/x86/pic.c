@@ -12,7 +12,7 @@
 
 spinlock_t piclock = SPINLOCK_INITIALIZER_IRQSAVE;
 
-/* * Remaps the Programmable Interrupt Controller to use IRQs 32-47
+/* Remaps the Programmable Interrupt Controller to use IRQs 32-47
  * http://wiki.osdev.org/PIC
  * Check osdev for a more thorough explanation/implementation.
  * http://bochs.sourceforge.net/techspec/PORTS.LST  */
@@ -41,6 +41,7 @@ void pic_remap(void)
 void pic_mask_irq(struct irq_handler *unused, int trap_nr)
 {
 	int irq = trap_nr - PIC1_OFFSET;
+
 	spin_lock_irqsave(&piclock);
 	if (irq > 7)
 		outb(PIC2_DATA, inb(PIC2_DATA) | (1 << (irq - 8)));
@@ -56,7 +57,8 @@ void pic_unmask_irq(struct irq_handler *unused, int trap_nr)
 	spin_lock_irqsave(&piclock);
 	if (irq > 7) {
 		outb(PIC2_DATA, inb(PIC2_DATA) & ~(1 << (irq - 8)));
-		outb(PIC1_DATA, inb(PIC1_DATA) & 0xfb); // make sure irq2 is unmasked
+		// make sure irq2 is unmasked
+		outb(PIC1_DATA, inb(PIC1_DATA) & 0xfb);
 	} else
 		outb(PIC1_DATA, inb(PIC1_DATA) & ~(1 << irq));
 	spin_unlock_irqsave(&piclock);
@@ -72,6 +74,7 @@ void pic_mask_all(void)
 uint16_t pic_get_mask(void)
 {
 	uint16_t ret;
+
 	spin_lock_irqsave(&piclock);
 	ret = (inb(PIC2_DATA) << 8) | inb(PIC1_DATA);
 	spin_unlock_irqsave(&piclock);
@@ -81,6 +84,7 @@ uint16_t pic_get_mask(void)
 static uint16_t __pic_get_irq_reg(int ocw3)
 {
 	uint16_t ret;
+
 	spin_lock_irqsave(&piclock);
 	/* OCW3 to PIC CMD to get the register values.  PIC2 is chained, and
 	 * represents IRQs 8-15.  PIC1 is IRQs 0-7, with 2 being the chain */
@@ -106,17 +110,19 @@ uint16_t pic_get_isr(void)
 /* Takes a raw vector/trap number (32-47), not a device IRQ (0-15) */
 bool pic_check_spurious(int trap_nr)
 {
-	/* the PIC may send spurious irqs via one of the chips irq 7.  if the isr
-	 * doesn't show that irq, then it was spurious, and we don't send an eoi.
-	 * Check out http://wiki.osdev.org/8259_PIC#Spurious_IRQs */
+	/* the PIC may send spurious irqs via one of the chips irq 7.  if the
+	 * isr doesn't show that irq, then it was spurious, and we don't send an
+	 * eoi.  Check out http://wiki.osdev.org/8259_PIC#Spurious_IRQs */
 	if ((trap_nr == PIC1_SPURIOUS) && !(pic_get_isr() & (1 << 7))) {
-		printd("Spurious PIC1 irq!\n");	/* want to know if this happens */
+		/* want to know if this happens */
+		printd("Spurious PIC1 irq!\n");
 		return TRUE;
 	}
 	if ((trap_nr == PIC2_SPURIOUS) && !(pic_get_isr() & (1 << 15))) {
-		printd("Spurious PIC2 irq!\n");	/* want to know if this happens */
-		/* for the cascaded PIC, we *do* need to send an EOI to the master's
-		 * cascade irq (2). */
+		/* want to know if this happens */
+		printd("Spurious PIC2 irq!\n");
+		/* for the cascaded PIC, we *do* need to send an EOI to the
+		 * master's cascade irq (2). */
 		pic_send_eoi(2 + PIC1_OFFSET);
 		return TRUE;
 	}
@@ -126,6 +132,7 @@ bool pic_check_spurious(int trap_nr)
 void pic_send_eoi(int trap_nr)
 {
 	int irq = trap_nr - PIC1_OFFSET;
+
 	spin_lock_irqsave(&piclock);
 	// all irqs beyond the first seven need to be chained to the slave
 	if (irq > 7)

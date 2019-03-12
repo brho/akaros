@@ -17,9 +17,9 @@ typedef void (*rcu_callback_t)(struct rcu_head *head);
 typedef void (*call_rcu_func_t)(struct rcu_head *head, rcu_callback_t func);
 
 struct rcu_head {
-	struct list_head			link;
-	rcu_callback_t				func;
-	unsigned long				gpnum;
+	struct list_head		link;
+	rcu_callback_t			func;
+	unsigned long			gpnum;
 };
 
 #include <rcupdate.h>
@@ -33,46 +33,46 @@ struct rcu_head {
 #include <rendez.h>
 
 struct rcu_node {
-	struct rcu_node				*parent;
-	unsigned long				qsmask;	/* cores that need to check in */
-	unsigned long				qsmaskinit;
-	unsigned int				level;
-	unsigned int				grplo;	/* lowest nr CPU here */
-	unsigned int				grphi;	/* highest nr CPU here */
-	unsigned int				grpnum;	/* our number in our parent */
-	unsigned long				grpmask;/* our bit in our parent */
+	struct rcu_node			*parent;
+	unsigned long			qsmask;	/* cores that need to check in*/
+	unsigned long			qsmaskinit;
+	unsigned int			level;
+	unsigned int			grplo;	/* lowest nr CPU here */
+	unsigned int			grphi;	/* highest nr CPU here */
+	unsigned int			grpnum;	/* our number in our parent */
+	unsigned long			grpmask;/* our bit in our parent */
 };
 
 struct rcu_state {
-	struct rcu_node				node[NUM_RCU_NODES];
-	struct rcu_node				*level[RCU_NUM_LVLS];
+	struct rcu_node			node[NUM_RCU_NODES];
+	struct rcu_node			*level[RCU_NUM_LVLS];
 
 	/* These are read by everyone but only written by the GP kthread */
-	unsigned long				gpnum;
-	unsigned long				completed;
+	unsigned long			gpnum;
+	unsigned long			completed;
 
-	/* These are written by anyone trying to wake the gp kthread, which can be
-	 * any core whose CB list is long or does an rcu_barrier() */
+	/* These are written by anyone trying to wake the gp kthread, which can
+	 * be any core whose CB list is long or does an rcu_barrier() */
 	/* TODO: make a ktask struct and use a read-only pointer. */
-	struct rendez				gp_ktask_rv;
-	int							gp_ktask_ctl;
+	struct rendez			gp_ktask_rv;
+	int				gp_ktask_ctl;
 };
 
 struct rcu_pcpui {
-	struct rcu_state			*rsp;
-	struct rcu_node				*my_node;
-	int							coreid;
-	unsigned int				grpnum;
-	unsigned long				grpmask;
-	bool						booted;
+	struct rcu_state		*rsp;
+	struct rcu_node			*my_node;
+	int				coreid;
+	unsigned int			grpnum;
+	unsigned long			grpmask;
+	bool				booted;
 
-	spinlock_t					lock;
-	struct list_head			cbs;
-	unsigned int				nr_cbs;
-	unsigned long				gp_acked;
+	spinlock_t			lock;
+	struct list_head		cbs;
+	unsigned int			nr_cbs;
+	unsigned long			gp_acked;
 
-	struct rendez				mgmt_ktask_rv;
-	int							mgmt_ktask_ctl;
+	struct rendez			mgmt_ktask_rv;
+	int				mgmt_ktask_ctl;
 };
 DECLARE_PERCPU(struct rcu_pcpui, rcu_pcpui);
 

@@ -46,6 +46,7 @@ int eventfd_read(int efd, eventfd_t *value)
 {
 	int ret;
 	char num64[32];
+
 	ret = read(efd, num64, sizeof(num64));
 	if (ret <= 0)
 		return -1;

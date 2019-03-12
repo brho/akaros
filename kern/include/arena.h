@@ -31,17 +31,17 @@ typedef enum {
 } btag_status_t;
 
 struct btag {
-	struct rb_node				all_link;	/* connects all non-free BTs */
-	BSD_LIST_ENTRY(btag)		misc_link;	/* freelist, unused, or hash */
-	uintptr_t					start;
-	size_t						size;
-	btag_status_t				status;
+	struct rb_node			all_link; /* all non-free BTs */
+	BSD_LIST_ENTRY(btag)		misc_link; /* freelist unused or hash */
+	uintptr_t			start;
+	size_t				size;
+	btag_status_t			status;
 };
 BSD_LIST_HEAD(btag_list, btag);
 
 /* 64 is the most powers of two we can express with 64 bits. */
-#define ARENA_NR_FREE_LISTS		64
-#define ARENA_NAME_SZ			32
+#define ARENA_NR_FREE_LISTS	64
+#define ARENA_NAME_SZ		32
 
 /* Forward declarations of import lists */
 struct arena;
@@ -53,41 +53,41 @@ TAILQ_HEAD(kmem_cache_tailq, kmem_cache);
  * All free segments are on one of the free_segs[] lists.  There is one list for
  * each power-of-two we can allocate. */
 struct arena {
-	spinlock_t					lock;
-	uint8_t						import_scale;
-	bool						is_base;
-	size_t						quantum;
-	size_t						qcache_max;
-	struct kmem_cache			*qcaches;
-	struct rb_root				all_segs;		/* BTs, using all_link */
-	struct btag_list			unused_btags;	/* BTs, using misc_link */
-	struct btag_list			*alloc_hash;	/* BTs, using misc_link */
-	struct hash_helper			hh;
+	spinlock_t			lock;
+	uint8_t				import_scale;
+	bool				is_base;
+	size_t				quantum;
+	size_t				qcache_max;
+	struct kmem_cache		*qcaches;
+	struct rb_root			all_segs;    /* BTs, using all_link */
+	struct btag_list		unused_btags;/* BTs, using misc_link */
+	struct btag_list		*alloc_hash; /* BTs, using misc_link */
+	struct hash_helper		hh;
 	void *(*afunc)(struct arena *, size_t, int);
 	void (*ffunc)(struct arena *, void *, size_t);
-	struct arena				*source;
-	size_t						amt_total_segs;	/* Does not include qcache */
-	size_t						amt_alloc_segs;
-	size_t						nr_allocs_ever;
-	uintptr_t					last_nextfit_alloc;
-	struct btag_list			free_segs[ARENA_NR_FREE_LISTS];
-	struct btag_list			static_hash[HASH_INIT_SZ];
+	struct arena			*source;
+	size_t				amt_total_segs;	/* not include qcache */
+	size_t				amt_alloc_segs;
+	size_t				nr_allocs_ever;
+	uintptr_t			last_nextfit_alloc;
+	struct btag_list		free_segs[ARENA_NR_FREE_LISTS];
+	struct btag_list		static_hash[HASH_INIT_SZ];
 
 	/* Accounting */
-	char						name[ARENA_NAME_SZ];
-	TAILQ_ENTRY(arena)			next;
+	char				name[ARENA_NAME_SZ];
+	TAILQ_ENTRY(arena)		next;
 	/* These lists are protected by the global arena_and_slab qlock */
-	TAILQ_ENTRY(arena)			import_link;
-	struct arena_tailq			__importing_arenas;
+	TAILQ_ENTRY(arena)		import_link;
+	struct arena_tailq		__importing_arenas;
 	struct kmem_cache_tailq		__importing_slabs;
 };
 
 extern struct arena_tailq all_arenas;
 
 /* Arena allocation styles, or'd with MEM_FLAGS */
-#define ARENA_BESTFIT			0x100
-#define ARENA_INSTANTFIT		0x200
-#define ARENA_NEXTFIT			0x400
+#define ARENA_BESTFIT		0x100
+#define ARENA_INSTANTFIT	0x200
+#define ARENA_NEXTFIT		0x400
 #define ARENA_ALLOC_STYLES (ARENA_BESTFIT | ARENA_INSTANTFIT | ARENA_NEXTFIT)
 
 /* Creates an area, with initial segment [@base, @base + @size).  Allocs are in

@@ -56,7 +56,7 @@ void slice_append(struct slice *s, void *p)
 		s->capacity *= 2;
 		ps = kreallocarray(s->ptrs, s->capacity, sizeof(void *),
 				   MEM_WAIT);
-		assert(ps != NULL);		/* XXX: if size*sizeof(void*) overflows. */
+		assert(ps != NULL); /* XXX: if size*sizeof(void*) overflows. */
 		s->ptrs = ps;
 	}
 	s->ptrs[s->len] = p;

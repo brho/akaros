@@ -12,16 +12,15 @@ static volatile int done = 0;
 static volatile int cleanup_pop_arg = 0;
 static volatile int cnt = 0;
 
-static void
-cleanup_handler(void *arg)
+static void cleanup_handler(void *arg)
 {
 	printf("Running Cleanup Handler\n");
 }
 
-static void *
-thread_start(void *arg)
+static void *thread_start(void *arg)
 {
 	time_t start, curr;
+
 	printf("Pushing Cleanup Handler\n");
 	pthread_cleanup_push(cleanup_handler, NULL);
 	while (!done)
@@ -31,8 +30,7 @@ thread_start(void *arg)
 	return NULL;
 }
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
 	pthread_t thr;
 	int s;

@@ -8,10 +8,10 @@
  * after the time you specify. (for now, this might change).
  *
  * TODO:
- * 	- have a kernel sense of time, instead of just the TSC or whatever timer the
- * 	chain uses...
- * 	- coalesce or otherwise deal with alarms that are close to cut down on
- * 	interrupt overhead. */
+ * - have a kernel sense of time, instead of just the TSC or whatever timer the
+ *   chain uses...
+ * - coalesce or otherwise deal with alarms that are close to cut down on
+ *   interrupt overhead. */
 
 #include <ros/common.h>
 #include <sys/queue.h>
@@ -30,9 +30,10 @@ static void reset_tchain_times(struct timer_chain *tchain)
 		tchain->earliest_time = ALARM_POISON_TIME;
 		tchain->latest_time = ALARM_POISON_TIME;
 	} else {
-		tchain->earliest_time = TAILQ_FIRST(&tchain->waiters)->wake_up_time;
+		tchain->earliest_time =
+		    TAILQ_FIRST(&tchain->waiters)->wake_up_time;
 		tchain->latest_time =
-		        TAILQ_LAST(&tchain->waiters, awaiters_tailq)->wake_up_time;
+		    TAILQ_LAST(&tchain->waiters, awaiters_tailq)->wake_up_time;
 	}
 }
 
@@ -68,10 +69,11 @@ void set_awaiter_abs(struct alarm_waiter *waiter, uint64_t abs_time)
 void set_awaiter_rel(struct alarm_waiter *waiter, uint64_t usleep)
 {
 	uint64_t now, then;
+
 	now = read_tsc();
 	then = now + usec2tsc(usleep);
-	/* This will go off if we wrap-around the TSC.  It'll never happen for legit
-	 * values, but this might catch some bugs with large usleeps. */
+	/* This will go off if we wrap-around the TSC.  It'll never happen for
+	 * legit values, but this might catch some bugs with large usleeps. */
 	assert(now <= then);
 	set_awaiter_abs(waiter, then);
 }
@@ -174,25 +176,26 @@ static bool __insert_awaiter(struct timer_chain *tchain,
 		/* Need to turn on the timer interrupt later */
 		return TRUE;
 	}
-	/* If not, either we're first, last, or in the middle.  Reset the interrupt
-	 * and adjust the tchain's times accordingly. */
+	/* If not, either we're first, last, or in the middle.  Reset the
+	 * interrupt and adjust the tchain's times accordingly. */
 	if (waiter->wake_up_time < tchain->earliest_time) {
 		tchain->earliest_time = waiter->wake_up_time;
 		TAILQ_INSERT_HEAD(&tchain->waiters, waiter, next);
-		/* Changed the first entry; we'll need to reset the interrupt later */
+		/* Changed the first entry; we'll need to reset the interrupt
+		 * later */
 		return TRUE;
 	}
-	/* If there is a tie for last, the newer one will really go last.  We need
-	 * to handle equality here since the loop later won't catch it. */
+	/* If there is a tie for last, the newer one will really go last.  We
+	 * need to handle equality here since the loop later won't catch it. */
 	if (waiter->wake_up_time >= tchain->latest_time) {
 		tchain->latest_time = waiter->wake_up_time;
 		/* Proactively put it at the end if we know we're last */
 		TAILQ_INSERT_TAIL(&tchain->waiters, waiter, next);
 		return FALSE;
 	}
-	/* Insert before the first one you are earlier than.  This won't scale well
-	 * (TODO) if we have a lot of inserts.  The proactive insert_tail up above
-	 * will help a bit. */
+	/* Insert before the first one you are earlier than.  This won't scale
+	 * well (TODO) if we have a lot of inserts.  The proactive insert_tail
+	 * up above will help a bit. */
 	TAILQ_FOREACH_SAFE(i, &tchain->waiters, next, temp) {
 		if (waiter->wake_up_time < i->wake_up_time) {
 			TAILQ_INSERT_BEFORE(i, waiter, next);
@@ -222,18 +225,20 @@ static bool __remove_awaiter(struct timer_chain *tchain,
                              struct alarm_waiter *waiter)
 {
 	struct alarm_waiter *temp;
-	bool reset_int = FALSE;		/* whether or not to reset the interrupt */
+	bool reset_int = FALSE;	/* whether or not to reset the interrupt */
 
-	/* Need to make sure earliest and latest are set, in case we're mucking with
-	 * the first and/or last element of the chain. */
+	/* Need to make sure earliest and latest are set, in case we're mucking
+	 * with the first and/or last element of the chain. */
 	if (TAILQ_FIRST(&tchain->waiters) == waiter) {
 		temp = TAILQ_NEXT(waiter, next);
-		tchain->earliest_time = (temp) ? temp->wake_up_time : ALARM_POISON_TIME;
-		reset_int = TRUE;		/* we'll need to reset the timer later */
+		tchain->earliest_time = (temp) ? temp->wake_up_time
+					       : ALARM_POISON_TIME;
+		reset_int = TRUE; /* we'll need to reset the timer later */
 	}
 	if (TAILQ_LAST(&tchain->waiters, awaiters_tailq) == waiter) {
 		temp = TAILQ_PREV(waiter, awaiters_tailq, next);
-		tchain->latest_time = (temp) ? temp->wake_up_time : ALARM_POISON_TIME;
+		tchain->latest_time = (temp) ? temp->wake_up_time
+				             : ALARM_POISON_TIME;
 	}
 	TAILQ_REMOVE(&tchain->waiters, waiter, next);
 	waiter->on_tchain = FALSE;
@@ -321,21 +326,21 @@ void set_pcpu_alarm_interrupt(struct timer_chain *tchain)
 	struct timer_chain *pcpui_tchain = &pcpui->tchain;
 
 	if (pcpui_tchain != tchain) {
-		/* cross-core call.  we can simply send an alarm IRQ.  the alarm handler
-		 * will reset its pcpu timer, based on its current lists.  they take an
-		 * extra IRQ, but it gets the job done. */
+		/* cross-core call.  we can simply send an alarm IRQ.  the alarm
+		 * handler will reset its pcpu timer, based on its current
+		 * lists.  they take an extra IRQ, but it gets the job done. */
 		rem_pcpui = (struct per_cpu_info*)((uintptr_t)tchain -
 		                    offsetof(struct per_cpu_info, tchain));
-		/* TODO: using the LAPIC vector is a bit ghetto, since that's x86.  But
-		 * RISCV ignores the vector field, and we don't have a global IRQ vector
-		 * namespace or anything. */
+		/* TODO: using the LAPIC vector is a bit ghetto, since that's
+		 * x86.  But RISCV ignores the vector field, and we don't have a
+		 * global IRQ vector namespace or anything. */
 		send_ipi(rem_pcpui - &per_cpu_info[0], IdtLAPIC_TIMER);
 		return;
 	}
 	time = TAILQ_EMPTY(&tchain->waiters) ? 0 : tchain->earliest_time;
 	if (time) {
-		/* Arm the alarm.  For times in the past, we just need to make sure it
-		 * goes off. */
+		/* Arm the alarm.  For times in the past, we just need to make
+		 * sure it goes off. */
 		now = read_tsc();
 		if (time <= now)
 			rel_usec = 1;

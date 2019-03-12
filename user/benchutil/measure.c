@@ -48,9 +48,9 @@ void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
 	float accum_samples = 0.0, coef_var;
 	unsigned int *hist_times;
 	unsigned int *lat_times;
-	unsigned int nr_hist_bins = 75;		/* looks reasonable when printed */
-	unsigned int nr_lat_bins = 500;		/* affects granularity of lat perc */
-	unsigned int max_dots_per_row = 45;	/* looks good with 80-wide col */
+	unsigned int nr_hist_bins = 75;	/* looks reasonable when printed */
+	unsigned int nr_lat_bins = 500;	/* affects granularity of lat perc */
+	unsigned int max_dots_per_row = 45; /* looks good with 80-wide col */
 	unsigned int max_hist_bin = 0;
 	#define HI_COEF_VAR 1.0
 
@@ -58,15 +58,17 @@ void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
 	/* First pass, figure out the min, max, avg, etc. */
 	for (int i = 0; i < nr_i; i++) {
 		for (int j = 0; j < nr_j; j++) {
-			/* get_sample returns 0 on success.  o/w, skip the sample */
+			/* get_sample returns 0 on success.  o/w, skip the
+			 * sample */
+			/* depending on semantics, we could break */
 			if (stats->get_sample(data, i, j, &sample_time))
-				continue;	/* depending on semantics, we could break */
+				continue;
 			stats->total_samples++;
 			stats->avg_time += sample_time;
-			stats->max_time = sample_time > stats->max_time ? sample_time
-			                                                : stats->max_time;
-			stats->min_time = sample_time < stats->min_time ? sample_time
-			                                                : stats->min_time;
+			stats->max_time = sample_time > stats->max_time ?
+				sample_time : stats->max_time;
+			stats->min_time = sample_time < stats->min_time ?
+				sample_time : stats->min_time;
 		}
 	}
 	if (stats->total_samples < 2) {
@@ -87,27 +89,29 @@ void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
 		}
 	}
 	stats->var_time /= stats->total_samples - 1;
-	/* We have two histogram structures.  The main one is for printing, and the
-	 * other is for computing latency percentiles.  The only real diff btw the
-	 * two is the number of bins.  The latency one has a lot more, for finer
-	 * granularity, and the regular one has fewer for better printing.
+	/* We have two histogram structures.  The main one is for printing, and
+	 * the other is for computing latency percentiles.  The only real diff
+	 * btw the two is the number of bins.  The latency one has a lot more,
+	 * for finer granularity, and the regular one has fewer for better
+	 * printing.
 	 *
-	 * Both have the same max and min bin values.  Any excesses get put in the
-	 * smallest or biggest bin.  This keeps the granularity reasonable in the
-	 * face of very large outliers.  Normally, I trim off anything outside 3
-	 * stddev.
+	 * Both have the same max and min bin values.  Any excesses get put in
+	 * the smallest or biggest bin.  This keeps the granularity reasonable
+	 * in the face of very large outliers.  Normally, I trim off anything
+	 * outside 3 stddev.
 	 * 
 	 * High variation will throw off our histogram bins, so we adjust.  A
-	 * coef_var > 1 is considered high variance.  The numbers I picked are just
-	 * heuristics to catch SMM interference and make the output look nice. */
+	 * coef_var > 1 is considered high variance.  The numbers I picked are
+	 * just heuristics to catch SMM interference and make the output look
+	 * nice. */
 	coef_var = sqrt(stats->var_time) / stats->avg_time;
 	if (coef_var > HI_COEF_VAR) {
 		hist_max_time = stats->avg_time * 3;
 		hist_min_time = stats->avg_time / 3;
 	} else {	/* 'normal' data */
-		/* trimming the printable hist at 3 stddevs, which for normal data is
-		 * 99.7% of the data.  For most any data, it gets 89% (Chebyshev's
-		 * inequality) */
+		/* trimming the printable hist at 3 stddevs, which for normal
+		 * data is 99.7% of the data.  For most any data, it gets 89%
+		 * (Chebyshev's inequality) */
 		hist_max_time = stats->avg_time + 3 * sqrt(stats->var_time);
 		hist_min_time = stats->avg_time - 3 * sqrt(stats->var_time);
 		if (hist_min_time > hist_max_time)
@@ -132,9 +136,9 @@ void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
 		for (int j = 0; j < nr_j; j++) {
 			if (stats->get_sample(data, i, j, &sample_time))
 				continue;
-			/* need to shift, offset by min_time.  anything too small is 0 and
-			 * will go into the first bin.  anything too large will go into the
-			 * last bin. */
+			/* need to shift, offset by min_time.  anything too
+			 * small is 0 and will go into the first bin.  anything
+			 * too large will go into the last bin. */
 			lat_idx = sample_time < lat_min_time
 			          ? 0
 			          : (sample_time - lat_min_time) / lat_bin_sz;
@@ -142,7 +146,8 @@ void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
 			lat_times[lat_idx]++;
 			hist_idx = sample_time < hist_min_time
 			           ? 0
-			           : (sample_time - hist_min_time) / hist_bin_sz;
+				   : (sample_time - hist_min_time) /
+				     hist_bin_sz;
 			hist_idx = MIN(hist_idx, nr_hist_bins - 1);
 			hist_times[hist_idx]++;
 			/* useful for formatting the ***s */
@@ -155,18 +160,23 @@ void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
 	for (int i = 0; i < nr_lat_bins; i++) {
 		accum_samples += lat_times[i];
 		/* (i + 1), since we've just accumulated one bucket's worth */
-		if (!stats->lat_50 && accum_samples / stats->total_samples > 0.50)
+		if (!stats->lat_50 &&
+		    accum_samples / stats->total_samples > 0.50)
 			stats->lat_50 = (i + 1) * lat_bin_sz + lat_min_time;
-		if (!stats->lat_75 && accum_samples / stats->total_samples > 0.75)
+		if (!stats->lat_75 &&
+		    accum_samples / stats->total_samples > 0.75)
 			stats->lat_75 = (i + 1) * lat_bin_sz + lat_min_time;
-		if (!stats->lat_90 && accum_samples / stats->total_samples > 0.90)
+		if (!stats->lat_90 &&
+		    accum_samples / stats->total_samples > 0.90)
 			stats->lat_90 = (i + 1) * lat_bin_sz + lat_min_time;
-		if (!stats->lat_99 && accum_samples / stats->total_samples > 0.99)
+		if (!stats->lat_99 &&
+		    accum_samples / stats->total_samples > 0.99)
 			stats->lat_99 = (i + 1) * lat_bin_sz + lat_min_time;
 	}
 	for (int i = 0; i < nr_hist_bins; i++) {
 		uint64_t interval_start = i * hist_bin_sz + hist_min_time;
 		uint64_t interval_end = (i + 1) * hist_bin_sz + hist_min_time;
+
 		/* customize the first and last entries */
 		if (i == 0)
 			interval_start = MIN(interval_start, stats->min_time);
@@ -175,11 +185,12 @@ void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
 			/* but not at the sake of formatting! (8 spaces) */
 			interval_end = MIN(interval_end, 99999999);
 		}
-		printf("    [%8llu - %8llu] %7d: ", interval_start, interval_end,
-		       hist_times[i]);
+		printf("    [%8llu - %8llu] %7d: ", interval_start,
+		       interval_end, hist_times[i]);
 		/* nr_dots = hist_times[i] * nr_dots_per_sample
 		 *         = hist_times[i] * (max_num_dots / max_hist_bin) */
 		int nr_dots = hist_times[i] * max_dots_per_row / max_hist_bin;
+
 		for (int j = 0; j < nr_dots; j++)
 			printf("*");
 		printf("\n");
@@ -191,7 +202,8 @@ void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
 	printf("Stdev time : %f\n", sqrt(stats->var_time));
 	printf("Coef Var   : %f\n", coef_var);
 	if (coef_var > HI_COEF_VAR)
-		printf("\tHigh coeff of var with serious outliers, adjusted bins\n");
+		printf(
+		  "\tHigh coeff of var with serious outliers, adjusted bins\n");
 	/* numbers are overestimates by at most a lat bin */
 	printf("50/75/90/99: %d / %d / %d / %d (-<%ld)\n", stats->lat_50,
 	       stats->lat_75, stats->lat_90, stats->lat_99, lat_bin_sz);
@@ -222,7 +234,7 @@ void print_throughput(void **data, unsigned int nr_steps, uint64_t interval,
 	unsigned int *next_sample;
 	unsigned int *step_events;
 	unsigned int most_step_events = 1;
-	unsigned int max_dots_per_row = 45;	/* looks good with 80-wide col */
+	unsigned int max_dots_per_row = 45; /* looks good with 80-wide col */
 	unsigned int total_events = 0;
 
 	if (!nr_steps)
@@ -253,15 +265,19 @@ void print_throughput(void **data, unsigned int nr_steps, uint64_t interval,
 	}
 	for (int k = 0; k < nr_steps; k++) {
 		time_now += interval;
-		/* for every 'thread', we'll figure out how many events occurred, and
-		 * advance next_sample to track the next one to consider */
+		/* for every 'thread', we'll figure out how many events
+		 * occurred, and advance next_sample to track the next one to
+		 * consider */
 		for (int i = 0; i < nr_i; i++) {
-			/* count nr locks that have happened, advance per thread tracker */
+			/* count nr locks that have happened, advance per thread
+			 * tracker */
 			for ( ; next_sample[i] < nr_j; next_sample[i]++) {
 				/* skip this thread if it has no more data */
-				if (get_sample(data, i, next_sample[i], &sample))
+				if (get_sample(data, i, next_sample[i],
+					       &sample))
 					continue;
-				/* break when we found one that hasn't happened yet */
+				/* break when we found one that hasn't happened
+				 * yet */
 				if (!(sample <= time_now))
 					break;
 				step_events[k]++;
@@ -272,7 +288,8 @@ void print_throughput(void **data, unsigned int nr_steps, uint64_t interval,
 		most_step_events = MAX(most_step_events, step_events[k]);
 	}
 	if (nr_print_steps)
-		printf("Events per dot: %d\n", most_step_events / max_dots_per_row);
+		printf("Events per dot: %d\n",
+		       most_step_events / max_dots_per_row);
 	for (int k = 0; k < nr_print_steps; k++) {
 		/* Last step isn't accurate, will only be partially full */
 		if (k == nr_steps - 1)
@@ -280,8 +297,9 @@ void print_throughput(void **data, unsigned int nr_steps, uint64_t interval,
 		printf("%6d: ", k);
 		printf("%6d ", step_events[k]);
 		/* nr_dots = step_events[k] * nr_dots_per_event
-		 *         = step_events[k] * (max_dots_per_row / most_step_events) */
-		int nr_dots = step_events[k] * max_dots_per_row / most_step_events;
+		 *   = step_events[k] * (max_dots_per_row / most_step_events) */
+		int nr_dots = step_events[k] * max_dots_per_row /
+			      most_step_events;
 		for (int i = 0; i < nr_dots; i++)
 			printf("*");
 		printf("\n");

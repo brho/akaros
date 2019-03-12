@@ -48,7 +48,8 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 	/* short get style */
-	snprintf(buf, sizeof(buf), "GET /%s\r\nConnection: close\r\n\r\n", page);
+	snprintf(buf, sizeof(buf), "GET /%s\r\nConnection: close\r\n\r\n",
+		 page);
 	ret = write(dfd, buf, strlen(buf));
 	if (ret < 0) {
 		perror("Write");

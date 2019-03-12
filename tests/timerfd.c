@@ -286,7 +286,8 @@ int main(int ac, char **av)
 		ret = read(tfd, &uticks, sizeof(uticks));
 		unset_alarm(&waiter);
 		if (ret > 0) {
-			fprintf(stdout, "Failed to block when we should have!\n");
+			fprintf(stdout,
+				"Failed to block when we should have!\n");
 			exit(-1);
 		}
 		fprintf(stdout, "done (still success)\n");

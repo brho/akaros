@@ -29,6 +29,7 @@ static inline void atomic_init(atomic_t *number, long val)
 static inline long atomic_read(atomic_t *number)
 {
 	long val;
+
 	asm volatile("mov %1,%0" : "=r"(val) : "m"(*number));
 	return val;
 }

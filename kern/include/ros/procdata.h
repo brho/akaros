@@ -14,19 +14,21 @@
 typedef struct procdata {
 	/*
 	syscall_sring_t			syscallring;
-	char					pad1[SYSCALLRINGSIZE - sizeof(syscall_sring_t)];
+	char				pad1[SYSCALLRINGSIZE -
+	                                     sizeof(syscall_sring_t)];
 	*/
 	syscall_sring_t			*syscallring;
 	sysevent_sring_t		syseventring;
-	char					pad2[SYSEVENTRINGSIZE - sizeof(sysevent_sring_t)];
-	bool					printx_on;
-	uint8_t					pad8;
-	uint16_t				pad16;
-	uint32_t				pad32;
+	char				pad2[SYSEVENTRINGSIZE
+		                             - sizeof(sysevent_sring_t)];
+	bool				printx_on;
+	uint8_t				pad8;
+	uint16_t			pad16;
+	uint32_t			pad32;
 	struct resource_req		res_req[MAX_NUM_RESOURCES];
 	struct event_queue		*kernel_evts[MAX_NR_EVENT];
-	/* Long range, would like these to be mapped in lazily, as the vcores are
-	 * requested.  Sharing MAX_NUM_CORES is a bit weird too. */
+	/* Long range, would like these to be mapped in lazily, as the vcores
+	 * are requested.  Sharing MAX_NUM_CORES is a bit weird too. */
 	struct preempt_data		vcore_preempt_data[MAX_NUM_CORES];
 } procdata_t;
 

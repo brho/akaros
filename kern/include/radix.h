@@ -27,12 +27,12 @@
 #include <rcu.h>
 
 struct radix_node {
-	struct rcu_head				rcu;
-	void						*items[NR_RNODE_SLOTS];
-	unsigned int				num_items;
-	bool						leaf;
-	struct radix_node			*parent;
-	struct radix_node			**my_slot;
+	struct rcu_head			rcu;
+	void				*items[NR_RNODE_SLOTS];
+	unsigned int			num_items;
+	bool				leaf;
+	struct radix_node		*parent;
+	struct radix_node		**my_slot;
 };
 
 /* writers (insert, delete, and callbacks) must synchronize externally, e.g. a
@@ -58,10 +58,10 @@ struct radix_node {
  * the slot pointer and what it points to are protected by RCU.
  */
 struct radix_tree {
-	seq_ctr_t					seq;
-	struct radix_node			*root;
-	unsigned int				depth;
-	unsigned long				upper_bound;
+	seq_ctr_t			seq;
+	struct radix_node		*root;
+	unsigned int			depth;
+	unsigned long			upper_bound;
 };
 
 void radix_init(void);		/* initializes the whole radix system */

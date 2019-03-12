@@ -48,10 +48,10 @@ struct srvfile {
 	TAILQ_ENTRY(srvfile) link;
 	char *name;
 	struct chan *chan;
-	struct kref ref;			/* +1 for existing on create, -1 on remove */
+	struct kref ref;	/* +1 for existing on create, -1 on remove */
 	char *user;
 	uint32_t perm;
-	atomic_t opens;				/* used for exclusive open checks */
+	atomic_t opens;		/* used for exclusive open checks */
 };
 
 struct srvfile *top_dir;
@@ -60,13 +60,14 @@ TAILQ_HEAD(srvfilelist, srvfile) srvfiles = TAILQ_HEAD_INITIALIZER(srvfiles);
  * without the lock. (if you're on the list, we can grab a ref). */
 spinlock_t srvlock = SPINLOCK_INITIALIZER;
 
-atomic_t nr_srvs = 0;			/* debugging - concerned about leaking mem */
+atomic_t nr_srvs = 0;		/* debugging - concerned about leaking mem */
 
 /* Given a pointer (internal ref), we attempt to get a kref */
 static bool grab_ref(struct srvfile *srv)
 {
 	bool ret = FALSE;
 	struct srvfile *srv_i;
+
 	spin_lock(&srvlock);
 	TAILQ_FOREACH(srv_i, &srvfiles, link) {
 		if (srv_i == srv) {
@@ -81,6 +82,7 @@ static bool grab_ref(struct srvfile *srv)
 static void srv_release(struct kref *kref)
 {
 	struct srvfile *srv = container_of(kref, struct srvfile, ref);
+
 	kfree(srv->user);
 	kfree(srv->name);
 	if (srv->chan)
@@ -111,13 +113,15 @@ static int srvgen(struct chan *c, char *name, struct dirtab *tab,
 		spin_unlock(&srvlock);
 		return -1;
 	}
-	/* update c to point to our new srvfile.  this keeps the chan and its srv in
-	 * sync with what we're genning. */
+	/* update c to point to our new srvfile.  this keeps the chan and its
+	 * srv in sync with what we're genning. */
 	c->aux = next;	/* uncounted ref */
 	mkqid(&q, Qsrvfile, 0, QTFILE);
-	/* once we release the lock, next could disappear, including next->name */
+	/* once we release the lock, next could disappear, including next->name
+	 */
 	strlcpy(get_cur_genbuf(), next->name, GENBUF_SZ);
-	devdir(c, q, get_cur_genbuf(), 1 /* length */ , next->user, next->perm, dp);
+	devdir(c, q, get_cur_genbuf(), 1 /* length */ , next->user, next->perm,
+	       dp);
 	spin_unlock(&srvlock);
 	return 1;
 }
@@ -144,6 +148,7 @@ static struct chan *srvattach(char *spec)
 	/* the inferno attach was pretty complicated, but
 	 * we're not sure that complexity is needed. */
 	struct chan *c = devattach(devname(), spec);
+
 	mkqid(&c->qid, Qtopdir, 0, QTDIR);
 	/* c->aux is an uncounted ref */
 	c->aux = top_dir;
@@ -161,8 +166,7 @@ static size_t srvstat(struct chan *c, uint8_t *db, size_t n)
 	return devstat(c, db, n, 0, 0, srvgen);
 }
 
-char*
-srvname(struct chan *c)
+char *srvname(struct chan *c)
 {
 	struct srvfile *srv_i;
 	char *s;
@@ -185,7 +189,9 @@ static struct chan *srvopen(struct chan *c, int omode)
 {
 	ERRSTACK(1);
 	struct srvfile *srv;
-	openmode(omode);	/* used as an error checker in plan9, does little now */
+
+	/* used as an error checker in plan9, does little now */
+	openmode(omode);
 	if (c->qid.type & QTDIR) {
 		if (omode & O_WRITE)
 			error(EISDIR, ERROR_FIXME);
@@ -207,8 +213,8 @@ static struct chan *srvopen(struct chan *c, int omode)
 	/* srv->chan is write-once, so we don't need to sync. */
 	if (!srv->chan)
 		error(EFAIL, "srv file has no chan yet");
-	/* this is more than just the ref - 1, since there will be refs in flight
-	 * as gens work their way through the list */
+	/* this is more than just the ref - 1, since there will be refs in
+	 * flight as gens work their way through the list */
 	atomic_inc(&srv->opens);
 	/* the magic of srv: open c, get c->srv->chan back */
 	cclose(c);
@@ -304,8 +310,9 @@ static size_t srvwrite(struct chan *c, void *va, size_t count, off64_t offset)
 	kbuf = kmalloc(count + 1, MEM_WAIT);
 	strlcpy(kbuf, va, count + 1);
 	fd = strtoul(kbuf, 0, 10);
-	/* the magic of srv: srv stores the chan corresponding to the fd.  -1 for
-	 * mode, so we just get the chan with no checks (RDWR would work too). */
+	/* the magic of srv: srv stores the chan corresponding to the fd.  -1
+	 * for mode, so we just get the chan with no checks (RDWR would work
+	 * too). */
 	new_chan = fdtochan(&current->open_files, fd, -1, FALSE, TRUE);
 	/* fdtochan already increffed for us */
 	if (!__sync_bool_compare_and_swap(&srv->chan, 0, new_chan)) {

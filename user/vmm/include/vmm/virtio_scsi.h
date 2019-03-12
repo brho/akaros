@@ -1,3 +1,5 @@
+#pragma once
+
 /*
  * This header is BSD licensed so anyone can use the definitions to implement
  * compatible drivers/servers.
@@ -24,9 +26,7 @@
  * SUCH DAMAGE.
  */
 
-#pragma once
-
- #include <stdint.h>
+#include <stdint.h>
 
 /* Default values of the CDB and sense data size configuration fields */
 #define VIRTIO_SCSI_CDB_DEFAULT_SIZE   32

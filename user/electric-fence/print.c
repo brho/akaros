@@ -65,7 +65,8 @@ static void vprint(const char *pattern, va_list args)
 				 * it is large enough to contain all of the
 				 * bits of a void pointer.
 				 */
-				printNumber((ef_number)va_arg(args, void *), 0x10);
+				printNumber((ef_number)va_arg(args, void *),
+					    0x10);
 				break;
 			case 's': {
 				const char *string;
@@ -89,7 +90,8 @@ static void vprint(const char *pattern, va_list args)
 			case 'x':
 				printNumber(va_arg(args, u_int), 0x10);
 				break;
-			case 'c': { /*Cast used, since char gets promoted to int in ... */
+			case 'c': {
+			/*Cast used, since char gets promoted to int in ... */
 				char c = (char)va_arg(args, int);
 
 				(void)write(2, &c, 1);

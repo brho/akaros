@@ -51,15 +51,16 @@ size_t backtrace_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 		if (!fp)
 			break;
 		assert(KERNBASE <= fp);
-		/* We need to check the next FP before reading PC from beyond it.  FP
-		 * could be 0 and be at the top of the stack, and reading PC in that
-		 * case will be a wild read. */
+		/* We need to check the next FP before reading PC from beyond
+		 * it.  FP could be 0 and be at the top of the stack, and
+		 * reading PC in that case will be a wild read. */
 		if (!*(uintptr_t*)fp)
 			break;
-		/* We used to set PC = retaddr - 1, where the -1 would put our PC back
-		 * inside the function that called us.  This was for obscure cases where
-		 * a no-return function calls another function and has no other code
-		 * after the function call.  Or something. */
+		/* We used to set PC = retaddr - 1, where the -1 would put our
+		 * PC back inside the function that called us.  This was for
+		 * obscure cases where a no-return function calls another
+		 * function and has no other code after the function call.  Or
+		 * something. */
 		pc = *(uintptr_t*)(fp + sizeof(uintptr_t));
 		fp = *(uintptr_t*)fp;
 	}
@@ -77,7 +78,8 @@ size_t backtrace_user_list(uintptr_t pc, uintptr_t fp, uintptr_t *pcs,
 		pcs[nr_pcs++] = pc;
 		if (!fp)
 			break;
-		error = copy_from_user(frame, (const void *) fp, 2 * sizeof(uintptr_t));
+		error = copy_from_user(frame, (const void *) fp, 2 *
+				       sizeof(uintptr_t));
 		if (unlikely(error))
 			break;
 		pc = frame[1];

@@ -44,7 +44,7 @@ static inline void save_user_ctx(struct user_context *ctx)
 	             "mov %%rbx, 0x10(%0);   "
 	             "1:                     " /* where this tf will restart */
 	             : "=D"(dummy) /* force clobber for rdi */
-				 : "D"(sw_tf)
+	             : "D"(sw_tf)
 	             : "rax", "rcx", "rdx", "rsi", "r8", "r9", "r10", "r11",
 	               "memory", "cc");
 } __attribute__((always_inline, returns_twice))
@@ -68,7 +68,7 @@ static inline void save_user_ctx_hw(struct user_context *ctx)
 	             "leaq 1f, %%rax;        " /* get future rip */
 	             "movq %%rax, (%1);      " /* store future rip */
 	             "popq %%rax;            " /* restore rax */
-	             "movq %2, %%rsp;        " /* move to the rax slot of the tf */
+	             "movq %2, %%rsp;        " /* move to the TF's rax slot */
 	             "addl $0x78,%%esp;      " /* move to just past r15 */
 	             "pushq %%r15;           " /* save regs */
 	             "pushq %%r14;           "
@@ -100,10 +100,11 @@ static inline void init_user_ctx(struct user_context *ctx, uintptr_t entry_pt,
 
 	ctx->type = ROS_SW_CTX;
 	/* Stack pointers in a fresh stackframe need to be such that adding or
-	 * subtracting 8 will result in 16 byte alignment (AMD64 ABI).  The reason
-	 * is so that input arguments (on the stack) are 16 byte aligned.  The
-	 * extra 8 bytes is the retaddr, pushed on the stack.  Compilers know they
-	 * can subtract 8 to get 16 byte alignment for instructions like movaps. */
+	 * subtracting 8 will result in 16 byte alignment (AMD64 ABI).  The
+	 * reason is so that input arguments (on the stack) are 16 byte aligned.
+	 * The extra 8 bytes is the retaddr, pushed on the stack.  Compilers
+	 * know they can subtract 8 to get 16 byte alignment for instructions
+	 * like movaps. */
 	sw_tf->tf_rsp = ROUNDDOWN(stack_top, 16) - 8;
 	sw_tf->tf_rip = entry_pt;
 	sw_tf->tf_rbp = 0;	/* for potential backtraces */

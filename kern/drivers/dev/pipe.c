@@ -188,13 +188,14 @@ pipegen(struct chan *c, char *unused,
 }
 
 static struct walkqid *pipewalk(struct chan *c, struct chan *nc, char **name,
-								unsigned int nname)
+				unsigned int nname)
 {
 	struct walkqid *wq;
 	Pipe *p;
 
 	p = c->aux;
-	wq = devwalk(c, nc, name, nname, p->pipedir, ARRAY_SIZE(pipedir), pipegen);
+	wq = devwalk(c, nc, name, nname, p->pipedir, ARRAY_SIZE(pipedir),
+		     pipegen);
 	if (wq != NULL && wq->clone != NULL && wq->clone != c) {
 		qlock(&p->qlock);
 		kref_get(&p->ref, 1);
@@ -225,25 +226,27 @@ static size_t pipestat(struct chan *c, uint8_t *db, size_t n)
 	tab = p->pipedir;
 
 	switch (type) {
-		case Qdir:
-		case Qctl:
-			devdir(c, c->qid, tab[type].name, tab[type].length, eve.name,
-			       tab[type].perm, &dir);
-			break;
-		case Qdata0:
-			perm = tab[1].perm;
-			perm |= qreadable(p->q[0]) ? DMREADABLE : 0;
-			perm |= qwritable(p->q[1]) ? DMWRITABLE : 0;
-			devdir(c, c->qid, tab[1].name, qlen(p->q[0]), eve.name, perm, &dir);
-			break;
-		case Qdata1:
-			perm = tab[2].perm;
-			perm |= qreadable(p->q[1]) ? DMREADABLE : 0;
-			perm |= qwritable(p->q[0]) ? DMWRITABLE : 0;
-			devdir(c, c->qid, tab[2].name, qlen(p->q[1]), eve.name, perm, &dir);
-			break;
-		default:
-			panic("pipestat");
+	case Qdir:
+	case Qctl:
+		devdir(c, c->qid, tab[type].name, tab[type].length, eve.name,
+		       tab[type].perm, &dir);
+		break;
+	case Qdata0:
+		perm = tab[1].perm;
+		perm |= qreadable(p->q[0]) ? DMREADABLE : 0;
+		perm |= qwritable(p->q[1]) ? DMWRITABLE : 0;
+		devdir(c, c->qid, tab[1].name, qlen(p->q[0]), eve.name, perm,
+		       &dir);
+		break;
+	case Qdata1:
+		perm = tab[2].perm;
+		perm |= qreadable(p->q[1]) ? DMREADABLE : 0;
+		perm |= qwritable(p->q[0]) ? DMWRITABLE : 0;
+		devdir(c, c->qid, tab[2].name, qlen(p->q[1]), eve.name, perm,
+		       &dir);
+		break;
+	default:
+		panic("pipestat");
 	}
 	n = convD2M(&dir, db, n);
 	if (n < BIT16SZ)
@@ -261,8 +264,9 @@ static struct chan *pipeopen(struct chan *c, int omode)
 
 	if (c->qid.type & QTDIR) {
 		if (omode & O_WRITE)
-			error(EINVAL, "Can only open directories O_READ, mode is %o oct",
-				  omode);
+			error(EINVAL,
+			      "Can only open directories O_READ, mode is %o oct",
+			      omode);
 		c->mode = openmode(omode);
 		c->flag |= COPEN;
 		c->offset = 0;
@@ -278,14 +282,14 @@ static struct chan *pipeopen(struct chan *c, int omode)
 		nexterror();
 	}
 	switch (NETTYPE(c->qid.path)) {
-		case Qdata0:
-			devpermcheck(p->user, p->pipedir[1].perm, omode);
-			p->qref[0]++;
-			break;
-		case Qdata1:
-			devpermcheck(p->user, p->pipedir[2].perm, omode);
-			p->qref[1]++;
-			break;
+	case Qdata0:
+		devpermcheck(p->user, p->pipedir[1].perm, omode);
+		p->qref[0]++;
+		break;
+	case Qdata1:
+		devpermcheck(p->user, p->pipedir[2].perm, omode);
+		p->qref[1]++;
+		break;
 	}
 	poperror();
 	qunlock(&p->qlock);
@@ -309,20 +313,20 @@ static void pipeclose(struct chan *c)
 		 *  closing either side hangs up the stream
 		 */
 		switch (NETTYPE(c->qid.path)) {
-			case Qdata0:
-				p->qref[0]--;
-				if (p->qref[0] == 0) {
-					qhangup(p->q[1], 0);
-					qclose(p->q[0]);
-				}
-				break;
-			case Qdata1:
-				p->qref[1]--;
-				if (p->qref[1] == 0) {
-					qhangup(p->q[0], 0);
-					qclose(p->q[1]);
-				}
-				break;
+		case Qdata0:
+			p->qref[0]--;
+			if (p->qref[0] == 0) {
+				qhangup(p->q[1], 0);
+				qclose(p->q[0]);
+			}
+			break;
+		case Qdata1:
+			p->qref[1]--;
+			if (p->qref[1] == 0) {
+				qhangup(p->q[0], 0);
+				qclose(p->q[1]);
+			}
+			break;
 		}
 	}
 
@@ -348,23 +352,23 @@ static size_t piperead(struct chan *c, void *va, size_t n, off64_t offset)
 	p = c->aux;
 
 	switch (NETTYPE(c->qid.path)) {
-		case Qdir:
-			return devdirread(c, va, n, p->pipedir, ARRAY_SIZE(pipedir),
-							  pipegen);
-		case Qctl:
-			return readnum(offset, va, n, p->path, NUMSIZE32);
-		case Qdata0:
-			if (c->flag & O_NONBLOCK)
-				return qread_nonblock(p->q[0], va, n);
-			else
-				return qread(p->q[0], va, n);
-		case Qdata1:
-			if (c->flag & O_NONBLOCK)
-				return qread_nonblock(p->q[1], va, n);
-			else
-				return qread(p->q[1], va, n);
-		default:
-			panic("piperead");
+	case Qdir:
+		return devdirread(c, va, n, p->pipedir, ARRAY_SIZE(pipedir),
+						  pipegen);
+	case Qctl:
+		return readnum(offset, va, n, p->path, NUMSIZE32);
+	case Qdata0:
+		if (c->flag & O_NONBLOCK)
+			return qread_nonblock(p->q[0], va, n);
+		else
+			return qread(p->q[0], va, n);
+	case Qdata1:
+		if (c->flag & O_NONBLOCK)
+			return qread_nonblock(p->q[1], va, n);
+		else
+			return qread(p->q[1], va, n);
+	default:
+		panic("piperead");
 	}
 	return -1;	/* not reached */
 }
@@ -376,16 +380,16 @@ static struct block *pipebread(struct chan *c, size_t n, off64_t offset)
 	p = c->aux;
 
 	switch (NETTYPE(c->qid.path)) {
-		case Qdata0:
-			if (c->flag & O_NONBLOCK)
-				return qbread_nonblock(p->q[0], n);
-			else
-				return qbread(p->q[0], n);
-		case Qdata1:
-			if (c->flag & O_NONBLOCK)
-				return qbread_nonblock(p->q[1], n);
-			else
-				return qbread(p->q[1], n);
+	case Qdata0:
+		if (c->flag & O_NONBLOCK)
+			return qbread_nonblock(p->q[0], n);
+		else
+			return qbread(p->q[0], n);
+	case Qdata1:
+		if (c->flag & O_NONBLOCK)
+			return qbread_nonblock(p->q[1], n);
+		else
+			return qbread(p->q[1], n);
 	}
 
 	return devbread(c, n, offset);
@@ -403,42 +407,42 @@ static size_t pipewrite(struct chan *c, void *va, size_t n, off64_t ignored)
 	p = c->aux;
 
 	switch (NETTYPE(c->qid.path)) {
-		case Qctl:
-			cb = parsecmd(va, n);
-			if (waserror()) {
-				kfree(cb);
-				nexterror();
-			}
-			if (cb->nf < 1)
-				error(EFAIL, "short control request");
-			if (strcmp(cb->f[0], "oneblock") == 0) {
-				q_toggle_qmsg(p->q[0], TRUE);
-				q_toggle_qcoalesce(p->q[0], TRUE);
-				q_toggle_qmsg(p->q[1], TRUE);
-				q_toggle_qcoalesce(p->q[1], TRUE);
-			} else {
-				error(EFAIL, "unknown control request");
-			}
+	case Qctl:
+		cb = parsecmd(va, n);
+		if (waserror()) {
 			kfree(cb);
-			poperror();
-			break;
+			nexterror();
+		}
+		if (cb->nf < 1)
+			error(EFAIL, "short control request");
+		if (strcmp(cb->f[0], "oneblock") == 0) {
+			q_toggle_qmsg(p->q[0], TRUE);
+			q_toggle_qcoalesce(p->q[0], TRUE);
+			q_toggle_qmsg(p->q[1], TRUE);
+			q_toggle_qcoalesce(p->q[1], TRUE);
+		} else {
+			error(EFAIL, "unknown control request");
+		}
+		kfree(cb);
+		poperror();
+		break;
 
-		case Qdata0:
-			if (c->flag & O_NONBLOCK)
-				n = qwrite_nonblock(p->q[1], va, n);
-			else
-				n = qwrite(p->q[1], va, n);
-			break;
+	case Qdata0:
+		if (c->flag & O_NONBLOCK)
+			n = qwrite_nonblock(p->q[1], va, n);
+		else
+			n = qwrite(p->q[1], va, n);
+		break;
 
-		case Qdata1:
-			if (c->flag & O_NONBLOCK)
-				n = qwrite_nonblock(p->q[0], va, n);
-			else
-				n = qwrite(p->q[0], va, n);
-			break;
+	case Qdata1:
+		if (c->flag & O_NONBLOCK)
+			n = qwrite_nonblock(p->q[0], va, n);
+		else
+			n = qwrite(p->q[0], va, n);
+		break;
 
-		default:
-			panic("pipewrite");
+	default:
+		panic("pipewrite");
 	}
 
 	return n;
@@ -452,25 +456,25 @@ static size_t pipebwrite(struct chan *c, struct block *bp, off64_t offset)
 
 	p = c->aux;
 	switch (NETTYPE(c->qid.path)) {
-		case Qctl:
-			return devbwrite(c, bp, offset);
-		case Qdata0:
-			if (c->flag & O_NONBLOCK)
-				n = qbwrite_nonblock(p->q[1], bp);
-			else
-				n = qbwrite(p->q[1], bp);
-			break;
+	case Qctl:
+		return devbwrite(c, bp, offset);
+	case Qdata0:
+		if (c->flag & O_NONBLOCK)
+			n = qbwrite_nonblock(p->q[1], bp);
+		else
+			n = qbwrite(p->q[1], bp);
+		break;
 
-		case Qdata1:
-			if (c->flag & O_NONBLOCK)
-				n = qbwrite_nonblock(p->q[0], bp);
-			else
-				n = qbwrite(p->q[0], bp);
-			break;
+	case Qdata1:
+		if (c->flag & O_NONBLOCK)
+			n = qbwrite_nonblock(p->q[0], bp);
+		else
+			n = qbwrite(p->q[0], bp);
+		break;
 
-		default:
-			n = 0;
-			panic("pipebwrite");
+	default:
+		n = 0;
+		panic("pipebwrite");
 	}
 
 	return n;
@@ -561,18 +565,19 @@ static void pipe_wake_cb(struct queue *q, void *data, int filter)
 	spin_lock(&p->tap_lock);
 	SLIST_FOREACH(tap_i, &p->data_taps, link) {
 		chan = tap_i->chan;
-		/* Depending which chan did the tapping, we'll care about different
-		 * filters on different qs.  For instance, if we tapped Qdata0, then we
-		 * only care about readables on q[0], writables on q[1], and hangups on
-		 * either.  More precisely, we don't care about writables on q[0] or
-		 * readables on q[1].
+		/* Depending which chan did the tapping, we'll care about
+		 * different filters on different qs.  For instance, if we
+		 * tapped Qdata0, then we only care about readables on q[0],
+		 * writables on q[1], and hangups on either.  More precisely, we
+		 * don't care about writables on q[0] or readables on q[1].
 		 *
-		 * Note the *tap's* filter might differ from the CB's filter.  The CB
-		 * could be for read|write|hangup on q[1], with a Qdata0 tap for just
-		 * read.  We don't want to just pass the CB filt directly to fire_tap,
-		 * since that would pass the CB's read on q[1] to the tap and fire.  The
-		 * user would think q[0] was readable.  This is why I mask out the CB
-		 * filter events that we know they don't want. */
+		 * Note the *tap's* filter might differ from the CB's filter.
+		 * The CB could be for read|write|hangup on q[1], with a Qdata0
+		 * tap for just read.  We don't want to just pass the CB filt
+		 * directly to fire_tap, since that would pass the CB's read on
+		 * q[1] to the tap and fire.  The user would think q[0] was
+		 * readable.  This is why I mask out the CB filter events that
+		 * we know they don't want. */
 		switch (NETTYPE(chan->qid.path)) {
 		case Qdata0:
 			if (q == p->q[0])
@@ -587,7 +592,8 @@ static void pipe_wake_cb(struct queue *q, void *data, int filter)
 				filter &= ~FDTAP_FILT_READABLE;
 			break;
 		default:
-			panic("Shouldn't be able to tap pipe qid %p", chan->qid.path);
+			panic("Shouldn't be able to tap pipe qid %p",
+			      chan->qid.path);
 		}
 		fire_tap(tap_i, filter);
 	}
@@ -608,8 +614,9 @@ static int pipetapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 	case Qdata1:
 		if (tap->filter & ~DEVPIPE_LEGAL_DATA_TAPS) {
 			set_errno(ENOSYS);
-			set_errstr("Unsupported #%s data tap %p, must be %p", devname(),
-			           tap->filter, DEVPIPE_LEGAL_DATA_TAPS);
+			set_errstr("Unsupported #%s data tap %p, must be %p",
+				   devname(), tap->filter,
+				   DEVPIPE_LEGAL_DATA_TAPS);
 			return -1;
 		}
 		spin_lock(&p->tap_lock);
@@ -632,7 +639,8 @@ static int pipetapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 			break;
 		default:
 			set_errno(ENOSYS);
-			set_errstr("Unsupported #%s data tap command %p", devname(), cmd);
+			set_errstr("Unsupported #%s data tap command %p",
+				   devname(), cmd);
 			ret = -1;
 		}
 		spin_unlock(&p->tap_lock);

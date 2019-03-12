@@ -12,8 +12,8 @@
 
 #include <ros/common.h>
 
-#define CPU_FEAT_VMM					1
-#define __CPU_FEAT_ARCH_START			64
+#define CPU_FEAT_VMM		1
+#define __CPU_FEAT_ARCH_START	64
 
 #include <ros/arch/cpu_feat.h>
 

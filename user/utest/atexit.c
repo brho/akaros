@@ -32,8 +32,8 @@ static void *child_func(void *arg)
 static void main_atexit(void)
 {
 	/* Using the non-UT assert, since the test_atexit_threads() has already
-	 * returned.  Also, since the child called atexit() after main, its handler
-	 * should run first, according to the man page. */
+	 * returned.  Also, since the child called atexit() after main, its
+	 * handler should run first, according to the man page. */
 	assert(child_ran_atexit);
 }
 
@@ -57,7 +57,6 @@ int num_utests = sizeof(utests) / sizeof(struct utest);
 
 int main(int argc, char *argv[])
 {
-	// Run test suite passing it all the args as whitelist of what tests to run.
 	char **whitelist = &argv[1];
 	int whitelist_len = argc - 1;
 

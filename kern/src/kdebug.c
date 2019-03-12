@@ -19,9 +19,10 @@ const char *get_fn_name(uintptr_t pc)
 {
 	struct symtab_entry *i, *prev = 0, *found = 0;
 
-	/* Table is in ascending order.  As soon as we get to an entry greater than
-	 * us, we were in the previous one.  This is only true if we were given a
-	 * good PC.  Random addresses will just find the previous symbol. */
+	/* Table is in ascending order.  As soon as we get to an entry greater
+	 * than us, we were in the previous one.  This is only true if we were
+	 * given a good PC.  Random addresses will just find the previous
+	 * symbol. */
 	for (i = &gbl_symtab[0]; i->name; i++) {
 		if (i->addr > pc) {
 			found = prev;
@@ -38,6 +39,7 @@ const char *get_fn_name(uintptr_t pc)
 uintptr_t get_symbol_addr(char *sym)
 {
 	struct symtab_entry *i;
+
 	for (i = &gbl_symtab[0]; i->name; i++) {
 		if (strcmp(i->name, sym) == 0)
 			return i->addr;
@@ -106,7 +108,8 @@ static void __print_hdr(void)
 		if (is_ktask(pcpui->cur_kthread)) {
 			printk("%10s:", pcpui->cur_kthread->name);
 		} else {
-			printk("PID %3d   :", pcpui->cur_proc ? pcpui->cur_proc->pid : 0);
+			printk("PID %3d   :", pcpui->cur_proc ?
+			       pcpui->cur_proc->pid : 0);
 		}
 	}
 }
@@ -149,21 +152,22 @@ bool printx_on = FALSE;
 void set_printx(int mode)
 {
 	switch (mode) {
-		case 0:
-			printx_on = FALSE;
-			break;
-		case 1:
-			printx_on = TRUE;
-			break;
-		case 2:
-			printx_on = !printx_on;
-			break;
+	case 0:
+		printx_on = FALSE;
+		break;
+	case 1:
+		printx_on = TRUE;
+		break;
+	case 2:
+		printx_on = !printx_on;
+		break;
 	}
 }
 
 void debug_addr_proc(struct proc *p, unsigned long addr)
 {
 	struct vm_region *vmr;
+
 	spin_lock(&p->vmr_lock);
 	TAILQ_FOREACH(vmr, &p->vm_regions, vm_link) {
 		if ((vmr->vm_base <= addr) && (addr < vmr->vm_end))
@@ -198,8 +202,10 @@ void debug_addr_pid(int pid, unsigned long addr)
 
 #define BT_FMT "#%02d [<%p>] in %s\n"
 
-void print_backtrace_list(uintptr_t *pcs, size_t nr_pcs,
-						  void (*pfunc)(void *, const char *), void *opaque)
+void print_backtrace_list(uintptr_t *pcs, size_t nr_pcs, void (*pfunc)(void *,
+								       const
+								       char *),
+			  void *opaque)
 {
 	char bt_line[128];
 
@@ -274,7 +280,8 @@ void backtrace_frame(uintptr_t eip, uintptr_t ebp)
 void backtrace_user_frame(uintptr_t eip, uintptr_t ebp)
 {
 	uintptr_t pcs[MAX_BT_DEPTH];
-	/* TODO: this assumes we have the user's address space loaded (current). */
+	/* TODO: this assumes we have the user's address space loaded (current).
+	 */
 	size_t nr_pcs = backtrace_user_list(eip, ebp, pcs, MAX_BT_DEPTH);
 
 	print_lock();
@@ -283,7 +290,7 @@ void backtrace_user_frame(uintptr_t eip, uintptr_t ebp)
 	/* This formatting is consumed by scripts/bt-akaros.sh. */
 	for (int i = 0; i < nr_pcs; i++) {
 		printk("#%02d ", i + 1);
-		/* TODO: user backtraces all assume we're working on 'current' */
+		/* TODO: user backtraces all assume we're working on 'current'*/
 		debug_addr_proc(current, pcs[i]);
 	}
 	print_unlock();

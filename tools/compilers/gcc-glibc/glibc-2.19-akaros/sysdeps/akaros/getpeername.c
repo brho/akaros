@@ -39,20 +39,20 @@ int __getpeername(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 	}
 
 	switch (r->domain) {
-		case PF_INET:
-			rip = (struct sockaddr_in *)&r->raddr;
-			memmove(addr.__sockaddr_in__, rip, sizeof(struct sockaddr_in));
-			*alen = sizeof(struct sockaddr_in);
-			break;
-		case PF_UNIX:
-			runix = (struct sockaddr_un *)&r->raddr;
-			i = &runix->sun_path[strlen(runix->sun_path)] - (char *)runix;
-			memmove(addr.__sockaddr_un__, runix, i);
-			*alen = i;
-			break;
-		default:
-			errno = EAFNOSUPPORT;
-			return -1;
+	case PF_INET:
+		rip = (struct sockaddr_in *)&r->raddr;
+		memmove(addr.__sockaddr_in__, rip, sizeof(struct sockaddr_in));
+		*alen = sizeof(struct sockaddr_in);
+		break;
+	case PF_UNIX:
+		runix = (struct sockaddr_un *)&r->raddr;
+		i = &runix->sun_path[strlen(runix->sun_path)] - (char *)runix;
+		memmove(addr.__sockaddr_un__, runix, i);
+		*alen = i;
+		break;
+	default:
+		errno = EAFNOSUPPORT;
+		return -1;
 	}
 	return 0;
 }

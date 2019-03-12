@@ -76,12 +76,14 @@ static inline void mwait(void *eax)
 	asm volatile("xorq %%rcx, %%rcx;"
 	             "xorq %%rdx, %%rdx;"
 	             "monitor;"
-				 /* this is racy, generically.  we never check if the write to
-				  * the monitored address happened already. */
+				 /* this is racy, generically.  we never check
+				  * if the write to the monitored address
+				  * happened already. */
 	             "movq $0, %%rax;"	/* c-state hint.  this is C1 */
 	             "mwait;"
 	             : : "a"(eax));
 }
+
 /* Check out k/a/x86/rdtsc_test.c for more info */
 static inline uint64_t read_tsc_serialized(void)
 {
@@ -107,9 +109,10 @@ static inline void enable_irqsave(int8_t *state)
 	// < 0 means more disabled calls have been made
 	// Mostly doing this so we can call disable_irqsave first if we want
 
-	// one side or another "gets a point" if interrupts were already the
-	// way it wanted to go.  o/w, state stays at 0.  if the state was not 0
-	// then, enabling/disabling isn't even an option.  just increment/decrement
+	// one side or another "gets a point" if interrupts were already the way
+	// it wanted to go.  o/w, state stays at 0.  if the state was not 0
+	// then, enabling/disabling isn't even an option.  just
+	// increment/decrement
 
 	// if enabling is winning or tied, make sure it's enabled
 	if ((*state == 0) && !irq_is_enabled())
@@ -149,6 +152,7 @@ static inline void cache_flush(void)
 static inline void reboot(void)
 {
 	uint8_t cf9 = inb(0xcf9) & ~6;
+
 	outb(0x92, 0x3);
 	outb(0xcf9, cf9 | 2);
 	outb(0xcf9, cf9 | 6);
@@ -192,11 +196,11 @@ static inline void swap_gs(void)
 static inline void __attribute__((noreturn))
 __reset_stack_pointer(void *arg, uintptr_t sp, void (*f)(void *))
 {
-	/* FP must be zeroed before SP.  Ideally, we'd do both atomically.  If we
-	 * take an IRQ/NMI in between and set SP first, then a backtrace would be
-	 * confused since FP points *below* the SP that the *IRQ handler* is now
-	 * using.  By zeroing FP first, at least we won't BT at all (though FP is
-	 * still out of sync with SP). */
+	/* FP must be zeroed before SP.  Ideally, we'd do both atomically.  If
+	 * we take an IRQ/NMI in between and set SP first, then a backtrace
+	 * would be confused since FP points *below* the SP that the *IRQ
+	 * handler* is now using.  By zeroing FP first, at least we won't BT at
+	 * all (though FP is still out of sync with SP). */
 	asm volatile ("mov $0x0, %%rbp;"
 	              "mov %0, %%rsp;"
 	              "jmp *%%rdx;"

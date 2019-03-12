@@ -369,7 +369,8 @@ int mlx4_en_create_rx_ring(struct mlx4_en_priv *priv,
 	ring->log_stride = ffs(ring->stride) - 1;
 	ring->buf_size = ring->size * ring->stride + TXBB_SIZE;
 
-	tmp = size * ROUNDUPPWR2(MLX4_EN_MAX_RX_FRAGS * sizeof(struct mlx4_en_rx_alloc));
+	tmp = size * ROUNDUPPWR2(MLX4_EN_MAX_RX_FRAGS *
+				 sizeof(struct mlx4_en_rx_alloc));
 	ring->rx_info = vmalloc_node(tmp, node);
 	if (!ring->rx_info) {
 		ring->rx_info = vmalloc(tmp);
@@ -423,7 +424,8 @@ int mlx4_en_activate_rx_rings(struct mlx4_en_priv *priv)
 	int i;
 	int ring_ind;
 	int err;
-	int stride = ROUNDUPPWR2(sizeof(struct mlx4_en_rx_desc) + DS_SIZE * priv->num_frags);
+	int stride = ROUNDUPPWR2(sizeof(struct mlx4_en_rx_desc) +
+				 DS_SIZE * priv->num_frags);
 
 	for (ring_ind = 0; ring_ind < priv->rx_ring_num; ring_ind++) {
 		ring = priv->rx_ring[ring_ind];
@@ -907,7 +909,8 @@ int mlx4_en_process_rx_cq(struct ether *dev, struct mlx4_en_cq *cq,
 		if (likely(dev->feat & NETIF_F_RXCSUM)) {
 			if (cqe->status & cpu_to_be16(MLX4_CQE_STATUS_TCP |
 						      MLX4_CQE_STATUS_UDP)) {
-				if ((cqe->status & cpu_to_be16(MLX4_CQE_STATUS_IPOK)) &&
+				if ((cqe->status &
+				     cpu_to_be16(MLX4_CQE_STATUS_IPOK)) &&
 				    cqe->checksum == cpu_to_be16(0xffff)) {
 					ip_summed = CHECKSUM_UNNECESSARY;
 					ring->csum_ok++;
@@ -916,9 +919,11 @@ int mlx4_en_process_rx_cq(struct ether *dev, struct mlx4_en_cq *cq,
 					ring->csum_none++;
 				}
 			} else {
-				if (priv->flags & MLX4_EN_FLAG_RX_CSUM_NON_TCP_UDP &&
-				    (cqe->status & cpu_to_be16(MLX4_CQE_STATUS_IPV4 |
-							       MLX4_CQE_STATUS_IPV6))) {
+				if (priv->flags &
+				    MLX4_EN_FLAG_RX_CSUM_NON_TCP_UDP &&
+				    (cqe->status &
+				     cpu_to_be16(MLX4_CQE_STATUS_IPV4 |
+						 MLX4_CQE_STATUS_IPV6))) {
 					ip_summed = CHECKSUM_COMPLETE;
 					ring->csum_complete++;
 				} else {

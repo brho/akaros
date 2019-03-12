@@ -23,40 +23,40 @@ int __vfcntl(int fd, int cmd, va_list vl)
 	long a1, a2, a3, a4;
 
 	switch (cmd) {
-		case F_GETFD:
-		case F_SYNC:
-			ret = ros_syscall(SYS_fcntl, fd, cmd, 0, 0, 0, 0);
-			break;
-		case F_DUPFD:
-		case F_SETFD:
-		case F_GETFL:
-			arg = va_arg(vl, int);
-			ret = ros_syscall(SYS_fcntl, fd, cmd, arg, 0, 0, 0);
-			break;
-		case F_SETFL:
-			arg = va_arg(vl, int);
-			ret = ros_syscall(SYS_fcntl, fd, cmd, arg, 0, 0, 0);
-			/* For SETFL, we mirror the operation on all of the Rocks FDs.  If
-			 * the others fail, we won't hear about it.  Similarly, we only
-			 * GETFL for the data FD. */
-			_sock_mirror_fcntl(fd, cmd, arg);
-			break;
-		case F_ADVISE:
-			offset = va_arg(vl, __off64_t);
-			len = va_arg(vl, __off64_t);
-			advise = va_arg(vl, int);
-			ret = ros_syscall(SYS_fcntl, fd, cmd, offset, len, advise, 0);
-			break;
-		default:
-			/* We don't know the number of arguments for generic calls.  We'll
-			 * just yank whatever arguments there could be from the ABI and
-			 * send them along. */
-			a1 = va_arg(vl, long);
-			a2 = va_arg(vl, long);
-			a3 = va_arg(vl, long);
-			a4 = va_arg(vl, long);
-			ret = ros_syscall(SYS_fcntl, fd, cmd, a1, a2, a3, a4);
-			break;
+	case F_GETFD:
+	case F_SYNC:
+		ret = ros_syscall(SYS_fcntl, fd, cmd, 0, 0, 0, 0);
+		break;
+	case F_DUPFD:
+	case F_SETFD:
+	case F_GETFL:
+		arg = va_arg(vl, int);
+		ret = ros_syscall(SYS_fcntl, fd, cmd, arg, 0, 0, 0);
+		break;
+	case F_SETFL:
+		arg = va_arg(vl, int);
+		ret = ros_syscall(SYS_fcntl, fd, cmd, arg, 0, 0, 0);
+		/* For SETFL, we mirror the operation on all of the Rocks FDs.
+		 * If the others fail, we won't hear about it.  Similarly, we
+		 * only GETFL for the data FD. */
+		_sock_mirror_fcntl(fd, cmd, arg);
+		break;
+	case F_ADVISE:
+		offset = va_arg(vl, __off64_t);
+		len = va_arg(vl, __off64_t);
+		advise = va_arg(vl, int);
+		ret = ros_syscall(SYS_fcntl, fd, cmd, offset, len, advise, 0);
+		break;
+	default:
+		/* We don't know the number of arguments for generic calls.
+		 * We'll just yank whatever arguments there could be from the
+		 * ABI and send them along. */
+		a1 = va_arg(vl, long);
+		a2 = va_arg(vl, long);
+		a3 = va_arg(vl, long);
+		a4 = va_arg(vl, long);
+		ret = ros_syscall(SYS_fcntl, fd, cmd, a1, a2, a3, a4);
+		break;
 	}
 	return ret;
 }
@@ -67,6 +67,7 @@ int __fcntl(int fd, int cmd, ...)
 {
 	int ret;
 	va_list vl;
+
 	va_start(vl, cmd);
 	ret = __vfcntl(fd, cmd, vl);
 	va_end(vl);

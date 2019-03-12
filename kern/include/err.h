@@ -17,19 +17,19 @@ extern struct errbuf *get_cur_errbuf(void);
 
 #define error_jmp() longjmp(&get_cur_errbuf()->jmpbuf, 1)
 
-#define error(e, x, ...)												\
-	do {																\
-		set_error(e, x, ##__VA_ARGS__);									\
-		error_jmp();													\
+#define error(e, x, ...)						\
+	do {								\
+		set_error(e, x, ##__VA_ARGS__);				\
+		error_jmp();						\
 	} while(0)
-#define nexterror() longjmp(&(errpop(errstack, ARRAY_SIZE(errstack), &curindex, \
-									 prev_errbuf)->jmpbuf), 1)
+#define nexterror() longjmp(&(errpop(errstack, ARRAY_SIZE(errstack), &curindex,\
+				     prev_errbuf)->jmpbuf), 1)
 #define poperror() errpop(errstack, ARRAY_SIZE(errstack), &curindex,	\
-						  prev_errbuf)
+			  prev_errbuf)
 /* Give Akaros people a hint that we need a real error message. */
 #define ERROR_FIXME "This space in %s@%d needs filling in.", __FILE__, __LINE__
 
 struct errbuf *errpush(struct errbuf *errstack, int stacksize, int *curindex,
-						struct errbuf **prev_errbuf);
+		       struct errbuf **prev_errbuf);
 struct errbuf *errpop(struct errbuf *errstack, int stacksize, int *curindex,
-					  struct errbuf *prev_errbuf);
+		      struct errbuf *prev_errbuf);

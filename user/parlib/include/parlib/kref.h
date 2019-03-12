@@ -33,7 +33,8 @@ static bool kref_get_not_zero(struct kref *kref, unsigned int inc)
 		if (!old_ref)
 			return FALSE;
 		new_ref = old_ref + inc;
-	} while (!__sync_bool_compare_and_swap(&kref->refcnt, old_ref, new_ref));
+	} while (!__sync_bool_compare_and_swap(&kref->refcnt, old_ref,
+					       new_ref));
 	return TRUE;
 }
 

@@ -41,13 +41,13 @@
 
 #define MAX_BOOT_CMDLINE_SIZE 4096
 
-#define ASSIGN_PTRVAL(prm, top, val)			\
-	do {										\
-		if (prm && (prm < top)) {				\
-			*prm = val;							\
-			prm++;								\
-		}										\
-	} while (0)
+#define ASSIGN_PTRVAL(prm, top, val)					\
+do {									\
+	if (prm && (prm < top)) {					\
+		*prm = val;						\
+		prm++;							\
+	}								\
+} while (0)
 
 bool booting = TRUE;
 struct proc_global_info __proc_global_info;
@@ -58,7 +58,7 @@ static void run_linker_funcs(void);
 static int run_init_script(void);
 
 const char *get_boot_option(const char *base, const char *option, char *param,
-							size_t max_param)
+			    size_t max_param)
 {
 	size_t optlen = strlen(option);
 	char *ptop = param + max_param - 1;
@@ -103,10 +103,9 @@ static void extract_multiboot_cmdline(struct multiboot_info *mbi)
 	if (mbi && (mbi->flags & MULTIBOOT_INFO_CMDLINE) && mbi->cmdline) {
 		const char *cmdln = (const char *) KADDR(mbi->cmdline);
 
-		/* We need to copy the command line in a permanent buffer, since the
-		 * multiboot memory where it is currently residing will be part of the
-		 * free boot memory later on in the boot process.
-		 */
+		/* We need to copy the command line in a permanent buffer, since
+		 * the multiboot memory where it is currently residing will be
+		 * part of the free boot memory later on in the boot process. */
 		strlcpy(boot_cmdline, cmdln, sizeof(boot_cmdline));
 	}
 }
@@ -118,10 +117,10 @@ void kernel_init(multiboot_info_t *mboot_info)
 	extern char __start_bss[], __stop_bss[];
 
 	memset(__start_bss, 0, __stop_bss - __start_bss);
-	/* mboot_info is a physical address.  while some arches currently have the
-	 * lower memory mapped, everyone should have it mapped at kernbase by now.
-	 * also, it might be in 'free' memory, so once we start dynamically using
-	 * memory, we may clobber it. */
+	/* mboot_info is a physical address.  while some arches currently have
+	 * the lower memory mapped, everyone should have it mapped at kernbase
+	 * by now.  also, it might be in 'free' memory, so once we start
+	 * dynamically using memory, we may clobber it. */
 	multiboot_kaddr = (struct multiboot_info*)((physaddr_t)mboot_info
                                                + KERNBASE);
 	extract_multiboot_cmdline(multiboot_kaddr);
@@ -141,7 +140,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	acpiinit();
 	topology_init();
 	percpu_init();
-	kthread_init();					/* might need to tweak when this happens */
+	kthread_init();		/* might need to tweak when this happens */
 	vmr_init();
 	page_check();
 	idt_init();
@@ -158,8 +157,8 @@ static void __kernel_init_part_deux(void *arg)
 	rcu_init();
 	enable_irq();
 	run_linker_funcs();
-	/* reset/init devtab after linker funcs 3 and 4.  these run NIC and medium
-	 * pre-inits, which need to happen before devether. */
+	/* reset/init devtab after linker funcs 3 and 4.  these run NIC and
+	 * medium pre-inits, which need to happen before devether. */
 	devtabreset();
 	devtabinit();
 
@@ -171,7 +170,7 @@ static void __kernel_init_part_deux(void *arg)
 
 #ifdef CONFIG_RUN_INIT_SCRIPT
 	if (run_init_script()) {
-		printk("Configured to run init script, but no script specified!\n");
+		printk("Told to run init script, but no script specified\n");
 		manager();
 	}
 #else
@@ -187,7 +186,8 @@ static int run_init_script(void)
 		int vargs = 0;
 		char *sptr = &CONFIG_INIT_SCRIPT_PATH_AND_ARGS[0];
 
-		/* Figure out how many arguments there are, by finding the spaces */
+		/* Figure out how many arguments there are, by finding the
+		 * spaces */
 		/* TODO: consider rewriting this stuff with parsecmd */
 		while (*sptr != '\0') {
 			if (*(sptr++) != ' ') {
@@ -197,8 +197,8 @@ static int run_init_script(void)
 			}
 		}
 
-		/* Initialize l_argv with its first three arguments, but allocate space
-		 * for all arguments as calculated above */
+		/* Initialize l_argv with its first three arguments, but
+		 * allocate space for all arguments as calculated above */
 		int static_args = 2;
 		int total_args = vargs + static_args;
 		char *l_argv[total_args];
@@ -207,6 +207,7 @@ static int run_init_script(void)
 
 		/* Initialize l_argv with the rest of the arguments */
 		int i = static_args;
+
 		sptr = &CONFIG_INIT_SCRIPT_PATH_AND_ARGS[0];
 		while (*sptr != '\0') {
 			if (*sptr != ' ') {
@@ -272,26 +273,29 @@ void _panic(struct hw_trapframe *hw_tf, const char *file, int line,
 	}
 	printk("\n");
 
-	/* If we're here, we panicked and currently hold the print_lock.  We might
-	 * have panicked recursively.  We must unlock unconditionally, since the
-	 * initial panic (which grabbed the lock) will never run again. */
+	/* If we're here, we panicked and currently hold the print_lock.  We
+	 * might have panicked recursively.  We must unlock unconditionally,
+	 * since the initial panic (which grabbed the lock) will never run
+	 * again. */
 	panic_printing = false;
 	print_unlock_force();
 	/* And we have to clear the depth, so that we lock again next time in.
-	 * Otherwise, we'd be unlocking without locking (which is another panic). */
+	 * Otherwise, we'd be unlocking without locking (which is another
+	 * panic). */
 	PERCPU_VAR(panic_depth) = 0;
 
-	/* Let's wait long enough for other printers to finish before entering the
-	 * monitor. */
+	/* Let's wait long enough for other printers to finish before entering
+	 * the monitor. */
 	do {
 		udelay(500000);
 		cmb();
 	} while (panic_printing);
 
 	/* Yikes!  We're claiming to be not in IRQ/trap ctx and not holding any
-	 * locks.  Obviously we could be wrong, and could easily deadlock.  We could
-	 * be in an IRQ handler, an unhandled kernel fault, or just a 'normal' panic
-	 * in a syscall - any of which can involve unrestore invariants. */
+	 * locks.  Obviously we could be wrong, and could easily deadlock.  We
+	 * could be in an IRQ handler, an unhandled kernel fault, or just a
+	 * 'normal' panic in a syscall - any of which can involve unrestore
+	 * invariants. */
 	pcpui->__ctx_depth = 0;
 	pcpui->lock_depth = 0;
 	/* And keep this off, for good measure. */
@@ -327,8 +331,8 @@ void _warn(const char *file, int line, const char *fmt,...)
 static void run_links(linker_func_t *linkstart, linker_func_t *linkend)
 {
 	/* Unlike with devtab, our linker sections for the function pointers are
-	 * 8 byte aligned (4 on 32 bit) (done by the linker/compiler), so we don't
-	 * have to worry about that.  */
+	 * 8 byte aligned (4 on 32 bit) (done by the linker/compiler), so we
+	 * don't have to worry about that.  */
 	printd("linkstart %p, linkend %p\n", linkstart, linkend);
 	for (int i = 0; &linkstart[i] < linkend; i++) {
 		printd("i %d, linkfunc %p\n", i, linkstart[i]);

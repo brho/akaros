@@ -37,22 +37,22 @@
  *
  * Notes on refcnting (the trickier parts here):
  * - the proc_alarms have counted references to their proc
- * 		proc won't free til all alarms are closed, which is fine.  we close
- * 		all files in destroy.  if a proc drops a chan in srv, the proc will stay
- * 		alive because the alarm is alive - til that chan is closed (srvremove)
+ * 	proc won't free til all alarms are closed, which is fine.  we close
+ * 	all files in destroy.  if a proc drops a chan in srv, the proc will stay
+ * 	alive because the alarm is alive - til that chan is closed (srvremove)
  *
- * 		other shady ways to keep a chan alive: cd to it!  if it is ., we'd
- * 		keep a ref around.  however, only alarmdir *file* grab refs, not
- * 		directories.
+ * 	other shady ways to keep a chan alive: cd to it!  if it is ., we'd
+ * 	keep a ref around.  however, only alarmdir *file* grab refs, not
+ * 	directories.
  *
  * - proc_alarms are kref'd, since there can be multiple chans per alarm
- * 		the only thing that keeps an alarm alive is a chan on a CTL or TIMER (or
- * 		other file).  when you cloned, you got back an open CTL, which keeps the
- * 		alarm (and the dir) alive.
+ * 	the only thing that keeps an alarm alive is a chan on a CTL or TIMER (or
+ * 	other file).  when you cloned, you got back an open CTL, which keeps the
+ * 	alarm (and the dir) alive.
  *
- * 		we need to be careful generating krefs, in case alarms are concurrently
- * 		released and removed from the lists.  just like with procs and pid2proc,
- * 		we need to sync with the source of the kref. */
+ * 	we need to be careful generating krefs, in case alarms are concurrently
+ * 	released and removed from the lists.  just like with procs and pid2proc,
+ * 	we need to sync with the source of the kref. */
 
 #include <kmalloc.h>
 #include <string.h>
@@ -76,13 +76,13 @@ static char *devname(void)
 }
 
 /* qid path types */
-#define Qtopdir					1
-#define Qclone					2
-#define Qalarmdir				3
-#define Qctl					4
-#define Qtimer					5	/* Qctl + 1 */
-#define Qperiod					6
-#define Qcount					7
+#define Qtopdir			1
+#define Qclone			2
+#define Qalarmdir		3
+#define Qctl			4
+#define Qtimer			5	/* Qctl + 1 */
+#define Qperiod			6
+#define Qcount			7
 
 /* This paddr/kaddr is a bit dangerous.  it'll work so long as we don't need all
  * 64 bits for a physical address (48 is the current norm on x86_64). */
@@ -96,6 +96,7 @@ static void alarm_release(struct kref *kref)
 {
 	struct proc_alarm *a = container_of(kref, struct proc_alarm, kref);
 	struct proc *p = a->proc;
+
 	assert(p);
 	spin_lock(&p->alarmset.lock);
 	TAILQ_REMOVE(&p->alarmset.list, a, link);
@@ -116,7 +117,8 @@ static void alarm_fire_taps(struct proc_alarm *a, int filter)
 
 static void proc_alarm_handler(struct alarm_waiter *a_waiter)
 {
-	struct proc_alarm *a = container_of(a_waiter, struct proc_alarm, a_waiter);
+	struct proc_alarm *a = container_of(a_waiter, struct proc_alarm,
+					    a_waiter);
 
 	cv_lock(&a->cv);
 	a->count++;
@@ -142,116 +144,120 @@ void devalarm_init(struct proc *p)
 	p->alarmset.id_counter = 0;
 }
 
-static int alarmgen(struct chan *c, char *entry_name,
-					struct dirtab *unused, int unused_nr_dirtab,
-					int s, struct dir *dp)
+static int alarmgen(struct chan *c, char *entry_name, struct dirtab *unused,
+		    int unused_nr_dirtab, int s, struct dir *dp)
 {
 	struct qid q;
 	struct proc_alarm *a_i;
 	struct proc *p = current;
-	/* Whether we're in one dir or at the top, .. still takes us to the top. */
+
+	/* Whether we're in one dir or at the top, .. still takes us to the top.
+	 */
 	if (s == DEVDOTDOT) {
 		mkqid(&q, Qtopdir, 0, QTDIR);
 		devdir(c, q, devname(), 0, eve.name, 0555, dp);
 		return 1;
 	}
 	switch (TYPE(c->qid)) {
-		case Qtopdir:
-			/* Generate elements for the top level dir.  We support a clone and
-			 * alarm dirs at the top level */
-			if (s == 0) {
-				mkqid(&q, Qclone, 0, QTFILE);
-				devdir(c, q, "clone", 0, eve.name, 0666, dp);
-				return 1;
-			}
-			s--;	/* 1 -> 0th element, 2 -> 1st element, etc */
-			/* Gets the s-th element (0 index)
-			 *
-			 * I would like to take advantage of the state machine and our
-			 * previous answer to get the sth element of the list.  We can get
-			 * at our previous run of gen from dp (struct dir), and use that to
-			 * get the next item.  I'd like to do something like:
-			 *
-			 * if (dp->qid.path >> ADDR_SHIFT)
-			 *      a_i = TAILQ_NEXT(QID2A(dp->qid), link);
-			 *
-			 * Dev would give us a 0'd dp path on the first run, so if we have a
-			 * path, we know we're on an iterative run.  However, the problem is
-			 * that we could have lost the element dp refers to (QID2A(dp->qid))
-			 * since our previous run, so we can't even access that memory to
-			 * check for refcnts or anything.  We need a new model for how gen
-			 * works (probably a gen_start and gen_stop devop, passed as
-			 * parameters to devwalk), so that we can have some invariants
-			 * between gen runs.
-			 *
-			 * Til then, we're stuck with arrays like in #ip (though we can use
-			 * Linux style fdsets) or lousy O(n^2) linked lists (like #srv).
-			 *
-			 * Note that we won't always start a gen loop with s == 0
-			 * (devdirread, for instance) */
-			spin_lock(&p->alarmset.lock);
-			TAILQ_FOREACH(a_i, &p->alarmset.list, link) {
-				if (s-- == 0)
-					break;
-			}
-			/* As soon as we unlock, someone could free a_i */
-			if (!a_i) {
-				spin_unlock(&p->alarmset.lock);
-				return -1;
-			}
-			snprintf(get_cur_genbuf(), GENBUF_SZ, "a%d", a_i->id);
-			mkqid(&q, QID(a_i, Qalarmdir), 0, QTDIR);
-			devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
+	case Qtopdir:
+		/* Generate elements for the top level dir.  We support a clone
+		 * and alarm dirs at the top level */
+		if (s == 0) {
+			mkqid(&q, Qclone, 0, QTFILE);
+			devdir(c, q, "clone", 0, eve.name, 0666, dp);
+			return 1;
+		}
+		s--;	/* 1 -> 0th element, 2 -> 1st element, etc */
+		/* Gets the s-th element (0 index)
+		 *
+		 * I would like to take advantage of the state machine and our
+		 * previous answer to get the sth element of the list.  We can
+		 * get at our previous run of gen from dp (struct dir), and use
+		 * that to get the next item.  I'd like to do something like:
+		 *
+		 * if (dp->qid.path >> ADDR_SHIFT)
+		 *      a_i = TAILQ_NEXT(QID2A(dp->qid), link);
+		 *
+		 * Dev would give us a 0'd dp path on the first run, so if we
+		 * have a path, we know we're on an iterative run.  However, the
+		 * problem is that we could have lost the element dp refers to
+		 * (QID2A(dp->qid)) since our previous run, so we can't even
+		 * access that memory to check for refcnts or anything.  We need
+		 * a new model for how gen works (probably a gen_start and
+		 * gen_stop devop, passed as parameters to devwalk), so that we
+		 * can have some invariants between gen runs.
+		 *
+		 * Til then, we're stuck with arrays like in #ip (though we can
+		 * use Linux style fdsets) or lousy O(n^2) linked lists (like
+		 * #srv).
+		 *
+		 * Note that we won't always start a gen loop with s == 0
+		 * (devdirread, for instance) */
+		spin_lock(&p->alarmset.lock);
+		TAILQ_FOREACH(a_i, &p->alarmset.list, link) {
+			if (s-- == 0)
+				break;
+		}
+		/* As soon as we unlock, someone could free a_i */
+		if (!a_i) {
 			spin_unlock(&p->alarmset.lock);
-			return 1;
-		case Qalarmdir:
-			/* Gen the contents of the alarm dirs */
-			s += Qctl;	/* first time through, start on Qctl */
-			switch (s) {
-				case Qctl:
-					mkqid(&q, QID(QID2A(c->qid), Qctl), 0, QTFILE);
-					devdir(c, q, "ctl", 0, eve.name, 0666, dp);
-					return 1;
-				case Qtimer:
-					mkqid(&q, QID(QID2A(c->qid), Qtimer), 0, QTFILE);
-					devdir(c, q, "timer", 0, eve.name, 0666, dp);
-					return 1;
-				case Qperiod:
-					mkqid(&q, QID(QID2A(c->qid), Qperiod), 0, QTFILE);
-					devdir(c, q, "period", 0, eve.name, 0666, dp);
-					return 1;
-				case Qcount:
-					mkqid(&q, QID(QID2A(c->qid), Qcount), 0, QTFILE);
-					devdir(c, q, "count", 0, eve.name, 0666, dp);
-					return 1;
-			}
 			return -1;
-			/* Need to also provide a direct hit for Qclone and all other files
-			 * (at all levels of the hierarchy).  Every file is both generated
-			 * (via the s increments in their respective directories) and
-			 * directly gen-able.  devstat() will call gen with a specific path
-			 * in the qid.  In these cases, we make a dir for whatever they are
-			 * asking for.  Note the qid stays the same.  I think this is what
-			 * the old plan9 comments above devgen were talking about for (ii).
-			 *
-			 * We don't need to do this for the directories - devstat will look
-			 * for the a directory by path and fail.  Then it will manually
-			 * build the stat output (check the -1 case in devstat). */
-		case Qclone:
-			devdir(c, c->qid, "clone", 0, eve.name, 0666, dp);
-			return 1;
+		}
+		snprintf(get_cur_genbuf(), GENBUF_SZ, "a%d", a_i->id);
+		mkqid(&q, QID(a_i, Qalarmdir), 0, QTDIR);
+		devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
+		spin_unlock(&p->alarmset.lock);
+		return 1;
+	case Qalarmdir:
+		/* Gen the contents of the alarm dirs */
+		s += Qctl;	/* first time through, start on Qctl */
+		switch (s) {
 		case Qctl:
-			devdir(c, c->qid, "ctl", 0, eve.name, 0666, dp);
+			mkqid(&q, QID(QID2A(c->qid), Qctl), 0, QTFILE);
+			devdir(c, q, "ctl", 0, eve.name, 0666, dp);
 			return 1;
 		case Qtimer:
-			devdir(c, c->qid, "timer", 0, eve.name, 0666, dp);
+			mkqid(&q, QID(QID2A(c->qid), Qtimer), 0, QTFILE);
+			devdir(c, q, "timer", 0, eve.name, 0666, dp);
 			return 1;
 		case Qperiod:
-			devdir(c, c->qid, "period", 0, eve.name, 0666, dp);
+			mkqid(&q, QID(QID2A(c->qid), Qperiod), 0, QTFILE);
+			devdir(c, q, "period", 0, eve.name, 0666, dp);
 			return 1;
 		case Qcount:
-			devdir(c, c->qid, "count", 0, eve.name, 0666, dp);
+			mkqid(&q, QID(QID2A(c->qid), Qcount), 0, QTFILE);
+			devdir(c, q, "count", 0, eve.name, 0666, dp);
 			return 1;
+		}
+		return -1;
+		/* Need to also provide a direct hit for Qclone and all other
+		 * files (at all levels of the hierarchy).  Every file is both
+		 * generated (via the s increments in their respective
+		 * directories) and directly gen-able.  devstat() will call gen
+		 * with a specific path in the qid.  In these cases, we make a
+		 * dir for whatever they are asking for.  Note the qid stays the
+		 * same.  I think this is what the old plan9 comments above
+		 * devgen were talking about for (ii).
+		 *
+		 * We don't need to do this for the directories - devstat will
+		 * look for the a directory by path and fail.  Then it will
+		 * manually build the stat output (check the -1 case in
+		 * devstat). */
+	case Qclone:
+		devdir(c, c->qid, "clone", 0, eve.name, 0666, dp);
+		return 1;
+	case Qctl:
+		devdir(c, c->qid, "ctl", 0, eve.name, 0666, dp);
+		return 1;
+	case Qtimer:
+		devdir(c, c->qid, "timer", 0, eve.name, 0666, dp);
+		return 1;
+	case Qperiod:
+		devdir(c, c->qid, "period", 0, eve.name, 0666, dp);
+		return 1;
+	case Qcount:
+		devdir(c, c->qid, "count", 0, eve.name, 0666, dp);
+		return 1;
 	}
 	return -1;
 }
@@ -263,12 +269,13 @@ static void alarminit(void)
 static struct chan *alarmattach(char *spec)
 {
 	struct chan *c = devattach(devname(), spec);
+
 	mkqid(&c->qid, Qtopdir, 0, QTDIR);
 	return c;
 }
 
 static struct walkqid *alarmwalk(struct chan *c, struct chan *nc, char **name,
-								 unsigned int nname)
+				 unsigned int nname)
 {
 	return devwalk(c, nc, name, nname, 0, 0, alarmgen);
 }
@@ -285,57 +292,60 @@ static struct chan *alarmopen(struct chan *c, int omode)
 	struct proc *p = current;
 	struct proc_alarm *a, *a_i;
 	switch (TYPE(c->qid)) {
-		case Qtopdir:
-		case Qalarmdir:
-			if (omode & O_REMCLO)
-				error(EPERM, ERROR_FIXME);
-			if (omode & O_WRITE)
-				error(EISDIR, ERROR_FIXME);
-			break;
-		case Qclone:
-			a = kzmalloc(sizeof(struct proc_alarm), MEM_WAIT);
-			kref_init(&a->kref, alarm_release, 1);
-			SLIST_INIT(&a->fd_taps);
-			cv_init(&a->cv);
-			qlock_init(&a->qlock);
-			init_awaiter(&a->a_waiter, proc_alarm_handler);
-			spin_lock(&p->alarmset.lock);
-			a->id = p->alarmset.id_counter++;
-			proc_incref(p, 1);
-			a->proc = p;
-			TAILQ_INSERT_TAIL(&p->alarmset.list, a, link);
-			spin_unlock(&p->alarmset.lock);
-			mkqid(&c->qid, QID(a, Qctl), 0, QTFILE);
-			break;
-		case Qctl:
-		case Qtimer:
-		case Qperiod:
-		case Qcount:
-			/* the purpose of opening is to hold a kref on the proc_alarm */
-			a = QID2A(c->qid);
-			assert(a);
-			/* this isn't a valid pointer yet, since our chan doesn't have a
-			 * ref.  since the time that walk gave our chan the qid, the chan
-			 * could have been closed, and the alarm decref'd and freed.  the
-			 * qid is essentially an uncounted reference, and we need to go to
-			 * the source to attempt to get a real ref.  Unfortunately, this is
-			 * another scan of the list, same as devsrv. */
-			spin_lock(&p->alarmset.lock);
-			TAILQ_FOREACH(a_i, &p->alarmset.list, link) {
-				if (a_i == a) {
-					assert(a->proc == current);
-					/* it's still possible we're not getting the ref, racing
-					 * with the release method */
-					if (!kref_get_not_zero(&a->kref, 1)) {
-						a_i = 0;	/* lost the race, will error out later */
-					}
-					break;
+	case Qtopdir:
+	case Qalarmdir:
+		if (omode & O_REMCLO)
+			error(EPERM, ERROR_FIXME);
+		if (omode & O_WRITE)
+			error(EISDIR, ERROR_FIXME);
+		break;
+	case Qclone:
+		a = kzmalloc(sizeof(struct proc_alarm), MEM_WAIT);
+		kref_init(&a->kref, alarm_release, 1);
+		SLIST_INIT(&a->fd_taps);
+		cv_init(&a->cv);
+		qlock_init(&a->qlock);
+		init_awaiter(&a->a_waiter, proc_alarm_handler);
+		spin_lock(&p->alarmset.lock);
+		a->id = p->alarmset.id_counter++;
+		proc_incref(p, 1);
+		a->proc = p;
+		TAILQ_INSERT_TAIL(&p->alarmset.list, a, link);
+		spin_unlock(&p->alarmset.lock);
+		mkqid(&c->qid, QID(a, Qctl), 0, QTFILE);
+		break;
+	case Qctl:
+	case Qtimer:
+	case Qperiod:
+	case Qcount:
+		/* the purpose of opening is to hold a kref on the proc_alarm */
+		a = QID2A(c->qid);
+		assert(a);
+		/* this isn't a valid pointer yet, since our chan doesn't have a
+		 * ref.  since the time that walk gave our chan the qid, the
+		 * chan could have been closed, and the alarm decref'd and
+		 * freed.  the qid is essentially an uncounted reference, and we
+		 * need to go to the source to attempt to get a real ref.
+		 * Unfortunately, this is another scan of the list, same as
+		 * devsrv. */
+		spin_lock(&p->alarmset.lock);
+		TAILQ_FOREACH(a_i, &p->alarmset.list, link) {
+			if (a_i == a) {
+				assert(a->proc == current);
+				/* it's still possible we're not getting the
+				 * ref, racing with the release method */
+				if (!kref_get_not_zero(&a->kref, 1)) {
+					/* lost the race; error out later */
+					a_i = 0;
 				}
+				break;
 			}
-			spin_unlock(&p->alarmset.lock);
-			if (!a_i)
-				error(EFAIL, "Unable to open alarm, concurrent closing");
-			break;
+		}
+		spin_unlock(&p->alarmset.lock);
+		if (!a_i)
+			error(EFAIL,
+			      "Unable to open alarm, concurrent closing");
+		break;
 	}
 	c->mode = openmode(omode);
 	/* Assumes c is unique (can't be closed concurrently */
@@ -346,18 +356,18 @@ static struct chan *alarmopen(struct chan *c, int omode)
 
 static void alarmclose(struct chan *c)
 {
-	/* There are more closes than opens.  For instance, sysstat doesn't open,
-	 * but it will close the chan it got from namec.  We only want to clean
-	 * up/decref chans that were actually open. */
+	/* There are more closes than opens.  For instance, sysstat doesn't
+	 * open, but it will close the chan it got from namec.  We only want to
+	 * clean up/decref chans that were actually open. */
 	if (!(c->flag & COPEN))
 		return;
 	switch (TYPE(c->qid)) {
-		case Qctl:
-		case Qtimer:
-		case Qperiod:
-		case Qcount:
-			kref_put(&QID2A(c->qid)->kref);
-			break;
+	case Qctl:
+	case Qtimer:
+	case Qperiod:
+	case Qcount:
+		kref_put(&QID2A(c->qid)->kref);
+		break;
 	}
 }
 
@@ -401,24 +411,24 @@ static size_t alarmread(struct chan *c, void *ubuf, size_t n, off64_t offset)
 	struct proc_alarm *p_alarm;
 
 	switch (TYPE(c->qid)) {
-		case Qtopdir:
-		case Qalarmdir:
-			return devdirread(c, ubuf, n, 0, 0, alarmgen);
-		case Qctl:
-			p_alarm = QID2A(c->qid);
-			/* simple reads from p_alarm shouldn't need a lock */
-			return readnum(offset, ubuf, n, p_alarm->id, NUMSIZE32);
-		case Qtimer:
-			p_alarm = QID2A(c->qid);
-			return readnum(offset, ubuf, n, p_alarm->a_waiter.wake_up_time,
-						   NUMSIZE64);
-		case Qperiod:
-			p_alarm = QID2A(c->qid);
-			return readnum(offset, ubuf, n, p_alarm->period, NUMSIZE64);
-		case Qcount:
-			return read_qcount(c, ubuf, n);	/* ignore offset */
-		default:
-			panic("Bad QID %p in devalarm", c->qid.path);
+	case Qtopdir:
+	case Qalarmdir:
+		return devdirread(c, ubuf, n, 0, 0, alarmgen);
+	case Qctl:
+		p_alarm = QID2A(c->qid);
+		/* simple reads from p_alarm shouldn't need a lock */
+		return readnum(offset, ubuf, n, p_alarm->id, NUMSIZE32);
+	case Qtimer:
+		p_alarm = QID2A(c->qid);
+		return readnum(offset, ubuf, n, p_alarm->a_waiter.wake_up_time,
+					   NUMSIZE64);
+	case Qperiod:
+		p_alarm = QID2A(c->qid);
+		return readnum(offset, ubuf, n, p_alarm->period, NUMSIZE64);
+	case Qcount:
+		return read_qcount(c, ubuf, n);	/* ignore offset */
+	default:
+		panic("Bad QID %p in devalarm", c->qid.path);
 	}
 	return 0;
 }
@@ -426,18 +436,19 @@ static size_t alarmread(struct chan *c, void *ubuf, size_t n, off64_t offset)
 /* Helper, sets the procalarm to hexval (abs TSC ticks).  0 disarms. */
 static void set_proc_alarm(struct proc_alarm *a, uint64_t hexval)
 {
-	/* Due to how we have to maintain 'count', we need to strictly account for
-	 * the firings of the alarm.  Easiest thing is to disarm it, reset
-	 * everything, then rearm it.  Note that if someone is blocked on count = 0,
-	 * they may still be blocked until the next time the alarm fires.
+	/* Due to how we have to maintain 'count', we need to strictly account
+	 * for the firings of the alarm.  Easiest thing is to disarm it, reset
+	 * everything, then rearm it.  Note that if someone is blocked on count
+	 * = 0, they may still be blocked until the next time the alarm fires.
 	 *
-	 * unset waits on the handler, which grabs the cv lock, so we don't grab the
-	 * cv lock.  However, we still need to protect ourselves from multiple
-	 * setters trying to run this at once.  Unset actually can handle being
-	 * called concurrently, but alarm setters can't, nor can it handle the
-	 * unsets and sets getting out of sync.  For instance, two unsets followed
-	 * by two sets would be a bug.  Likewise, setting the awaiter value while it
-	 * is on a tchain is a bug.  The qlock prevents that. */
+	 * unset waits on the handler, which grabs the cv lock, so we don't grab
+	 * the cv lock.  However, we still need to protect ourselves from
+	 * multiple setters trying to run this at once.  Unset actually can
+	 * handle being called concurrently, but alarm setters can't, nor can it
+	 * handle the unsets and sets getting out of sync.  For instance, two
+	 * unsets followed by two sets would be a bug.  Likewise, setting the
+	 * awaiter value while it is on a tchain is a bug.  The qlock prevents
+	 * that. */
 	qlock(&a->qlock);
 	unset_alarm(a->proc->alarmset.tchain, &a->a_waiter);
 	cv_lock(&a->cv);
@@ -459,23 +470,23 @@ static size_t alarmwrite(struct chan *c, void *ubuf, size_t n, off64_t unused)
 	struct proc_alarm *p_alarm;
 
 	switch (TYPE(c->qid)) {
-		case Qtopdir:
-		case Qalarmdir:
-		case Qctl:
-		case Qcount:
-			error(EPERM, ERROR_FIXME);
-		case Qtimer:
-			set_proc_alarm(QID2A(c->qid), strtoul_from_ubuf(ubuf, n, 16));
-			break;
-		case Qperiod:
-			p_alarm = QID2A(c->qid);
-			/* racing with the handler which checks the val repeatedly */
-			cv_lock(&p_alarm->cv);
-			p_alarm->period = strtoul_from_ubuf(ubuf, n, 16);
-			cv_unlock(&p_alarm->cv);
-			break;
-		default:
-			panic("Bad QID %p in devalarm", c->qid.path);
+	case Qtopdir:
+	case Qalarmdir:
+	case Qctl:
+	case Qcount:
+		error(EPERM, ERROR_FIXME);
+	case Qtimer:
+		set_proc_alarm(QID2A(c->qid), strtoul_from_ubuf(ubuf, n, 16));
+		break;
+	case Qperiod:
+		p_alarm = QID2A(c->qid);
+		/* racing with the handler which checks the val repeatedly */
+		cv_lock(&p_alarm->cv);
+		p_alarm->period = strtoul_from_ubuf(ubuf, n, 16);
+		cv_unlock(&p_alarm->cv);
+		break;
+	default:
+		panic("Bad QID %p in devalarm", c->qid.path);
 	}
 	return n;
 }

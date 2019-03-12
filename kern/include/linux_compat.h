@@ -44,12 +44,12 @@ static inline void synchronize_sched(void)
 
 #define atomic_cmpxchg(_addr, _old, _new)                                      \
 ({                                                                             \
-	typeof(_old) _ret;                                                         \
-	if (atomic_cas((_addr), (_old), (_new)))                                   \
-		_ret = _old;                                                           \
-	else                                                                       \
-		_ret = atomic_read(_addr);                                             \
-	_ret;                                                                      \
+	typeof(_old) _ret;                                                     \
+	if (atomic_cas((_addr), (_old), (_new)))                               \
+		_ret = _old;                                                   \
+	else                                                                   \
+		_ret = atomic_read(_addr);                                     \
+	_ret;                                                                  \
 })
 
 #define UINT_MAX UINT64_MAX
@@ -100,6 +100,7 @@ static inline void *__dma_zalloc_coherent(size_t size, dma_addr_t *dma_handle,
                                           gfp_t flags)
 {
 	void *vaddr = __dma_alloc_coherent(size, dma_handle, flags);
+
 	if (vaddr)
 		memset(vaddr, 0, size);
 	return vaddr;
@@ -162,6 +163,7 @@ static inline int __dma_mapping_error(dma_addr_t dma_addr)
 static void *vmalloc(size_t size)
 {
 	void *vaddr = get_cont_pages(LOG2_UP(nr_pages(size)), MEM_WAIT);
+
 	/* zalloc, to be safe */
 	if (vaddr)
 		memset(vaddr, 0, size);
@@ -466,31 +468,31 @@ enum {
 
 /* Sockaddr structs */
 struct sockaddr {
-	uint16_t				sa_family;
-	char					sa_data[14];
+	uint16_t		sa_family;
+	char			sa_data[14];
 };
 
 struct in_addr {
 	uint32_t		s_addr;
 };
 struct sockaddr_in {
-	uint16_t				sin_family;
-	uint16_t				sin_port;
-	struct in_addr			sin_addr;
-	uint8_t					sin_zero[8]; /* padding */
+	uint16_t		sin_family;
+	uint16_t		sin_port;
+	struct in_addr		sin_addr;
+	uint8_t			sin_zero[8]; /* padding */
 };
 
 struct in6_addr {
 	/* this is actually a weird union in glibc */
-	uint8_t					s6_addr[16];
+	uint8_t			s6_addr[16];
 };
 
 struct sockaddr_in6 {
-	uint16_t				sin6_family;
-	uint16_t				sin6_port;
-	uint32_t				sin6_flowinfo;
-	struct in6_addr			sin6_addr;
-	uint32_t				sin6_scope_id;
+	uint16_t		sin6_family;
+	uint16_t		sin6_port;
+	uint32_t		sin6_flowinfo;
+	struct in6_addr		sin6_addr;
+	uint32_t		sin6_scope_id;
 };
 
 /* Common way to go from netdev (ether / netif) to driver-private ctlr */
@@ -522,23 +524,23 @@ typedef unsigned int netdev_features_t;
  * checksum was already done.  There is no flag for saying the device can do
  * it.  For transmits, the stack needs to know in advance if the device can
  * handle the checksum or not. */
-#define NETIF_F_RXHASH				0
-#define NETIF_F_RXCSUM				NETF_RXCSUM
-#define NETIF_F_LRO					NETF_LRO
-#define NETIF_F_GRO					0
-#define NETIF_F_LOOPBACK			0
-#define NETIF_F_TSO					NETF_TSO
-#define NETIF_F_SG					NETF_SG
-#define NETIF_F_IP_CSUM				(NETF_IPCK | NETF_UDPCK | NETF_TCPCK)
-#define NETIF_F_IPV6_CSUM			(NETF_IPCK | NETF_UDPCK | NETF_TCPCK)
-#define NETIF_F_GSO_GRE				0
+#define NETIF_F_RXHASH			0
+#define NETIF_F_RXCSUM			NETF_RXCSUM
+#define NETIF_F_LRO			NETF_LRO
+#define NETIF_F_GRO			0
+#define NETIF_F_LOOPBACK		0
+#define NETIF_F_TSO			NETF_TSO
+#define NETIF_F_SG			NETF_SG
+#define NETIF_F_IP_CSUM			(NETF_IPCK | NETF_UDPCK | NETF_TCPCK)
+#define NETIF_F_IPV6_CSUM		(NETF_IPCK | NETF_UDPCK | NETF_TCPCK)
+#define NETIF_F_GSO_GRE			0
 #define NETIF_F_GSO_UDP_TUNNEL		0
-#define NETIF_F_GSO_IPIP			0
-#define NETIF_F_GSO_SIT				0
-#define NETIF_F_TSO_ECN				0
-#define NETIF_F_TSO6				0
+#define NETIF_F_GSO_IPIP		0
+#define NETIF_F_GSO_SIT			0
+#define NETIF_F_TSO_ECN			0
+#define NETIF_F_TSO6			0
 #define NETIF_F_HW_VLAN_CTAG_TX		0
-#define NETIF_F_HIGHDMA				0
+#define NETIF_F_HIGHDMA			0
 #define NETIF_F_HW_VLAN_CTAG_RX		0
 #define NETIF_F_TSO_MANGLEID		0
 #define NETIF_F_ALL_TSO (NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_TSO_ECN | NETIF_F_TSO_MANGLEID)
@@ -551,11 +553,11 @@ typedef unsigned int netdev_features_t;
 #define netif_msg_ifup(p)		((p)->msg_enable & NETIF_MSG_IFUP)
 #define netif_msg_rx_err(p)		((p)->msg_enable & NETIF_MSG_RX_ERR)
 #define netif_msg_tx_err(p)		((p)->msg_enable & NETIF_MSG_TX_ERR)
-#define netif_msg_tx_queued(p)	((p)->msg_enable & NETIF_MSG_TX_QUEUED)
+#define netif_msg_tx_queued(p)		((p)->msg_enable & NETIF_MSG_TX_QUEUED)
 #define netif_msg_intr(p)		((p)->msg_enable & NETIF_MSG_INTR)
-#define netif_msg_tx_done(p)	((p)->msg_enable & NETIF_MSG_TX_DONE)
-#define netif_msg_rx_status(p)	((p)->msg_enable & NETIF_MSG_RX_STATUS)
-#define netif_msg_pktdata(p)	((p)->msg_enable & NETIF_MSG_PKTDATA)
+#define netif_msg_tx_done(p)		((p)->msg_enable & NETIF_MSG_TX_DONE)
+#define netif_msg_rx_status(p)		((p)->msg_enable & NETIF_MSG_RX_STATUS)
+#define netif_msg_pktdata(p)		((p)->msg_enable & NETIF_MSG_PKTDATA)
 #define netif_msg_hw(p)			((p)->msg_enable & NETIF_MSG_HW)
 #define netif_msg_wol(p)		((p)->msg_enable & NETIF_MSG_WOL)
 
@@ -581,9 +583,9 @@ enum netdev_state_t {
 
 enum netdev_tx {
 	__NETDEV_TX_MIN	 = INT32_MIN,	/* make sure enum is signed */
-	NETDEV_TX_OK	 = 0x00,		/* driver took care of packet */
-	NETDEV_TX_BUSY	 = 0x10,		/* driver tx path was busy*/
-	NETDEV_TX_LOCKED = 0x20,		/* driver tx lock was already taken */
+	NETDEV_TX_OK	 = 0x00,	/* driver took care of packet */
+	NETDEV_TX_BUSY	 = 0x10,	/* driver tx path was busy*/
+	NETDEV_TX_LOCKED = 0x20,	/* driver tx lock was already taken */
 };
 typedef enum netdev_tx netdev_tx_t;
 
@@ -600,10 +602,10 @@ typedef enum netdev_tx netdev_tx_t;
  * devices, and this table is handled by higher level systems.  We don't have
  * those systems, but we probably want the table still for our own parsing. */
 struct pci_device_id {
-	uint32_t vendor, device;		/* Vendor and device ID or PCI_ANY_ID*/
+	uint32_t vendor, device;	/* Vendor and device ID or PCI_ANY_ID*/
 	uint32_t subvendor, subdevice;	/* Subsystem ID's or PCI_ANY_ID */
-	uint32_t class, class_mask;		/* (class,subclass,prog-if) triplet */
-	unsigned long driver_data;		/* Data private to the driver */
+	uint32_t class, class_mask;	/* (class,subclass,prog-if) triplet */
+	unsigned long driver_data;	/* Data private to the driver */
 };
 
 static const struct pci_device_id *
@@ -612,7 +614,8 @@ srch_linux_pci_tbl(const struct pci_device_id *tbl, struct pci_device *needle)
 	const struct pci_device_id *i;
 
 	for (i = tbl; i->vendor; i++) {
-		if ((needle->ven_id == i->vendor) && (needle->dev_id == i->device))
+		if ((needle->ven_id == i->vendor) && (needle->dev_id ==
+						      i->device))
 			break;
 	}
 	if (i->vendor)
@@ -710,8 +713,8 @@ static inline void *pci_resource_end(struct pci_device *dev, int bir)
 }
 
 #define IORESOURCE_TYPE_BITS    0x00001f00  /* Resource type */
-#define IORESOURCE_IO       0x00000100  /* PCI/ISA I/O ports */
-#define IORESOURCE_MEM      0x00000200
+#define IORESOURCE_IO           0x00000100  /* PCI/ISA I/O ports */
+#define IORESOURCE_MEM          0x00000200
 
 static inline int pci_resource_flags(struct pci_device *pdev, int bir)
 {
@@ -859,7 +862,7 @@ struct firmware {
 
 static inline int request_firmware(const struct firmware **fwp,
                                    const char *file_name,
-								   struct device *ignored)
+				   struct device *ignored)
 {
 	struct firmware *ret_fw;
 	struct file_or_chan *fw_file;

@@ -333,7 +333,8 @@ static void initialize(void)
 	if (size > allocationListSize) {
 		slot[1].internalAddress = slot[1].userAddress =
 		    ((char *)slot[0].internalAddress) + slot[0].internalSize;
-		slot[1].internalSize = slot[1].userSize = size - slot[0].internalSize;
+		slot[1].internalSize = slot[1].userSize
+			= size - slot[0].internalSize;
 		slot[1].mode = FREE;
 	}
 
@@ -476,9 +477,11 @@ extern C_LINKAGE void *memalign(size_t alignment, size_t userSize)
 
 	for (slot = allocationList, count = slotCount; count > 0; count--) {
 		if (slot->mode == FREE && slot->internalSize >= internalSize) {
-			if (!fullSlot || slot->internalSize < fullSlot->internalSize) {
+			if (!fullSlot || slot->internalSize <
+			    fullSlot->internalSize) {
 				fullSlot = slot;
-				if (slot->internalSize == internalSize && emptySlots[0])
+				if (slot->internalSize == internalSize &&
+				    emptySlots[0])
 					break; /* All done, */
 			}
 		} else if (slot->mode == NOT_IN_USE) {
@@ -486,7 +489,8 @@ extern C_LINKAGE void *memalign(size_t alignment, size_t userSize)
 				emptySlots[0] = slot;
 			else if (!emptySlots[1])
 				emptySlots[1] = slot;
-			else if (fullSlot && fullSlot->internalSize == internalSize)
+			else if (fullSlot && fullSlot->internalSize ==
+				 internalSize)
 				break; /* All done. */
 		}
 		slot++;
@@ -537,7 +541,8 @@ extern C_LINKAGE void *memalign(size_t alignment, size_t userSize)
 	 * a free buffer containing the surplus memory.
 	 */
 	if (fullSlot->internalSize > internalSize) {
-		emptySlots[0]->internalSize = fullSlot->internalSize - internalSize;
+		emptySlots[0]->internalSize =
+			fullSlot->internalSize - internalSize;
 		emptySlots[0]->internalAddress =
 		    ((char *)fullSlot->internalAddress) + internalSize;
 		emptySlots[0]->mode = FREE;
@@ -641,7 +646,8 @@ static Slot *slotForInternalAddressPreviousTo(void *address)
 	register size_t count = slotCount;
 
 	for (; count > 0; count--) {
-		if (((char *)slot->internalAddress) + slot->internalSize == address)
+		if (((char *)slot->internalAddress) + slot->internalSize ==
+		    address)
 			return slot;
 		slot++;
 	}
@@ -705,7 +711,8 @@ extern C_LINKAGE void free(void *address)
 		slot = previousSlot;
 		unUsedSlots++;
 	}
-	if (nextSlot && (nextSlot->mode == FREE || nextSlot->mode == PROTECTED)) {
+	if (nextSlot && (nextSlot->mode == FREE || nextSlot->mode == PROTECTED))
+	{
 		/* Coalesce next slot with this one. */
 		slot->internalSize += nextSlot->internalSize;
 		nextSlot->internalAddress = nextSlot->userAddress = 0;
@@ -748,8 +755,8 @@ extern C_LINKAGE void *realloc(void *oldBuffer, size_t newSize)
 		slot = slotForUserAddress(oldBuffer);
 
 		if (slot == 0)
-			EF_Abort("realloc(%a, %d): address not from malloc().", oldBuffer,
-			         newSize);
+			EF_Abort("realloc(%a, %d): address not from malloc().",
+				 oldBuffer, newSize);
 
 		if (newSize < (size = slot->userSize))
 			size = newSize;

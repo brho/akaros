@@ -32,7 +32,7 @@ static inline void core_set_clearcpu(struct core_set *cset, unsigned int cpuno)
 }
 
 static inline bool core_set_getcpu(const struct core_set *cset,
-								  unsigned int cpuno)
+				   unsigned int cpuno)
 {
 	return test_bit(cpuno, cset->cpus);
 }

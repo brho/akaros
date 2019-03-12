@@ -120,8 +120,8 @@ weak_alias(__cpu_relax_vc, cpu_relax_vc)
 
 void __uthread_sched_yield(void)
 {
-	/* In the off-chance we're called before parlib is available, we'll do the
-	 * single-threaded, SCP yield. */
+	/* In the off-chance we're called before parlib is available, we'll do
+	 * the single-threaded, SCP yield. */
 	ros_syscall(SYS_proc_yield, TRUE, 0, 0, 0, 0, 0);
 }
 weak_alias(__uthread_sched_yield, uthread_sched_yield)

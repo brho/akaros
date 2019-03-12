@@ -43,9 +43,9 @@ void deregister_evq(struct syscall *sysc);
 typedef void (*handle_event_t)(struct event_msg *ev_msg, unsigned int ev_type,
                                void *data);
 struct ev_handler {
-	struct ev_handler			*next;
-	handle_event_t				func;
-	void						*data;
+	struct ev_handler		*next;
+	handle_event_t			func;
+	void				*data;
 };
 extern struct ev_handler *ev_handlers[];
 int register_ev_handler(unsigned int ev_type, handle_event_t handler,

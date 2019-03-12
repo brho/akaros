@@ -32,26 +32,26 @@
 /* The main UCQ structure, contains indexes and start points (for the indexes),
  * etc. */
 struct ucq {
-	atomic_t					prod_idx;		/* both pg and slot nr */
-	atomic_t					spare_pg;		/* mmaped, unused page */
-	atomic_t					nr_extra_pgs;	/* nr pages mmaped */
-	atomic_t					cons_idx;		/* cons pg and slot nr */
-	bool						prod_overflow;	/* flag to prevent wraparound */
-	bool						ucq_ready;		/* ucq is ready to be used */
+	atomic_t			prod_idx;     /* both pg and slot nr */
+	atomic_t			spare_pg;     /* mmaped, unused page */
+	atomic_t			nr_extra_pgs; /* nr pages mmaped */
+	atomic_t			cons_idx;     /* cons pg and slot nr */
+	bool				prod_overflow;/* prevent wraparound */
+	bool				ucq_ready;
 	/* Userspace lock for modifying the UCQ */
-	uint32_t					u_lock[2];
+	uint32_t			u_lock[2];
 };
 
 /* Struct at the beginning of every page/buffer, tracking consumers and
  * pointing to the next one, so that the consumer can follow. */
 struct ucq_page_header {
-	uintptr_t					cons_next_pg;	/* next page to consume */
-	atomic_t 					nr_cons;		/* like an inverted refcnt */
+	uintptr_t			cons_next_pg; /* next page to consume */
+	atomic_t 			nr_cons; /* like an inverted refcnt */
 };
 
 struct msg_container {
-	struct event_msg			ev_msg;
-	bool						ready;			/* kernel has written */
+	struct event_msg		ev_msg;
+	bool				ready;
 };
 
 struct ucq_page {
@@ -59,7 +59,7 @@ struct ucq_page {
 	struct msg_container		msgs[];
 };
 
-#define UCQ_WARN_THRESH			1000			/* nr pages befor warning */
+#define UCQ_WARN_THRESH		1000		/* nr pages befor warning */
 
 #define NR_MSG_PER_PAGE ((PGSIZE - ROUNDUP(sizeof(struct ucq_page_header),     \
                                            __alignof__(struct msg_container))) \
@@ -70,6 +70,7 @@ static bool slot_is_good(uintptr_t slot)
 {
 	uintptr_t counter = PGOFF(slot);
 	uintptr_t pg_addr = PTE_ADDR(slot);
+
 	return ((counter < NR_MSG_PER_PAGE) && pg_addr) ? TRUE : FALSE;
 }
 

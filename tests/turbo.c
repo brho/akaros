@@ -35,14 +35,14 @@ static struct argp_option options[] = {
 	{ 0 }
 };
 
-#define PROG_CMD_ENABLE			1
-#define PROG_CMD_DISABLE		2
-#define PROG_CMD_STATUS			3
+#define PROG_CMD_ENABLE		1
+#define PROG_CMD_DISABLE	2
+#define PROG_CMD_STATUS		3
 #define PROG_CMD_PRINT_RATIO	4
-#define PROG_CMD_ZERO_RATIO		5
+#define PROG_CMD_ZERO_RATIO	5
 
 struct prog_opts {
-	int							cmd;
+	int			cmd;
 };
 
 static int num_cores;
@@ -54,35 +54,35 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 	switch (key) {
 	case 'e':
 		if (p_opts->cmd) {
-			fprintf(stderr, "Too many commands; just one allowed.\n\n");
+			fprintf(stderr, "Too many commands; one allowed.\n\n");
 			argp_usage(state);
 		}
 		p_opts->cmd = PROG_CMD_ENABLE;
 		break;
 	case 'd':
 		if (p_opts->cmd) {
-			fprintf(stderr, "Too many commands; just one allowed.\n\n");
+			fprintf(stderr, "Too many commands; one allowed.\n\n");
 			argp_usage(state);
 		}
 		p_opts->cmd = PROG_CMD_DISABLE;
 		break;
 	case 's':
 		if (p_opts->cmd) {
-			fprintf(stderr, "Too many commands; just one allowed.\n\n");
+			fprintf(stderr, "Too many commands; one allowed.\n\n");
 			argp_usage(state);
 		}
 		p_opts->cmd = PROG_CMD_STATUS;
 		break;
 	case 'r':
 		if (p_opts->cmd) {
-			fprintf(stderr, "Too many commands; just one allowed.\n\n");
+			fprintf(stderr, "Too many commands; one allowed.\n\n");
 			argp_usage(state);
 		}
 		p_opts->cmd = PROG_CMD_PRINT_RATIO;
 		break;
 	case 'z':
 		if (p_opts->cmd) {
-			fprintf(stderr, "Too many commands; just one allowed.\n\n");
+			fprintf(stderr, "Too many commands; one allowed.\n\n");
 			argp_usage(state);
 		}
 		p_opts->cmd = PROG_CMD_ZERO_RATIO;
@@ -136,8 +136,8 @@ static int set_turbo_mode(bool enable)
 		perror("pread MSR_PERF_CTL");
 		exit(-1);
 	}
-	/* The assumption here is that all cores have the same MSR value.  Changing
-	 * this would require changing the wrmsr kernel interface. */
+	/* The assumption here is that all cores have the same MSR value.
+	 * Changing this would require changing the wrmsr kernel interface. */
 	msr_val = buf[0];
 	if (enable)
 		msr_val &= ~(1ULL << 32);
@@ -148,7 +148,8 @@ static int set_turbo_mode(bool enable)
 		perror("pwrite MSR_PERF_CTL");
 		exit(-1);
 	}
-	printf("%s turbo mode for all cores\n", enable ? "Enabled" : "Disabled");
+	printf("%s turbo mode for all cores\n",
+	       enable ? "Enabled" : "Disabled");
 	free(buf);
 	close(fd);
 	return 0;
@@ -172,8 +173,8 @@ static int print_turbo_status(void)
 		perror("pread MSR_PERF_CTL");
 		exit(-1);
 	}
-	/* The assumption here is that all cores have the same MSR value.  Changing
-	 * this would require changing the wrmsr kernel interface. */
+	/* The assumption here is that all cores have the same MSR value.
+	 * Changing this would require changing the wrmsr kernel interface. */
 	msr_val = buf[0];
 	printf("Turbo mode is %s for all cores\n", msr_val & (1ULL << 32) ?
 	                                           "disabled" : "enabled");
@@ -207,7 +208,8 @@ static int print_turbo_ratio(void)
 	mperf_buf = malloc(buf_sz);
 	aperf_buf = malloc(buf_sz);
 	assert(mperf_buf && aperf_buf);
-	/* ideally these reads happen with no interference/interrupts in between */
+	/* ideally these reads happen with no interference/interrupts in between
+	 */
 	ret = pread(fd, mperf_buf, buf_sz, MSR_IA32_MPERF);
 	if (ret < 0) {
 		perror("pread MSR_MPERF");
@@ -219,7 +221,8 @@ static int print_turbo_ratio(void)
 		exit(-1);
 	}
 	for (int i = 0; i < num_cores; i++)
-		printf("Core %3d: %4f%\n", i, 100.0 * aperf_buf[i] / mperf_buf[i]);
+		printf("Core %3d: %4f%\n", i,
+		       100.0 * aperf_buf[i] / mperf_buf[i]);
 	free(mperf_buf);
 	free(aperf_buf);
 	close(fd);
@@ -269,7 +272,7 @@ int main(int argc, char **argv)
 	case PROG_CMD_ZERO_RATIO:
 		return zero_turbo_ratio();
 	default:
-		fprintf(stderr, "Unhandled options (argp should catch this)!\n");
+		fprintf(stderr, "Unhandled cmd (argp should catch this)!\n");
 		return -1;
 	};
 }

@@ -105,8 +105,7 @@ enum {
 	Qurandom
 };
 
-static
-struct dirtab randomdir[] = {
+static struct dirtab randomdir[] = {
 	{".", {Qdir, 0, QTDIR}, 0, DMDIR | 0500},
 	{"random", {Qrandom}, 0, 0444},
 	{"urandom", {Qurandom}, 0, 0444},
@@ -150,7 +149,8 @@ static size_t randomstat(struct chan *c, uint8_t *dp, size_t n)
 		devdir(c, tab->qid, tab->name, 0, eve.name, perm, &dir);
 		return dev_make_stat(c, &dir, dp, n);
 	default:
-		return devstat(c, dp, n, randomdir, ARRAY_SIZE(randomdir), devgen);
+		return devstat(c, dp, n, randomdir, ARRAY_SIZE(randomdir),
+			       devgen);
 	}
 }
 
@@ -169,15 +169,15 @@ static void randomclose(struct chan *c)
 static size_t randomread(struct chan *c, void *va, size_t n, off64_t ignored)
 {
 	switch (c->qid.path) {
-		case Qdir:
-			return devdirread(c, va, n, randomdir,
-					  ARRAY_SIZE(randomdir), devgen);
-		case Qrandom:
-			return random_read(va, n);
-		case Qurandom:
-			return urandom_read(va, n);
-		default:
-			panic("randomread: qid %d is impossible", c->qid.path);
+	case Qdir:
+		return devdirread(c, va, n, randomdir,
+				  ARRAY_SIZE(randomdir), devgen);
+	case Qrandom:
+		return random_read(va, n);
+	case Qurandom:
+		return urandom_read(va, n);
+	default:
+		panic("randomread: qid %d is impossible", c->qid.path);
 	}
 	return -1;	/* not reached */
 }

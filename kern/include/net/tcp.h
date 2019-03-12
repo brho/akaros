@@ -51,7 +51,7 @@ enum {
 	TcptimerDONE = 2,
 	MAX_TIME = (1 << 20),	/* Forever */
 	TCP_ACK = 50,	/* Timed ack sequence in ms */
-	MAXBACKMS = 9 * 60 * 1000,	/* longest backoff time (ms) before hangup */
+	MAXBACKMS = 9 * 60 * 1000, /* longest backoff time (ms) before hangup */
 
 	URG = 0x20,	/* Data marked urgent */
 	ACK = 0x10,	/* Acknowledge is valid */
@@ -66,10 +66,10 @@ enum {
 	MSS_LENGTH = 4,	/* max segment size header option length */
 	WSOPT = 3,
 	WS_LENGTH = 3,	/* WS header option length */
-	MAX_WS_VALUE = 14,	/* RFC specified.  Limits available window to 2^30 */
+	MAX_WS_VALUE = 14, /* RFC specified.  Limits available window to 2^30 */
 	TS_OPT = 8,
 	TS_LENGTH = 10,
-	TS_SEND_PREPAD = 2,	/* For non-SYNs, pre-pad 2 nops for 32 byte alignment */
+	TS_SEND_PREPAD = 2, /* For non-SYNs, pre-pad 2 nops for 32 byte align */
 	SACK_OK_OPT = 4,
 	SACK_OK_LENGTH = 2,
 	SACK_OPT = 5,
@@ -113,7 +113,7 @@ enum {
 	Last_ack,
 	Time_wait,
 
-	Maxlimbo = 1000,	/* maximum procs waiting for response to SYN ACK */
+	Maxlimbo = 1000,/* maximum procs waiting for response to SYN ACK */
 	NLHT = 256,	/* hash table size, must be a power of 2 */
 	LHTMASK = NLHT - 1,
 
@@ -154,11 +154,11 @@ struct tcphdr {
  */
 typedef struct tcp4hdr Tcp4hdr;
 struct tcp4hdr {
-	uint8_t vihl;				/* Version and header length */
-	uint8_t tos;				/* Type of service */
-	uint8_t length[2];			/* packet length */
-	uint8_t id[2];				/* Identification */
-	uint8_t frag[2];			/* Fragment information */
+	uint8_t vihl;			/* Version and header length */
+	uint8_t tos;			/* Type of service */
+	uint8_t length[2];		/* packet length */
+	uint8_t id[2];			/* Identification */
+	uint8_t frag[2];		/* Fragment information */
 	uint8_t Unused;
 	uint8_t proto;
 	uint8_t tcplen[2];
@@ -196,14 +196,14 @@ struct tcp {
 	uint32_t seq;
 	uint32_t ack;
 	uint8_t flags;
-	uint16_t ws;				/* window scale option (if not zero) */
+	uint16_t ws;		/* window scale option (if not zero) */
 	uint32_t wnd;
 	uint16_t urg;
-	uint16_t mss;				/* max segment size option (if not zero) */
-	uint16_t len;				/* size of data */
-	uint32_t ts_val;			/* timestamp val from sender */
-	uint32_t ts_ecr;			/* timestamp echo response from sender */
-	bool sack_ok;				/* header had/should have SACK_PERMITTED */
+	uint16_t mss;		/* max segment size option (if not zero) */
+	uint16_t len;		/* size of data */
+	uint32_t ts_val;	/* timestamp val from sender */
+	uint32_t ts_ecr;	/* timestamp echo response from sender */
+	bool sack_ok;		/* header had/should have SACK_PERMITTED */
 	uint8_t nr_sacks;
 	struct sack_block sacks[MAX_NR_SACKS_PER_PACKET];
 };
@@ -225,71 +225,71 @@ struct reseq {
  */
 typedef struct tcpctl Tcpctl;
 struct tcpctl {
-	uint8_t state;				/* Connection state */
-	uint8_t type;				/* Listening or active connection */
-	uint8_t code;				/* Icmp code */
+	uint8_t state;		/* Connection state */
+	uint8_t type;		/* Listening or active connection */
+	uint8_t code;		/* Icmp code */
 	struct {
-		uint32_t una;			/* Left edge of unacked data region */
-		uint32_t nxt;			/* Next seq to send, right edge of unacked */
-		uint32_t rtx;			/* Next to send for retrans */
-		uint32_t wnd;			/* Tcp send window */
-		uint32_t urg;			/* Urgent data pointer */
+		uint32_t una;	/* Left edge of unacked data region */
+		uint32_t nxt;	/* Next seq to send, right edge of unacked */
+		uint32_t rtx;	/* Next to send for retrans */
+		uint32_t wnd;	/* Tcp send window */
+		uint32_t urg;	/* Urgent data pointer */
 		uint32_t wl2;
-		int scale;				/* how much to right shift window for xmit */
-		uint32_t in_flight;		/* estimate of how much is in flight */
-		uint8_t loss_hint;		/* number of loss hints rcvd */
+		int scale;	/* how much to right shift window for xmit */
+		uint32_t in_flight;	/* estimate of how much is in flight */
+		uint8_t loss_hint;	/* number of loss hints rcvd */
 		uint8_t sack_loss_hint;	/* For detecting sack rxmit losses */
-		bool flush_sacks;		/* Two timeouts in a row == dump sacks */
-		uint8_t recovery;		/* loss recovery flag */
+		bool flush_sacks;	/* Two timeouts in a row == dump sacks */
+		uint8_t recovery;	/* loss recovery flag */
 		uint32_t recovery_pt;	/* right window for recovery point */
 		uint8_t nr_sacks;
 		struct sack_block sacks[MAX_NR_SND_SACKS];
 	} snd;
 	struct {
-		uint32_t nxt;			/* Receive pointer to next uint8_t slot */
-		uint32_t wnd;			/* Receive window incoming */
-		uint32_t urg;			/* Urgent pointer */
+		uint32_t nxt;	/* Receive pointer to next uint8_t slot */
+		uint32_t wnd;	/* Receive window incoming */
+		uint32_t urg;	/* Urgent pointer */
 		int blocked;
-		int una;				/* unacked data segs */
-		int scale;				/* how much to left shift window for rx */
+		int una;	/* unacked data segs */
+		int scale;	/* how much to left shift window for rx */
 		uint8_t nr_sacks;
 		struct sack_block sacks[MAX_NR_RCV_SACKS];
 	} rcv;
-	uint32_t iss;				/* Initial sequence number */
-	int sawwsopt;				/* true if we saw a wsopt on the incoming SYN */
-	uint32_t cwind;				/* Congestion window */
-	int scale;					/* desired snd.scale */
-	uint32_t ssthresh;			/* Slow start threshold */
-	int irs;					/* Initial received squence */
-	uint16_t mss;				/* Max segment size */
-	uint16_t typical_mss;		/* MSS for most packets (< MSS for some opts) */
-	int rerecv;					/* Overlap of data rerecevived */
-	uint32_t window;			/* Recevive window */
-	uint8_t backoff;			/* Exponential backoff counter */
-	int backedoff;				/* ms we've backed off for rexmits */
-	uint8_t flags;				/* State flags */
-	Reseq *reseq;				/* Resequencing queue */
-	Tcptimer timer;				/* Activity timer */
-	Tcptimer acktimer;			/* Acknowledge timer */
-	Tcptimer rtt_timer;			/* Round trip timer */
-	Tcptimer katimer;			/* keep alive timer */
-	uint32_t rttseq;			/* Round trip sequence */
-	int srtt;					/* Shortened round trip */
-	int mdev;					/* Mean deviation of round trip */
-	int kacounter;				/* count down for keep alive */
-	uint64_t sndsyntime;		/* time syn sent */
-	uint64_t time;				/* time Finwait2 was sent */
-	int nochecksum;				/* non-zero means don't send checksums */
-	int flgcnt;					/* number of flags in the sequence (FIN,SYN) */
-	uint32_t ts_recent;			/* timestamp received around last_ack_sent */
-	uint32_t last_ack_sent;		/* to determine when to update timestamp */
-	bool sack_ok;				/* Can use SACK for this connection */
-	struct Ipifc *ifc;			/* Uncounted ref */
+	uint32_t iss;		/* Initial sequence number */
+	int sawwsopt;		/* true if we saw a wsopt on the incoming SYN */
+	uint32_t cwind;		/* Congestion window */
+	int scale;		/* desired snd.scale */
+	uint32_t ssthresh;	/* Slow start threshold */
+	int irs;		/* Initial received squence */
+	uint16_t mss;		/* Max segment size */
+	uint16_t typical_mss;	/* MSS for most packets (< MSS for some opts) */
+	int rerecv;		/* Overlap of data rerecevived */
+	uint32_t window;	/* Recevive window */
+	uint8_t backoff;	/* Exponential backoff counter */
+	int backedoff;		/* ms we've backed off for rexmits */
+	uint8_t flags;		/* State flags */
+	Reseq *reseq;		/* Resequencing queue */
+	Tcptimer timer;		/* Activity timer */
+	Tcptimer acktimer;	/* Acknowledge timer */
+	Tcptimer rtt_timer;	/* Round trip timer */
+	Tcptimer katimer;	/* keep alive timer */
+	uint32_t rttseq;	/* Round trip sequence */
+	int srtt;		/* Shortened round trip */
+	int mdev;		/* Mean deviation of round trip */
+	int kacounter;		/* count down for keep alive */
+	uint64_t sndsyntime;	/* time syn sent */
+	uint64_t time;		/* time Finwait2 was sent */
+	int nochecksum;		/* non-zero means don't send checksums */
+	int flgcnt;		/* number of flags in the sequence (FIN,SYN) */
+	uint32_t ts_recent;	/* timestamp received around last_ack_sent */
+	uint32_t last_ack_sent;	/* to determine when to update timestamp */
+	bool sack_ok;		/* Can use SACK for this connection */
+	struct Ipifc *ifc;	/* Uncounted ref */
 
 	union {
 		Tcp4hdr tcp4hdr;
 		Tcp6hdr tcp6hdr;
-	} protohdr;					/* prototype header */
+	} protohdr;		/* prototype header */
 };
 
 /* New calls are put in limbo rather than having a conversation structure
@@ -312,17 +312,17 @@ struct limbo {
 	uint8_t raddr[IPaddrlen];
 	uint16_t lport;
 	uint16_t rport;
-	uint32_t irs;				/* initial received sequence */
-	uint32_t iss;				/* initial sent sequence */
-	uint16_t mss;				/* mss from the other end */
-	uint16_t rcvscale;			/* how much to scale rcvd windows */
-	uint16_t sndscale;			/* how much to scale sent windows */
-	uint64_t lastsend;			/* last time we sent a synack */
-	uint8_t version;			/* v4 or v6 */
-	uint8_t rexmits;			/* number of retransmissions */
-	bool sack_ok;				/* other side said SACK_OK */
-	uint32_t ts_val;			/* timestamp val from sender */
-	struct Ipifc *ifc;			/* Uncounted ref */
+	uint32_t irs;			/* initial received sequence */
+	uint32_t iss;			/* initial sent sequence */
+	uint16_t mss;			/* mss from the other end */
+	uint16_t rcvscale;		/* how much to scale rcvd windows */
+	uint16_t sndscale;		/* how much to scale sent windows */
+	uint64_t lastsend;		/* last time we sent a synack */
+	uint8_t version;		/* v4 or v6 */
+	uint8_t rexmits;		/* number of retransmissions */
+	bool sack_ok;			/* other side said SACK_OK */
+	uint32_t ts_val;		/* timestamp val from sender */
+	struct Ipifc *ifc;		/* Uncounted ref */
 };
 
 enum {

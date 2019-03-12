@@ -38,19 +38,19 @@ int __getsockname(int fd, __SOCKADDR_ARG addr, socklen_t * __restrict alen)
 	}
 
 	switch (r->domain) {
-		case PF_INET:
-			lip = addr.__sockaddr_in__;
-			_sock_ingetaddr(r, lip, alen, "local");
-			break;
-		case PF_UNIX:
-			lunix = (struct sockaddr_un *)&r->addr;
-			i = &lunix->sun_path[strlen(lunix->sun_path)] - (char *)lunix;
-			memmove(addr.__sockaddr_un__, lunix, i);
-			*alen = i;
-			break;
-		default:
-			errno = EAFNOSUPPORT;
-			return -1;
+	case PF_INET:
+		lip = addr.__sockaddr_in__;
+		_sock_ingetaddr(r, lip, alen, "local");
+		break;
+	case PF_UNIX:
+		lunix = (struct sockaddr_un *)&r->addr;
+		i = &lunix->sun_path[strlen(lunix->sun_path)] - (char *)lunix;
+		memmove(addr.__sockaddr_un__, lunix, i);
+		*alen = i;
+		break;
+	default:
+		errno = EAFNOSUPPORT;
+		return -1;
 	}
 	return 0;
 }

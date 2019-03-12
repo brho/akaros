@@ -58,7 +58,8 @@ uintptr_t get_fixup_ip(uintptr_t xip)
 		const struct extable_ip_fixup *last = __stop___ex_table;
 
 		while (first <= last) {
-			const struct extable_ip_fixup *x = first + ((last - first) >> 1);
+			const struct extable_ip_fixup *x =
+				first + ((last - first) >> 1);
 			uintptr_t insn = ex_insn_addr(x);
 
 			if (insn < xip)

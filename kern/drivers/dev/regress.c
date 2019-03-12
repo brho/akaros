@@ -47,15 +47,14 @@ enum{
 };
 
 struct dirtab regresstab[]={
-	{".",		{Monitordirqid, 0, QTDIR},0,	DMDIR|0550},
+	{".",		{Monitordirqid, 0, QTDIR},	0,	DMDIR|0550},
 	{"mondata",	{Monitordataqid},		0,	0600},
 	{"monctl",	{Monitorctlqid},		0,	0600},
 };
 
 static char *ctlcommands = "ktest";
 
-static struct chan*
-regressattach(char *spec)
+static struct chan *regressattach(char *spec)
 {
 	uint32_t n;
 
@@ -66,8 +65,7 @@ regressattach(char *spec)
 	return devattach(devname(), spec);
 }
 
-static void
-regressinit(void)
+static void regressinit(void)
 {
 }
 
@@ -88,11 +86,10 @@ static size_t regressstat(struct chan *c, uint8_t *db, size_t n)
 	return devstat(c, db, n, regresstab, ARRAY_SIZE(regresstab), devgen);
 }
 
-static struct chan*
-regressopen(struct chan *c, int omode)
+static struct chan *regressopen(struct chan *c, int omode)
 {
-	if(c->qid.type & QTDIR){
-		if(openmode(omode) != O_READ)
+	if (c->qid.type & QTDIR) {
+		if (openmode(omode) != O_READ)
 			error(EPERM, ERROR_FIXME);
 	}
 	c->mode = openmode(omode);
@@ -101,8 +98,7 @@ regressopen(struct chan *c, int omode)
 	return c;
 }
 
-static void
-regressclose(struct chan*unused)
+static void regressclose(struct chan *unused)
 {
 }
 
@@ -116,7 +112,8 @@ static size_t regressread(struct chan *c, void *va, size_t n, off64_t off)
 
 	switch((int)c->qid.path){
 	case Monitordirqid:
-		n = devdirread(c, va, n, regresstab, ARRAY_SIZE(regresstab), devgen);
+		n = devdirread(c, va, n, regresstab, ARRAY_SIZE(regresstab),
+			       devgen);
 		break;
 
 	case Monitorctlqid:
@@ -125,7 +122,8 @@ static size_t regressread(struct chan *c, void *va, size_t n, off64_t off)
 
 	case Monitordataqid:
 		if (regress.monitor) {
-			printd("monitordataqid: regress.monitor %p len %p\n", regress.monitor, qlen(kprof.monitor));
+			printd("monitordataqid: regress.monitor %p len %p\n",
+			       regress.monitor, qlen(kprof.monitor));
 			if (qlen(regress.monitor) > 0)
 				n = qread(regress.monitor, va, n);
 			else
@@ -157,7 +155,8 @@ static size_t regresswrite(struct chan *c, void *a, size_t n, off64_t unused)
 		if(strncmp(a, "ktest", 5) == 0){
 			run_registered_ktest_suites();
 		} else {
-			error(EFAIL, "regresswrite: only commands are %s", ctlcommands);
+			error(EFAIL, "regresswrite: only commands are %s",
+			      ctlcommands);
 		}
 		break;
 

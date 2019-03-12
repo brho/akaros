@@ -72,20 +72,20 @@ static __inline int isxdigit(int c)
 }
 
 struct mntrpc {
-	struct chan *c;				/* Channel for whom we are working */
-	struct mntrpc *list;		/* Free/pending list */
-	struct fcall request;		/* Outgoing file system protocol message */
-	struct fcall reply;			/* Incoming reply */
-	struct mnt *m;				/* Mount device during rpc */
-	struct rendez r;			/* Place to hang out */
-	uint8_t *rpc;				/* I/O Data buffer */
-	unsigned int rpclen;		/* len of buffer */
-	struct block *b;			/* reply blocks */
-	char done;					/* Rpc completed */
-	uint64_t stime;				/* start time for mnt statistics */
-	uint32_t reqlen;			/* request length for mnt statistics */
-	uint32_t replen;			/* reply length for mnt statistics */
-	struct mntrpc *flushed;		/* message this one flushes */
+	struct chan *c;		/* Channel for whom we are working */
+	struct mntrpc *list;	/* Free/pending list */
+	struct fcall request;	/* Outgoing file system protocol message */
+	struct fcall reply;	/* Incoming reply */
+	struct mnt *m;		/* Mount device during rpc */
+	struct rendez r;	/* Place to hang out */
+	uint8_t *rpc;		/* I/O Data buffer */
+	unsigned int rpclen;	/* len of buffer */
+	struct block *b;	/* reply blocks */
+	char done;		/* Rpc completed */
+	uint64_t stime;		/* start time for mnt statistics */
+	uint32_t reqlen;	/* request length for mnt statistics */
+	uint32_t replen;	/* reply length for mnt statistics */
+	struct mntrpc *flushed;	/* message this one flushes */
 };
 
 /* Our TRUNC and remove on close differ from 9ps, so we'll need to translate.
@@ -95,7 +95,7 @@ struct mntrpc {
 
 struct Mntalloc {
 	spinlock_t l;
-	struct mnt *list;			/* Mount devices in use */
+	struct mnt *list;		/* Mount devices in use */
 	struct mnt *mntfree;		/* Free list */
 	struct mntrpc *rpcfree;
 	int nrpcfree;
@@ -148,7 +148,8 @@ long mntversion(struct chan *c, char *version, int msize, int returnlen)
 	uint64_t oo;
 	char buf[128];
 
-	qlock(&c->umqlock);	/* make sure no one else does this until we've established ourselves */
+	/* make sure no one else does this until we've established ourselves */
+	qlock(&c->umqlock);
 	if (waserror()) {
 		qunlock(&c->umqlock);
 		nexterror();
@@ -178,8 +179,9 @@ long mntversion(struct chan *c, char *version, int msize, int returnlen)
 		strlcpy(buf, m->version, sizeof(buf));
 		k = strlen(buf);
 		if (strncmp(buf, v, k) != 0) {
-			snprintf(buf, sizeof buf, "incompatible 9P versions %s %s",
-					 m->version, v);
+			snprintf(buf, sizeof buf,
+				 "incompatible 9P versions %s %s", m->version,
+				 v);
 			error(EFAIL, buf);
 		}
 		if (returnlen > 0) {
@@ -321,7 +323,8 @@ struct chan *mntauth(struct chan *c, char *spec)
 
 	r->request.type = Tauth;
 	r->request.afid = c->fid;
-	/* This assumes we're called from a syscall, which should always be true. */
+	/* This assumes we're called from a syscall, which should always be
+	 * true. */
 	if (!current_kthread->sysc)
 		warn("Kthread %s didn't have a syscall, current is %s",
 		     current_kthread->name, current ? current->progname : NULL);
@@ -385,7 +388,8 @@ static struct chan *mntattach(char *muxattach)
 		r->request.afid = NOFID;
 	else
 		r->request.afid = params->authchan->fid;
-	/* This assumes we're called from a syscall, which should always be true. */
+	/* This assumes we're called from a syscall, which should always be
+	 * true. */
 	if (!current_kthread->sysc)
 		warn("Kthread %s didn't have a syscall, current is %s",
 		     current_kthread->name, current ? current->progname : NULL);
@@ -450,8 +454,9 @@ static struct walkqid *mntwalk(struct chan *c, struct chan *nc, char **name,
 	if (nc == NULL) {
 		nc = devclone(c);
 		/* Until the other side accepts this fid, we can't mntclose it.
-		 * Therefore set type to -1 for now.  inferno was setting this to 0,
-		 * assuming it was devroot.  lining up with chanrelease and newchan */
+		 * Therefore set type to -1 for now.  inferno was setting this
+		 * to 0, assuming it was devroot.  lining up with chanrelease
+		 * and newchan */
 		nc->type = -1;
 		alloc = 1;
 	}
@@ -537,7 +542,7 @@ static size_t mntstat(struct chan *c, uint8_t *dp, size_t n)
 }
 
 static struct chan *mntopencreate(int type, struct chan *c, char *name,
-								  int omode, uint32_t perm)
+				  int omode, uint32_t perm)
 {
 	ERRSTACK(1);
 	struct mnt *m;
@@ -724,7 +729,7 @@ size_t mntrdwr(int type, struct chan *c, void *buf, size_t n, off64_t off)
 {
 	ERRSTACK(1);
 	struct mnt *m;
-	struct mntrpc *r;			/* TO DO: volatile struct { Mntrpc *r; } r; */
+	struct mntrpc *r;	/* TO DO: volatile struct { Mntrpc *r; } r; */
 	char *uba;
 	uint32_t cnt, nr, nreq;
 
@@ -779,37 +784,37 @@ void mountrpc(struct mnt *m, struct mntrpc *r)
 
 	t = r->reply.type;
 	switch (t) {
-		case Rerror:
-			/* in Akaros mode, first four characters
-			 * are errno.
-			 */
-			e = r->reply.ename;
-			/* If it is in the format "XXXX <at least one char>" */
-			if ((strlen(e) > 5) && isxdigit(e[0]) &&
-				isxdigit(e[1]) &&
-				isxdigit(e[2]) &&
-				isxdigit(e[3])) {
+	case Rerror:
+		/* in Akaros mode, first four characters
+		 * are errno.
+		 */
+		e = r->reply.ename;
+		/* If it is in the format "XXXX <at least one char>" */
+		if ((strlen(e) > 5) && isxdigit(e[0]) &&
+			isxdigit(e[1]) &&
+			isxdigit(e[2]) &&
+			isxdigit(e[3])) {
 
-				int errno = strtoul(e, NULL, 16);
+			int errno = strtoul(e, NULL, 16);
 
-				error(errno, &r->reply.ename[5]);
-			} else
-				error(EFAIL, r->reply.ename);
-		case Rflush:
-			error(EINTR, ERROR_FIXME);
-		default:
-			if (t == r->request.type + 1)
-				break;
-			sn = "?";
-			if (m->c->name != NULL)
-				sn = m->c->name->s;
-			cn = "?";
-			if (r->c != NULL && r->c->name != NULL)
-				cn = r->c->name->s;
-			warn("mnt: mismatch from %s %s rep %p tag %d fid %d T%d R%d rp %d\n",
-				 sn, cn, r, r->request.tag,
-				 r->request.fid, r->request.type, r->reply.type, r->reply.tag);
-			error(EPROTO, ERROR_FIXME);
+			error(errno, &r->reply.ename[5]);
+		} else
+			error(EFAIL, r->reply.ename);
+	case Rflush:
+		error(EINTR, ERROR_FIXME);
+	default:
+		if (t == r->request.type + 1)
+			break;
+		sn = "?";
+		if (m->c->name != NULL)
+			sn = m->c->name->s;
+		cn = "?";
+		if (r->c != NULL && r->c->name != NULL)
+			cn = r->c->name->s;
+		warn("mnt: mismatch from %s %s rep %p tag %d fid %d T%d R%d rp %d\n",
+		     sn, cn, r, r->request.tag, r->request.fid, r->request.type,
+		     r->reply.type, r->reply.tag);
+		error(EPROTO, ERROR_FIXME);
 	}
 }
 
@@ -826,24 +831,28 @@ void mountio(struct mnt *m, struct mntrpc *r)
 	while (waserror()) {
 		if (m->rip == current_kthread)
 			mntgate(m);
-		/* Syscall aborts are like Plan 9 Eintr.  For those, we need to change
-		 * the old request to a flush (mntflushalloc) and try again.  We'll
-		 * always try to flush, and you can't get out until the flush either
-		 * succeeds or errors out with a non-abort/Eintr error.
+		/* Syscall aborts are like Plan 9 Eintr.  For those, we need to
+		 * change the old request to a flush (mntflushalloc) and try
+		 * again.  We'll always try to flush, and you can't get out
+		 * until the flush either succeeds or errors out with a
+		 * non-abort/Eintr error.
 		 *
-		 * This all means that regular aborts cannot break us out of here!  We
-		 * can consider that policy in the future, if we need to.  Regardless,
-		 * if the process is dying, we really do need to abort.  We might not
-		 * always have a process (RKM chan_release), but in that case we're fine
+		 * This all means that regular aborts cannot break us out of
+		 * here!  We can consider that policy in the future, if we need
+		 * to.  Regardless, if the process is dying, we really do need
+		 * to abort.  We might not always have a process (RKM
+		 * chan_release), but in that case we're fine
 		 * - we're not preventing a process from dying. */
-		if ((get_errno() != EINTR) || kth_proc_is_dying(current_kthread)) {
+		if ((get_errno() != EINTR) ||
+		    kth_proc_is_dying(current_kthread)) {
 			/* all other errors or dying, bail out! */
 			mntflushfree(m, r);
 			nexterror();
 		}
-		/* try again.  this is where you can get the "rpc tags" errstr. */
+		/* try again.  this is where you can get the "rpc tags" errstr.
+		 */
 		r = mntflushalloc(r, m->msize);
-		/* need one for every waserror call (so this plus one outside) */
+		/* need one for every waserror call; so this plus one outside */
 		poperror();
 	}
 
@@ -919,7 +928,8 @@ int mntrpcread(struct mnt *m, struct mntrpc *r)
 		return -1;
 	nb = pullupqueue(m->q, BIT32SZ + BIT8SZ + BIT16SZ);
 
-	/* read in the rest of the message, avoid ridiculous (for now) message sizes */
+	/* read in the rest of the message, avoid ridiculous (for now) message
+	 * sizes */
 	len = GBIT32(nb->rp);
 	if (len > m->msize) {
 		qdiscard(m->q, qlen(m->q));
@@ -947,15 +957,16 @@ int mntrpcread(struct mnt *m, struct mntrpc *r)
 		return -1;
 	}
 
-	/* TODO: this should use a qio helper directly.  qputback should have the
-	 * qlocked, but I guess we assume we're the only one using it. */
+	/* TODO: this should use a qio helper directly.  qputback should have
+	 * the qlocked, but I guess we assume we're the only one using it. */
 
 	/* hang the data off of the fcall struct */
 	l = &r->b;
 	*l = NULL;
 	do {
 		b = qget(m->q);
-		/* TODO: have better block helpers for this and the memmove below */
+		/* TODO: have better block helpers for this and the memmove
+		 * below */
 		b = linearizeblock(b);
 		if (hlen > 0) {
 			b->rp += hlen;
@@ -1018,8 +1029,8 @@ void mountmux(struct mnt *m, struct mntrpc *r)
 			q->done = 1;
 			spin_unlock(&m->lock);
 			if (mntstats != NULL)
-				(*mntstats) (q->request.type,
-							 m->c, q->stime, q->reqlen + r->replen);
+				(*mntstats) (q->request.type, m->c, q->stime,
+					     q->reqlen + r->replen);
 			if (q != r)
 				rendez_wakeup(&q->r);
 			return;
@@ -1028,11 +1039,11 @@ void mountmux(struct mnt *m, struct mntrpc *r)
 	}
 	spin_unlock(&m->lock);
 	if (r->reply.type == Rerror) {
-		printd("unexpected reply tag %u; type %d (error %q)\n", r->reply.tag,
-			   r->reply.type, r->reply.ename);
+		printd("unexpected reply tag %u; type %d (error %q)\n",
+		       r->reply.tag, r->reply.type, r->reply.ename);
 	} else {
 		printd("unexpected reply tag %u; type %d\n", r->reply.tag,
-			   r->reply.type);
+		       r->reply.type);
 	}
 }
 
@@ -1183,10 +1194,11 @@ struct mnt *mntchk(struct chan *c)
 {
 	struct mnt *m;
 
-	/* This routine is mostly vestiges of prior lives; now it's just sanity checking */
+	/* This routine is mostly vestiges of prior lives; now it's just sanity
+	 * checking */
 
 	if (c->mchan == NULL)
-		panic("mntchk 1: NULL mchan c %s\n", /*c2name(c) */ "channame?");
+		panic("mntchk 1: NULL mchan c %s\n", /*c2name(c)*/ "channame?");
 
 	m = c->mchan->mux;
 
@@ -1210,11 +1222,11 @@ struct mnt *mntchk(struct chan *c)
  */
 void mntdirfix(uint8_t * dirbuf, struct chan *c)
 {
-	/* TODO: We used to use the device's char (dc), instead of the type.  not
-	 * sure about the effects one way or the other.  This might be the type[2]
-	 * and dev[4] in a D (struct dir, see 9p's stat
-	 * (http://man.cat-v.org/plan_9/5/stat).  In which case, those should be for
-	 * the kernel's use.  Hopefully our kernel. */
+	/* TODO: We used to use the device's char (dc), instead of the type.
+	 * not sure about the effects one way or the other.  This might be the
+	 * type[2] and dev[4] in a D (struct dir, see 9p's stat
+	 * (http://man.cat-v.org/plan_9/5/stat).  In which case, those should be
+	 * for the kernel's use.  Hopefully our kernel. */
 	dirbuf += BIT16SZ;	/* skip count */
 	PBIT16(dirbuf, c->type);
 	dirbuf += BIT16SZ;

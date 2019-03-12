@@ -17,11 +17,11 @@
 #include <atomic.h>
 
 struct rwlock {
-	spinlock_t					lock;
-	atomic_t					nr_readers;
-	bool						writing;
-	struct cond_var				readers;
-	struct cond_var				writers;
+	spinlock_t			lock;
+	atomic_t			nr_readers;
+	bool				writing;
+	struct cond_var			readers;
+	struct cond_var			writers;
 };
 typedef struct rwlock rwlock_t;
 

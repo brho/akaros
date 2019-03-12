@@ -28,6 +28,7 @@
 int __kill (int pid, int sig)
 {
 	struct event_msg local_msg = {0};
+
 	if (pid <= 0) {
 		errno = ENOSYS;
 		return -1;
@@ -36,6 +37,7 @@ int __kill (int pid, int sig)
 		return ros_syscall(SYS_proc_destroy, pid, 0, 0, 0, 0, 0);
 	local_msg.ev_type = EV_POSIX_SIGNAL;
 	local_msg.ev_arg1 = sig;
-	return ros_syscall(SYS_notify, pid, EV_POSIX_SIGNAL, &local_msg, 0, 0, 0);
+	return ros_syscall(SYS_notify, pid, EV_POSIX_SIGNAL, &local_msg, 0, 0,
+			   0);
 }
 weak_alias (__kill, kill)

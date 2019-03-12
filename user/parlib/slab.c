@@ -77,15 +77,18 @@ static void kmem_cache_init(void *arg)
 	 * kmem_cache_cache. */
 	__kmem_cache_create(&kmem_cache_cache, "kmem_cache",
 	                    sizeof(struct kmem_cache),
-	                    __alignof__(struct kmem_cache), 0, NULL, NULL, NULL);
+			    __alignof__(struct kmem_cache), 0, NULL, NULL,
+			    NULL);
 	/* Build the slab and bufctl caches */
 	kmem_slab_cache = kmem_cache_alloc(&kmem_cache_cache, 0);
-	__kmem_cache_create(kmem_slab_cache, "kmem_slab", sizeof(struct kmem_slab),
+	__kmem_cache_create(kmem_slab_cache, "kmem_slab",
+			    sizeof(struct kmem_slab),
 	                    __alignof__(struct kmem_slab), 0, NULL, NULL, NULL);
 	kmem_bufctl_cache = kmem_cache_alloc(&kmem_cache_cache, 0);
 	__kmem_cache_create(kmem_bufctl_cache, "kmem_bufctl",
 	                    sizeof(struct kmem_bufctl),
-	                    __alignof__(struct kmem_bufctl), 0, NULL, NULL, NULL);
+			    __alignof__(struct kmem_bufctl), 0, NULL, NULL,
+			    NULL);
 }
 
 /* Cache management */
@@ -120,10 +123,11 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 		struct kmem_bufctl *i;
 		void *page_start = (void*)-1;
 		/* compute how many pages are allocated, same as in grow */
-		size_t nr_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
-		                        PGSIZE;
+		size_t nr_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size,
+					PGSIZE) / PGSIZE;
 		TAILQ_FOREACH(i, &a_slab->bufctl_freelist, link) {
-			// Track the lowest buffer address, which is the start of the buffer
+			// Track the lowest buffer address, which is the start
+			// of the buffer
 			page_start = MIN(page_start, i->buf_addr);
 			/* Deconstruct all the objects, if necessary */
 			if (cp->dtor) // TODO: (BUF)
@@ -146,9 +150,9 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 	spin_pdr_lock(&cp->cache_lock);
 	assert(TAILQ_EMPTY(&cp->full_slab_list));
 	assert(TAILQ_EMPTY(&cp->partial_slab_list));
-	/* Clean out the empty list.  We can't use a regular FOREACH here, since the
-	 * link element is stored in the slab struct, which is stored on the page
-	 * that we are freeing. */
+	/* Clean out the empty list.  We can't use a regular FOREACH here, since
+	 * the link element is stored in the slab struct, which is stored on the
+	 * page that we are freeing. */
 	a_slab = TAILQ_FIRST(&cp->empty_slab_list);
 	while (a_slab) {
 		next = TAILQ_NEXT(a_slab, link);
@@ -169,6 +173,7 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 	spin_pdr_lock(&cp->cache_lock);
 	// look at partial list
 	struct kmem_slab *a_slab = TAILQ_FIRST(&cp->partial_slab_list);
+
 	// 	if none, go to empty list and get an empty and make it partial
 	if (!a_slab) {
 		if (TAILQ_EMPTY(&cp->empty_slab_list))
@@ -182,13 +187,14 @@ void *kmem_cache_alloc(struct kmem_cache *cp, int flags)
 	// have a partial now (a_slab), get an item, return item
 	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
 		retval = a_slab->free_small_obj;
-		/* adding the size of the cache_obj to get to the pointer at end of the
-		 * buffer pointing to the next free_small_obj */
+		/* adding the size of the cache_obj to get to the pointer at end
+		 * of the buffer pointing to the next free_small_obj */
 		a_slab->free_small_obj = *(uintptr_t**)(a_slab->free_small_obj +
 		                                        cp->obj_size);
 	} else {
 		// rip the first bufctl out of the partial slab's buf list
-		struct kmem_bufctl *a_bufctl = TAILQ_FIRST(&a_slab->bufctl_freelist);
+		struct kmem_bufctl *a_bufctl =
+			TAILQ_FIRST(&a_slab->bufctl_freelist);
 		TAILQ_REMOVE(&a_slab->bufctl_freelist, a_bufctl, link);
 		retval = a_bufctl->buf_addr;
 	}
@@ -219,8 +225,8 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf)
 		// find its slab
 		a_slab = (struct kmem_slab*)(ROUNDDOWN((uintptr_t)buf, PGSIZE) +
 		                             PGSIZE - sizeof(struct kmem_slab));
-		/* write location of next free small obj to the space at the end of the
-		 * buffer, then list buf as the next free small obj */
+		/* write location of next free small obj to the space at the end
+		 * of the buffer, then list buf as the next free small obj */
 		*(uintptr_t**)(buf + cp->obj_size) = a_slab->free_small_obj;
 		a_slab->free_small_obj = buf;
 	} else {
@@ -262,28 +268,34 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 	if (cp->obj_size <= SLAB_LARGE_CUTOFF) {
 		// Just get a single page for small slabs
 		a_page = mmap(0, PGSIZE, PROT_READ | PROT_WRITE | PROT_EXEC,
-		              MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+			      MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1,
+			      0);
 		assert(a_page != MAP_FAILED);
 		// the slab struct is stored at the end of the page
 		a_slab = (struct kmem_slab*)(a_page + PGSIZE -
 		                             sizeof(struct kmem_slab));
-		// Need to add room for the next free item pointer in the object buffer.
-		a_slab->obj_size = ROUNDUP(cp->obj_size + sizeof(uintptr_t), cp->align);
+		// Need to add room for the next free item pointer in the object
+		// buffer.
+		a_slab->obj_size = ROUNDUP(cp->obj_size + sizeof(uintptr_t),
+					   cp->align);
 		a_slab->num_busy_obj = 0;
 		a_slab->num_total_obj = (PGSIZE - sizeof(struct kmem_slab)) /
 		                        a_slab->obj_size;
 		// TODO: consider staggering this IAW section 4.3
 		a_slab->free_small_obj = a_page;
-		/* Walk and create the free list, which is circular.  Each item stores
-		 * the location of the next one at the end of the block. */
+		/* Walk and create the free list, which is circular.  Each item
+		 * stores the location of the next one at the end of the block.
+		 */
 		void *buf = a_slab->free_small_obj;
+
 		for (int i = 0; i < a_slab->num_total_obj - 1; i++) {
 			// Initialize the object, if necessary
 			if (cp->ctor) {
 				ctor_ret = cp->ctor(buf, cp->priv, 0);
 				assert(!ctor_ret);
 			}
-			*(uintptr_t**)(buf + cp->obj_size) = buf + a_slab->obj_size;
+			*(uintptr_t**)(buf + cp->obj_size) = buf +
+				                             a_slab->obj_size;
 			buf += a_slab->obj_size;
 		}
 		/* Initialize the final object (note the -1 in the for loop). */
@@ -295,14 +307,17 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 	} else {
 		a_slab = kmem_cache_alloc(kmem_slab_cache, 0);
 		// TODO: hash table for back reference (BUF)
-		a_slab->obj_size = ROUNDUP(cp->obj_size + sizeof(uintptr_t), cp->align);
-		/* Need at least nr_pgs to hold NUM_BUF objects.  Note we don't round up
-		 * to the next higher order (power of 2) number of pages, like we do in
-		 * the kernel. */
-		size_t nr_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size, PGSIZE) /
-		                         PGSIZE;
-		void *buf = mmap(0, nr_pgs * PGSIZE, PROT_READ | PROT_WRITE | PROT_EXEC,
-		                 MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+		a_slab->obj_size = ROUNDUP(cp->obj_size + sizeof(uintptr_t),
+					   cp->align);
+		/* Need at least nr_pgs to hold NUM_BUF objects.  Note we don't
+		 * round up to the next higher order (power of 2) number of
+		 * pages, like we do in the kernel. */
+		size_t nr_pgs = ROUNDUP(NUM_BUF_PER_SLAB * a_slab->obj_size,
+					PGSIZE) / PGSIZE;
+		void *buf = mmap(0, nr_pgs * PGSIZE, PROT_READ | PROT_WRITE |
+				 PROT_EXEC, MAP_POPULATE | MAP_ANONYMOUS |
+				 MAP_PRIVATE, -1, 0);
+
 		assert(buf != MAP_FAILED);
 		a_slab->num_busy_obj = 0;
 		a_slab->num_total_obj = nr_pgs * PGSIZE / a_slab->obj_size;
@@ -315,10 +330,12 @@ static void kmem_cache_grow(struct kmem_cache *cp)
 				assert(!ctor_ret);
 			}
 			a_bufctl = kmem_cache_alloc(kmem_bufctl_cache, 0);	
-			TAILQ_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
+			TAILQ_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl,
+					  link);
 			a_bufctl->buf_addr = buf;
 			a_bufctl->my_slab = a_slab;
-			// TODO: (BUF) write the bufctl reference at the bottom of the buffer.
+			// TODO: (BUF) write the bufctl reference at the bottom
+			// of the buffer.
 			*(struct kmem_bufctl**)(buf + cp->obj_size) = a_bufctl;
 			buf += a_slab->obj_size;
 		}
@@ -372,8 +389,8 @@ void print_kmem_slab(struct kmem_slab *slab)
 		printf("Free Small obj: 0x%08x\n", slab->free_small_obj);
 		void *buf = slab->free_small_obj;
 		for (int i = 0; i < slab->num_total_obj; i++) {
-			printf("Addr of buf: 0x%08x, Addr of next: 0x%08x\n", buf,
-			       *((uintptr_t**)buf));
+			printf("Addr of buf: 0x%08x, Addr of next: 0x%08x\n",
+			       buf, *((uintptr_t**)buf));
 			buf += slab->obj_size;
 		}
 	} else {

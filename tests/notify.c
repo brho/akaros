@@ -10,7 +10,8 @@ int main(int argc, char **argv)
 	int pid, ev_type;
 
 	if (argc < 3) {
-		printf("Usage: %s PID EV_NUM [Arg1 Arg2 0xArg3 Arg4]\n", argv[0]);
+		printf("Usage: %s PID EV_NUM [Arg1 Arg2 0xArg3 Arg4]\n",
+		       argv[0]);
 		exit(-1);
 	}
 	pid = strtol(argv[1], 0, 10);

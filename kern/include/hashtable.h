@@ -39,7 +39,7 @@ static inline size_t indexFor(unsigned int tablelength, unsigned int hashvalue)
 /*****************************************************************************/
 
 /* Example of use:
- *		hashtable_init(); // Do this once during kernel initialization
+ *	hashtable_init(); // Do this once during kernel initialization
  *
  *      struct hashtable  *h;
  *      struct some_key   *k;

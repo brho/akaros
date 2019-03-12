@@ -53,7 +53,7 @@ struct Netlog {
 	char *rptr;
 	int len;
 
-	int logmask;				/* mask of things to debug */
+	int logmask;			/* mask of things to debug */
 	uint8_t iponly[IPaddrlen];	/* ip address to print debugging for */
 	int iponlyset;
 
@@ -92,8 +92,7 @@ enum {
 	CMonly,
 };
 
-static
-struct cmdtab routecmd[] = {
+static struct cmdtab routecmd[] = {
 	{CMset, "set", 0},
 	{CMclear, "clear", 0},
 	{CMonly, "only", 0},
@@ -214,26 +213,26 @@ void netlogctl(struct Fs *f, char *s, int n)
 	ct = lookupcmd(cb, routecmd, ARRAY_SIZE(routecmd));
 
 	switch (ct->index) {
-		case CMset:
-			set = 1;
-			break;
+	case CMset:
+		set = 1;
+		break;
 
-		case CMclear:
-			set = 0;
-			break;
+	case CMclear:
+		set = 0;
+		break;
 
-		case CMonly:
-			parseip(f->alog->iponly, cb->f[1]);
-			if (ipcmp(f->alog->iponly, IPnoaddr) == 0)
-				f->alog->iponlyset = 0;
-			else
-				f->alog->iponlyset = 1;
-			kfree(cb);
-			poperror();
-			return;
+	case CMonly:
+		parseip(f->alog->iponly, cb->f[1]);
+		if (ipcmp(f->alog->iponly, IPnoaddr) == 0)
+			f->alog->iponlyset = 0;
+		else
+			f->alog->iponlyset = 1;
+		kfree(cb);
+		poperror();
+		return;
 
-		default:
-			cmderror(cb, "unknown ip control message");
+	default:
+		cmderror(cb, "unknown ip control message");
 	}
 
 	for (i = 1; i < cb->nf; i++) {
@@ -281,7 +280,8 @@ void netlog(struct Fs *f, int mask, char *fmt, ...)
 		f->alog->len -= i;
 		f->alog->rptr += i;
 		if (f->alog->rptr >= f->alog->end)
-			f->alog->rptr = f->alog->buf + (f->alog->rptr - f->alog->end);
+			f->alog->rptr = f->alog->buf + (f->alog->rptr -
+							f->alog->end);
 	}
 	t = f->alog->rptr + f->alog->len;
 	fp = buf;

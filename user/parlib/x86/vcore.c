@@ -44,12 +44,12 @@
 /* Helper for writing the info we need later to the u_tf's stack.  Also, note
  * this goes backwards, since memory reads up the stack. */
 struct restart_helper {
-	void						*notif_disab_loc;
-	void						*notif_pend_loc;
-	struct syscall				*sysc;
-	uint64_t					rdi_save;
-	uint64_t					rflags;
-	uint64_t					rip;
+	void				*notif_disab_loc;
+	void				*notif_pend_loc;
+	struct syscall			*sysc;
+	uint64_t			rdi_save;
+	uint64_t			rflags;
+	uint64_t			rip;
 };
 
 /* Static syscall, used for self-notifying.  We never wait on it, and we
@@ -74,12 +74,12 @@ struct syscall vc_entry = {
 
 static void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 {
-	#define X86_RED_ZONE_SZ			128
+	#define X86_RED_ZONE_SZ		128
 	struct restart_helper *rst;
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 
-	/* The stuff we need to write will be below the current stack and red zone
-	 * of the utf */
+	/* The stuff we need to write will be below the current stack and red
+	 * zone of the utf */
 	rst = (struct restart_helper*)((void*)tf->tf_rsp - X86_RED_ZONE_SZ -
 	                               sizeof(struct restart_helper));
 	/* Fill in the info we'll need later */
@@ -106,37 +106,38 @@ static void pop_hw_tf(struct hw_trapframe *tf, uint32_t vcoreid)
 	              "popq %%r13;           "
 	              "popq %%r14;           "
 	              "popq %%r15;           "
-	              "addq $0x28, %%rsp;    " /* move to the rsp slot in the tf */
+	              "addq $0x28, %%rsp;    " /* move to rsp slot in the tf */
 	              "popq %%rsp;           " /* change to the utf's %rsp */
 	              "subq %[red], %%rsp;   " /* jump over the redzone */
-	              "subq $0x10, %%rsp;    " /* move rsp to below rdi's slot */
+	              "subq $0x10, %%rsp;    " /* move rsp to below rdi's slot*/
 	              "pushq %%rdi;          " /* save rdi, will clobber soon */
 	              "subq $0x18, %%rsp;    " /* move to notif_dis_loc slot */
 	              "popq %%rdi;           " /* load notif_disabled addr */
 	              "movb $0x00, (%%rdi);  " /* enable notifications */
-				  /* Need a wrmb() here so the write of enable_notif can't pass
-				   * the read of notif_pending (racing with a potential
-				   * cross-core call with proc_notify()). */
-				  "lock addb $0, (%%rdi);" /* LOCK is a CPU mb() */
-				  /* From here down, we can get interrupted and restarted */
-	              "popq %%rdi;           " /* get notif_pending status loc */
+	              /* Need a wrmb() here so the write of enable_notif can't
+	               * pass the read of notif_pending (racing with a potential
+	               * cross-core call with proc_notify()). */
+	              "lock addb $0, (%%rdi);" /* LOCK is a CPU mb() */
+	              /* From here down, we can get interrupted and restarted */
+	              "popq %%rdi;           " /* get notif_pending status loc*/
 	              "testb $0x01, (%%rdi); " /* test if a notif is pending */
-	              "jz 1f;                " /* if not pending, skip syscall */
-				  /* Actual syscall.  Note we don't wait on the async call */
+	              "jz 1f;                " /* if not pending skip syscall */
+	              /* Actual syscall. Note we don't wait on the async call */
 	              "popq %%rdi;           " /* &sysc, trap arg0 */
 	              "pushq %%rsi;          " /* save rax, will be trap arg1 */
 	              "pushq %%rax;          " /* save rax, will be trap ret */
-	              "movq $0x1, %%rsi;     " /* sending one async syscall: arg1 */
+	              "movq $0x1, %%rsi;     " /* send one async syscall: arg1*/
 	              "int %1;               " /* fire the syscall */
 	              "popq %%rax;           " /* restore regs after syscall */
 	              "popq %%rsi;           "
 	              "jmp 2f;               " /* skip 1:, already popped */
-				  "1: addq $0x08, %%rsp; " /* discard &sysc (on non-sc path) */
-	              "2: popq %%rdi;        " /* restore tf's %rdi (both paths) */
-				  "popfq;                " /* restore utf's rflags */
-	              "ret %[red];           " /* return to the new PC, skip red */
+	              "1: addq $0x08, %%rsp; " /* discard &sysc on non-sc path*/
+	              "2: popq %%rdi;        " /* restore tf's %rdi both paths*/
+	              "popfq;                " /* restore utf's rflags */
+	              "ret %[red];           " /* ret to the new PC, skip red */
 	              :
-	              : "g"(&tf->tf_rax), "i"(T_SYSCALL), [red]"i"(X86_RED_ZONE_SZ)
+	              : "g"(&tf->tf_rax), "i"(T_SYSCALL),
+		        [red]"i"(X86_RED_ZONE_SZ)
 	              : "memory");
 }
 
@@ -150,17 +151,17 @@ static void pop_sw_tf(struct sw_trapframe *sw_tf, uint32_t vcoreid)
 	 *
 	 * The main issue here is that while our context was saved in an
 	 * ABI-complaint manner, we may be starting up on a somewhat random FPU
-	 * state.  Having gibberish in registers isn't a big deal, but some of the
-	 * FP environment settings could cause trouble.  If fnclex; emms isn't
-	 * enough, we could also save/restore the entire FP env with fldenv, or do
-	 * an fninit before fldcw. */
+	 * state.  Having gibberish in registers isn't a big deal, but some of
+	 * the FP environment settings could cause trouble.  If fnclex; emms
+	 * isn't enough, we could also save/restore the entire FP env with
+	 * fldenv, or do an fninit before fldcw. */
 	asm volatile ("ldmxcsr %0" : : "m"(sw_tf->tf_mxcsr));
 	asm volatile ("fnclex; emms; fldcw %0" : : "m"(sw_tf->tf_fpucw));
-	/* Basic plan: restore all regs, off rcx as the sw_tf.  Switch to the new
-	 * stack, save the PC so we can jump to it later.  Use clobberably
-	 * registers for the locations of sysc, notif_dis, and notif_pend. Once on
-	 * the new stack, we enable notifs, check if we missed one, and if so, self
-	 * notify.  Note the syscall clobbers rax. */
+	/* Basic plan: restore all regs, off rcx as the sw_tf.  Switch to the
+	 * new stack, save the PC so we can jump to it later.  Use clobberably
+	 * registers for the locations of sysc, notif_dis, and notif_pend. Once
+	 * on the new stack, we enable notifs, check if we missed one, and if
+	 * so, self notify.  Note the syscall clobbers rax. */
 	asm volatile ("movq 0x00(%0), %%rbx; " /* restore regs */
 	              "movq 0x08(%0), %%rbp; "
 	              "movq 0x10(%0), %%r12; "
@@ -170,16 +171,16 @@ static void pop_sw_tf(struct sw_trapframe *sw_tf, uint32_t vcoreid)
 	              "movq 0x30(%0), %%r8;  " /* save rip in r8 */
 	              "movq 0x38(%0), %%rsp; " /* jump to future stack */
 	              "movb $0x00, (%2);     " /* enable notifications */
-	              /* Need a wrmb() here so the write of enable_notif can't pass
-	               * the read of notif_pending (racing with a potential
+	              /* Need a wrmb() here so the write of enable_notif can't
+	               * pass the read of notif_pending (racing with a potential
 	               * cross-core call with proc_notify()). */
 	              "lock addb $0, (%2);   " /* LOCK is a CPU mb() */
 	              /* From here down, we can get interrupted and restarted */
 	              "testb $0x01, (%3);    " /* test if a notif is pending */
-	              "jz 1f;                " /* if not pending, skip syscall */
+	              "jz 1f;                " /* if not pending, skip syscall*/
 	              /* Actual syscall.  Note we don't wait on the async call.
 	               * &vc_entry is already in rdi (trap arg0). */
-	              "movq $0x1, %%rsi;     " /* sending one async syscall: arg1 */
+	              "movq $0x1, %%rsi;     " /* send one async syscall: arg1*/
 	              "int %4;               " /* fire the syscall */
 	              "1: jmp *%%r8;         " /* ret saved earlier */
 	              :
@@ -207,18 +208,20 @@ void pop_user_ctx(struct user_context *ctx, uint32_t vcoreid)
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 
 	/* We check early for notif_pending, since if we deal with it during
-	 * pop_hw_tf, we grow the stack slightly.  If a thread consistently fails to
-	 * restart due to notif pending, it will eventually run off the bottom of
-	 * its stack.  By performing the check here, we shrink that window.  You'd
-	 * have to have a notif come after this check, but also *not* before this
-	 * check.  If you PF in pop_user_ctx, this all failed. */
+	 * pop_hw_tf, we grow the stack slightly.  If a thread consistently
+	 * fails to restart due to notif pending, it will eventually run off the
+	 * bottom of its stack.  By performing the check here, we shrink that
+	 * window.  You'd have to have a notif come after this check, but also
+	 * *not* before this check.  If you PF in pop_user_ctx, this all failed.
+	 * */
 	if (vcpd->notif_pending) {
-		/* if pop_user_ctx fails (and resets the vcore), the ctx contents must
-		 * be in VCPD (due to !UTHREAD_SAVED).  it might already be there. */
+		/* if pop_user_ctx fails (and resets the vcore), the ctx
+		 * contents must be in VCPD (due to !UTHREAD_SAVED).  it might
+		 * already be there. */
 		if (ctx != &vcpd->uthread_ctx)
 			vcpd->uthread_ctx = *ctx;
-		/* To restart the vcore, we must have the right TLS, stack pointer, and
-		 * vc_ctx = TRUE. */
+		/* To restart the vcore, we must have the right TLS, stack
+		 * pointer, and vc_ctx = TRUE. */
 		set_tls_desc((void*)vcpd->vcore_tls_desc);
 		begin_safe_access_tls_vars()
 		__vcore_context = TRUE;
@@ -256,7 +259,8 @@ void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 
 	assert(ctx->type == ROS_HW_CTX);
-	/* The stuff we need to write will be below the current stack of the utf */
+	/* The stuff we need to write will be below the current stack of the utf
+	 */
 	rst = (struct restart_helper*)((void*)tf->tf_rsp -
 	                               sizeof(struct restart_helper));
 	/* Fill in the info we'll need later */
@@ -281,20 +285,20 @@ void pop_user_ctx_raw(struct user_context *ctx, uint32_t vcoreid)
 	              "popq %%r13;           "
 	              "popq %%r14;           "
 	              "popq %%r15;           "
-	              "addq $0x28, %%rsp;    " /* move to the rsp slot in the tf */
+	              "addq $0x28, %%rsp;    " /* move to rsp slot in the tf */
 	              "popq %%rsp;           " /* change to the utf's %rsp */
-	              "subq $0x10, %%rsp;    " /* move rsp to below rdi's slot */
+	              "subq $0x10, %%rsp;    " /* move rsp to below rdi's slot*/
 	              "pushq %%rdi;          " /* save rdi, will clobber soon */
 	              "subq $0x18, %%rsp;    " /* move to notif_dis_loc slot */
 	              "popq %%rdi;           " /* load notif_disabled addr */
 	              "movb $0x00, (%%rdi);  " /* enable notifications */
-				  /* Here's where we differ from the regular pop_user_ctx().
-				   * We need to adjust rsp and whatnot, but don't do test,
-				   * clear notif_pending, or call a syscall. */
-				  /* From here down, we can get interrupted and restarted */
+	              /* Here's where we differ from the regular pop_user_ctx().
+	               * We need to adjust rsp and whatnot, but don't do test,
+	               * clear notif_pending, or call a syscall. */
+	              /* From here down, we can get interrupted and restarted */
 	              "addq $0x10, %%rsp;    " /* move to rdi save slot */
 	              "popq %%rdi;           " /* restore tf's %rdi */
-				  "popfq;                " /* restore utf's rflags */
+	              "popfq;                " /* restore utf's rflags */
 	              "ret;                  " /* return to the new PC */
 	              :
 	              : "g"(&tf->tf_rax)
@@ -417,10 +421,11 @@ void __attribute__((noreturn)) __kvc_entry_c(void)
 	#ifndef __x86_64__
 	set_tls_desc(vcpd_of(id)->vcore_tls_desc);
 	#endif
-	/* Every time the vcore comes up, it must set that it is in vcore context.
-	 * uthreads may share the same TLS as their vcore (when uthreads do not have
-	 * their own TLS), and if a uthread was preempted, __vcore_context == FALSE,
-	 * and that will continue to be true the next time the vcore pops up. */
+	/* Every time the vcore comes up, it must set that it is in vcore
+	 * context.  uthreads may share the same TLS as their vcore (when
+	 * uthreads do not have their own TLS), and if a uthread was preempted,
+	 * __vcore_context == FALSE, and that will continue to be true the next
+	 * time the vcore pops up. */
 	__vcore_context = TRUE;
 	vcore_entry();
 	fprintf(stderr, "vcore_entry() should never return!\n");

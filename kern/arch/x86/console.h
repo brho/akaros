@@ -11,16 +11,16 @@
 
 /* Types of console devices */
 #define CONS_KB_DEV		1
-#define CONS_SER_DEV	2
+#define CONS_SER_DEV		2
 
 struct cons_dev;
 /* Interrupt-driven console input devices */
 struct cons_dev {
 	SLIST_ENTRY(cons_dev)		next;
-	int							type;		/* e.g., CONS_KB_DEV */
-	int							val;		/* e.g., COM1 */
-	int							irq;		/* desired irq */
-	char						*model;		/* descriptive string */
+	int				type;	/* e.g., CONS_KB_DEV */
+	int				val;	/* e.g., COM1 */
+	int				irq;	/* desired irq */
+	char				*model;	/* descriptive string */
 	int (*getc)(struct cons_dev *, uint8_t *);
 };
 SLIST_HEAD(cons_dev_slist, cons_dev);

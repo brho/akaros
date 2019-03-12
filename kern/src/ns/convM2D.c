@@ -66,7 +66,8 @@ void statcheck(uint8_t *buf, size_t nbuf)
 		buf += BIT16SZ + GBIT16(buf);
 	}
 	/* Legacy 9p stats are OK
-	 * TODO: consider removing this.  We get them from userspace, e.g. mkdir. */
+	 * TODO: consider removing this.  We get them from userspace, e.g.
+	 * mkdir. */
 	if (buf == ebuf)
 		return;
 
@@ -99,9 +100,9 @@ convM2D(uint8_t * buf, unsigned int nbuf, struct dir *d, char *strs)
 	if (nbuf < STAT_FIX_LEN_9P)
 		return 0;
 
-	/* This M might not have all the fields we expect.  We'll ensure the strings
-	 * have the right values later.  We still need to initialize all of the
-	 * non-string extended fields. */
+	/* This M might not have all the fields we expect.  We'll ensure the
+	 * strings have the right values later.  We still need to initialize all
+	 * of the non-string extended fields. */
 	init_empty_dir(d);
 
 	p = buf;
@@ -129,9 +130,10 @@ convM2D(uint8_t * buf, unsigned int nbuf, struct dir *d, char *strs)
 	if ((int32_t)d->mtime.tv_sec == -1)
 		d->mtime.tv_sec = ~0;
 
-	/* Anything beyond the legacy 9p strings might not be supported.  Though if
-	 * you have more, you probably have at least EVH's 9p2000.u extensions.
-	 * Once we get all of the legacy strings, we have a good stat. */
+	/* Anything beyond the legacy 9p strings might not be supported.  Though
+	 * if you have more, you probably have at least EVH's 9p2000.u
+	 * extensions.  Once we get all of the legacy strings, we have a good
+	 * stat. */
 	for (i = 0; i < STAT_NR_STRINGS_AK; i++) {
 		if (i == STAT_NR_STRINGS_9P)
 			good_stat = true;

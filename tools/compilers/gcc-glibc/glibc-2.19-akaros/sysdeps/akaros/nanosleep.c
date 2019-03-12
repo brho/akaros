@@ -23,7 +23,8 @@
 int __libc_nanosleep(const struct timespec *requested_time,
                      struct timespec *remaining)
 {
-	return ros_syscall(SYS_nanosleep, requested_time, remaining, 0, 0, 0, 0);
+	return ros_syscall(SYS_nanosleep, requested_time, remaining, 0, 0, 0,
+			   0);
 }
 
 weak_alias(__libc_nanosleep, __nanosleep)

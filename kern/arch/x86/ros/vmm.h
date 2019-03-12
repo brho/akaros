@@ -11,11 +11,11 @@
 /* Initialization data provided by the userspace part of the VMM when setting
  * up a guest physical core (vmx vcpu). */
 struct vmm_gpcore_init {
-	void					*posted_irq_desc;
-	void					*vapic_addr;
-	void					*apic_addr;
-	uintptr_t				fsbase;
-	uintptr_t				gsbase;
+	void				*posted_irq_desc;
+	void				*vapic_addr;
+	void				*apic_addr;
+	uintptr_t			fsbase;
+	uintptr_t			gsbase;
 };
 
 /* Intel VM Trap Injection Fields */

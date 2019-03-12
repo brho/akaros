@@ -46,7 +46,7 @@ static char *devname(void)
 }
 
 enum {
-	Type8021Q = 0x8100,			/* value of type field for 802.1[pQ] tags */
+	Type8021Q = 0x8100,	/* value of type field for 802.1[pQ] tags */
 };
 
 static struct ether *etherxx[MaxEther];	/* real controllers */
@@ -117,7 +117,7 @@ static void ethershutdown(void)
 }
 
 static struct walkqid *etherwalk(struct chan *chan, struct chan *nchan,
-								 char **name, unsigned int nname)
+				 char **name, unsigned int nname)
 {
 	ERRSTACK(1);
 	struct walkqid *wq;
@@ -312,8 +312,8 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 	ether->inpackets++;
 
 	pkt = (struct etherpkt *)bp->rp;
-	/* TODO: we might need to assert more for higher layers, or otherwise deal
-	 * with extra data. */
+	/* TODO: we might need to assert more for higher layers, or otherwise
+	 * deal with extra data. */
 	assert(BHLEN(bp) >= offsetof(struct etherpkt, data));
 	type = (pkt->type[0] << 8) | pkt->type[1];
 	if (type == Type8021Q && ether->nvlan) {
@@ -322,9 +322,11 @@ struct block *etheriq(struct ether *ether, struct block *bp, int fromwire)
 			for (i = 0; i < ARRAY_SIZE(ether->vlans); i++) {
 				vlan = ether->vlans[i];
 				if (vlan != NULL && vlan->vlanid == vlanid) {
-					/* might have a problem with extra data here */
+					/* might have a problem with extra data
+					 * here */
 					assert(BHLEN(bp) >= 4 + 2 * Eaddrlen);
-					memmove(bp->rp + 4, bp->rp, 2 * Eaddrlen);
+					memmove(bp->rp + 4, bp->rp,
+						2 * Eaddrlen);
 					bp->rp += 4;
 					return etheriq(vlan, bp, fromwire);
 				}
@@ -434,7 +436,8 @@ static int etheroq(struct ether *ether, struct block *bp)
 		bp = padblock(bp, 2 + 2);
 		memmove(bp->rp, bp->rp + 4, 2 * Eaddrlen);
 		hnputs(bp->rp + 2 * Eaddrlen, Type8021Q);
-		hnputs(bp->rp + 2 * Eaddrlen + 2, ether->vlanid & 0xFFF);	/* prio:3 0:1 vid:12 */
+		/* prio:3 0:1 vid:12 */
+		hnputs(bp->rp + 2 * Eaddrlen + 2, ether->vlanid & 0xFFF);
 		ether = ether->ctlr;
 	}
 
@@ -554,8 +557,8 @@ static long vlanctl(struct ether *ether, void *buf, long n)
 	int i;
 
 	cb = parsecmd(buf, n);
-	if (cb->nf >= 2
-		&& strcmp(cb->f[0], "ea") == 0 && parseether(ea, cb->f[1]) == 0) {
+	if (cb->nf >= 2 && strcmp(cb->f[0], "ea") == 0 &&
+	    parseether(ea, cb->f[1]) == 0) {
 		kfree(cb);
 		memmove(ether->ea, ea, Eaddrlen);
 		memmove(ether->addr, ether->ea, Eaddrlen);
@@ -613,7 +616,8 @@ static struct ether *vlanalloc(struct ether *ether, int id)
 		rwinit(&vlan->rwlock);
 		qlock_init(&vlan->vlq);
 		netifinit(vlan, name, Ntypes, ether->limit);
-		ether->vlans[fid] = vlan;	/* id is still zero, can't be matched */
+		/* id is still zero, can't be matched */
+		ether->vlans[fid] = vlan;
 		ether->nvlan++;
 	} else
 		memmove(vlan->name, name, KNAMELEN - 1);
@@ -702,10 +706,11 @@ static void etherreset(void)
 		/* looked like irq type, we don't have these yet */
 		//ether->netif.itype = -1;
 
-		/* TODO: looks like they expected some init to be done here.  at the
-		 * very least, ether->type is 0 right now, and needs to be set.  looking
-		 * around online, it seems to find out ether config settings, so that we
-		 * can set some flags in the opt parseing below. */
+		/* TODO: looks like they expected some init to be done here.  at
+		 * the very least, ether->type is 0 right now, and needs to be
+		 * set.  looking around online, it seems to find out ether
+		 * config settings, so that we can set some flags in the opt
+		 * parseing below. */
 		//if(archether(ctlrno, ether) <= 0)
 		//  continue;
 
@@ -715,45 +720,46 @@ static void etherreset(void)
 				continue;
 			for (i = 0; i < ether->nopt; i++) {
 				if (cistrncmp(ether->opt[i], "ea=", 3) == 0) {
-					if (parseether(ether->ea, &ether->opt[i][3]) == -1)
+					if (parseether(ether->ea,
+						       &ether->opt[i][3]) == -1)
 						memset(ether->ea, 0, Eaddrlen);
-				} else if (cistrcmp(ether->opt[i], "fullduplex") == 0 ||
-						   cistrcmp(ether->opt[i], "10BASE-TFD") == 0)
+				} else if (cistrcmp(ether->opt[i], "fullduplex")
+					   == 0 || cistrcmp(ether->opt[i],
+							    "10BASE-TFD") == 0)
 					ether->fullduplex = 1;
-				else if (cistrcmp(ether->opt[i], "100BASE-TXFD") == 0)
+				else if (cistrcmp(ether->opt[i], "100BASE-TXFD")
+					 == 0)
 					ether->mbps = 100;
 			}
 #endif
 			if (cards[n].reset(ether))
 				continue;
-			/* might be fucked a bit - reset() doesn't know the type.  might not
-			 * even matter, except for debugging. */
+			/* might be fucked a bit - reset() doesn't know the
+			 * type.  might not even matter, except for debugging */
 			ether->type = cards[n].type;
 			snprintf(name, sizeof(name), "ether%d", ctlrno);
 
 			i = snprintf(buf, sizeof(buf),
-						 "#l%d: %s: %dMbps port 0x%x irq %u", ctlrno,
-						 ether->type, ether->mbps,
-				     ether->port,
-						 ether->irq);
+				     "#l%d: %s: %dMbps port 0x%x irq %u",
+				     ctlrno, ether->type, ether->mbps,
+				     ether->port, ether->irq);
 			/* Looks like this is for printing MMIO addrs */
 #if 0
 			if (ether->mem)
-				i += snprintf(buf + i, sizeof(buf) - i, " addr 0x%lx",
-							  PADDR(ether->mem));
+				i += snprintf(buf + i, sizeof(buf) - i,
+					      " addr 0x%lx", PADDR(ether->mem));
 			if (ether->size)
-				i += snprintf(buf + i, sizeof(buf) - i, " size 0x%lx",
-							  ether->size);
+				i += snprintf(buf + i, sizeof(buf) - i,
+					      " size 0x%lx", ether->size);
 #endif
 			i += snprintf(buf + i, sizeof(buf) - i,
-						  ": %02.2x:%02.2x:%02.2x:%02.2x:%02.2x:%02.2x",
-						  ether->ea[0], ether->ea[1], ether->ea[2],
-						  ether->ea[3], ether->ea[4], ether->ea[5]);
+				      ": %02.2x:%02.2x:%02.2x:%02.2x:%02.2x:%02.2x",
+				      ether->ea[0], ether->ea[1], ether->ea[2],
+				      ether->ea[3], ether->ea[4], ether->ea[5]);
 			snprintf(buf + i, sizeof(buf) - i, "\n");
 			printk(buf);
 
 			switch (ether->mbps) {
-
 			case 1 ... 99:
 				qsize = 64 * 1024;
 				break;
@@ -790,18 +796,21 @@ static void etherpower(int on)
 	struct ether *ether;
 
 	/* TODO: fix etherpower.  locking and ether->readers are broken. */
-	warn("%s needs attention.  had a rough porting from inferno", __FUNCTION__);
+	warn("%s needs attention.  had a rough porting from inferno",
+	     __FUNCTION__);
 	for (i = 0; i < MaxEther; i++) {
 		if ((ether = etherxx[i]) == NULL || ether->power == NULL)
 			continue;
 		if (on) {
-			/* brho: not sure what they are doing.  there seem to be certain
-			 * assumptions about calling etherpower.  i think they are using
-			 * canrlock to see if the lock is currently writelocked.  and if it
-			 * was not lockable, they would assume they had the write lock and
-			 * could unlock.  this is super fucked up. */
+			/* brho: not sure what they are doing.  there seem to be
+			 * certain assumptions about calling etherpower.  i
+			 * think they are using canrlock to see if the lock is
+			 * currently writelocked.  and if it was not lockable,
+			 * they would assume they had the write lock and could
+			 * unlock.  this is super fucked up. */
 			if (canrlock(&ether->rwlock)) {
-				runlock(&ether->rwlock);	// brho added this
+				// brho added this
+				runlock(&ether->rwlock);
 				continue;
 			}
 			if (ether->power != NULL)

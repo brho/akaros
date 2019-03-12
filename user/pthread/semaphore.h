@@ -26,7 +26,7 @@ __BEGIN_DECLS
 #define SEM_FAILED      ((sem_t *) 0)
 
 typedef struct {
-	uth_semaphore_t				real_sem;
+	uth_semaphore_t		real_sem;
 } sem_t;
 
 int sem_init(sem_t *__sem, int __pshared, unsigned int __value);

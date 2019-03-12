@@ -83,20 +83,21 @@ static int __timerfd_gettime(int timerfd, int periodfd,
 	if (read(timerfd, buf, sizeof(buf) <= 0))
 		return -1;
 	timer_tsc = strtoul(buf, 0, 0);
-	/* If 0 (disabled), we'll return 0 for 'it_value'.  o/w we need to return
-	 * the relative time. */
+	/* If 0 (disabled), we'll return 0 for 'it_value'.  o/w we need to
+	 * return the relative time. */
 	if (timer_tsc) {
 		now_tsc = read_tsc();
 		if (timer_tsc > now_tsc) {
 			timer_tsc -= now_tsc;
 		} else {
-			/* it's possible that timer_tsc is in the past, and that we lost the
-			 * race.  The alarm fired since we looked at it, and it might be
-			 * disabled.  It might have fired multiple times too. */
+			/* it's possible that timer_tsc is in the past, and that
+			 * we lost the race.  The alarm fired since we looked at
+			 * it, and it might be disabled.  It might have fired
+			 * multiple times too. */
 			if (!period_tsc) {
-				/* if there was no period and the alarm fired, then it should be
-				 * disabled.  This is racy, if there are other people setting
-				 * the timer. */
+				/* if there was no period and the alarm fired,
+				 * then it should be disabled.  This is racy, if
+				 * there are other people setting the timer. */
 				timer_tsc = 0;
 			} else {
 				while (timer_tsc < now_tsc)
@@ -140,16 +141,17 @@ int timerfd_settime(int fd, int flags,
 	ret = set_period(periodfd, period);
 	if (ret < 0)
 		goto out;
-	/* So the caller is asking for timespecs in wall-clock time (depending on
-	 * the clock, actually, (TODO)), and the kernel expects TSC ticks from boot.
-	 * If !ABSTIME, then it's just relative to now.  If it is ABSTIME, then they
-	 * are asking in terms of real-world time, which means ABS - NOW to get the
-	 * rel time, then convert to tsc ticks. */
+	/* So the caller is asking for timespecs in wall-clock time (depending
+	 * on the clock, actually, (TODO)), and the kernel expects TSC ticks
+	 * from boot.  If !ABSTIME, then it's just relative to now.  If it is
+	 * ABSTIME, then they are asking in terms of real-world time, which
+	 * means ABS - NOW to get the rel time, then convert to tsc ticks. */
 	if (flags & TFD_TIMER_ABSTIME) {
 		ret = clock_gettime(CLOCK_MONOTONIC, &now_timespec);
 		if (ret < 0)
 			goto out;
-		subtract_timespecs(&rel_timespec, &new_value->it_value, &now_timespec);
+		subtract_timespecs(&rel_timespec, &new_value->it_value,
+				   &now_timespec);
 	} else {
 		rel_timespec = new_value->it_value;
 	}

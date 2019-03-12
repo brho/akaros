@@ -202,7 +202,8 @@ static void evexit(int rc)
 
 static void usage(void)
 {
-	fprintf(stderr, "CS:usage: %s [-dn] [-f ndb-file] [-x netmtpt]\n", argv0);
+	fprintf(stderr, "CS:usage: %s [-dn] [-f ndb-file] [-x netmtpt]\n",
+		argv0);
 	fprintf(stderr, "CS:usage");
 	evexit(1);
 }
@@ -498,9 +499,8 @@ static void io(void)
 	pthread_attr_t pth_attr;
 
 	/*
-	 * each request is handled via a thread. Somewhat less efficient than the
-	 * old
-	 * cs but way cleaner.
+	 * each request is handled via a thread. Somewhat less efficient than
+	 * the old cs but way cleaner.
 	 */
 
 	pthread_attr_init(&pth_attr);
@@ -513,9 +513,10 @@ static void io(void)
 		if (convM2S(mdata, n, &job->request) != n) {
 			fprintf(stderr,
 			        "convM2S went south: format error %ux %ux %ux %ux %ux",
-			        mdata[0], mdata[1], mdata[2], mdata[3], mdata[4]);
-			error(1, 0, "format error %ux %ux %ux %ux %ux", mdata[0], mdata[1],
-			      mdata[2], mdata[3], mdata[4]);
+				mdata[0], mdata[1], mdata[2], mdata[3],
+				mdata[4]);
+			error(1, 0, "format error %ux %ux %ux %ux %ux",
+			      mdata[0], mdata[1], mdata[2], mdata[3], mdata[4]);
 			freejob(job);
 			continue;
 		}
@@ -609,7 +610,8 @@ static char *rwalk(struct job *job, struct mfile *mf)
 				err = "not a directory";
 				break;
 			}
-			if (strcmp(elems[i], "..") == 0 || strcmp(elems[i], ".") == 0) {
+			if (strcmp(elems[i], "..") == 0
+			    || strcmp(elems[i], ".") == 0) {
 				qid.type = QTDIR;
 				qid.path = Qdir;
 Found:
@@ -832,7 +834,8 @@ static void rwrite(struct job *job, struct mfile *mf)
 	if (debug)
 		fprintf(stderr, "CS:write %s", job->request.data);
 	if (paranoia)
-		fprintf(stderr, "CS:write %s by %s", job->request.data, mf->user);
+		fprintf(stderr, "CS:write %s by %s", job->request.data,
+			mf->user);
 
 	/*
 	 *  break up name
@@ -926,7 +929,8 @@ static void sendmsg(struct job *job, char *err)
 	job->reply.tag = job->request.tag;
 	n = convS2M(&job->reply, mdata, sizeof(mdata));
 	if (n == 1) {
-		fprintf(stderr, "CS:sendmsg convS2M of %F returns 0", &job->reply);
+		fprintf(stderr, "CS:sendmsg convS2M of %F returns 0",
+			&job->reply);
 		abort();
 	}
 	spinlock_lock(&joblock);
@@ -993,7 +997,8 @@ static void ipid(void)
 		 */
 		if (mysysname == 0 && netdb != NULL) {
 			ndbreopen(netdb);
-			for (tt = t = ndbparse(netdb); t != NULL; t = t->entry) {
+			for (tt = t = ndbparse(netdb); t != NULL; t = t->entry)
+			{
 				if (strcmp(t->attr, "sys") == 0) {
 					mysysname = strdup(t->val);
 					break;
@@ -1002,19 +1007,24 @@ static void ipid(void)
 			ndbfree(tt);
 		}
 
-		/* next network database, ip address, and ether address to find a name
+		/* next network database, ip address, and ether address to find
+		 * a name
 		 */
 		if (mysysname == 0) {
 			t = NULL;
 			if (isvalidip(ipa))
-				free(ndbgetvalue(db, &s, "ip", ipaddr, "sys", &t));
+				free(ndbgetvalue(db, &s, "ip", ipaddr, "sys",
+						 &t));
 			if (t == NULL) {
 				for (f = 0; f < 3; f++) {
-					snprintf(buf, sizeof(buf), "%s/ether%d", mntpt, f);
+					snprintf(buf, sizeof(buf), "%s/ether%d",
+						 mntpt, f);
 					if (myetheraddr(addr, buf) < 0)
 						continue;
-					snprintf(eaddr, sizeof(eaddr), "%E", addr);
-					free(ndbgetvalue(db, &s, "ether", eaddr, "sys", &t));
+					snprintf(eaddr, sizeof(eaddr), "%E",
+						 addr);
+					free(ndbgetvalue(db, &s, "ether", eaddr,
+							 "sys", &t));
 					if (t != NULL)
 						break;
 				}
@@ -1083,7 +1093,8 @@ static void netinit(int background)
 	ipid();
 
 	if (debug)
-		fprintf(stderr, logfile, "CS:mysysname %s eaddr %s ipaddr %s ipa %I\n",
+		fprintf(stderr, logfile,
+			"CS:mysysname %s eaddr %s ipaddr %s ipa %I\n",
 		        mysysname ? mysysname : "???", eaddr, ipaddr, ipa);
 }
 
@@ -1154,9 +1165,11 @@ static int lookup(struct mfile *mf)
 			nt = (*np->lookup)(np, mf->host, mf->serv, 1);
 			if (nt == NULL)
 				continue;
-			hack = np->fasttimeouthack && !lookforproto(nt, np->net);
+			hack = np->fasttimeouthack && !lookforproto(nt,
+								    np->net);
 			for (t = nt; mf->nreply < Nreply && t; t = t->entry) {
-				cp = (*np->trans)(t, np, mf->serv, mf->rem, hack);
+				cp = (*np->trans)(t, np, mf->serv, mf->rem,
+						  hack);
 				if (!cp)
 					continue;
 				/* avoid duplicates */
@@ -1213,8 +1226,8 @@ static int lookup(struct mfile *mf)
 	 *  not a known network, don't translate host or service
 	 */
 	if (mf->serv)
-		snprintf(reply, sizeof(reply), "%s/%s/clone %s!%s", mntpt, mf->net,
-		         mf->host, mf->serv);
+		snprintf(reply, sizeof(reply), "%s/%s/clone %s!%s", mntpt,
+			 mf->net, mf->host, mf->serv);
 	else
 		snprintf(reply, sizeof(reply), "%s/%s/clone %s", mntpt, mf->net,
 		         mf->host);
@@ -1446,11 +1459,11 @@ static char *iptrans(struct ndbtuple *t, struct network *np, char *serv,
 		*x = 0;
 
 	if (*t->val == '*')
-		snprintf(reply, sizeof(reply), "%s/%s/clone %s%s", mntpt, np->net, ts,
-		         x);
+		snprintf(reply, sizeof(reply), "%s/%s/clone %s%s", mntpt,
+			 np->net, ts, x);
 	else
-		snprintf(reply, sizeof(reply), "%s/%s/clone %s!%s%s%s", mntpt, np->net,
-		         t->val, ts, x, hack ? "!fasttimeout" : "");
+		snprintf(reply, sizeof(reply), "%s/%s/clone %s!%s%s%s", mntpt,
+			 np->net, t->val, ts, x, hack ? "!fasttimeout" : "");
 
 	return strdup(reply);
 }
@@ -1489,11 +1502,11 @@ static char *telcotrans(struct ndbtuple *t, struct network *np, char *serv,
 	else
 		*x = 0;
 	if (serv)
-		snprintf(reply, sizeof(reply), "%s/%s/clone %s!%s%s", mntpt, np->net,
-		         t->val, serv, x);
+		snprintf(reply, sizeof(reply), "%s/%s/clone %s!%s%s", mntpt,
+			 np->net, t->val, serv, x);
 	else
-		snprintf(reply, sizeof(reply), "%s/%s/clone %s%s", mntpt, np->net,
-		         t->val, x);
+		snprintf(reply, sizeof(reply), "%s/%s/clone %s%s", mntpt,
+			 np->net, t->val, x);
 	return strdup(reply);
 }
 
@@ -1591,7 +1604,8 @@ static int qmatch(struct ndbtuple *t, char **attr, char **val, int n)
 		found = 0;
 		for (nt = t; nt; nt = nt->entry)
 			if (strcmp(attr[i], nt->attr) == 0)
-				if (strcmp(val[i], "*") == 0 || strcmp(val[i], nt->val) == 0) {
+				if (strcmp(val[i], "*") == 0 ||
+				    strcmp(val[i], nt->val) == 0) {
 					found = 1;
 					break;
 				}
@@ -1685,7 +1699,8 @@ static char *genquery(struct mfile *mf, char *query)
 	}
 
 	/* give dns a chance */
-	if ((strcmp(attr[0], "dom") == 0 || strcmp(attr[0], "ip") == 0) && val[0]) {
+	if ((strcmp(attr[0], "dom") == 0 || strcmp(attr[0], "ip") == 0)
+	    && val[0]) {
 		t = dnsiplookup(val[0], &s);
 		if (t) {
 			if (qmatch(t, attr, val, n)) {

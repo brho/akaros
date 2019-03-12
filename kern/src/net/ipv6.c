@@ -32,12 +32,12 @@
 #include <kmalloc.h>
 
 enum {
-	IP4HDR = 20,				/* sizeof(Ip4hdr) */
-	IP6HDR = 40,	/* sizeof(Ip6hdr) */
+	IP4HDR = 20,		/* sizeof(Ip4hdr) */
+	IP6HDR = 40,		/* sizeof(Ip6hdr) */
 	IP_HLEN4 = 0x05,	/* Header length in words */
-	IP_DF = 0x4000,	/* Don't fragment */
-	IP_MF = 0x2000,	/* More fragments */
-	IP6FHDR = 8,	/* sizeof(Fraghdr6) */
+	IP_DF = 0x4000,		/* Don't fragment */
+	IP_MF = 0x2000,		/* More fragments */
+	IP6FHDR = 8,		/* sizeof(Fraghdr6) */
 	IP_MAX = (32 * 1024),	/* Maximum Internet packet size */
 };
 
@@ -142,7 +142,7 @@ struct IP {
 	struct fragment6 *fragfree6;
 	int id6;
 
-	int iprouting;				/* true if we route like a gateway */
+	int iprouting;		/* true if we route like a gateway */
 };
 
 int ipoput6(struct Fs *f, struct block *bp,
@@ -176,7 +176,8 @@ int ipoput6(struct Fs *f, struct block *bp,
 
 	tentative = iptentative(f, eh->src);
 	if (tentative) {
-		netlog(f, Logip, "reject tx of packet with tentative src address\n");
+		netlog(f, Logip,
+		       "reject tx of packet with tentative src address\n");
 		goto free;
 	}
 
@@ -250,13 +251,14 @@ int ipoput6(struct Fs *f, struct block *bp,
 	if (gating)
 		if (ifc->reassemble <= 0) {
 			/*
-			 * v6 intermediate nodes are not supposed to fragment pkts;
-			 * we fragment if ifc->reassemble is turned on; an exception
-			 * needed for nat.
+			 * v6 intermediate nodes are not supposed to fragment
+			 * pkts; we fragment if ifc->reassemble is turned on; an
+			 * exception needed for nat.
 			 */
 			ip->stats[OutDiscards]++;
 			icmppkttoobig6(f, ifc, bp);
-			netlog(f, Logip, "%I: gated pkts not fragmented\n", eh->dst);
+			netlog(f, Logip, "%I: gated pkts not fragmented\n",
+			       eh->dst);
 			goto raise;
 		}
 
@@ -393,7 +395,8 @@ void ipiput6(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 	/* Check header version */
 	if (BLKIPVER(bp) != IP_VER6) {
 		ip->stats[InHdrErrors]++;
-		netlog(f, Logip, "ip: bad version 0x%x\n", (h->vcf[0] & 0xF0) >> 2);
+		netlog(f, Logip, "ip: bad version 0x%x\n",
+		       (h->vcf[0] & 0xF0) >> 2);
 		freeblist(bp);
 		return;
 	}
@@ -529,10 +532,10 @@ static struct block *procxtns(struct IP *ip, struct block *bp, int doreasm)
 	return bp;
 }
 
-/*	returns length of "Unfragmentable part", i.e., sum of lengths of ipv6 hdr,
- *	hop-by-hop & routing headers if present; *nexthdr is set to nexthdr value
- *	of the last header in the "Unfragmentable part"; if setfh != 0, nexthdr
- *	field of the last header in the "Unfragmentable part" is set to FH.
+/* returns length of "Unfragmentable part", i.e., sum of lengths of ipv6 hdr,
+ * hop-by-hop & routing headers if present; *nexthdr is set to nexthdr value of
+ * the last header in the "Unfragmentable part"; if setfh != 0, nexthdr field of
+ * the last header in the "Unfragmentable part" is set to FH.
  */
 int unfraglen(struct block *bp, uint8_t * nexthdr, int setfh)
 {
@@ -540,7 +543,7 @@ int unfraglen(struct block *bp, uint8_t * nexthdr, int setfh)
 	int ufl, hs;
 
 	p = bp->rp;
-	q = p + 6;	/* proto, = p+sizeof(Ip6hdr.vcf)+sizeof(Ip6hdr.ploadlen) */
+	q = p + 6; /* proto, = p+sizeof(Ip6hdr.vcf)+sizeof(Ip6hdr.ploadlen) */
 	*nexthdr = *q;
 	ufl = IP6HDR;
 	p += ufl;
@@ -603,7 +606,8 @@ struct block *ip6reassemble(struct IP *ip, int uflen, struct block *bp,
 	 */
 	for (f = ip->flisthead6; f; f = fnext) {
 		fnext = f->next;
-		if (ipcmp(f->src, src) == 0 && ipcmp(f->dst, dst) == 0 && f->id == id)
+		if (ipcmp(f->src, src) == 0 && ipcmp(f->dst, dst) == 0
+		    && f->id == id)
 			break;
 		if (f->age < NOW) {
 			ip->stats[ReasmTimeout]++;
@@ -720,7 +724,8 @@ struct block *ip6reassemble(struct IP *ip, int uflen, struct block *bp,
 
 			memmove(bl->rp + IP6FHDR, bl->rp, uflen);
 			bl->rp += IP6FHDR;
-			len = nhgets(((struct ip6hdr *)(bl->rp))->ploadlen) - IP6FHDR;
+			len = nhgets(((struct ip6hdr *)(bl->rp))->ploadlen) -
+				IP6FHDR;
 			bl->wp = bl->rp + len + IP6HDR;
 
 			/* Pullup all the fragment headers and

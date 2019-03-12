@@ -26,8 +26,8 @@ struct termios
 	tcflag_t c_lflag;			/* local mode flags */
 	cc_t c_line;				/* line discipline */
 	cc_t c_cc[NCCS];			/* control characters */
-	/* these last two might not be supported by all glibc builds.  search for
-	 * _HAVE_STRUCT_TERMIOS_C_ISPEED and friends. */
+	/* these last two might not be supported by all glibc builds.  search
+	 * for _HAVE_STRUCT_TERMIOS_C_ISPEED and friends. */
 	speed_t c_ispeed;			/* input speed */
 	speed_t c_ospeed;			/* output speed */
 };

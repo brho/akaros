@@ -1,37 +1,37 @@
-#include <multiboot.h>
-#include <ros/memlayout.h>
 #include <arch/arch.h>
 #include <arch/mmu.h>
-#include <string.h>
 #include <assert.h>
-#include <stdio.h>
+#include <multiboot.h>
 #include <pmap.h>
+#include <ros/memlayout.h>
+#include <stdio.h>
+#include <string.h>
 
 #define MAX_KERNBASE_SIZE (KERN_VMAP_TOP - KERNBASE)
 
-uint32_t num_cores = 1;   // this must not be in BSS
+uint32_t num_cores = 1; // this must not be in BSS
 
-static uint64_t
-mem_size(uint64_t sz_mb)
+static uint64_t mem_size(uint64_t sz_mb)
 {
 	uint64_t sz = (uint64_t)sz_mb * 1024 * 1024;
-	return MIN(sz,  MIN(MAX_KERNBASE_SIZE, (uint64_t)L1PGSIZE * NPTENTRIES));
+
+	return MIN(sz, MIN(MAX_KERNBASE_SIZE, (uint64_t)L1PGSIZE * NPTENTRIES));
 }
 
-void pagetable_init(uint32_t memsize_mb, pte_t* l1pt, pte_t* l1pt_boot,
-                    pte_t* l2pt)
+void pagetable_init(uint32_t memsize_mb, pte_t *l1pt, pte_t *l1pt_boot,
+                    pte_t *l2pt)
 {
 	static_assert(KERNBASE % L1PGSIZE == 0);
 	// The boot L1 PT retains the identity mapping [0,memsize-1],
 	// whereas the post-boot L1 PT does not.
 	uint64_t memsize = mem_size(memsize_mb);
-	for(uint64_t pa = 0; pa < memsize+L1PGSIZE-1; pa += L1PGSIZE)
-	{
+
+	for (uint64_t pa = 0; pa < memsize + L1PGSIZE - 1; pa += L1PGSIZE) {
 		pte_t pte = build_pte(pa, PTE_KERN_RW | PTE_E);
 
-		l1pt_boot[L1X(pa)] = pte; // identity mapping
-		l1pt_boot[L1X(KERNBASE+pa)] = pte; // KERNBASE mapping
-		l1pt[L1X(KERNBASE+pa)] = pte; // KERNBASE mapping
+		l1pt_boot[L1X(pa)] = pte;            // identity mapping
+		l1pt_boot[L1X(KERNBASE + pa)] = pte; // KERNBASE mapping
+		l1pt[L1X(KERNBASE + pa)] = pte;      // KERNBASE mapping
 	}
 
 #ifdef __riscv64
@@ -47,15 +47,16 @@ void pagetable_init(uint32_t memsize_mb, pte_t* l1pt, pte_t* l1pt_boot,
 	l1pt[L1X(KERN_LOAD_ADDR)] = PTD(l2pt);
 	l1pt_boot[L1X(KERN_LOAD_ADDR)] = PTD(l2pt);
 
-	for (uintptr_t pa = 0; pa < (uintptr_t)(-KERN_LOAD_ADDR); pa += L2PGSIZE)
-		l2pt[L2X(KERN_LOAD_ADDR+pa)] = build_pte(pa, PTE_KERN_RW | PTE_E);
+	for (uintptr_t pa = 0; pa < (uintptr_t)(-KERN_LOAD_ADDR);
+	     pa += L2PGSIZE)
+		l2pt[L2X(KERN_LOAD_ADDR + pa)] =
+		    build_pte(pa, PTE_KERN_RW | PTE_E);
 #else
-	(void) l2pt; // don't need this for rv32
+	(void)l2pt; // don't need this for rv32
 #endif
 }
 
-void
-cmain(uint32_t memsize_mb, uint32_t nc)
+void cmain(uint32_t memsize_mb, uint32_t nc)
 {
 	multiboot_info_t mbi;
 	memset(&mbi, 0, sizeof(mbi));
@@ -64,7 +65,8 @@ cmain(uint32_t memsize_mb, uint32_t nc)
 
 	num_cores = nc;
 
-	extern void kernel_init(multiboot_info_t *mboot_info);
+	extern void kernel_init(multiboot_info_t * mboot_info);
+
 	// kernel_init expects a pre-relocation mbi address
-	kernel_init((multiboot_info_t*)PADDR(&mbi));
+	kernel_init((multiboot_info_t *)PADDR(&mbi));
 }

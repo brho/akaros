@@ -80,12 +80,12 @@ static bool fd_is_set(unsigned int fd, fd_set *set)
 
 static void select_fd_closed(int fd)
 {
-	/* Slightly racy, but anything concurrently added will be closed later, and
-	 * after it is_set. */
+	/* Slightly racy, but anything concurrently added will be closed later,
+	 * and after it is_set. */
 	if (!fd_is_set(fd, &all_fds))
 		return;
-	/* We just need to stop tracking FD.  We do not need to remove it from the
-	 * epoll set, since that will happen automatically on close(). */
+	/* We just need to stop tracking FD.  We do not need to remove it from
+	 * the epoll set, since that will happen automatically on close(). */
 	uth_mutex_lock(epoll_mtx);
 	FD_CLR(fd, &all_fds);
 	uth_mutex_unlock(epoll_mtx);
@@ -98,11 +98,13 @@ static void select_forked(void)
 	uth_mutex_lock(epoll_mtx);
 	for (int i = 0; i < FD_SETSIZE; i++) {
 		if (fd_is_set(i, &all_fds)) {
-			ep_ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR;
+			ep_ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLHUP |
+				       EPOLLERR;
 			ep_ev.data.fd = i;
-			/* Discard error.  The underlying tap is gone, and the epoll ctlr
-			 * might also have been emptied.  We just want to make sure there is
-			 * no epoll/tap so that a future CTL_ADD doesn't fail. */
+			/* Discard error.  The underlying tap is gone, and the
+			 * epoll ctlr might also have been emptied.  We just
+			 * want to make sure there is no epoll/tap so that a
+			 * future CTL_ADD doesn't fail. */
 			epoll_ctl(epoll_fd, EPOLL_CTL_DEL, i, &ep_ev);
 			FD_CLR(i, &all_fds);
 		}
@@ -148,8 +150,8 @@ static unsigned int fd_set_actionable(int fd, fd_set *readfds, fd_set *writefds)
 	struct stat stat_buf;
 	int ret;
 
-	/* Avoid the stat call on FDs we're not tracking (which should trigger an
-	 * error, or give us the stat for FD 0). */
+	/* Avoid the stat call on FDs we're not tracking (which should trigger
+	 * an error, or give us the stat for FD 0). */
 	if (!(fd_is_set(fd, readfds) || fd_is_set(fd, writefds)))
 		return 0;
 	ret = fstat(fd, &stat_buf);
@@ -215,44 +217,49 @@ loop:
 		    !fd_is_set(i, &all_fds)) {
 
 			FD_SET(i, &all_fds);
-			/* FDs that we track for *any* reason with select will be
-			 * tracked for *all* reasons with epoll. */
-			ep_ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR;
+			/* FDs that we track for *any* reason with select will
+			 * be tracked for *all* reasons with epoll. */
+			ep_ev.events = EPOLLET | EPOLLIN | EPOLLOUT | EPOLLHUP |
+				       EPOLLERR;
 			ep_ev.data.fd = i;
 			if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, i, &ep_ev)) {
-				/* We might have failed because we tried to set up too many
-				 * FD tap types.  Listen FDs, for instance, can only be
-				 * tapped for READABLE and HANGUP.  Let's try for one of
-				 * those. */
+				/* We might have failed because we tried to set
+				 * up too many FD tap types.  Listen FDs, for
+				 * instance, can only be tapped for READABLE and
+				 * HANGUP.  Let's try for one of those. */
 				if (errno == ENOSYS) {
-					ep_ev.events = EPOLLET | EPOLLIN | EPOLLHUP;
-					if (!epoll_ctl(epoll_fd, EPOLL_CTL_ADD, i, &ep_ev))
+					ep_ev.events = EPOLLET | EPOLLIN |
+						       EPOLLHUP;
+					if (!epoll_ctl(epoll_fd, EPOLL_CTL_ADD,
+						       i, &ep_ev))
 						continue;
 				}
-				/* Careful to unlock before calling perror.  perror calls
-				 * close, which calls our CB, which grabs the lock. */
+				/* Careful to unlock before calling perror.
+				 * perror calls close, which calls our CB, which
+				 * grabs the lock. */
 				uth_mutex_unlock(epoll_mtx);
 				perror("select epoll_ctl failed");
 				return -1;
 			}
 		}
 	}
-	/* Since we just added some FDs to our tracking set, we don't know if they
-	 * are readable or not.  We'll only catch edge-triggered changes in the
-	 * future.
+	/* Since we just added some FDs to our tracking set, we don't know if
+	 * they are readable or not.  We'll only catch edge-triggered changes in
+	 * the future.
 	 *
 	 * Similarly, it is legal to select on a readable FD even if you didn't
 	 * consume all of the data yet; similarly for writers on non-full FDs.
 	 *
-	 * Additionally, since there is a global epoll set, we could have multiple
-	 * threads epolling concurrently and one thread could consume the events
-	 * that should wake another thread.  Also, keep in mind we could also have a
-	 * single thread that selects multiple times on separate FD sets.
+	 * Additionally, since there is a global epoll set, we could have
+	 * multiple threads epolling concurrently and one thread could consume
+	 * the events that should wake another thread.  Also, keep in mind we
+	 * could also have a single thread that selects multiple times on
+	 * separate FD sets.
 	 *
 	 * Due to any of these cases, we need to check every FD this select call
 	 * cares about (i.e. in an fd_set) to see if it is actionable.  We do it
-	 * while holding the mutex to prevent other threads from consuming our epoll
-	 * events. */
+	 * while holding the mutex to prevent other threads from consuming our
+	 * epoll events. */
 	ret = 0;
 	FD_ZERO(&working_read_fds);
 	FD_ZERO(&working_write_fds);
@@ -277,16 +284,19 @@ loop:
 		return -1;
 	}
 	ep_ret = epoll_wait(epoll_fd, ep_results, FD_SETSIZE, ep_timeout);
-	/* We need to hold the mtx during all of this processing since we're using
-	 * the global working_ fds sets.  We can't modify the
+	/* We need to hold the mtx during all of this processing since we're
+	 * using the global working_ fds sets.  We can't modify the
 	 * readfds/writefds/exceptfds until we're sure we are done. */
 	ret = 0;
-	/* Note that ret can be > ep_ret.  An FD that is both readable and writable
-	 * counts as one event for epoll, but as two bits for select. */
+	/* Note that ret can be > ep_ret.  An FD that is both readable and
+	 * writable counts as one event for epoll, but as two bits for select.
+	 * */
 	for (int i = 0; i < ep_ret; i++) {
-		ret += extract_bits_for_events(&ep_results[i], EPOLLIN | EPOLLHUP,
+		ret += extract_bits_for_events(&ep_results[i],
+					       EPOLLIN | EPOLLHUP,
 		                               readfds, &working_read_fds);
-		ret += extract_bits_for_events(&ep_results[i], EPOLLOUT | EPOLLHUP,
+		ret += extract_bits_for_events(&ep_results[i],
+					       EPOLLOUT | EPOLLHUP,
 		                               writefds, &working_write_fds);
 		ret += extract_bits_for_events(&ep_results[i], EPOLLERR,
 		                               exceptfds, &working_except_fds);
@@ -305,11 +315,11 @@ loop:
 	 * (POSIX). */
 	if (ret)
 		return ret;
-	/* If we have no rets at this point, there are a few options: we could have
-	 * timed out (if requested), or we could have consumed someone else's event.
-	 * No one could have consumed our event, since we were the only epoller
-	 * (while holding the mtx).  In the latter case, we'll need to try again,
-	 * but with an updated timeout. */
+	/* If we have no rets at this point, there are a few options: we could
+	 * have timed out (if requested), or we could have consumed someone
+	 * else's event.  No one could have consumed our event, since we were
+	 * the only epoller (while holding the mtx).  In the latter case, we'll
+	 * need to try again, but with an updated timeout. */
 	if (timeout) {
 		gettimeofday(end_tv, NULL);
 		timersub(end_tv, start_tv, end_tv);	/* diff in end_tv */

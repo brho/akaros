@@ -93,10 +93,10 @@ static void __tf_free(struct tree_file *tf)
 	}
 	cleanup_fs_file((struct fs_file*)tf);
 	kfree(tf);
-	/* the reason for decreffing the parent now is for convenience on releasing.
-	 * When we unlink the child from the LRU pruner, we don't want to release
-	 * the parent immediately while we hold the parent's qlock (and other
-	 * locks). */
+	/* the reason for decreffing the parent now is for convenience on
+	 * releasing.  When we unlink the child from the LRU pruner, we don't
+	 * want to release the parent immediately while we hold the parent's
+	 * qlock (and other locks). */
 	if (parent)
 		tf_kref_put(parent);
 }
@@ -122,16 +122,17 @@ static void tf_release(struct kref *kref)
 		return;
 	}
 	if (!(tf->flags & (TF_F_DISCONNECTED | TF_F_IS_ROOT))) {
-		/* It's possible that we paused before locking, then another thread
-		 * upped, downed, and put it on the LRU list already.  The helper deals
-		 * with that. */
+		/* It's possible that we paused before locking, then another
+		 * thread upped, downed, and put it on the LRU list already.
+		 * The helper deals with that. */
 		__add_to_lru(tf);
 		spin_unlock(&tf->lifetime);
 		return;
 	}
 	spin_unlock(&tf->lifetime);
-	/* Need RCU, since we could have had a reader who saw the object and still
-	 * needs to try to kref (and fail).  call_rcu, since we can't block. */
+	/* Need RCU, since we could have had a reader who saw the object and
+	 * still needs to try to kref (and fail).  call_rcu, since we can't
+	 * block. */
 	call_rcu(&tf->rcu, __tf_free_rcu);
 }
 
@@ -178,15 +179,16 @@ static struct tree_file *wc_lookup_child(struct tree_file *parent,
 
 	bucket = &wc->ht[hash_val % wc->hh.nr_hash_bits];
 	hlist_for_each_entry_rcu(i, bucket, hash) {
-		/* Note 'i' is an rcu protected pointer.  That deref is safe.  i->parent
-		 * is also a pointer that in general we want to protect.  In this case,
-		 * even though we don't dereference it, we want a pointer that is good
-		 * enough to dereference so we can do the comparison. */
+		/* Note 'i' is an rcu protected pointer.  That deref is safe.
+		 * i->parent is also a pointer that in general we want to
+		 * protect.  In this case, even though we don't dereference it,
+		 * we want a pointer that is good enough to dereference so we
+		 * can do the comparison. */
 		if (rcu_dereference(i->parent) != parent)
 			continue;
-		/* The file's name should never change while it is in the table, so no
-		 * need for a seq-reader.  Can't assert though, since there are valid
-		 * reasons for other seq lockers. */
+		/* The file's name should never change while it is in the table,
+		 * so no need for a seq-reader.  Can't assert though, since
+		 * there are valid reasons for other seq lockers. */
 		if (!strcmp(tree_file_to_name(i), name))
 			return i;
 	}
@@ -200,11 +202,11 @@ static void wc_insert_child(struct tree_file *parent, struct tree_file *child)
 	unsigned long hash_val = hash_string(tree_file_to_name(child));
 	struct hlist_head *bucket;
 
-	assert(child->parent == parent);	/* catch bugs from our callers */
-	/* TODO: consider bucket locks and/or growing the HT.  Prob need a seq_ctr
-	 * in the WC, used on the read side during resizing.  Removal probably would
-	 * need something other than the bucket lock too (confusion about which
-	 * bucket during the op). */
+	assert(child->parent == parent); /* catch bugs from our callers */
+	/* TODO: consider bucket locks and/or growing the HT.  Prob need a
+	 * seq_ctr in the WC, used on the read side during resizing.  Removal
+	 * probably would need something other than the bucket lock too
+	 * (confusion about which bucket during the op). */
 	spin_lock(&wc->ht_lock);
 	bucket = &wc->ht[hash_val % wc->hh.nr_hash_bits];
 	hlist_add_head_rcu(&child->hash, bucket);
@@ -216,7 +218,7 @@ static void wc_remove_child(struct tree_file *parent, struct tree_file *child)
 {
 	struct walk_cache *wc = &parent->tfs->wc;
 
-	assert(child->parent == parent);	/* catch bugs from our callers */
+	assert(child->parent == parent); /* catch bugs from our callers */
 	spin_lock(&wc->ht_lock);
 	hlist_del_rcu(&child->hash);
 	spin_unlock(&wc->ht_lock);
@@ -254,9 +256,9 @@ static struct tree_file *get_locked_and_kreffed_parent(struct tree_file *child)
 	if (!parent)
 		return NULL;
 	qlock(&parent->file.qlock);
-	/* Checking the parent == child->parent isn't enough here.  That works for
-	 * rename, but not removal/unlink.  Older versions of TF code cleared
-	 * child->parent, but now that's dealt with in tf_free.
+	/* Checking the parent == child->parent isn't enough here.  That works
+	 * for rename, but not removal/unlink.  Older versions of TF code
+	 * cleared child->parent, but now that's dealt with in tf_free.
 	 *
 	 * We're doing a lockless peek at child's flags.  We hold the potential
 	 * parent's lock, so if they are ours, no one will be messing with the
@@ -313,8 +315,8 @@ struct tree_file *tree_file_alloc(struct tree_filesystem *tfs,
 	fs_file_init((struct fs_file*)tf, name, &tfs->fs_ops);
 	kref_init(&tf->kref, tf_release, 0);
 	spinlock_init(&tf->lifetime);
-	/* Need to set the parent early on, even if the child isn't linked yet, so
-	 * that the TFS ops know who the parent is. */
+	/* Need to set the parent early on, even if the child isn't linked yet,
+	 * so that the TFS ops know who the parent is. */
 	tf->parent = parent;
 	if (parent)
 		kref_get(&parent->kref, 1);
@@ -327,12 +329,12 @@ struct tree_file *tree_file_alloc(struct tree_filesystem *tfs,
 /* Callers must hold the parent's qlock. */
 static void __link_child(struct tree_file *parent, struct tree_file *child)
 {
-	/* Devices may have already increffed ("+1 for existing").  Those that don't
-	 * need to be on the LRU.  We haven't linked to the parent yet, so we hold
-	 * the only ref.  Once we unlock in __add_to_lru, we're discoverable via
-	 * that list, even though we're not linked.  The lru pruner is careful to
-	 * not muck with the parent's or wc linkage without qlocking the parent,
-	 * which we currently hold. */
+	/* Devices may have already increffed ("+1 for existing").  Those that
+	 * don't need to be on the LRU.  We haven't linked to the parent yet, so
+	 * we hold the only ref.  Once we unlock in __add_to_lru, we're
+	 * discoverable via that list, even though we're not linked.  The lru
+	 * pruner is careful to not muck with the parent's or wc linkage without
+	 * qlocking the parent, which we currently hold. */
 	if (kref_refcnt(&child->kref) == 0)
 		__add_to_lru(child);
 	/* This was set in tree_file_alloc */
@@ -353,7 +355,7 @@ static void __prune_dir_negatives(struct tree_file *dir)
 			continue;
 		spin_lock(&child->lifetime);
 		assert(kref_refcnt(&child->kref) == 0);
-		/* This mark prevents new lookups.  We'll disconnect it shortly. */
+		/* This mark prevents new lookups; will disconnect it shortly */
 		child->flags |= TF_F_DISCONNECTED;
 		spin_unlock(&child->lifetime);
 		assert(child->parent == dir);
@@ -369,8 +371,8 @@ static void neuter_directory(struct tree_file *dir)
 		error(ENOTEMPTY, "can't remove dir with children");
 	}
 	dir->can_have_children = false;
-	/* Even if we don't have real children, we might have some negatives.  Those
-	 * aren't a reason to abort an rmdir, we just need to drop them. */
+	/* Even if we don't have real children, we might have some negatives.
+	 * Those aren't a reason to abort an rmdir, we just need to drop them.*/
 	__prune_dir_negatives(dir);
 	qunlock(&dir->file.qlock);
 }
@@ -383,8 +385,8 @@ static void neuter_directory(struct tree_file *dir)
 static void __unlink_child(struct tree_file *parent, struct tree_file *child)
 {
 	/* Need to make sure concurrent creates/renames do not add children to
-	 * directories that are unlinked.  Note we don't undo the neutering if the
-	 * backend fails. */
+	 * directories that are unlinked.  Note we don't undo the neutering if
+	 * the backend fails. */
 	if (tree_file_is_dir(child))
 		neuter_directory(child);
 	/* The ramfs backend will probably decref the "+1 for existing" ref.
@@ -414,8 +416,8 @@ static struct tree_file *lookup_child_entry(struct tree_file *parent,
 	qlock(&parent->file.qlock);
 	child = wc_lookup_child(parent, name);
 	if (child) {
-		/* Since we last looked, but before we qlocked, someone else added our
-		 * entry. */
+		/* Since we last looked, but before we qlocked, someone else
+		 * added our entry. */
 		rcu_read_lock();
 		qunlock(&parent->file.qlock);
 		return child;
@@ -426,8 +428,9 @@ static struct tree_file *lookup_child_entry(struct tree_file *parent,
 	}
 	child = tree_file_alloc(parent->tfs, parent, name);
 	if (waserror()) {
-		/* child wasn't fully created, so freeing it may be tricky, esp on the
-		 * device ops side (might see something they never created). */
+		/* child wasn't fully created, so freeing it may be tricky, esp
+		 * on the device ops side (might see something they never
+		 * created). */
 		__tf_free(child);
 		qunlock(&parent->file.qlock);
 		nexterror();
@@ -462,19 +465,19 @@ struct walkqid *tree_file_walk(struct tree_file *from, char **name,
 	wq = kzmalloc(sizeof(struct walkqid) + nname * sizeof(struct qid),
 				  MEM_WAIT);
 	/* A walk with zero names means "make me a copy."  If we go through the
-	 * regular walker, our usual tf_kref_get will fail - similar to failing if
-	 * we got a walk for "foo/../" during a concurrent removal of ourselves.
-	 * We'll let a walk of zero names work, but if you provide any names, the
-	 * actual walk must happen.
+	 * regular walker, our usual tf_kref_get will fail - similar to failing
+	 * if we got a walk for "foo/../" during a concurrent removal of
+	 * ourselves.  We'll let a walk of zero names work, but if you provide
+	 * any names, the actual walk must happen.
 	 *
-	 * This is tricky, and confused me a little.  We're returning a *TF* through
-	 * wq->clone, not a chan, and that is refcounted.  Normally for chans that
-	 * end up with wq->clone == c, we do not incref the object hanging off the
-	 * chan (see k/d/d/eventfd.c), since there is just one chan with a kreffed
-	 * object hanging off e.g. c->aux.  But here, wq->clone is considered a
-	 * distinct refcnt to some TF, and it might be 'from.'  Our *caller* needs
-	 * to deal with the "wq->clone == from_chan", since they deal with chans.
-	 * We deal with tree files. */
+	 * This is tricky, and confused me a little.  We're returning a *TF*
+	 * through wq->clone, not a chan, and that is refcounted.  Normally for
+	 * chans that end up with wq->clone == c, we do not incref the object
+	 * hanging off the chan (see k/d/d/eventfd.c), since there is just one
+	 * chan with a kreffed object hanging off e.g. c->aux.  But here,
+	 * wq->clone is considered a distinct refcnt to some TF, and it might be
+	 * 'from.'  Our *caller* needs to deal with the "wq->clone ==
+	 * from_chan", since they deal with chans.  We deal with tree files. */
 	if (!nname) {
 		kref_get(&from->kref, 1);
 		wq->clone = (struct chan*)from;
@@ -488,24 +491,26 @@ struct walkqid *tree_file_walk(struct tree_file *from, char **name,
 	rcu_read_lock();
 	at = from;
 	for (int i = 0; i < nname; i++) {
-		/* Walks end if we reach a regular file, i.e. you can't walk through a
-		 * file, only a dir.  But even if there are more names, the overall walk
-		 * might succeed.  E.g. a directory could be mounted on top of the
-		 * current file we're at.  That's just not our job. */
+		/* Walks end if we reach a regular file, i.e. you can't walk
+		 * through a file, only a dir.  But even if there are more
+		 * names, the overall walk might succeed.  E.g. a directory
+		 * could be mounted on top of the current file we're at.  That's
+		 * just not our job. */
 		if (tree_file_is_file(at)) {
 			if (i == 0)
 				error(ENOTDIR, "initial walk from a file");
 			break;
 		}
-		/* Normally, symlinks stop walks, and namec's walk() will deal with it.
-		 * We allow walks 'through' symlinks, but only for .. and only for the
-		 * first name.  This is for relative lookups so we can find the parent
-		 * of a symlink. */
+		/* Normally, symlinks stop walks, and namec's walk() will deal
+		 * with it.  We allow walks 'through' symlinks, but only for ..
+		 * and only for the first name.  This is for relative lookups so
+		 * we can find the parent of a symlink. */
 		if (tree_file_is_symlink(at)) {
 			if (i != 0)
 				break;
 			if (strcmp(name[i], ".."))
-				error(ELOOP, "walk from a symlink that wasn't ..");
+				error(ELOOP,
+				      "walk from a symlink that wasn't ..");
 		}
 		if (!caller_has_tf_perms(at, O_READ)) {
 			if (i == 0)
@@ -520,30 +525,37 @@ struct walkqid *tree_file_walk(struct tree_file *from, char **name,
 			next = rcu_dereference(at->parent);
 			if (!next) {
 				if (tree_file_is_root(at)) {
-					wq->qid[wq->nqid++] = tree_file_to_qid(at);
-					/* I think namec should never give us DOTDOT that isn't at
-					 * the end of the names array.  Though devwalk() seems to
-					 * expect it. */
+					wq->qid[wq->nqid++] =
+						tree_file_to_qid(at);
+					/* I think namec should never give us
+					 * DOTDOT that isn't at the end of the
+					 * names array.  Though devwalk() seems
+					 * to expect it. */
 					if (i != nname - 1)
-						warn("Possible namec DOTDOT bug, call for help!");
+						warn("namec DOTDOT bug?");
 					continue;
 				}
-				/* We lost our parent due to a removal/rename.  We might have
-				 * walked enough for our walk to succeed (e.g.  there's a mount
-				 * point in the WQ), so we can return what we have.  Though if
-				 * we've done nothing, it's a failure.
+				/* We lost our parent due to a removal/rename.
+				 * We might have walked enough for our walk to
+				 * succeed (e.g.  there's a mount point in the
+				 * WQ), so we can return what we have.  Though
+				 * if we've done nothing, it's a failure.
 				 *
-				 * Note the removal could have happened a long time ago:
-				 * consider an O_PATH open, then namec_from().
+				 * Note the removal could have happened a long
+				 * time ago: consider an O_PATH open, then
+				 * namec_from().
 				 *
-				 * We also could walk up and see the *new* parent during
-				 * rename().  For instance, /src/x/../y could get the old /src/y
-				 * or the new /dst/y.  If we want to avoid that, then we'll need
-				 * some sort of sync with rename to make sure we don't get the
-				 * new one.  Though this can happen with namec_from(), so I'm
-				 * not sure I care. */
+				 * We also could walk up and see the *new*
+				 * parent during rename().  For instance,
+				 * /src/x/../y could get the old /src/y or the
+				 * new /dst/y.  If we want to avoid that, then
+				 * we'll need some sort of sync with rename to
+				 * make sure we don't get the new one.  Though
+				 * this can happen with namec_from(), so I'm not
+				 * sure I care. */
 				if (i == 0)
-					error(ENOENT, "file lost its parent during lookup");
+					error(ENOENT,
+					  "file lost its parent during lookup");
 				break;
 			}
 			at = next;
@@ -552,46 +564,51 @@ struct walkqid *tree_file_walk(struct tree_file *from, char **name,
 		}
 		next = wc_lookup_child(at, name[i]);
 		if (!next) {
-			/* TFSs with no backend have the entire tree in the WC HT. */
+			/* TFSs with no backend have the entire tree in the WC
+			 * HT. */
 			if (!tfs->tf_ops.lookup) {
 				if (i == 0)
 					error(ENOENT, "file does not exist");
 				break;
 			}
-			/* Need to hold a kref on 'at' before we rcu_read_unlock().  Our
-			 * TFS op might block. */
+			/* Need to hold a kref on 'at' before we
+			 * rcu_read_unlock().  Our TFS op might block. */
 			if (!tf_kref_get(at)) {
 				if (i == 0)
-					error(ENOENT, "file was removed during lookup");
-				/* WQ has a qid for 'at' from a previous loop.  We can't grab a
-				 * ref, so it's being removed/renamed.  Yet it's still OK to
-				 * report this as part of the wq, since we could fail for other
-				 * reasons (thus not getting nnames) and have the same race,
-				 * which we handle below (i.e. we only get a ref when it was the
-				 * last name).  Here we're just *noticing* the race. */
+					error(ENOENT,
+					      "file was removed during lookup");
+				/* WQ has a qid for 'at' from a previous loop.
+				 * We can't grab a ref, so it's being
+				 * removed/renamed.  Yet it's still OK to report
+				 * this as part of the wq, since we could fail
+				 * for other reasons (thus not getting nnames)
+				 * and have the same race, which we handle below
+				 * (i.e. we only get a ref when it was the last
+				 * name).  Here we're just *noticing* the race.
+				 */
 				break;
 			}
 			rcu_read_unlock();
-			/* propagate the error only on the first name.  Note we run the
-			 * 'else' case, and run the poperror case for non-errors and
-			 * non-name=0-errors. */
+			/* propagate the error only on the first name.  Note we
+			 * run the 'else' case, and run the poperror case for
+			 * non-errors and non-name=0-errors. */
 			if (waserror()) {
 				tf_kref_put(at);
 				if (i == 0)
 					nexterror();
-				/* In this case, we're discarding the waserror, same as in the
-				 * other i != 0 cases. */
+				/* In this case, we're discarding the waserror,
+				 * same as in the other i != 0 cases. */
 				poperror();
 				break;
 			}
-			/* This returns with an rcu_read_lock protecting 'next' */
+			/* returns with an rcu_read_lock protecting 'next' */
 			next = lookup_child_entry(at, name[i]);
 			tf_kref_put(at);
 			poperror();
 			assert(next);
 		}
 		if (tree_file_is_negative(next)) {
-			/* lockless peek.  other flag users aren't atomic, etc. */
+			/* lockless peek.  other flag users aren't atomic. */
 			if (!(next->flags & TF_F_HAS_BEEN_USED)) {
 				spin_lock(&next->lifetime);
 				next->flags |= TF_F_HAS_BEEN_USED;
@@ -606,13 +623,13 @@ struct walkqid *tree_file_walk(struct tree_file *from, char **name,
 	}
 	if (wq->nqid == nname || tree_file_is_symlink(at)) {
 		if (!tf_kref_get(at)) {
-			/* We need to undo our last result as if we never saw it. */
+			/* need to undo our last result as if we never saw it.*/
 			wq->nqid--;
 			if (wq->nqid == 0)
 				error(ENOENT, "file was removed during lookup");
 		} else {
-			/* Hanging the refcounted TF off the wq->clone, which is cheating.
-			 * Our walker shim knows to expect this. */
+			/* Hanging the refcounted TF off the wq->clone, which is
+			 * cheating.  Our walker shim knows to expect this. */
 			wq->clone = (struct chan*)at;
 		}
 	}
@@ -636,13 +653,15 @@ struct walkqid *tree_chan_walk(struct chan *c, struct chan *nc, char **name,
 		return wq;
 	if (!nc)
 		nc = devclone(c);
-	/* Not sure if callers that specify nc must have a chan from our device */
+	/* Not sure if callers that specify nc must have a chan from our device.
+	 */
 	assert(nc->type == c->type);
 	to = (struct tree_file*)wq->clone;
 	nc->qid = tree_file_to_qid(to);
 	chan_set_tree_file(nc, to);
 	wq->clone = nc;
-	/* We might be returning the same chan, so there's actually just one ref */
+	/* We might be returning the same chan, so there's actually just one
+	 * ref. */
 	if (wq->clone == c)
 		tf_kref_put(chan_to_tree_file(c));
 	return wq;
@@ -669,13 +688,13 @@ struct tree_file *tree_file_create(struct tree_file *parent, const char *name,
 		error(ENOENT, "create failed, parent dir being removed");
 	child = wc_lookup_child(parent, name);
 	if (child) {
-		/* The create(5) message fails if the file exists, which differs from
-		 * the syscall.  namec() handles this. */
+		/* The create(5) message fails if the file exists, which differs
+		 * from the syscall.  namec() handles this. */
 		if (!tree_file_is_negative(child))
 			error(EEXIST, "file exists");
-		/* future lookups that find no entry will qlock.  concurrent ones that
-		 * see the child, even if disconnected, will see it was negative and
-		 * fail. */
+		/* future lookups that find no entry will qlock.  concurrent
+		 * ones that see the child, even if disconnected, will see it
+		 * was negative and fail. */
 		__disconnect_child(parent, child);
 	}
 	child = tree_file_alloc(parent->tfs, parent, name);
@@ -683,8 +702,8 @@ struct tree_file *tree_file_create(struct tree_file *parent, const char *name,
 		__tf_free(child);
 		nexterror();
 	}
-	/* Backend will need to know the ext for its create.  This gets cleaned up
-	 * on error. */
+	/* Backend will need to know the ext for its create.  This gets cleaned
+	 * up on error. */
 	if (perm & DMSYMLINK)
 		kstrdup(&child->file.dir.ext, ext);
 	/* Backend will need to fill in dir, except for name. */
@@ -696,7 +715,7 @@ struct tree_file *tree_file_create(struct tree_file *parent, const char *name,
 	/* At this point, the child is visible, so it must be ready to go */
 	__link_child(parent, child);
 	got_ref = tf_kref_get(child);
-	assert(got_ref);	/* we hold the qlock, no one should have removed */
+	assert(got_ref); /* we hold the qlock, no one should have removed */
 	__set_acmtime_to(&parent->file, FSF_CTIME | FSF_MTIME, &now);
 	qunlock(&parent->file.qlock);
 	poperror();
@@ -726,9 +745,10 @@ struct chan *tree_chan_open(struct chan *c, int omode)
 	if (c->qid.type & QTSYMLINK)
 		error(ELOOP, "can't open a symlink");
 	tree_file_perm_check(tf, omode);
-	/* TODO: if we want to support DMEXCL on dir.mode, we'll need to lock/sync
-	 * on the fs_file (have a flag for FSF_IS_OPEN, handle in close).  We'll
-	 * also need a way to pass it in to the dir.mode during create/wstat/etc. */
+	/* TODO: if we want to support DMEXCL on dir.mode, we'll need to
+	 * lock/sync on the fs_file (have a flag for FSF_IS_OPEN, handle in
+	 * close).  We'll also need a way to pass it in to the dir.mode during
+	 * create/wstat/etc. */
 	if (omode & O_TRUNC)
 		fs_file_truncate(&tf->file, 0);
 	c->mode = openmode(omode);
@@ -771,9 +791,9 @@ void tree_chan_remove(struct chan *c)
 	ERRSTACK(1);
 	struct tree_file *tf = chan_to_tree_file(c);
 
-	/* sysremove expects a chan that is disconnected from the device, regardless
-	 * of whether or not we fail.  See sysremove(); it will clear type, ensuring
-	 * our close is never called. */
+	/* sysremove expects a chan that is disconnected from the device,
+	 * regardless of whether or not we fail.  See sysremove(); it will clear
+	 * type, ensuring our close is never called. */
 	if (waserror()) {
 		chan_set_tree_file(c, NULL);
 		tf_kref_put(tf);	/* The ref from the original walk */
@@ -843,9 +863,9 @@ void tree_file_rename(struct tree_file *tf, struct tree_file *new_parent,
 	old_parent = __tf_get_potential_parent(tf);
 	if (!old_parent)
 		error(ENOENT, "renamed file had no parent");
-	/* global mtx helps with a variety of weird races, including the "can't move
-	 * to a subdirectory of yourself" case and the lock ordering of parents
-	 * (locks flow from parent->child). */
+	/* global mtx helps with a variety of weird races, including the "can't
+	 * move to a subdirectory of yourself" case and the lock ordering of
+	 * parents (locks flow from parent->child). */
 	qlock(&tf->tfs->rename_mtx);
 	qlock_tree_files(old_parent, new_parent);
 	if (waserror()) {
@@ -874,38 +894,42 @@ void tree_file_rename(struct tree_file *tf, struct tree_file *new_parent,
 		if (tree_file_is_dir(prev_dst)) {
 			if (!tree_file_is_dir(tf))
 				error(EISDIR, "can't rename a file onto a dir");
-			/* We need to ensure prev_dst is childless and remains so.  That
-			 * requires grabbing its qlock, but there's a potential lock
-			 * ordering issue with old_parent.  We could have this:
-			 * new_parent/dst/x/y/z/old_parent/src.  That will fail, but we need
-			 * to check for that case instead of grabbing prev_dst's qlock. */
+			/* We need to ensure prev_dst is childless and remains
+			 * so.  That requires grabbing its qlock, but there's a
+			 * potential lock ordering issue with old_parent.  We
+			 * could have this: new_parent/dst/x/y/z/old_parent/src.
+			 * That will fail, but we need to check for that case
+			 * instead of grabbing prev_dst's qlock. */
 			if (is_descendant_of(prev_dst, old_parent))
-				error(ENOTEMPTY, "old_parent descends from dst");
+				error(ENOTEMPTY,
+				      "old_parent descends from dst");
 			neuter_directory(prev_dst);
 		} else {
 			if (tree_file_is_dir(tf))
-				error(ENOTDIR, "can't rename a dir onto a file");
+				error(ENOTDIR,
+				      "can't rename a dir onto a file");
 		}
 	}
-	/* We check with the backend first, so that it has a chance to fail early.
-	 * Once we make the changes to the front end, lookups can see the effects of
-	 * the change, which we can't roll back.  Since we hold the parents' qlocks,
-	 * no one should be able to get the info from the backend either (lookups
-	 * that require the backend, readdir, etc). */
+	/* We check with the backend first, so that it has a chance to fail
+	 * early.  Once we make the changes to the front end, lookups can see
+	 * the effects of the change, which we can't roll back.  Since we hold
+	 * the parents' qlocks, no one should be able to get the info from the
+	 * backend either (lookups that require the backend, readdir, etc). */
 	tf->tfs->tf_ops.rename(tf, old_parent, new_parent, name, flags);
-	/* Similar to __disconnect_child, we don't clear tf->parent.  rcu readers at
-	 * TF will be able to walk up (with ..).  Same with namec_from an FD.  If we
-	 * atomically replace tf->parent, we should be good.  See tree_file_walk().
+	/* Similar to __disconnect_child, we don't clear tf->parent.  rcu
+	 * readers at TF will be able to walk up (with ..).  Same with
+	 * namec_from an FD.  If we atomically replace tf->parent, we should be
+	 * good.  See tree_file_walk().
 	 *
-	 * Further, we don't mark the tf disconnected.  Someone might lookup from
-	 * the old location, and that's fine.  We just don't want issues with
-	 * decrefs. */
+	 * Further, we don't mark the tf disconnected.  Someone might lookup
+	 * from the old location, and that's fine.  We just don't want issues
+	 * with decrefs. */
 	__remove_from_parent_list(old_parent, tf);
 	wc_remove_child(old_parent, tf);
 	synchronize_rcu();
-	/* Now, no new lookups will find it at the old location.  That change is not
-	 * atomic wrt src, but it will be wrt dst.  Importantly, no one will see
-	 * /path/to/old_parent/new_basename */
+	/* Now, no new lookups will find it at the old location.  That change is
+	 * not atomic wrt src, but it will be wrt dst.  Importantly, no one will
+	 * see /path/to/old_parent/new_basename */
 	fs_file_change_basename((struct fs_file*)tf, name);
 	/* We're clobbering the old_parent ref, which we'll drop later */
 	rcu_assign_pointer(tf->parent, new_parent);
@@ -913,37 +937,38 @@ void tree_file_rename(struct tree_file *tf, struct tree_file *new_parent,
 	__add_to_parent_list(new_parent, tf);
 	wc_insert_child(new_parent, tf);
 	/* Now both the prev_dst (if it existed) or the tf file are in the walk
-	 * cache / HT and either could have been looked up by a concurrent reader.
-	 * Readers will always get one or the other, but never see nothing.  This is
-	 * the atomic guarantee of rename. */
+	 * cache / HT and either could have been looked up by a concurrent
+	 * reader.  Readers will always get one or the other, but never see
+	 * nothing.  This is the atomic guarantee of rename. */
 	if (prev_dst) {
 		__remove_from_parent_list(new_parent, prev_dst);
 		wc_remove_child(new_parent, prev_dst);
 		synchronize_rcu();
-		/* Now no one can find prev_dst.  Someone might still have a ref, or it
-		 * might be on the LRU list (if kref == 0).  Now we can mark
-		 * disconnected.  Had we disconnected earlier, then lookup code would
-		 * see that and treat it as a failure.  Using rcu and putting the
-		 * complexity in rename was easier and simpler than changing lookup.
+		/* Now no one can find prev_dst.  Someone might still have a
+		 * ref, or it might be on the LRU list (if kref == 0).  Now we
+		 * can mark disconnected.  Had we disconnected earlier, then
+		 * lookup code would see that and treat it as a failure.  Using
+		 * rcu and putting the complexity in rename was easier and
+		 * simpler than changing lookup.
 		 *
-		 * We still need RCU here for freeing the prev_dst.  We could have had
-		 * an LRU pruner, etc, looking.  The synchronize_rcu above only dealt
-		 * with lookups via parent in this function. */
+		 * We still need RCU here for freeing the prev_dst.  We could
+		 * have had an LRU pruner, etc, looking.  The synchronize_rcu
+		 * above only dealt with lookups via parent in this function. */
 		if (__mark_disconnected(prev_dst))
 			call_rcu(&prev_dst->rcu, __tf_free_rcu);
 	}
 	now = nsec2timespec(epoch_nsec());
 	__set_acmtime_to(&old_parent->file, FSF_CTIME | FSF_MTIME, &now);
 	__set_acmtime_to(&new_parent->file, FSF_CTIME | FSF_MTIME, &now);
-	/* Can we unlock earlier?  No.  We need to at least hold new_parent's qlock,
-	 * which was the parent of old_dst, until old_dst is marked disconnected.
-	 * Even though old_dst is removed from new_parent's HT, it is still in the
-	 * LRU list. */
+	/* Can we unlock earlier?  No.  We need to at least hold new_parent's
+	 * qlock, which was the parent of old_dst, until old_dst is marked
+	 * disconnected.  Even though old_dst is removed from new_parent's HT,
+	 * it is still in the LRU list. */
 	qunlock_tree_files(old_parent, new_parent);
 	qunlock(&tf->tfs->rename_mtx);
 	poperror();
-	tf_kref_put(old_parent);	/* the original tf->parent ref we clobbered */
-	tf_kref_put(old_parent);	/* the one we grabbed when we started */
+	tf_kref_put(old_parent); /* the original tf->parent ref we clobbered */
+	tf_kref_put(old_parent); /* the one we grabbed when we started */
 }
 
 void tree_chan_rename(struct chan *c, struct chan *new_p_c, const char *name,
@@ -1033,10 +1058,10 @@ struct fs_file *tree_chan_mmap(struct chan *c, struct vm_region *vmr, int prot,
 {
 	struct fs_file *f = &chan_to_tree_file(c)->file;
 
-	/* TODO: In the future, we'll check the prot, establish hooks with the VMR,
-	 * and other things, mostly in something like fs_file_mmap, which will be
-	 * able to handle mmaping something that doesn't use the page cache.  For
-	 * now, I'm aggressively qlocking to catch bugs. */
+	/* TODO: In the future, we'll check the prot, establish hooks with the
+	 * VMR, and other things, mostly in something like fs_file_mmap, which
+	 * will be able to handle mmaping something that doesn't use the page
+	 * cache.  For now, I'm aggressively qlocking to catch bugs. */
 	qlock(&f->qlock);
 	if ((prot & PROT_WRITE) && (flags & MAP_SHARED))
 		f->flags |= FSF_DIRTY;
@@ -1051,13 +1076,14 @@ unsigned long tree_chan_ctl(struct chan *c, int op, unsigned long a1,
 	switch (op) {
 	case CCTL_DEBUG:
 		print_lock();
-		printk("Dumping tree_file info (frontend), dev %s, chan %s:\n\n",
+		printk("Dumping tree_file info (frontend), dev %s chan %s:\n\n",
 		       chan_dev_name(c), channame(c));
 		__tfs_dump_tf(chan_to_tree_file(c));
 		print_unlock();
 		return 0;
 	default:
-		error(EINVAL, "%s does not support chanctl %d", chan_dev_name(c), op);
+		error(EINVAL, "%s does not support chanctl %d",
+		      chan_dev_name(c), op);
 	}
 }
 
@@ -1104,17 +1130,17 @@ static void tf_dfs_cb(struct tree_file *tf, void (*cb)(struct tree_file *tf))
 	if (tree_file_is_dir(tf)) {
 		qlock(&tf->file.qlock);
 		/* Note we don't have a kref on our child's TF - we have a weak
-		 * reference (the list membership).  We hold the parent's qlock, which
-		 * prevents removal/unlinking/disconnecting/etc.  The child's membership
-		 * on the LRU list can change repeatedly.
+		 * reference (the list membership).  We hold the parent's qlock,
+		 * which prevents removal/unlinking/disconnecting/etc.  The
+		 * child's membership on the LRU list can change repeatedly.
 		 *
-		 * If we want to avoid holding the parent's qlock, we could grab a kref
-		 * on the child.  However, our list walk would be in jeopardy - both
-		 * child and temp could be removed from the list.  So we'd need to qlock
-		 * the parent, grab krefs on all children, and put them on a local list.
-		 * Also, grabbing krefs on our children will muck with the LRU list;
-		 * when we're done, it would be like we sorted the LRU list in the DFS
-		 * order. */
+		 * If we want to avoid holding the parent's qlock, we could grab
+		 * a kref on the child.  However, our list walk would be in
+		 * jeopardy - both child and temp could be removed from the
+		 * list.  So we'd need to qlock the parent, grab krefs on all
+		 * children, and put them on a local list.  Also, grabbing krefs
+		 * on our children will muck with the LRU list; when we're done,
+		 * it would be like we sorted the LRU list in the DFS order. */
 		list_for_each_entry(child, &tf->children, siblings)
 			tf_dfs_cb(child, cb);
 		qunlock(&tf->file.qlock);
@@ -1150,17 +1176,19 @@ static void tf_dfs_purge(struct tree_file *tf, void (*cb)(struct tree_file *tf))
 
 	if (tree_file_is_dir(tf)) {
 		qlock(&tf->file.qlock);
-		/* Note we don't have a kref on TF, and one of our children should
-		 * decref *us* to 0.  We aren't disconnected yet, and we can't be
-		 * removed (parent's qlock is held), so we'll just end up on the LRU
-		 * list, which is OK.
+		/* Note we don't have a kref on TF, and one of our children
+		 * should decref *us* to 0.  We aren't disconnected yet, and we
+		 * can't be removed (parent's qlock is held), so we'll just end
+		 * up on the LRU list, which is OK.
 		 *
-		 * Our child should remove itself from our list, so we need the _safe.
+		 * Our child should remove itself from our list, so we need the
+		 * _safe.
 		 *
-		 * Also note that the child decrefs us in a call_rcu.  CB can block, and
-		 * technically so can qlock, so we might run RCU callbacks while
-		 * qlocked.  We'll need to rcu_barrier so that our children's decrefs
-		 * occur before we remove ourselves from our parent. */
+		 * Also note that the child decrefs us in a call_rcu.  CB can
+		 * block, and technically so can qlock, so we might run RCU
+		 * callbacks while qlocked.  We'll need to rcu_barrier so that
+		 * our children's decrefs occur before we remove ourselves from
+		 * our parent. */
 		list_for_each_entry_safe(child, temp, &tf->children, siblings)
 			tf_dfs_purge(child, cb);
 		qunlock(&tf->file.qlock);
@@ -1170,8 +1198,8 @@ static void tf_dfs_purge(struct tree_file *tf, void (*cb)(struct tree_file *tf))
 	if (!tree_file_is_negative(tf))
 		cb(tf);
 	spin_lock(&tf->lifetime);
-	/* should be unused, with no children.  we have a ref on root, to keep the
-	 * TFS around while we destroy the tree. */
+	/* should be unused, with no children.  we have a ref on root, to keep
+	 * the TFS around while we destroy the tree. */
 	assert(kref_refcnt(&tf->kref) == 0 || tree_file_is_root(tf));
 	/* This mark prevents new lookups.  We'll disconnect it shortly. */
 	tf->flags |= TF_F_DISCONNECTED;
@@ -1210,8 +1238,9 @@ static void print_tf(struct tree_file *tf)
 		   tf->file.dir.qid.path,
 		   kref_refcnt(&tf->kref),
 		   tf->file.dir.uid,
-		   tree_file_is_dir(tf) ? 'd' :
-								tf->file.dir.mode & DMSYMLINK ? 'l' : '-',
+		   tree_file_is_dir(tf) ? 'd'
+		                        : tf->file.dir.mode & DMSYMLINK ? 'l'
+					                                : '-',
 		   tf->file.dir.mode & S_PMASK,
 		   tf->file.dir.mode & DMSYMLINK ? tf->file.dir.ext : ""
 		   );
@@ -1271,14 +1300,16 @@ void tfs_lru_for_each(struct tree_filesystem *tfs, bool cb(struct tree_file *),
 	struct tree_file *tf, *temp, *parent;
 	size_t nr_tfs = 0;
 
-	/* We can have multiple LRU workers in flight, though a given TF will be on
-	 * only one CB list at a time. */
+	/* We can have multiple LRU workers in flight, though a given TF will be
+	 * on only one CB list at a time. */
 	spin_lock(&wc->lru_lock);
 	list_for_each_entry_safe(tf, temp, &wc->lru, lru) {
-		/* lockless peak at the flag.  once it's NEGATIVE, it never goes back */
+		/* lockless peak at the flag.  once it's NEGATIVE, it never goes
+		 * back */
 		if (tree_file_is_negative(tf))
 			continue;
-		/* Normal lock order is TF -> LRU.  Best effort is fine for LRU. */
+		/* Normal lock order is TF -> LRU.
+		 * Best effort is fine for LRU. */
 		if (!spin_trylock(&tf->lifetime))
 			continue;
 		/* Can't be disconnected and on LRU */
@@ -1287,9 +1318,9 @@ void tfs_lru_for_each(struct tree_filesystem *tfs, bool cb(struct tree_file *),
 		tf->flags &= ~TF_F_ON_LRU;
 		list_del(&tf->lru);
 		__kref_get(&tf->kref, 1);
-		/* The 'used' bit is the what allows us to detect a user in between our
-		 * callback and the disconnection/freeing.  It's a moot point if the CB
-		 * returns false. */
+		/* The 'used' bit is the what allows us to detect a user in
+		 * between our callback and the disconnection/freeing.  It's a
+		 * moot point if the CB returns false. */
 		tf->flags &= ~TF_F_HAS_BEEN_USED;
 		spin_unlock(&tf->lifetime);
 		list_add_tail(&tf->lru, &work);
@@ -1299,9 +1330,9 @@ void tfs_lru_for_each(struct tree_filesystem *tfs, bool cb(struct tree_file *),
 	spin_unlock(&wc->lru_lock);
 
 	/* We have a snapshot of the LRU list.  As soon as we unlocked a file,
-	 * someone could incref it (e.g. to something > 1), and they'll set the used
-	 * bit.  That won't abort the CB.  New TFs could be added to the LRU list.
-	 * Those are ignored for this pass. */
+	 * someone could incref it (e.g. to something > 1), and they'll set the
+	 * used bit.  That won't abort the CB.  New TFs could be added to the
+	 * LRU list.  Those are ignored for this pass. */
 	list_for_each_entry_safe(tf, temp, &work, lru) {
 		if (!cb(tf)) {
 			list_del(&tf->lru);
@@ -1310,8 +1341,8 @@ void tfs_lru_for_each(struct tree_filesystem *tfs, bool cb(struct tree_file *),
 		}
 	}
 
-	/* Now we have a list of victims to be removed, so long as they haven't been
-	 * used since. */
+	/* Now we have a list of victims to be removed, so long as they haven't
+	 * been used since. */
 	list_for_each_entry_safe(tf, temp, &work, lru) {
 		parent = get_locked_and_kreffed_parent(tf);
 		if (!parent) {
@@ -1329,20 +1360,21 @@ void tfs_lru_for_each(struct tree_filesystem *tfs, bool cb(struct tree_file *),
 			continue;
 		}
 		tf->flags |= TF_F_DISCONNECTED;
-		/* We hold a ref, so it shouldn't have found its way back on LRU */
+		/* We hold a ref, so it shouldn't have found its way back on
+		 * LRU. */
 		assert(!(tf->flags & TF_F_ON_LRU));
 		spin_unlock(&tf->lifetime);
 		__remove_from_parent_list(parent, tf);
 		wc_remove_child(parent, tf);
-		/* If we get tired of unlocking and relocking, we could see if the next
-		 * parent is the current parent before unlocking. */
+		/* If we get tired of unlocking and relocking, we could see if
+		 * the next parent is the current parent before unlocking. */
 		qunlock(&parent->file.qlock);
 		tf_kref_put(parent);
 	}
-	/* Now we have a list of refs that are all disconnected, kref == 1 (because
-	 * no one used them since we increffed them when they were LRU, which was
-	 * when the refcnt was 0).  Each TF has a ref on its parent btw, so parents
-	 * will never be on the LRU list.  (leaves only).
+	/* Now we have a list of refs that are all disconnected, kref == 1
+	 * (because no one used them since we increffed them when they were LRU,
+	 * which was when the refcnt was 0).  Each TF has a ref on its parent
+	 * btw, so parents will never be on the LRU list.  (leaves only).
 	 *
 	 * We need to synchronize_rcu() too, since we could have had lockless
 	 * lookups that have pointers to TF and are waiting to notice that it is
@@ -1351,8 +1383,9 @@ void tfs_lru_for_each(struct tree_filesystem *tfs, bool cb(struct tree_file *),
 	list_for_each_entry_safe(tf, temp, &work, lru) {
 		assert(kref_refcnt(&tf->kref) == 1);
 		list_del(&tf->lru);
-		/* We could decref, but instead we can directly free.  We know the ref
-		 * == 1 and it is disconnected.  Directly freeing bypasses call_rcu. */
+		/* We could decref, but instead we can directly free.  We know
+		 * the ref == 1 and it is disconnected.  Directly freeing
+		 * bypasses call_rcu. */
 		__tf_free(tf);
 	}
 }
@@ -1378,7 +1411,7 @@ void tfs_lru_prune_neg(struct tree_filesystem *tfs)
 			spin_unlock(&tf->lifetime);
 			continue;
 		}
-		rcu_read_lock();	/* holding a spinlock, but just to be clear. */
+		rcu_read_lock(); /* holding a spinlock, but just to be clear. */
 		parent = rcu_dereference(tf->parent);
 		/* Again, inverting the lock order, so best effort trylock */
 		if (!canqlock(&parent->file.qlock)) {
@@ -1389,8 +1422,9 @@ void tfs_lru_prune_neg(struct tree_filesystem *tfs)
 		__remove_from_parent_list(parent, tf);
 		wc_remove_child(parent, tf);
 		qunlock(&parent->file.qlock);
-		/* We're off the list, but our kref == 0 still.  We can break that
-		 * invariant since we have the only ref and are about to free the TF. */
+		/* We're off the list, but our kref == 0 still.  We can break
+		 * that invariant since we have the only ref and are about to
+		 * free the TF. */
 		tf->flags &= ~TF_F_ON_LRU;
 		list_del(&tf->lru);
 		spin_unlock(&tf->lifetime);
@@ -1402,8 +1436,8 @@ void tfs_lru_prune_neg(struct tree_filesystem *tfs)
 	 * (because they are negatives).
 	 *
 	 * We need to synchronize_rcu() too, since we could have had lockless
-	 * lookups that have pointers to TF, and they may even mark HAS_BEEN_USED.
-	 * Too late. */
+	 * lookups that have pointers to TF, and they may even mark
+	 * HAS_BEEN_USED.  Too late. */
 	synchronize_rcu();
 	list_for_each_entry_safe(tf, temp, &work, lru) {
 		assert(kref_refcnt(&tf->kref) == 0);

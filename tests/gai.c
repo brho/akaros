@@ -16,11 +16,14 @@
 static void print_gai(struct addrinfo *ai, const char *info)
 {
 	struct sockaddr_in *ipv4sa;
+
 	printf("%s: fam %d, sock %d, prot %d ", info, ai->ai_family,
 	       ai->ai_socktype, ai->ai_protocol);
 	char buf[128];
+
 	ipv4sa = (struct sockaddr_in*)ai->ai_addr;
 	const char *ipv4n = inet_ntop(AF_INET, &ipv4sa->sin_addr, buf, 128);
+
 	assert(buf == ipv4n);
 	printf("addr %s, port %d\n", buf, ntohs(ipv4sa->sin_port));
 }
@@ -30,8 +33,10 @@ static void test_gai(const char *node, const char *serv, struct addrinfo *hints,
 {
 	struct addrinfo *_ai_res;
 	int ret = getaddrinfo(node, serv, hints, &_ai_res);
+
 	if (ret) {
-		printf("%s: GAI failed, %d, %d %s\n", info, ret, errno, errstr());
+		printf("%s: GAI failed, %d, %d %s\n", info, ret, errno,
+		       errstr());
 	} else {
 		print_gai(_ai_res, info);
 		freeaddrinfo(_ai_res);

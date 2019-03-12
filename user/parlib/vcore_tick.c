@@ -23,12 +23,12 @@ enum {
 };
 
 struct vcore_tick {
-	int							state;
-	int							ctl_fd;
-	int							timer_fd;
-	uint64_t					next_deadline;
-	uint64_t					period_ticks;
-	struct event_queue			*ev_q;
+	int				state;
+	int				ctl_fd;
+	int				timer_fd;
+	uint64_t			next_deadline;
+	uint64_t			period_ticks;
+	struct event_queue		*ev_q;
 };
 
 static struct vcore_tick *__vc_ticks;
@@ -131,34 +131,36 @@ int vcore_tick_poll(void)
 
 	evbm = &vc_tick->ev_q->ev_mbox->evbm;
 	if (!GET_BITMASK_BIT(evbm->bitmap, EV_ALARM)) {
-		/* It might be possible that the virtual time has passed, but the alarm
-		 * hasn't arrived yet.
+		/* It might be possible that the virtual time has passed, but
+		 * the alarm hasn't arrived yet.
 		 *
-		 * We assume that if the bit is not set and the tick is enabled that
-		 * the kernel still has an alarm set for us.  It is possible for the bit
-		 * to be set more than expected (disable an alarm, but fail to cancel
-		 * the alarm before it goes off, then enable it, and then we'll have the
-		 * bit set before the alarm expired).  However, it is not possible that
-		 * the bit is clear and there is no alarm pending at this point.  This
-		 * is because the only time we clear the bit is below, and then right
-		 * after that we set an alarm. (The bit is also clear at init time, and
-		 * we start the alarm when we enable the tick).
+		 * We assume that if the bit is not set and the tick is enabled
+		 * that the kernel still has an alarm set for us.  It is
+		 * possible for the bit to be set more than expected (disable an
+		 * alarm, but fail to cancel the alarm before it goes off, then
+		 * enable it, and then we'll have the bit set before the alarm
+		 * expired).  However, it is not possible that the bit is clear
+		 * and there is no alarm pending at this point.  This is because
+		 * the only time we clear the bit is below, and then right after
+		 * that we set an alarm. (The bit is also clear at init time,
+		 * and we start the alarm when we enable the tick).
 		 *
-		 * Anyway, the alarm should be arriving shortly.  In this case, as in
-		 * the case where the bit gets set right after we check, we missed
-		 * polling for the event.  The kernel will still __notify us, setting
-		 * notif_pending, and we'll notice the next time we attempt to leave
-		 * vcore context. */
+		 * Anyway, the alarm should be arriving shortly.  In this case,
+		 * as in the case where the bit gets set right after we check,
+		 * we missed polling for the event.  The kernel will still
+		 * __notify us, setting notif_pending, and we'll notice the next
+		 * time we attempt to leave vcore context. */
 		uth_enable_notifs();
 		return 0;
 	}
 	/* Don't care about clobbering neighboring bits (non-atomic op) */
 	CLR_BITMASK_BIT(evbm->bitmap, EV_ALARM);
-	/* As mentioned above, it is possible to still have an active alarm in the
-	 * kernel.  We can still set a new time for the alarm, and it will just
-	 * update the kernel's awaiter.  And if that alarm has fired, then we'll
-	 * just have a spurious setting of the bit.  This does not affect our return
-	 * value, which is based on virtual time, not alarm resets. */
+	/* As mentioned above, it is possible to still have an active alarm in
+	 * the kernel.  We can still set a new time for the alarm, and it will
+	 * just update the kernel's awaiter.  And if that alarm has fired, then
+	 * we'll just have a spurious setting of the bit.  This does not affect
+	 * our return value, which is based on virtual time, not alarm resets.
+	 * */
 	virtual_now = vcore_account_uptime_ticks(vcore_id());
 	/* It's possible that we've fallen multiple ticks behind virtual now.
 	 * In that case, we'll just jump ahead a bit */
@@ -167,9 +169,9 @@ int vcore_tick_poll(void)
 		vc_tick->next_deadline += vc_tick->period_ticks;
 	}
 	/* There's a slight chance we miss an alarm if the period is very small.
-	 * virtual_now is a little old.  If the period is so small that this is a
-	 * problem and if we updated virtual now in the while loop, then we'd also
-	 * get caught in the while loop forever. */
+	 * virtual_now is a little old.  If the period is so small that this is
+	 * a problem and if we updated virtual now in the while loop, then we'd
+	 * also get caught in the while loop forever. */
 	from_now = vc_tick->next_deadline - virtual_now;
 	__vcore_tick_start(vc_tick, from_now);
 	uth_enable_notifs();

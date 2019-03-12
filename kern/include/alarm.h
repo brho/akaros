@@ -36,15 +36,12 @@
  * Note that RKM unset_alarm() has a waits-on dependency with the actual alarm
  * handler, so be careful of deadlock.
  *
- * To use an IRQ alarm, init the waiter with init_awaiter_irq().
- *
  * Quick howto, using the pcpu tchains:
  * 	struct timer_chain *tchain = &per_cpu_info[core_id()].tchain;
  * To block your kthread on an alarm:
  * 	struct alarm_waiter *waiter = kmalloc(sizeof(struct alarm_waiter), 0);
- * 	struct alarm_waiter a_waiter;	// or use the stack
  *
- * 	init_awaiter(waiter, HANDLER); // or init_awaiter_irq() for IRQ ctx alarms
+ * 	init_awaiter(waiter, HANDLER);
  * 	set_awaiter_rel(waiter, USEC);
  * 	set_alarm(tchain, waiter);
  *
@@ -68,11 +65,11 @@
 /* These structures allow code to defer work for a certain amount of time.
  * Timer chains (like off a per-core timer) are made of lists/trees of these. */
 struct alarm_waiter {
-	uint64_t 					wake_up_time;	/* ugh, this is a TSC for now */
+	uint64_t 			wake_up_time;
 	void (*func) (struct alarm_waiter *waiter);
-	void						*data;
+	void				*data;
 	TAILQ_ENTRY(alarm_waiter)	next;
-	bool						on_tchain;
+	bool				on_tchain;
 };
 TAILQ_HEAD(awaiters_tailq, alarm_waiter);		/* ideally not a LL */
 
@@ -82,12 +79,12 @@ typedef void (*alarm_handler)(struct alarm_waiter *waiter);
  * with a lock, even if its rarely needed (like the pcpu tchains).
  * set_interrupt() is a method for setting the interrupt source. */
 struct timer_chain {
-	spinlock_t					lock;
+	spinlock_t			lock;
 	struct awaiters_tailq		waiters;
-	struct alarm_waiter			*running;
-	uint64_t					earliest_time;
-	uint64_t					latest_time;
-	struct cond_var				cv;
+	struct alarm_waiter		*running;
+	uint64_t			earliest_time;
+	uint64_t			latest_time;
+	struct cond_var			cv;
 	void (*set_interrupt)(struct timer_chain *);
 };
 
@@ -125,6 +122,6 @@ static inline bool alarm_expired(struct alarm_waiter *awaiter)
 }
 
 /* Debugging */
-#define ALARM_POISON_TIME 12345				/* could use some work */
+#define ALARM_POISON_TIME 12345		/* could use some work */
 void print_chain(struct timer_chain *tchain);
 void print_pcpu_chains(void);

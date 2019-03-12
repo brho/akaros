@@ -6,8 +6,8 @@
  *
  * The idea behind this was that the traditional style of using rdtsc was to
  * call:
- * 			cpuid;
- * 			rdtsc;
+ * 	cpuid;
+ * 	rdtsc;
  * since rdtsc does no serialization (meaning later instructions can get
  * executed before it, or vice versa).  While this first cpuid isn't a big deal,
  * doing this in pairs means reading the end time also measures cpuid.  This is
@@ -16,11 +16,11 @@
  * If we use rdtscp for the end call, we can put the cpuid after rdtscp, thereby
  * not including cpuid's overhead (and variability) in our measurement.  That's
  * where the intel doc ends.  For more info, check out:
- * 		http://www.intel.com/content/dam/www/public/us/en/documents/white-papers/ia-32-ia-64-benchmark-code-execution-paper.pdf
+ * 	http://www.intel.com/content/dam/www/public/us/en/documents/white-papers/ia-32-ia-64-benchmark-code-execution-paper.pdf
  *
  * Note that the Intel SDM says you can serialize rdtsc with lfence, such as:
- * 			lfence;
- * 			rdtsc;
+ * 	lfence;
+ * 	rdtsc;
  * Linux uses this (mfence on amd64, lfence on intel).  For more info:
  * 		https://lkml.org/lkml/2008/1/2/353
  * Note this use of lfence before rdtsc is supposedly serializing any
@@ -28,17 +28,17 @@
  * while lfence only serializes memory (and not arbitrary instructions), in
  * actual hardware there is no point to reorder non-memory instructions around
  * rdtsc:
- * 		http://stackoverflow.com/questions/12631856/difference-between-rdtscp-rdtsc-memory-and-cpuid-rdtsc
- * 		(look for janneb's response to questions about his comment)
+ * 	http://stackoverflow.com/questions/12631856/difference-between-rdtscp-rdtsc-memory-and-cpuid-rdtsc
+ * 	(look for janneb's response to questions about his comment)
  *
  * Its not clear from what anyone writes as to whether or not you need to
  * serialize below rdtsc.  Supposedly, you'd need cpuid/lfence on both sides of
  * rdtsc to prevent reordering in both directions.  Andi Kleen does this in a
  * few places
- * 		https://lkml.org/lkml/2008/1/7/276
+ * 	https://lkml.org/lkml/2008/1/7/276
  * though other places in the kernel suggest it is unnecessary (at least for
  * loads:
- * 		http://lxr.linux.no/#linux+v3.8.2/arch/x86/kvm/x86.c#L1258
+ * 	http://lxr.linux.no/#linux+v3.8.2/arch/x86/kvm/x86.c#L1258
  * The intel docs don't mention it (otherwise we would be told to use
  * lfence;rdtsc;lfence).  The howto this file is based off of didn't mention it
  * either, other than to say rdtscp needs to serialize from below.  AFAIK,
@@ -56,12 +56,12 @@
  *
  * CASE    START ASM            END ASM
  * ---------------------------------------------------
- * case 0: cpuid;rdtsc;			cpuid;rdtscp;
- * case 1: cpuid;rdtsc;			rdtscp;cpuid; (or rdtscp;lfence)
- * case 2: lfence;rdtsc;		rdtscp;cpuid; (or rdtscp;lfence)
- * case 3: rdtscp;				rdtscp;cpuid; (or rdtscp;lfence)
- * case 4: rdtscp;				rdtscp;
- * case 5: lfence;rdtsc;		lfence;rdtsc;
+ * case 0: cpuid;rdtsc;		cpuid;rdtscp;
+ * case 1: cpuid;rdtsc;		rdtscp;cpuid; (or rdtscp;lfence)
+ * case 2: lfence;rdtsc;	rdtscp;cpuid; (or rdtscp;lfence)
+ * case 3: rdtscp;		rdtscp;cpuid; (or rdtscp;lfence)
+ * case 4: rdtscp;		rdtscp;
+ * case 5: lfence;rdtsc;	lfence;rdtsc;
  * case 6: lfence;rdtsc;lfence;	lfence;rdtsc;lfence;
  *
  * Note I only ran these a couple times, with 1000x10000, and I did notice some
@@ -81,8 +81,8 @@
  * case 5: most lines   3 var, 4 max dev, 28 min, 2 var 4 max dev overall
  * case 6: most lines   3 var, 4 max dev, 44 min, 2 var 4 max dev overall
  *
- * 		case 1-3: cpuid vs lfence: both seem to work the same and have no effect
- * 		(since they are outside the loop)
+ * 	case 1-3: cpuid vs lfence: both seem to work the same and have no effect
+ * 	(since they are outside the loop)
  *
  * So running with rdtscp for both start and stop (case 3 and 4) had the least
  * amount of variance (both per line and total).  When these cases have had any
@@ -139,7 +139,7 @@
  * potentially underestimating by a few cycles/ticks.  One thing we can do is
  * try to see what the resolution is of the different methods.
  *
- * case 1: cpuid;rdtsc;			rdtscp;cpuid; (or rdtscp;lfence)
+ * case 1: cpuid;rdtsc;		rdtscp;cpuid; (or rdtscp;lfence)
  * -------------------
  * loop_size:0 >>>> variance(cycles): 3; max_deviation: 8; min time: 44
  * loop_size:1 >>>> variance(cycles): 6; max_deviation: 28; min time: 44
@@ -154,7 +154,7 @@
  * loop_size:10 >>>> variance(cycles): 9; max_deviation: 36; min time: 52
  * loop_size:11 >>>> variance(cycles): 16; max_deviation: 64; min time: 56
  *
- * case 4: rdtscp;				rdtscp;
+ * case 4: rdtscp;		rdtscp;
  * -------------------
  * loop_size:0 >>>> variance(cycles): 1; max_deviation: 20; min time: 32
  * loop_size:1 >>>> variance(cycles): 12; max_deviation: 36; min time: 36
@@ -166,7 +166,7 @@
  * loop_size:7 >>>> variance(cycles): 8; max_deviation: 32; min time: 44
  * loop_size:8 >>>> variance(cycles): 10; max_deviation: 48; min time: 48
  *
- * case 5: lfence;rdtsc;		lfence;rdtsc;
+ * case 5: lfence;rdtsc;	lfence;rdtsc;
  * -------------------
  * loop_size:0 >>>> variance(cycles): 3; max_deviation: 12; min time: 28
  * loop_size:1 >>>> variance(cycles): 8; max_deviation: 28; min time: 32
@@ -190,12 +190,12 @@
  * some extra tsc-related code above the measurement (an accidental asm
  * insertion of lfence;rdtsc above reading the start time) and with no work in
  * between:
- * 		case 1: no effect
- * 		case 2: no effect
+ * 	case 1: no effect
+ * 	case 2: no effect
  * These both had some form of serialization (cpuid or lfence) above the rdtsc
  * command.  But when we try using just rdtscp (with no extra serialization:)
- * 		case 3, normal: lines   0 var, 0 max dev, 32 min, 0 var 0 max dev
- * 		case 3, extras: lines 2-3 var, 4 max dev, 28 min, 2 var 4 max dev
+ * 	case 3, normal: lines   0 var, 0 max dev, 32 min, 0 var 0 max dev
+ * 	case 3, extras: lines 2-3 var, 4 max dev, 28 min, 2 var 4 max dev
  * Similar deal with case 4.  Lots of 28s and deviation.  It looks like some
  * times the rdtsc diff is only 28, and others 32 (hence the deviation of 4).
  * Note this means the measurement interval is *lower*, which means the code was
@@ -204,33 +204,33 @@
  * code *slower*)?  Or is it because the previous command was rdtsc, which might
  * 'speed up' subsequent rdtscs.  I tried it again, with a little work between
  * the unused TSC read and the start tsc read:
- * 		case 3, more crap : lines 2-3 var, 4 max dev, 28 min, 2 var 4 max dev
+ * 	case 3, more crap : lines 2-3 var, 4 max dev, 28 min, 2 var 4 max dev
  * So no real change from adding minor code in between.  What about adding an
  * lfence above the rdtscp (so it is almost exactly like case 2)?
  * Our assembly code now looks like:
- * 		lfence;
- * 		rdtsc;
- * 		mov %edx, (memory); 	// these get overwritten
- * 		mov %eax, (memory); 	// these get overwritten
+ * 	lfence;
+ * 	rdtsc;
+ * 	mov %edx, (memory); 	// these get overwritten
+ * 	mov %eax, (memory); 	// these get overwritten
  *
- * 		mov (memory), %eax;		// misc work (variable = i + j)
- * 		add %esi, %eax;			// misc work (variable = i + j)
- * 		mov %eax, (memory);		// misc work (variable = i + j)
+ * 	mov (memory), %eax;	// misc work (variable = i + j)
+ * 	add %esi, %eax;		// misc work (variable = i + j)
+ * 	mov %eax, (memory);	// misc work (variable = i + j)
  *
- * 		lfence;
- * 		rdtscp;					// this is the real start measurement
- * 		mov %edx, (memory);
- * 		mov %eax, (memory);
+ * 	lfence;
+ * 	rdtscp;			// this is the real start measurement
+ * 	mov %edx, (memory);
+ * 	mov %eax, (memory);
  *
  *      // no extra work here
  *
- * 		rdtscp;					// this is the real end measurement
- * 		mov %edx, (memory);
- * 		mov %eax, (memory);
- * 		cpuid;					// this is case 3, with sync after
+ * 	rdtscp;			// this is the real end measurement
+ * 	mov %edx, (memory);
+ * 	mov %eax, (memory);
+ * 	cpuid;			// this is case 3, with sync after
  *
  * Even with this extra lfence, case 3-style still shows numbers like:
- * 		case 3, added crap: lines 2-3 var, 4 max dev, 28 min, 2 var 4 max dev
+ * 	case 3, added crap: lines 2-3 var, 4 max dev, 28 min, 2 var 4 max dev
  * So either rdtscp is somehow faster due to internal-processor-caching (a
  * previous rdtsc makes the next rdtscp somewhat faster sometimes, including
  * after some instructions and an lfence), or the baseline case of no variation
@@ -277,7 +277,7 @@
  * support in the BIOS.  Specifically, faking USB keyboards and mice (making
  * them look like PS/2) and USB mass storage (making them look like a HDD) all
  * lead to an increase in SMIs.  For more info, check out:
- * 		https://rt.wiki.kernel.org/index.php/HOWTO:_Build_an_RT-application
+ * 	https://rt.wiki.kernel.org/index.php/HOWTO:_Build_an_RT-application
  * It is not sufficient to merely not use things like the USB mass storage.  It
  * needs to be disabled in the BIOS.  At least, this is true on my nehalem.  A
  * while back, we had an issue with microbenchmarks taking 10% longer if you
@@ -330,69 +330,71 @@ static inline void filltimes(uint64_t **times, unsigned int loop_bound,
 	for (j = 0; j < loop_bound; j++) {
 		for (i = 0; i < stat_size; i++) {
 			variable = 0;
-			/* starting side, i want to make sure we always copy out to memory
-			 * (stack), instead of sometimes using registers (and other times
-			 * not).  if you use =a, for instance, with no work, the compiler
-			 * will use esi and edi to store start_high and _low.
+			/* starting side, i want to make sure we always copy out
+			 * to memory (stack), instead of sometimes using
+			 * registers (and other times not).  if you use =a, for
+			 * instance, with no work, the compiler will use esi and
+			 * edi to store start_high and _low.
 			 *
-			 * The same concern is probably unnecessary at the end, but it might
-			 * keep the compiler from reserving the use of those registers.*/
+			 * The same concern is probably unnecessary at the end,
+			 * but it might keep the compiler from reserving the use
+			 * of those registers.*/
 
 			#if 0 /* extra crap before the measurement code */
 			asm volatile (
-						  "lfence;"
-			              "rdtsc;"
-						  "mov %%edx, %0;"
-						  "mov %%eax, %1;"
-						  : "=m" (dummy_high), "=m" (dummy_low)
-						  :
-						  : "%eax", "%edx");
+				"lfence;"
+				"rdtsc;"
+				"mov %%edx, %0;"
+				"mov %%eax, %1;"
+				: "=m" (dummy_high), "=m" (dummy_low)
+				:
+				: "%eax", "%edx");
 
 			variable = i + j;
 			#endif
 
 			asm volatile (
-						  "lfence;"
-			              "rdtsc;"
-						  "mov %%edx, %0;"
-						  "mov %%eax, %1;"
-						  : "=m" (start_high), "=m" (start_low)
-						  :
-						  : "%eax", "%edx");
+				"lfence;"
+				"rdtsc;"
+				"mov %%edx, %0;"
+				"mov %%eax, %1;"
+				: "=m" (start_high), "=m" (start_low)
+				:
+				: "%eax", "%edx");
 			#if 0 	/* types of start time measurements */
 			asm volatile (
 			              "cpuid;"
 			              "rdtsc;"
-						  "mov %%edx, %0;"
-						  "mov %%eax, %1;"
-						  : "=m" (start_high), "=m" (start_low)
-						  :
-						  : "%eax", "%ebx", "%ecx", "%edx");
+			              "mov %%edx, %0;"
+			              "mov %%eax, %1;"
+			              : "=m" (start_high), "=m" (start_low)
+			              :
+			              : "%eax", "%ebx", "%ecx", "%edx");
 			asm volatile (
-						  "lfence;"
+			              "lfence;"
 			              "rdtsc;"
-						  "mov %%edx, %0;"
-						  "mov %%eax, %1;"
-						  : "=m" (start_high), "=m" (start_low)
-						  :
-						  : "%eax", "%edx");
+			              "mov %%edx, %0;"
+			              "mov %%eax, %1;"
+			              : "=m" (start_high), "=m" (start_low)
+			              :
+			              : "%eax", "%edx");
 			asm volatile (
-						  "lfence;"
+			              "lfence;"
 			              "rdtsc;"
-						  "lfence;"
-						  "mov %%edx, %0;"
-						  "mov %%eax, %1;"
-						  : "=m" (start_high), "=m" (start_low)
-						  :
-						  : "%eax", "%edx");
+			              "lfence;"
+			              "mov %%edx, %0;"
+			              "mov %%eax, %1;"
+			              : "=m" (start_high), "=m" (start_low)
+			              :
+			              : "%eax", "%edx");
 
 			asm volatile(
 			             "rdtscp;"
-						  "mov %%edx, %0;"
-						  "mov %%eax, %1;"
-						 : "=m" (start_high), "=m" (start_low)
-						 :
-						 : "%eax", "%ecx", "%edx");
+			             "mov %%edx, %0;"
+			             "mov %%eax, %1;"
+			            : "=m" (start_high), "=m" (start_low)
+			            :
+			            : "%eax", "%ecx", "%edx");
 			#endif
 
 			/* call the function to measure here */
@@ -410,65 +412,66 @@ static inline void filltimes(uint64_t **times, unsigned int loop_bound,
 			             "rdtsc;"
 			             "mov %%edx, %0;"
 			             "mov %%eax, %1;"
-						 : "=m" (end_high), "=m" (end_low)
-						 :
-						 : "%eax", "%edx");
+			             : "=m" (end_high), "=m" (end_low)
+			             :
+			             : "%eax", "%edx");
 			#if 0 	/* types of end time measurements */
 			asm volatile("cpuid;"
 			             "rdtsc;"
 			             "mov %%edx, %0;"
 			             "mov %%eax, %1;"
-						 : "=m" (end_high), "=m" (end_low)
-						 :
-						 : "%eax", "%ebx", "%ecx", "%edx");
+			             : "=m" (end_high), "=m" (end_low)
+			             :
+			             : "%eax", "%ebx", "%ecx", "%edx");
 			asm volatile("lfence;"
 			             "rdtsc;"
 			             "mov %%edx, %0;"
 			             "mov %%eax, %1;"
-						 : "=m" (end_high), "=m" (end_low)
-						 :
-						 : "%eax", "%edx");
+			             : "=m" (end_high), "=m" (end_low)
+			             :
+			             : "%eax", "%edx");
 			asm volatile("lfence;"
 			             "rdtsc;"
 						  "lfence;"
 			             "mov %%edx, %0;"
 			             "mov %%eax, %1;"
-						 : "=m" (end_high), "=m" (end_low)
-						 :
-						 : "%eax", "%edx");
+			             : "=m" (end_high), "=m" (end_low)
+			             :
+			             : "%eax", "%edx");
 
 			asm volatile(
 			             "rdtscp;"
 			             "mov %%edx, %0;"
 			             "mov %%eax, %1;"
-						 : "=m" (end_high), "=m" (end_low)
-						 :
-						 : "%eax", "%ecx", "%edx");
+			             : "=m" (end_high), "=m" (end_low)
+			             :
+			             : "%eax", "%ecx", "%edx");
 			asm volatile(
 			             "rdtscp;"
 						 "lfence;"
 			             "mov %%edx, %0;"
 			             "mov %%eax, %1;"
-						 : "=m" (end_high), "=m" (end_low)
-						 :
-						 : "%eax", "%ecx", "%edx");
+			             : "=m" (end_high), "=m" (end_low)
+			             :
+			             : "%eax", "%ecx", "%edx");
 			asm volatile(
 			             "rdtscp;"
 			             "mov %%edx, %0;"
 			             "mov %%eax, %1;"
 			             "cpuid;"
-						 : "=m" (end_high), "=m" (end_low)
-						 :
-						 : "%eax", "%ebx", "%ecx", "%edx");
+			             : "=m" (end_high), "=m" (end_low)
+			             :
+			             : "%eax", "%ebx", "%ecx", "%edx");
 			#endif
 
 			start = ( ((uint64_t)start_high << 32) | start_low );
 			end = ( ((uint64_t)end_high << 32) | end_low );
 
 			if ( (int64_t)(end - start) < 0) {
-				printk("CRITICAL ERROR IN TAKING THE TIME!!!!!!\n"
-                       "loop(%d) stat(%d) start = %llu, end = %llu, "
-                       "variable = %u\n", j, i, start, end, variable);
+				printk("CRITICAL ERROR IN TAKING THE TIME!!!!\n"
+				       "loop(%d) stat(%d) start = %llu, "
+				       "end = %llu, variable = %u\n", j, i,
+				       start, end, variable);
 				times[j][i] = 0;
 			} else {
 				times[j][i] = end - start;
@@ -483,6 +486,7 @@ uint64_t var_calc(uint64_t *inputs, int size)
 {
 	int i;
 	uint64_t acc = 0, previous = 0, temp_var = 0;
+
 	for (i = 0; i < size; i++) {
 		if (acc < previous)
 			goto overflow;
@@ -519,6 +523,7 @@ int test_rdtsc(unsigned int loop_bound, unsigned int stat_size)
 	uint64_t *min_values;
 	uint64_t max_dev = 0, min_time = 0, max_time = 0, prev_min = 0;
 	uint64_t tot_var = 0, max_dev_all = 0, var_of_vars = 0, var_of_mins = 0;
+
 	loop_bound = loop_bound ?: LOOP_BOUND_DEF;
 	stat_size = stat_size ?: STAT_SIZE_DEF;
 
@@ -581,8 +586,8 @@ int test_rdtsc(unsigned int loop_bound, unsigned int stat_size)
 		tot_var += variances[j];
 
 		printk("loop_size:%d >>>> variance(cycles): %llu; "
-               "max_deviation: %llu; min time: %llu\n", j, variances[j],
-               max_dev, min_time);
+		       "max_deviation: %llu; min time: %llu\n", j, variances[j],
+		       max_dev, min_time);
 		prev_min = min_time;
 	}
 
@@ -655,110 +660,111 @@ void test_tsc_cycles(void)
 	start = read_tsc_serialized();
 	for (int i = 0; i < 1000; i++) {
 		asm volatile ("addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-	                  "addl $1, %%eax;"
-				      : : : "eax", "cc");
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+		              "addl $1, %%eax;"
+			      : : : "eax", "cc");
 	}
 	end = read_tsc_serialized();
 	end = end - start - __proc_global_info.tsc_overhead;
-	printk("%llu (100,000) ticks passed, run twice to load the icache\n", end);
+	printk("%llu (100,000) ticks passed, run twice to load the icache\n",
+	       end);
 
 	enable_irqsave(&irq_state);
 }
@@ -809,7 +815,7 @@ void interference_test(void)
 	size_t total = 0;
 	size_t max = 0;
 
-    deadline += pmc_cycles();
+	deadline += pmc_cycles();
 	enable_irq();
 	do {
 		total++;

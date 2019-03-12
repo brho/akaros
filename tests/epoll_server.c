@@ -46,18 +46,18 @@ int main()
 	char adir[40], ldir[40];
 	int n;
 	char buf[256];
-	/* We'll use this to see if we actually did epoll_waits instead of blocking
-	 * calls.  It's not 100%, but with a human on the other end, it should be
-	 * fine. */
+	/* We'll use this to see if we actually did epoll_waits instead of
+	 * blocking calls.  It's not 100%, but with a human on the other end, it
+	 * should be fine. */
 	bool has_epolled = FALSE;
 
 #ifdef PLAN9NET
 	printf("Using Plan 9's networking stack\n");
-	/* This clones a conversation (opens /net/tcp/clone), then reads the cloned
-	 * fd (which is the ctl) to givure out the conv number (the line), then
-	 * writes "announce [addr]" into ctl.  This "announce" command often has a
-	 * "bind" in it too.  plan9 bind just sets the local addr/port.  TCP
-	 * announce also does this.  Returns the ctlfd. */
+	/* This clones a conversation (opens /net/tcp/clone), then reads the
+	 * cloned fd (which is the ctl) to givure out the conv number (the
+	 * line), then writes "announce [addr]" into ctl.  This "announce"
+	 * command often has a "bind" in it too.  plan9 bind just sets the local
+	 * addr/port.  TCP announce also does this.  Returns the ctlfd. */
 	afd = announce9("tcp!*!23", adir, 0);
 
 	if (afd < 0) {
@@ -74,8 +74,8 @@ int main()
 	srv.sin_port = htons(23);
 	socklen_t socksize = sizeof(struct sockaddr_in);
 
-	/* Equiv to cloning a converstation in plan 9.  The shim returns the data FD
-	 * for the conversation. */
+	/* Equiv to cloning a converstation in plan 9.  The shim returns the
+	 * data FD for the conversation. */
 	srv_socket = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 	if (srv_socket < 0) {
 		perror("Socket failure");
@@ -84,7 +84,8 @@ int main()
 	/* bind + listen is equiv to announce() in plan 9.  Note that the "bind"
 	 * command is used, unlike in the plan9 announce. */
 	/* Binds our socket to the given addr/port in srv. */
-	ret = bind(srv_socket, (struct sockaddr*)&srv, sizeof(struct sockaddr_in));
+	ret = bind(srv_socket, (struct sockaddr*)&srv,
+		   sizeof(struct sockaddr_in));
 	if (ret < 0) {
 		perror("Bind failure");
 		return -1;
@@ -98,8 +99,8 @@ int main()
 	printf("Listened on port %d\n", ntohs(srv.sin_port));
 #endif
 
-	/* at this point, the server has done all the prep necessary to be able to
-	 * sleep/block/wait on an incoming connection. */
+	/* at this point, the server has done all the prep necessary to be able
+	 * to sleep/block/wait on an incoming connection. */
 	#define EP_SET_SZ 10	/* this is actually the ID of the largest FD */
 	int epfd = epoll_create(EP_SET_SZ);
 	struct epoll_event ep_ev;
@@ -120,10 +121,11 @@ int main()
 		return -1;
 	}
 	/* This is a little subtle.  We're putting a tap on the listen file /
-	 * listen_fd.  When this fires, we get an event because of that listen_fd.
-	 * But we don't actually listen or do anything to that listen_fd.  It's
-	 * solely for monitoring.  We open a path, below, and we'll reattempt to do
-	 * *that* operation when someone tells us that our listen tap fires. */
+	 * listen_fd.  When this fires, we get an event because of that
+	 * listen_fd.  But we don't actually listen or do anything to that
+	 * listen_fd.  It's solely for monitoring.  We open a path, below, and
+	 * we'll reattempt to do *that* operation when someone tells us that our
+	 * listen tap fires. */
 	ep_ev.data.fd = listen_fd;
 	if (epoll_ctl(epfd, EPOLL_CTL_ADD, listen_fd, &ep_ev)) {
 		perror("epoll_ctl_add listen");
@@ -131,13 +133,15 @@ int main()
 	}
 	has_epolled = FALSE;
 	while (1) {
-		/* Opens the conversation's listen file.  This blocks til someone
-		 * connects.  When they do, a new conversation is created, and that open
-		 * returned an FD for the new conv's ctl.  listen() reads that to find
-		 * out the conv number (the line) for this new conv.  listen() returns
-		 * the ctl for this new conv.
+		/* Opens the conversation's listen file.  This blocks til
+		 * someone connects.  When they do, a new conversation is
+		 * created, and that open returned an FD for the new conv's ctl.
+		 * listen() reads that to find out the conv number (the line)
+		 * for this new conv.  listen() returns the ctl for this new
+		 * conv.
 		 *
-		 * Non-block is for the act of listening, and applies to lcfd. */
+		 * Non-block is for the act of listening, and applies to lcfd.
+		 */
 		lcfd = listen9(adir, ldir, O_NONBLOCK);
 		if (lcfd >= 0)
 			break;
@@ -163,9 +167,9 @@ int main()
 	}
 	close(listen_fd);
 
-	/* Writes "accept [NUM]" into the ctlfd, then opens the conv's data file and
-	 * returns that fd.  Writing "accept" is a noop for most of our protocols.
-	 * */
+	/* Writes "accept [NUM]" into the ctlfd, then opens the conv's data file
+	 * and returns that fd.  Writing "accept" is a noop for most of our
+	 * protocols.  */
 	dfd = accept9(lcfd, ldir);
 	if (dfd < 0) {
 		perror("Accept failure");
@@ -251,7 +255,7 @@ int main()
 
 #ifdef PLAN9NET
 	close(dfd);		/* data fd for the new conv, from listen */
-	close(lcfd);	/* ctl fd for the new conv, from listen */
+	close(lcfd);		/* ctl fd for the new conv, from listen */
 	close(afd);		/* ctl fd for the listening conv */
 #else
 	close(dfd);		/* new connection socket, from accept */

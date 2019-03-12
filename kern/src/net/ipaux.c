@@ -385,23 +385,23 @@ extern char *v4parseip(uint8_t * to, char *from)
 			p++;
 	}
 	switch (CLASS(to)) {
-		case 0:	/* class A - 1 uint8_t net */
-		case 1:
-			if (i == 3) {
-				to[3] = to[2];
-				to[2] = to[1];
-				to[1] = 0;
-			} else if (i == 2) {
-				to[3] = to[1];
-				to[1] = 0;
-			}
-			break;
-		case 2:	/* class B - 2 uint8_t net */
-			if (i == 3) {
-				to[3] = to[2];
-				to[2] = 0;
-			}
-			break;
+	case 0:	/* class A - 1 uint8_t net */
+	case 1:
+		if (i == 3) {
+			to[3] = to[2];
+			to[2] = to[1];
+			to[1] = 0;
+		} else if (i == 2) {
+			to[3] = to[1];
+			to[1] = 0;
+		}
+		break;
+	case 2:	/* class B - 2 uint8_t net */
+		if (i == 3) {
+			to[3] = to[2];
+			to[2] = 0;
+		}
+		break;
 	}
 	return p;
 }
@@ -599,6 +599,7 @@ int parsemac(uint8_t * to, char *from, int len)
 uint32_t iphash(uint8_t * sa, uint16_t sp, uint8_t * da, uint16_t dp)
 {
 	uint32_t ret;
+
 	ret = (sa[IPaddrlen - 1] << 24) ^ (sp << 16) ^ (da[IPaddrlen - 1] << 8)
 		^ dp;
 	ret %= Nhash;
@@ -674,7 +675,7 @@ struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
 			continue;
 		c = h->c;
 		if (sp == c->rport && dp == c->lport
-			&& ipcmp(sa, c->raddr) == 0 && ipcmp(da, c->laddr) == 0) {
+		    && ipcmp(sa, c->raddr) == 0 && ipcmp(da, c->laddr) == 0) {
 			spin_unlock(&ht->lock);
 			return c;
 		}
@@ -739,7 +740,8 @@ void dump_ipht(struct Ipht *ht)
 		for (h = ht->tab[i]; h != NULL; h = h->next) {
 			c = h->c;
 			printk("Conv proto %s, idx %d: local %I:%d, remote %I:%d\n",
-			       c->p->name, c->x, c->laddr, c->lport, c->raddr, c->rport);
+			       c->p->name, c->x, c->laddr, c->lport, c->raddr,
+			       c->rport);
 		}
 	}
 	spin_unlock(&ht->lock);

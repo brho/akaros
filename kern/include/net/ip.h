@@ -80,40 +80,40 @@ struct Proto;
 struct conv {
 	qlock_t qlock;
 
-	int x;						/* conversation index */
+	int x;			/* conversation index */
 	struct Proto *p;
 
-	int restricted;				/* remote port is restricted */
-	uint32_t ttl;				/* max time to live */
-	uint32_t tos;				/* type of service */
-	int ignoreadvice;			/* don't terminate connection on icmp errors */
+	int restricted;		/* remote port is restricted */
+	uint32_t ttl;		/* max time to live */
+	uint32_t tos;		/* type of service */
+	int ignoreadvice;	/* don't terminate connection on icmp errors */
 
 	uint8_t ipversion;
-	uint8_t laddr[IPaddrlen];	/* local IP address */
-	uint8_t raddr[IPaddrlen];	/* remote IP address */
-	uint16_t lport;				/* local port number */
-	uint16_t rport;				/* remote port number */
+	uint8_t laddr[IPaddrlen];/* local IP address */
+	uint8_t raddr[IPaddrlen];/* remote IP address */
+	uint16_t lport;		/* local port number */
+	uint16_t rport;		/* remote port number */
 
-	char *owner;				/* protections */
+	char *owner;		/* protections */
 	int perm;
-	int inuse;					/* opens of listen/data/ctl */
+	int inuse;		/* opens of listen/data/ctl */
 	int length;
 	int state;
-	struct queue *rq_save;		/* rq created by proto, saved during bypass */
-	struct queue *wq_save;		/* wq created by proto, saved during bypass */
+	struct queue *rq_save;	/* rq created by proto, saved during bypass */
+	struct queue *wq_save;	/* wq created by proto, saved during bypass */
 
 	/* udp specific */
-	int headers;				/* data src/dst headers in udp */
-	int reliable;				/* true if reliable udp */
+	int headers;		/* data src/dst headers in udp */
+	int reliable;		/* true if reliable udp */
 
-	struct conv *incall;		/* calls waiting to be listened for */
+	struct conv *incall;	/* calls waiting to be listened for */
 	struct conv *next;
 
-	struct queue *rq;			/* queued data waiting to be read */
-	struct queue *wq;			/* queued data waiting to be written */
-	struct queue *eq;			/* returned error packets */
-	struct queue *sq;			/* snooping queue */
-	atomic_t snoopers;			/* number of processes with snoop open */
+	struct queue *rq;	/* queued data waiting to be read */
+	struct queue *wq;	/* queued data waiting to be written */
+	struct queue *eq;	/* returned error packets */
+	struct queue *sq;	/* snooping queue */
+	atomic_t snoopers;	/* number of processes with snoop open */
 
 	struct fdtap_slist data_taps;
 	struct fdtap_slist listen_taps;
@@ -125,12 +125,12 @@ struct conv {
 	qlock_t listenq;
 	struct rendez listenr;
 
-	struct Ipmulti *multi;		/* multicast bindings for this interface */
+	struct Ipmulti *multi;	/* multicast bindings for this interface */
 
-	void *ptcl;					/* Protocol specific stuff */
+	void *ptcl;		/* Protocol specific stuff */
 
-	struct route *r;			/* last route used */
-	uint32_t rgen;				/* routetable generation for *r */
+	struct route *r;	/* last route used */
+	uint32_t rgen;		/* routetable generation for *r */
 };
 
 struct Ipifc;
@@ -138,15 +138,15 @@ struct Fs;
 
 struct medium {
 	char *name;
-	int hsize;					/* medium header size */
-	int mintu;					/* default min mtu */
-	int maxtu;					/* default max mtu */
-	int maclen;					/* mac address length  */
+	int hsize;		/* medium header size */
+	int mintu;		/* default min mtu */
+	int maxtu;		/* default max mtu */
+	int maclen;		/* mac address length  */
 	void (*bind) (struct Ipifc * unused_Ipifc, int unused_int,
-				  char **unused_char_pp_t);
+		      char **unused_char_pp_t);
 	void (*unbind) (struct Ipifc * unused_Ipifc);
-	void (*bwrite) (struct Ipifc * ifc,
-					struct block * b, int version, uint8_t * ip);
+	void (*bwrite) (struct Ipifc * ifc, struct block * b, int version,
+			uint8_t * ip);
 
 	/* for arming interfaces to receive multicast */
 	void (*addmulti) (struct Ipifc * ifc, uint8_t * a, uint8_t * ia);
@@ -157,9 +157,9 @@ struct medium {
 
 	/* routes for router boards */
 	void (*addroute) (struct Ipifc * ifc, int unused_int, uint8_t * u8p,
-					  uint8_t *, uint8_t * u8p2, int);
+			  uint8_t *, uint8_t * u8p2, int);
 	void (*remroute) (struct Ipifc * ifc, int i, uint8_t * u8p,
-					  uint8_t * uu8p2);
+			  uint8_t * uu8p2);
 	void (*flushroutes) (struct Ipifc * ifc);
 
 	/* for routing multicast groups */
@@ -167,13 +167,15 @@ struct medium {
 	void (*leavemulti) (struct Ipifc * ifc, uint8_t * a, uint8_t * ia);
 
 	/* address resolution */
-	void (*ares) (struct Fs *, int unused_int, uint8_t * unused_uint8_p_t, uint8_t *, int, int);	/* resolve */
-	void (*areg) (struct Ipifc * unused_Ipifc, uint8_t * unused_uint8_p_t);	/* register */
+	void (*ares) (struct Fs *, int unused_int, uint8_t * unused_uint8_p_t,
+		      uint8_t *, int, int);	/* resolve */
+	void (*areg) (struct Ipifc * unused_Ipifc,
+		      uint8_t * unused_uint8_p_t);	/* register */
 
 	/* v6 address generation */
 	void (*pref2addr) (uint8_t * pref, uint8_t * ea);
 
-	int unbindonclose;			/* if non-zero, unbind on last close */
+	int unbindonclose;	/* if non-zero, unbind on last close */
 };
 
 /* logical interface associated with a physical one */
@@ -182,12 +184,12 @@ struct Iplifc {
 	uint8_t mask[IPaddrlen];
 	uint8_t remote[IPaddrlen];
 	uint8_t net[IPaddrlen];
-	uint8_t tentative;			/* =1 => v6 dup disc on, =0 => confirmed unique */
-	uint8_t onlink;				/* =1 => onlink, =0 offlink. */
-	uint8_t autoflag;			/* v6 autonomous flag */
-	uint64_t validlt;				/* v6 valid lifetime */
-	uint64_t preflt;				/* v6 preferred lifetime */
-	uint64_t origint;				/* time when addr was added */
+	uint8_t tentative; /* =1 => v6 dup disc on, =0 => confirmed unique */
+	uint8_t onlink;			/* =1 => onlink, =0 offlink. */
+	uint8_t autoflag;		/* v6 autonomous flag */
+	uint64_t validlt;		/* v6 valid lifetime */
+	uint64_t preflt;		/* v6 preferred lifetime */
+	uint64_t origint;		/* time when addr was added */
 	struct Iplink *link;		/* addresses linked to this lifc */
 	struct Iplifc *next;
 };
@@ -221,34 +223,34 @@ struct routerparams {
 struct Ipifc {
 	rwlock_t rwlock;
 
-	struct conv *conv;			/* link to its conversation structure */
-	char dev[64];				/* device we're attached to */
-	struct medium *m;			/* Media pointer */
-	int maxtu;					/* Maximum transfer unit */
-	int mintu;					/* Minumum tranfer unit */
-	unsigned int feat;				/* Offload features */
-	void *arg;					/* medium specific */
-	int reassemble;				/* reassemble IP packets before forwarding */
+	struct conv *conv;	/* link to its conversation structure */
+	char dev[64];		/* device we're attached to */
+	struct medium *m;	/* Media pointer */
+	int maxtu;		/* Maximum transfer unit */
+	int mintu;		/* Minumum tranfer unit */
+	unsigned int feat;	/* Offload features */
+	void *arg;		/* medium specific */
+	int reassemble;		/* reassemble IP packets before forwarding */
 
 	/* these are used so that we can unbind on the fly */
 	spinlock_t idlock;
-	uint8_t ifcid;				/* incremented each 'bind/unbind/add/remove' */
-	int ref;					/* number of proc's using this Ipifc */
-	struct rendez wait;			/* where unbinder waits for ref == 0 */
+	uint8_t ifcid;		/* incremented each 'bind/unbind/add/remove' */
+	int ref;		/* number of proc's using this Ipifc */
+	struct rendez wait;	/* where unbinder waits for ref == 0 */
 	int unbinding;
 
-	uint8_t mac[MAClen];		/* MAC address */
+	uint8_t mac[MAClen];	/* MAC address */
 
-	struct Iplifc *lifc;		/* logical interfaces on this physical one */
+	struct Iplifc *lifc;	/* logical interfaces on this physical one */
 
-	uint32_t in, out;			/* message statistics */
-	uint32_t inerr, outerr;		/* ... */
+	uint32_t in, out;	/* message statistics */
+	uint32_t inerr, outerr;	/* ... */
 	uint32_t tracedrop;
 
-	uint8_t sendra6;			/* == 1 => send router advs on this ifc */
-	uint8_t recvra6;			/* == 1 => recv router advs on this ifc */
-	struct routerparams rp;		/* router parameters as in RFC 2461, pp.40--43.
-								   used only if node is router */
+	uint8_t sendra6;	/* == 1 => send router advs on this ifc */
+	uint8_t recvra6;	/* == 1 => recv router advs on this ifc */
+	struct routerparams rp;	/* router parameters as in RFC 2461, pp.40--43.
+				   used only if node is router */
 };
 
 /*
@@ -264,7 +266,7 @@ struct Ipmulti {
  *  hash table for 2 ip addresses + 2 ports
  */
 enum {
-	Nipht = 521,				/* convenient prime */
+	Nipht = 521,		/* convenient prime */
 
 	IPmatchexact = 0,	/* match on 4 tuple */
 	IPmatchany,	/* *!* */
@@ -286,7 +288,7 @@ struct Ipht {
 void iphtadd(struct Ipht *, struct conv *);
 void iphtrem(struct Ipht *, struct conv *);
 struct conv *iphtlook(struct Ipht *ht, uint8_t * sa, uint16_t sp, uint8_t * da,
-					  uint16_t dp);
+		      uint16_t dp);
 void dump_ipht(struct Ipht *ht);
 
 /*
@@ -294,9 +296,9 @@ void dump_ipht(struct Ipht *ht);
  */
 struct Proto {
 	qlock_t qlock;
-	char *name;					/* protocol name */
-	int x;						/* protocol index */
-	int ipproto;				/* ip protocol type */
+	char *name;		/* protocol name */
+	int x;			/* protocol index */
+	int ipproto;		/* ip protocol type */
 
 	void (*connect)(struct conv *, char **, int);
 	void (*announce)(struct conv *, char **, int);
@@ -313,14 +315,15 @@ struct Proto {
 	int (*local) (struct conv *, char *unused_char_p_t, int);
 	int (*remote) (struct conv *, char *unused_char_p_t, int);
 	int (*inuse) (struct conv *);
-	int (*gc) (struct Proto *);	/* returns true if any conversations are freed */
+	/* returns true if any conversations are freed */
+	int (*gc) (struct Proto *);
 
-	struct Fs *f;				/* file system this proto is part of */
-	struct conv **conv;			/* array of conversations */
-	int ptclsize;				/* size of per protocol ctl block */
-	int nc;						/* number of conversations */
+	struct Fs *f;		/* file system this proto is part of */
+	struct conv **conv;	/* array of conversations */
+	int ptclsize;		/* size of per protocol ctl block */
+	int nc;			/* number of conversations */
 	int ac;
-	struct qid qid;				/* qid for protocol directory */
+	struct qid qid;		/* qid for protocol directory */
 	uint16_t nextport;
 	uint16_t nextrport;
 
@@ -346,8 +349,8 @@ struct Fs {
 	int np;
 	struct Proto *p[Maxproto + 1];	/* list of supported protocols */
 	struct Proto *t2p[256];		/* vector of all protocols */
-	struct Proto *ipifc;		/* kludge for ipifcremroute & ipifcaddroute */
-	struct Proto *ipmux;		/* kludge for finding an ip multiplexor */
+	struct Proto *ipifc;	/* kludge for ipifcremroute & ipifcaddroute */
+	struct Proto *ipmux;	/* kludge for finding an ip multiplexor */
 
 	struct IP *ip;
 	struct Ipselftab *self;
@@ -357,12 +360,12 @@ struct Fs {
 
 	struct route *v4root[1 << Lroot];	/* v4 routing forest */
 	struct route *v6root[1 << Lroot];	/* v6 routing forest */
-	struct route *queue;		/* used as temp when reinjecting routes */
+	struct route *queue;	/* used as temp when reinjecting routes */
 
 	struct Netlog *alog;
 	struct Ifclog *ilog;
 
-	char ndb[1024];				/* an ndb entry for this interface */
+	char ndb[1024];		/* an ndb entry for this interface */
 	int ndbvers;
 	long ndbmtime;
 };
@@ -385,13 +388,13 @@ struct V6params {
 	struct routerparams rp;		/* v6 params, one copy per node now */
 	struct hostparams hp;
 	struct V6router v6rlist[3];	/* max 3 default routers, currently */
-	int cdrouter;				/* uses only v6rlist[cdrouter] if   */
+	int cdrouter;			/* uses only v6rlist[cdrouter] if   */
 	/* cdrouter >= 0. */
 };
 
 int Fsconnected(struct conv *, char *unused_char_p_t);
 struct conv *Fsnewcall(struct conv *, uint8_t * unused_uint8_p_t, uint16_t,
-					   uint8_t *, uint16_t, uint8_t unused_uint8_t);
+		       uint8_t *, uint16_t, uint8_t unused_uint8_t);
 int Fspcolstats(char *unused_char_p_t, int);
 int Fsproto(struct Fs *, struct Proto *);
 int Fsbuiltinproto(struct Fs *, uint8_t unused_uint8_t);
@@ -449,8 +452,8 @@ void ifclogclose(struct Fs *, struct chan *);
 enum {
 
 	/* type bits */
-	Rv4 = (1 << 0),				/* this is a version 4 route */
-	Rifc = (1 << 1),	/* this route is a directly connected interface */
+	Rv4 = (1 << 0),		/* this is a version 4 route */
+	Rifc = (1 << 1),	/* route is a directly connected interface */
 	Rptpt = (1 << 2),	/* this route is a pt to pt interface */
 	Runi = (1 << 3),	/* a unicast self address */
 	Rbcast = (1 << 4),	/* a broadcast self address */
@@ -473,7 +476,7 @@ struct RouteTree {
 	struct route *mid;
 	uint8_t depth;
 	uint8_t type;
-	uint8_t ifcid;				/* must match ifc->id */
+	uint8_t ifcid;		/* must match ifc->id */
 	struct Ipifc *ifc;
 	char tag[4];
 	struct kref kref;
@@ -500,9 +503,9 @@ struct route {
 	};
 };
 extern void v4addroute(struct Fs *f, char *tag, uint8_t * a, uint8_t * mask,
-					   uint8_t * gate, int type);
+		       uint8_t * gate, int type);
 extern void v6addroute(struct Fs *f, char *tag, uint8_t * a, uint8_t * mask,
-					   uint8_t * gate, int type);
+		       uint8_t * gate, int type);
 extern void v4delroute(struct Fs *f, uint8_t * a, uint8_t * mask, int dolock);
 extern void v6delroute(struct Fs *f, uint8_t * a, uint8_t * mask, int dolock);
 extern struct route *v4lookup(struct Fs *f, uint8_t * a, struct conv *c);
@@ -512,7 +515,7 @@ extern long routewrite(struct Fs *f, struct chan *, char *unused_char_p_t, int);
 extern void routetype(int unused_int, char *unused_char_p_t);
 extern void ipwalkroutes(struct Fs *, struct routewalk *);
 extern void convroute(struct route *r, uint8_t * u8pt, uint8_t * u8pt1,
-					  uint8_t * u8pt2, char *unused_char_p_t, int *intp);
+		      uint8_t * u8pt2, char *unused_char_p_t, int *intp);
 
 /*
  *  devip.c
@@ -523,7 +526,7 @@ extern void convroute(struct route *r, uint8_t * u8pt, uint8_t * u8pt1,
  *  It maintains the state used by devip and iproute.
  */
 struct IPaux {
-	char *owner;				/* the user that did the attach */
+	char *owner;		/* the user that did the attach */
 	char tag[4];
 };
 
@@ -535,30 +538,30 @@ extern struct IPaux *newipaux(char *unused_char_p_t, char *);
 struct arpent {
 	uint8_t ip[IPaddrlen];
 	uint8_t mac[MAClen];
-	struct medium *type;		/* media type */
+	struct medium *type;	/* media type */
 	struct arpent *hash;
 	struct block *hold;
 	struct block *last;
-	uint64_t ctime;			/* time entry was created or refreshed */
-	uint64_t utime;			/* time entry was last used */
+	uint64_t ctime;		/* time entry was created or refreshed */
+	uint64_t utime;		/* time entry was last used */
 	uint8_t state;
-	struct arpent *nextrxt;		/* re-transmit chain */
-	uint64_t rtime;			/* time for next retransmission */
+	struct arpent *nextrxt;	/* re-transmit chain */
+	uint64_t rtime;		/* time for next retransmission */
 	uint8_t rxtsrem;
 	struct Ipifc *ifc;
-	uint8_t ifcid;				/* must match ifc->id */
+	uint8_t ifcid;		/* must match ifc->id */
 };
 
 extern void arpinit(struct Fs *);
 extern int arpread(struct arp *, char *unused_char_p_t, uint32_t, int);
 extern int arpwrite(struct Fs *, char *unused_char_p_t, long);
 extern struct arpent *arpget(struct arp *, struct block *bp, int version,
-							 struct Ipifc *ifc, uint8_t * ip, uint8_t * h);
+			     struct Ipifc *ifc, uint8_t * ip, uint8_t * h);
 extern void arprelease(struct arp *, struct arpent *a);
 extern struct block *arpresolve(struct arp *, struct arpent *a,
-								struct medium *type, uint8_t * mac);
-extern void arpenter(struct Fs *, int version, uint8_t * ip,
-					 uint8_t * mac, int len, int norefresh);
+				struct medium *type, uint8_t * mac);
+extern void arpenter(struct Fs *, int version, uint8_t * ip, uint8_t * mac,
+		     int len, int norefresh);
 
 /*
  * ipaux.c
@@ -595,6 +598,7 @@ static inline long ipcmp(unsigned char *x, unsigned char *y)
 {
 	uint32_t *a = (uint32_t *)x;
 	uint32_t *b = (uint32_t *)y;
+
 	return (a[0] ^ b[0]) | (a[1] ^ b[1]) |
 		(a[2] ^ b[2]) | (a[3] ^ b[3]);
 }
@@ -641,10 +645,10 @@ extern int ipifccheckin(struct Ipifc *ifc, struct medium *med);
 extern void ipifccheckout(struct Ipifc *ifc);
 extern int ipifcgrab(struct Ipifc *ifc);
 extern void ipifcaddroute(struct Fs *, int unused_int,
-						  uint8_t * unused_uint8_p_t, uint8_t *, uint8_t *,
+			  uint8_t * unused_uint8_p_t, uint8_t *, uint8_t *,
 						  int);
 extern void ipifcremroute(struct Fs *, int unused_int, uint8_t * u8pt,
-						  uint8_t * u8pt2);
+			  uint8_t * u8pt2);
 extern void ipifcremmulti(struct conv *c, uint8_t * ma, uint8_t * ia);
 extern void ipifcaddmulti(struct conv *c, uint8_t * ma, uint8_t * ia);
 extern void ipifc_trace_block(struct Ipifc *ifc, struct block *bp);
@@ -658,16 +662,16 @@ extern void iprouting(struct Fs *, int);
 extern void icmpnoconv(struct Fs *, struct block *);
 extern void icmpcantfrag(struct Fs *, struct block *, int);
 extern void icmpttlexceeded(struct Fs *, uint8_t * unused_uint8_p_t,
-					struct block *);
+			    struct block *);
 
 uint16_t ipchecksum(uint8_t *addr, int len);
 extern uint16_t ipcsum(uint8_t * unused_uint8_p_t);
 extern void ipiput4(struct Fs *, struct Ipifc *unused_ipifc, struct block *);
 extern void ipiput6(struct Fs *, struct Ipifc *unused_ipifc, struct block *);
-extern int ipoput4(struct Fs *,
-				   struct block *, int unused_int, int, int, struct conv *);
-extern int ipoput6(struct Fs *,
-				   struct block *, int unused_int, int, int, struct conv *);
+extern int ipoput4(struct Fs *, struct block *, int unused_int, int, int,
+		   struct conv *);
+extern int ipoput6(struct Fs *, struct block *, int unused_int, int, int,
+		   struct conv *);
 extern int ipstats(struct Fs *, char *unused_char_p_t, int);
 extern uint16_t ptclbsum(uint8_t * unused_uint8_p_t, int);
 extern uint16_t ptclcsum(struct block *, int unused_int, int);
@@ -690,9 +694,10 @@ static inline void ptclcsum_finalize(struct block *bp, unsigned int feat)
 
 	if (flag && (flag & feat) != flag) {
 		csum_store = bp->rp + bp->transport_offset + bp->tx_csum_offset;
-		/* NOTE pseudo-header partial checksum (if any) is already placed at
-		 * csum_store (e.g. tcpcksum), and the ptclcsum() below will include
-		 * that partial checksum as part of the calculation.
+		/* NOTE pseudo-header partial checksum (if any) is already
+		 * placed at csum_store (e.g. tcpcksum), and the ptclcsum()
+		 * below will include that partial checksum as part of the
+		 * calculation.
 		 */
 		hnputs((uint16_t *)csum_store,
 		       ptclcsum(bp, bp->transport_offset,
@@ -725,7 +730,7 @@ extern struct chan *chandial(char *u1, char *u2, char *u3, struct chan **c);
  *  global to all of the stack
  */
 extern void (*igmpreportfn) (struct Ipifc * unused_ipifc,
-							 uint8_t * unused_uint8_p_t);
+			     uint8_t * unused_uint8_p_t);
 
 /* IPV6 */
 /* rfc 3513 defines the address prefices */
@@ -746,23 +751,23 @@ typedef struct Routinghdr Routinghdr;
 typedef struct Fraghdr6 Fraghdr6;
 
 struct Ip4hdr {
-	uint8_t vihl;				/* Version and header length */
-	uint8_t tos;				/* Type of service */
-	uint8_t length[2];			/* packet length */
-	uint8_t id[2];				/* ip->identification */
-	uint8_t frag[2];			/* Fragment information */
-	uint8_t ttl;				/* Time to live */
-	uint8_t proto;				/* Protocol */
-	uint8_t cksum[2];			/* Header checksum */
-	uint8_t src[4];				/* IP source */
-	uint8_t dst[4];				/* IP destination */
+	uint8_t vihl;			/* Version and header length */
+	uint8_t tos;			/* Type of service */
+	uint8_t length[2];		/* packet length */
+	uint8_t id[2];			/* ip->identification */
+	uint8_t frag[2];		/* Fragment information */
+	uint8_t ttl;			/* Time to live */
+	uint8_t proto;			/* Protocol */
+	uint8_t cksum[2];		/* Header checksum */
+	uint8_t src[4];			/* IP source */
+	uint8_t dst[4];			/* IP destination */
 };
 
 struct ip6hdr {
-	uint8_t vcf[4];				// version:4, traffic class:8, flow label:20
-	uint8_t ploadlen[2];		// payload length: packet length - 40
-	uint8_t proto;				// next header type
-	uint8_t ttl;				// hop limit
+	uint8_t vcf[4];		// version:4, traffic class:8, flow label:20
+	uint8_t ploadlen[2];	// payload length: packet length - 40
+	uint8_t proto;		// next header type
+	uint8_t ttl;		// hop limit
 	uint8_t src[IPaddrlen];
 	uint8_t dst[IPaddrlen];
 };
@@ -786,8 +791,8 @@ struct fraghdr6 {
 	uint8_t id[4];
 };
 
-enum {							/* Header Types */
-	HBH = 0,					//?
+enum {					/* Header Types */
+	HBH = 0,
 	ICMP = 1,
 	IGMP = 2,
 	GGP = 3,
@@ -906,14 +911,13 @@ static inline unsigned int ip_version(struct block *bp)
 
 extern void ipv62smcast(uint8_t *, uint8_t *);
 extern void icmpns(struct Fs *f, uint8_t * src, int suni, uint8_t * targ,
-				   int tuni, uint8_t * mac);
+		   int tuni, uint8_t * mac);
 extern void icmpna(struct Fs *f, uint8_t * src, uint8_t * dst, uint8_t * targ,
-				   uint8_t * mac, uint8_t flags);
+		   uint8_t * mac, uint8_t flags);
 extern void icmpttlexceeded6(struct Fs *f, struct Ipifc *ifc, struct block *bp);
 extern void icmppkttoobig6(struct Fs *f, struct Ipifc *ifc, struct block *bp);
-extern void icmphostunr(struct Fs *f,
-						struct Ipifc *ifc,
-						struct block *bp, int code, int free);
+extern void icmphostunr(struct Fs *f, struct Ipifc *ifc, struct block *bp,
+			int code, int free);
 
 extern uint8_t v6allnodesN[IPaddrlen];
 extern uint8_t v6allnodesL[IPaddrlen];
@@ -983,25 +987,25 @@ struct netfile {
 	uint32_t mode;
 	char owner[KNAMELEN];
 
-	int type;					/* multiplexor type */
-	int prom;					/* promiscuous mode */
-	int scan;					/* base station scanning interval */
-	int bridge;					/* bridge mode */
-	int headersonly;			/* headers only - no data */
-	uint8_t maddr[8];			/* bitmask of multicast addresses requested */
-	int nmaddr;					/* number of multicast addresses */
+	int type;		/* multiplexor type */
+	int prom;		/* promiscuous mode */
+	int scan;		/* base station scanning interval */
+	int bridge;		/* bridge mode */
+	int headersonly;	/* headers only - no data */
+	uint8_t maddr[8];	/* bitmask of multicast addresses requested */
+	int nmaddr;		/* number of multicast addresses */
 
-	struct queue *in;			/* input buffer */
+	struct queue *in;	/* input buffer */
 };
 
 /*
  *  a network address
  */
 struct netaddr {
-	struct netaddr *next;		/* allocation chain */
+	struct netaddr *next;	/* allocation chain */
 	struct netaddr *hnext;
 	uint8_t addr[Nmaxaddr];
-	int ref;					/* leaving this as an int, not a kref.  no reaping, yet. */
+	int ref; /* leaving this as an int, not a kref.  no reaping, yet. */
 };
 
 /*
@@ -1018,7 +1022,7 @@ enum {
 	NETF_UDPCK = (1 << NS_UDPCK_SHIFT),	/* xmit udp checksum */
 	NETF_TCPCK = (1 << NS_TCPCK_SHIFT),	/* xmit tcp checksum */
 	NETF_PADMIN = (1 << NETF_PADMIN_SHIFT),	/* device pads to mintu */
-	NETF_SG	= (1 << NETF_SG_SHIFT),		/* device can do scatter/gather */
+	NETF_SG	= (1 << NETF_SG_SHIFT),		/* can do scatter/gather */
 	NETF_TSO = (1 << NS_TSO_SHIFT),		/* device can do TSO */
 	NETF_LRO = (1 << NETF_LRO_SHIFT),	/* device can do LRO */
 	NETF_RXCSUM = (1 << NETF_RXCSUM_SHIFT),	/* device can do rx checksums */
@@ -1026,36 +1030,36 @@ enum {
 
 /* Linux's rtnl_link_stats64 */
 struct netif_stats {
-	uint64_t				rx_packets;	/* total packets received */
-	uint64_t				tx_packets;	/* total packets transmitted */
-	uint64_t				rx_bytes;	/* total bytes received */
-	uint64_t				tx_bytes;	/* total bytes transmitted */
-	uint64_t				rx_errors;	/* bad packets received */
-	uint64_t				tx_errors;	/* packet transmit problems */
-	uint64_t				rx_dropped;	/* no space in linux buffers */
-	uint64_t				tx_dropped;	/* no space available in linux */
-	uint64_t				multicast;	/* multicast packets received */
-	uint64_t				collisions;
+	uint64_t		rx_packets;	/* total packets received */
+	uint64_t		tx_packets;	/* total packets transmitted */
+	uint64_t		rx_bytes;	/* total bytes received */
+	uint64_t		tx_bytes;	/* total bytes transmitted */
+	uint64_t		rx_errors;	/* bad packets received */
+	uint64_t		tx_errors;	/* packet transmit problems */
+	uint64_t		rx_dropped;	/* no space in linux buffers */
+	uint64_t		tx_dropped;	/* no space available in linux*/
+	uint64_t		multicast;	/* multicast packets received */
+	uint64_t		collisions;
 
 	/* detailed rx_errors: */
-	uint64_t				rx_length_errors;
-	uint64_t				rx_over_errors;	/* receiver ring buff overflow */
-	uint64_t				rx_crc_errors;	/* recved pkt with crc error */
-	uint64_t				rx_frame_errors;/* recv'd frame alignment error */
-	uint64_t				rx_fifo_errors;	/* recv'r fifo overrun */
-	uint64_t				rx_missed_errors;	/* receiver missed packet */
+	uint64_t		rx_length_errors;
+	uint64_t		rx_over_errors;	/* recv'r ring buff overflow */
+	uint64_t		rx_crc_errors;	/* recv'd pkt with crc error */
+	uint64_t		rx_frame_errors;/* recv'd frame alignment err */
+	uint64_t		rx_fifo_errors;	/* recv'r fifo overrun */
+	uint64_t		rx_missed_errors; /* receiver missed packet */
 
 	/* detailed tx_errors */
-	uint64_t				tx_aborted_errors;
-	uint64_t				tx_carrier_errors;
-	uint64_t				tx_fifo_errors;
-	uint64_t				tx_heartbeat_errors;
-	uint64_t				tx_window_errors;
+	uint64_t		tx_aborted_errors;
+	uint64_t		tx_carrier_errors;
+	uint64_t		tx_fifo_errors;
+	uint64_t		tx_heartbeat_errors;
+	uint64_t		tx_window_errors;
 
 	/* for cslip etc */
-	uint64_t				rx_compressed;
-	uint64_t				tx_compressed;
-	uint64_t				rx_nohandler;	/* dropped, no handler found */
+	uint64_t		rx_compressed;
+	uint64_t		tx_compressed;
+	uint64_t		rx_nohandler;	/* dropped, no handler found */
 };
 
 /*
@@ -1066,42 +1070,42 @@ struct netif {
 	qlock_t qlock;
 
 	/* multiplexing */
-	char name[KNAMELEN];		/* for top level directory */
-	char drv_name[KNAMELEN];	/* device driver name */
-	int nfile;					/* max number of Netfiles */
+	char name[KNAMELEN];	/* for top level directory */
+	char drv_name[KNAMELEN];/* device driver name */
+	int nfile;		/* max number of Netfiles */
 	struct netfile **f;
 
 	/* about net */
-	int limit;					/* flow control */
-	int alen;					/* address length */
-	int mbps;					/* megabits per sec */
-	int link;					/* link status (seems to be driver specific) */
+	int limit;		/* flow control */
+	int alen;		/* address length */
+	int mbps;		/* megabits per sec */
+	int link;		/* link status (seems to be driver specific) */
 	struct rendez link_rz;
 	bool link_is_up;
-	unsigned int feat;			/* dev features turned on */
+	unsigned int feat;	/* dev features turned on */
 	unsigned int hw_features;	/* dev features available */
 	uint8_t addr[Nmaxaddr];
 	uint8_t bcast[Nmaxaddr];
-	struct netaddr *maddr;		/* known multicast addresses */
-	int nmaddr;					/* number of known multicast addresses */
+	struct netaddr *maddr;	/* known multicast addresses */
+	int nmaddr;		/* number of known multicast addresses */
 	struct netaddr *mhash[Nmhash];	/* hash table of multicast addresses */
-	int prom;					/* number of promiscuous opens */
-	int scan;					/* number of base station scanners */
-	int all;					/* number of -1 multiplexors */
-	/* Analogous to linux's IFF_PROMISC flags, currently used by linux drivers,
-	 * pending a rewrite of ow promiscuous works */
+	int prom;		/* number of promiscuous opens */
+	int scan;		/* number of base station scanners */
+	int all;		/* number of -1 multiplexors */
+	/* Analogous to linux's IFF_PROMISC flags, currently used by linux
+	 * drivers, pending a rewrite of ow promiscuous works */
 	int rx_mode;
 
 	/* 9ns statistics */
 	int misses;
 	int inpackets;
 	int outpackets;
-	int crcs;					/* input crc errors */
-	int oerrs;					/* output errors */
-	int frames;					/* framing errors */
-	int overflows;				/* packet overflows */
-	int buffs;					/* buffering errors */
-	int soverflows;				/* software overflow */
+	int crcs;			/* input crc errors */
+	int oerrs;			/* output errors */
+	int frames;			/* framing errors */
+	int overflows;			/* packet overflows */
+	int buffs;			/* buffering errors */
+	int soverflows;			/* software overflow */
 	/* Linux-style statistics */
 	struct netif_stats stats;
 
@@ -1113,9 +1117,8 @@ struct netif {
 };
 
 void netifinit(struct ether *, char *, int, uint32_t);
-struct walkqid *netifwalk(struct ether *, struct chan *, struct chan *,
-			  char **,
-						  int);
+struct walkqid *netifwalk(struct ether *, struct chan *, struct chan *, char **,
+			  int);
 struct chan *netifopen(struct ether *, struct chan *, int);
 void netifclose(struct ether *, struct chan *);
 long netifread(struct ether *, struct chan *, void *, long, uint32_t);
@@ -1167,13 +1170,13 @@ struct ether {
 	void (*detach) (struct ether *);
 	void (*transmit) (struct ether *);
 	long (*ifstat) (struct ether *, void *, long, uint32_t);
-	long (*ctl) (struct ether *, void *, long);	/* custom ctl messages */
+	long (*ctl) (struct ether *, void *, long); /* custom ctl messages */
 	void (*power) (struct ether *, int);	/* power on/off */
-	void (*shutdown) (struct ether *);	/* shutdown hardware before reboot */
+	void (*shutdown) (struct ether *); /* shutdown hardware before reboot */
 	void *ctlr;
 	int pcmslot;				/* PCMCIA */
 	int fullduplex;				/* non-zero if full duplex */
-	int vlanid;					/* non-zero if vlan */
+	int vlanid;				/* non-zero if vlan */
 
 	struct queue *oq;
 

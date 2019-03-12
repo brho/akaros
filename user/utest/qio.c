@@ -46,19 +46,19 @@ bool test_partial_write_to_full_queue(void)
 	} while (ret > 0);
 	UT_ASSERT_FMT("Didn't get EAGAIN, got %d", errno == EAGAIN, errno);
 
-	/* The way qio works is we accept the last block, and won't accept future
-	 * blocks until we drop below the limit.  Let's drain until we get there.
-	 * Should be only one or two. */
+	/* The way qio works is we accept the last block, and won't accept
+	 * future blocks until we drop below the limit.  Let's drain until we
+	 * get there.  Should be only one or two. */
 	while (!fd_is_writable(pipefd[1])) {
 		ret = read(pipefd[0], buf, 1024);
 		UT_ASSERT_FMT("Failed to read from pipe with data", ret > 0);
 	}
 
 	/* Now we have a little room.  If we send in a very large write, greater
-	 * than Maxatomic, we should get a partial write.  If we get -1 back, then
-	 * the kernel said it was writable, but we couldn't write.  This happened
-	 * once when the kernel would write some, then get EAGAIN and throw -
-	 * ignoring the successful initial write. */
+	 * than Maxatomic, we should get a partial write.  If we get -1 back,
+	 * then the kernel said it was writable, but we couldn't write.  This
+	 * happened once when the kernel would write some, then get EAGAIN and
+	 * throw - ignoring the successful initial write. */
 	ret = write(pipefd[1], buf, buf_sz);
 	UT_ASSERT_FMT("write error %d, errno %d", ret > 0, ret, errno);
 	UT_ASSERT_FMT("wrote %d >= %d buf_sz", ret < buf_sz, ret, buf_sz);
@@ -79,7 +79,6 @@ int num_utests = sizeof(utests) / sizeof(struct utest);
 
 int main(int argc, char *argv[])
 {
-	// Run test suite passing it all the args as whitelist of what tests to run.
 	char **whitelist = &argv[1];
 	int whitelist_len = argc - 1;
 

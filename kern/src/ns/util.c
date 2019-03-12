@@ -25,6 +25,7 @@ static int __readnum(unsigned long off, char *buf, unsigned long n,
                      unsigned long val, size_t size, const char *fmt)
 {
 	char tmp[64];
+
 	size = MIN(sizeof(tmp), size);
 	/* we really need the %* format. */
 	size = snprintf(tmp, size, fmt, val);
@@ -77,6 +78,7 @@ int omode_to_rwx(int open_flags)
 	                          [O_WRITE | O_EXEC] = 0300,
 	                          [O_WRITE] = 0200,
 	                          [O_EXEC] = 0100 };
+
 	return rwx_opts[open_flags & O_ACCMODE];
 }
 
@@ -95,6 +97,7 @@ int omode_to_9p_accmode(int open_flags)
 	                          [O_READ] = 0,
 	                          [0] = 0 /* we can't express no permissions */
 	                          };
+
 	return acc_opts[open_flags & O_ACCMODE];
 }
 
@@ -135,8 +138,8 @@ bool caller_has_perms(char *fileuid, uint32_t perm, int omode)
 	else
 		perm <<= 6;
 	/* translate omode into things like S_IRUSR (just one set of rwx------).
-	 * Plan 9 originally only returned 0400 0200 0600 and 0100 here; it didn't
-	 * seem to handle O_EXEC being mixed readable or writable. */
+	 * Plan 9 originally only returned 0400 0200 0600 and 0100 here; it
+	 * didn't seem to handle O_EXEC being mixed readable or writable. */
 	rwx = omode_to_rwx(omode);
 	return (rwx & perm) == rwx;
 }

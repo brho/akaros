@@ -21,7 +21,7 @@ int cheap_dial(char *addr, char *local, char *dir, int *cfdp)
 {
 	int ret, ctlfd, datafd, conv_id;
 	char *prefix;
-	char *hostname;						/* including !port */
+	char *hostname;				/* including !port */
 	size_t buf_len = strlen(addr) + 30;	/* 30 should be enough extra */
 	char *buf = malloc(buf_len);
 	if (!buf) {

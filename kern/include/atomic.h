@@ -110,13 +110,13 @@ static inline bool spin_lock_irq_enabled(spinlock_t *lock);
  * bigger one.  In the future, they might be growable, etc, which init code may
  * care about. */
 struct hashlock {
-	unsigned int		nr_entries;
-	struct spinlock		locks[];
+	unsigned int			nr_entries;
+	struct spinlock			locks[];
 };
 #define HASHLOCK_DEFAULT_SZ 53		/* nice prime, might be a bit large */
 struct small_hashlock {
-	unsigned int		nr_entries;
-	struct spinlock		locks[HASHLOCK_DEFAULT_SZ];
+	unsigned int			nr_entries;
+	struct spinlock			locks[HASHLOCK_DEFAULT_SZ];
 };
 
 void hashlock_init(struct hashlock *hl, unsigned int nr_entries);
@@ -173,12 +173,12 @@ static inline void poke_init(struct poke_tracker *tracker, void (*func)(void*))
 
 /* Will spin for a little while, but not deadlock if it never happens */
 #define spin_on(x)                                                             \
-	for (int i = 0; (x); i++) {                                                \
-		cpu_relax();                                                           \
-		if (i == MAX_SPINS) {                                                  \
-			printk("Probably timed out/failed.\n");                            \
-			break;                                                             \
-		}                                                                      \
+	for (int i = 0; (x); i++) {                                            \
+		cpu_relax();                                                   \
+		if (i == MAX_SPINS) {                                          \
+			printk("Probably timed out/failed.\n");                \
+			break;                                                 \
+		}                                                              \
 	}
 
 /*********************** Checklist stuff **********************/
@@ -192,7 +192,8 @@ typedef struct checklist_mask {
 struct checklist {
 	spinlock_t lock;
 	checklist_mask_t mask;
-	// eagle-eyed readers may know why this might have been needed. 2009-09-04
+	// eagle-eyed readers may know why this might have been needed.
+	// 2009-09-04
 	//volatile uint8_t (COUNT(BYTES_FOR_BITMASK(size)) bits)[];
 };
 typedef struct checklist checklist_t;

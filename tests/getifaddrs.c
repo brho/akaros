@@ -47,8 +47,8 @@ static void print_inet(struct ifaddrs *ifa)
 	printf("\tAddr: %s\n", inet_ntop(AF_INET, &sa_in->sin_addr, buf,
 	                                 sizeof(buf)));
 	if (mask_in)
-		printf("\tMask: %s\n", inet_ntop(AF_INET, &mask_in->sin_addr, buf,
-		                                 sizeof(buf)));
+		printf("\tMask: %s\n", inet_ntop(AF_INET, &mask_in->sin_addr,
+						 buf, sizeof(buf)));
 }
 
 static void print_inet6(struct ifaddrs *ifa)

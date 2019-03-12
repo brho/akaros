@@ -353,9 +353,11 @@ void init(void)
 	if (register_printf_specifier('E', printf_ethaddr,
 	                              printf_ethaddr_info) != 0)
 		fprintf(stderr, "Installing 'E' failed\n");
-	if (register_printf_specifier('R', printf_ipaddr, printf_ipaddr_info) != 0)
+	if (register_printf_specifier('R', printf_ipaddr, printf_ipaddr_info) !=
+	    0)
 		fprintf(stderr, "Installing 'R' failed\n");
-	if (register_printf_specifier('M', printf_ipmask, printf_ipmask_info) != 0)
+	if (register_printf_specifier('M', printf_ipmask, printf_ipmask_info) !=
+	    0)
 		fprintf(stderr, "Installing 'M' failed\n");
 
 	setnetmtpt(conf.mpoint, sizeof(conf).mpoint, NULL);
@@ -420,7 +422,8 @@ int parseargs(int argc, char *argv[])
 		case Vtorus:
 		case Vtree:
 		case Vpkt:
-			fprintf(stderr, "medium %s already specified\n", conf.type);
+			fprintf(stderr, "medium %s already specified\n",
+				conf.type);
 			evexit(-1);
 		case Vadd:
 		case Vremove:
@@ -664,9 +667,11 @@ void doremove(void)
 		for (lifc = nifc->lifc; lifc != NULL; lifc = lifc->next) {
 			if (ipcmp(conf.laddr, lifc->ip) != 0)
 				continue;
-			if (validip(conf.mask) && ipcmp(conf.mask, lifc->mask) != 0)
+			if (validip(conf.mask) && ipcmp(conf.mask, lifc->mask)
+			    != 0)
 				continue;
-			if (validip(conf.raddr) && ipcmp(conf.raddr, lifc->net) != 0)
+			if (validip(conf.raddr) && ipcmp(conf.raddr, lifc->net)
+			    != 0)
 				continue;
 
 			snprintf(file, sizeof(file), "%s/ipifc/%d/ctl",
@@ -676,7 +681,8 @@ void doremove(void)
 				warning("can't open %s: %r", conf.mpoint);
 				continue;
 			}
-			snprintf(buf, sizeof(buf), "remove %R %M", lifc->ip, lifc->mask);
+			snprintf(buf, sizeof(buf), "remove %R %M", lifc->ip,
+				 lifc->mask);
 			if (write(cfd, buf, strlen(buf)) != strlen(buf))
 				warning("can't remove %R %M from %s: %r",
 				        lifc->ip, lifc->mask, file);
@@ -731,7 +737,8 @@ void adddefroute(char *mpoint, uint8_t *gaddr)
 /* create a client id */
 void mkclientid(void)
 {
-	if ((strcmp(conf.type, "ether") == 0) || (strcmp(conf.type, "gbe") == 0)) {
+	if ((strcmp(conf.type, "ether") == 0) ||
+	    (strcmp(conf.type, "gbe") == 0)) {
 		if (myetheraddr(conf.hwa, conf.dev) == 0) {
 			conf.hwalen = 6;
 			conf.hwatype = 1;
@@ -740,8 +747,8 @@ void mkclientid(void)
 			conf.cidlen = conf.hwalen + 1;
 		} else {
 			conf.hwatype = -1;
-			snprintf((char *)conf.cid, sizeof(conf).cid, "plan9_%ld.%d",
-			         lrand48(), getpid());
+			snprintf((char *)conf.cid, sizeof(conf).cid,
+				 "plan9_%ld.%d", lrand48(), getpid());
 			conf.cidlen = strlen((char *)conf.cid);
 		}
 	}
@@ -797,19 +804,22 @@ void binddevice(void)
 		snprintf(buf, sizeof(buf), "%s/ipifc/clone", conf.mpoint);
 		conf.cfd = open(buf, O_RDWR);
 		if (conf.cfd < 0) {
-			fprintf(stderr, "opening %s/ipifc/clone: %r\n", conf.mpoint);
+			fprintf(stderr, "opening %s/ipifc/clone: %r\n",
+				conf.mpoint);
 			evexit(-1);
 		}
 
 		/* specify medium as ethernet, bind the interface to it */
 		snprintf(buf, sizeof(buf), "bind %s %s", conf.type, conf.dev);
 		if (write(conf.cfd, buf, strlen(buf)) != strlen(buf)) {
-			fprintf(stderr, "%s: bind %s %s: %r\n", buf, conf.type, conf.dev);
+			fprintf(stderr, "%s: bind %s %s: %r\n", buf, conf.type,
+				conf.dev);
 			evexit(-1);
 		}
 	} else {
 		/* open the old interface */
-		snprintf(buf, sizeof(buf), "%s/ipifc/%d/ctl", conf.mpoint, myifc);
+		snprintf(buf, sizeof(buf), "%s/ipifc/%d/ctl", conf.mpoint,
+			 myifc);
 		conf.cfd = open(buf, O_RDWR);
 		if (conf.cfd < 0) {
 			fprintf(stderr, "open %s: %r\n", buf);
@@ -837,7 +847,8 @@ int ip4cfg(void)
 	if (validip(conf.raddr)) {
 		n += snprintf(buf + n, sizeof(buf) - n, " %R", conf.raddr);
 		if (conf.mtu != 0)
-			n += snprintf(buf + n, sizeof(buf) - n, " %d", conf.mtu);
+			n += snprintf(buf + n, sizeof(buf) - n, " %d",
+				      conf.mtu);
 	}
 
 	if (write(conf.cfd, buf, n) < 0) {
@@ -928,8 +939,8 @@ void dhcpquery(int needconfig, int startstate)
 }
 
 enum {
-	// This was an hour, but needs to be less for the ARM/GS1 until the timer
-	// code has been cleaned up (pb).
+	// This was an hour, but needs to be less for the ARM/GS1 until the
+	// timer code has been cleaned up (pb).
 	Maxsleep = 450,
 };
 
@@ -1191,7 +1202,8 @@ void dhcprecv(void)
 			 * The All_Aboard NAT package from Internet Share
 			 * doesn't give a lease time, so we have to assume one.
 			 */
-			warning("Offer with %lud lease, using %d", lease, MinLease);
+			warning("Offer with %lud lease, using %d", lease,
+				MinLease);
 			lease = MinLease;
 		}
 		DEBUG("lease=%lud ", lease);
@@ -1223,7 +1235,8 @@ void dhcprecv(void)
 			 * The All_Aboard NAT package from Internet Share
 			 * doesn't give a lease time, so we have to assume one.
 			 */
-			warning("Ack with %lud lease, using %d", lease, MinLease);
+			warning("Ack with %lud lease, using %d", lease,
+				MinLease);
 			lease = MinLease;
 		}
 		DEBUG("lease=%lud ", lease);
@@ -1245,7 +1258,8 @@ void dhcprecv(void)
 			DEBUG("ipgw=%R ", conf.gaddr);
 		} else if (optgetaddr(bp->optdata, OBrouter, conf.gaddr)) {
 			DEBUG("ipgw=%R ", conf.gaddr);
-		} else if (memcmp(bp->giaddr, IPnoaddr + IPv4off, IPv4addrlen) != 0) {
+		} else if (memcmp(bp->giaddr, IPnoaddr + IPv4off, IPv4addrlen)
+			   != 0) {
 			v4tov6(conf.gaddr, bp->giaddr);
 			DEBUG("giaddr=%R ", conf.gaddr);
 		}
@@ -1274,13 +1288,15 @@ void dhcprecv(void)
 		getoptions(bp->optdata);
 
 		/* get plan9-specific options */
-		n = optgetvec(bp->optdata, OBvendorinfo, vopts, sizeof(vopts) - 1);
+		n = optgetvec(bp->optdata, OBvendorinfo, vopts,
+			      sizeof(vopts) - 1);
 		if (n > 0 && parseoptions(vopts, n) == 0) {
 			n = 1;
 			if (!validip(conf.fs) || !Oflag) {
 				n = optgetp9addrs(vopts, OP9fs, conf.fs, 2);
 				if (n == 0)
-					n = optgetaddrs(vopts, OP9fsv4, conf.fs, 2);
+					n = optgetaddrs(vopts, OP9fsv4, conf.fs,
+							2);
 			}
 			for (i = 0; i < n; i++)
 				DEBUG("fs=%R ", conf.fs + i * IPaddrlen);
@@ -1289,7 +1305,8 @@ void dhcprecv(void)
 			if (!validip(conf.auth) || !Oflag) {
 				n = optgetp9addrs(vopts, OP9auth, conf.auth, 2);
 				if (n == 0)
-					n = optgetaddrs(vopts, OP9authv4, conf.auth, 2);
+					n = optgetaddrs(vopts, OP9authv4,
+							conf.auth, 2);
 			}
 			for (i = 0; i < n; i++)
 				DEBUG("auth=%R ", conf.auth + i * IPaddrlen);
@@ -1684,17 +1701,20 @@ void putndb(void)
 		append = 1;
 	else {
 		append = 0;
-		n += snprintf(buf + n, sizeof(buf) - n, "ip=%R ipmask=%M ipgw=%R\n",
+		n += snprintf(buf + n, sizeof(buf) - n,
+			      "ip=%R ipmask=%M ipgw=%R\n",
 		              conf.laddr, conf.mask, conf.gaddr);
 	}
 	np = strchr(conf.hostname, '.');
 	if (np != NULL) {
 		if (*conf.domainname == 0)
-			snprintf(conf.domainname, sizeof(conf).domainname, "%s", np + 1);
+			snprintf(conf.domainname, sizeof(conf).domainname, "%s",
+				 np + 1);
 		*np = 0;
 	}
 	if (*conf.hostname)
-		n += snprintf(buf + n, sizeof(buf) - n, "\tsys=%s\n", conf.hostname);
+		n += snprintf(buf + n, sizeof(buf) - n, "\tsys=%s\n",
+			      conf.hostname);
 	if (*conf.domainname)
 		n += snprintf(buf + n, sizeof(buf) - n, "\tdom=%s.%s\n",
 		              conf.hostname, conf.domainname);
@@ -1816,8 +1836,8 @@ void ndbconfig(void)
 		fprintf(stderr, "can't open ndb: %r\n");
 		evexit(-1);
 	}
-	if ((strcmp(conf.type, "ether") != 0 && strcmp(conf.type, "gbe") != 0) ||
-	    myetheraddr(conf.hwa, conf.dev) != 0) {
+	if ((strcmp(conf.type, "ether") != 0 && strcmp(conf.type, "gbe") != 0)
+	    || myetheraddr(conf.hwa, conf.dev) != 0) {
 		fprintf(stderr, "can't read hardware address\n");
 		evexit(-1);
 	}

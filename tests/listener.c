@@ -51,11 +51,11 @@ int main()
 
 #ifdef PLAN9NET
 	printf("Using Plan 9's networking stack\n");
-	/* This clones a conversation (opens /net/tcp/clone), then reads the cloned
-	 * fd (which is the ctl) to givure out the conv number (the line), then
-	 * writes "announce [addr]" into ctl.  This "announce" command often has a
-	 * "bind" in it too.  plan9 bind just sets the local addr/port.  TCP
-	 * announce also does this.  Returns the ctlfd. */
+	/* This clones a conversation (opens /net/tcp/clone), then reads the
+	 * cloned fd (which is the ctl) to givure out the conv number (the
+	 * line), then writes "announce [addr]" into ctl.  This "announce"
+	 * command often has a "bind" in it too.  plan9 bind just sets the local
+	 * addr/port.  TCP announce also does this.  Returns the ctlfd. */
 	afd = announce9("tcp!*!23", adir, 0);
 
 	if (afd < 0) {
@@ -65,15 +65,17 @@ int main()
 	printf("Announced on line %s\n", adir);
 #else
 	printf("Using the BSD socket shims over Plan 9's networking stack\n");
+
 	int srv_socket, con_socket;
 	struct sockaddr_in dest, srv = {0};
+
 	srv.sin_family = AF_INET;
 	srv.sin_addr.s_addr = htonl(INADDR_ANY);
 	srv.sin_port = htons(23);
 	socklen_t socksize = sizeof(struct sockaddr_in);
 
-	/* Equiv to cloning a converstation in plan 9.  The shim returns the data FD
-	 * for the conversation. */
+	/* Equiv to cloning a converstation in plan 9.  The shim returns the
+	 * data FD for the conversation. */
 	srv_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (srv_socket < 0) {
 		perror("Socket failure");
@@ -83,7 +85,8 @@ int main()
 	/* bind + listen is equiv to announce() in plan 9.  Note that the "bind"
 	 * command is used, unlike in the plan9 announce. */
 	/* Binds our socket to the given addr/port in srv. */
-	ret = bind(srv_socket, (struct sockaddr*)&srv, sizeof(struct sockaddr_in));
+	ret = bind(srv_socket, (struct sockaddr*)&srv,
+		   sizeof(struct sockaddr_in));
 	if (ret < 0) {
 		perror("Bind failure");
 		return -1;
@@ -96,15 +99,15 @@ int main()
 	}
 #endif
 
-	/* at this point, the server has done all the prep necessary to be able to
-	 * sleep/block/wait on an incoming connection. */
+	/* at this point, the server has done all the prep necessary to be able
+	 * to sleep/block/wait on an incoming connection. */
 
 #ifdef PLAN9NET
-	/* Opens the conversation's listen file.  This blocks til someone connects.
-	 * When they do, a new conversation is created, and that open returned an FD
-	 * for the new conv's ctl.  listen() reads that to find out the conv number
-	 * (the line) for this new conv.  listen() returns the ctl for this new
-	 * conv. */
+	/* Opens the conversation's listen file.  This blocks til someone
+	 * connects.  When they do, a new conversation is created, and that open
+	 * returned an FD for the new conv's ctl.  listen() reads that to find
+	 * out the conv number (the line) for this new conv.  listen() returns
+	 * the ctl for this new conv. */
 	lcfd = listen9(adir, ldir, 0);
 
 	if (lcfd < 0) {
@@ -113,9 +116,9 @@ int main()
 	}
 	printf("Listened and got line %s\n", ldir);
 
-	/* Writes "accept [NUM]" into the ctlfd, then opens the conv's data file and
-	 * returns that fd.  Writing "accept" is a noop for most of our protocols.
-	 * */
+	/* Writes "accept [NUM]" into the ctlfd, then opens the conv's data file
+	 * and returns that fd.  Writing "accept" is a noop for most of our
+	 * protocols.  */
 	dfd = accept9(lcfd, ldir);
 	if (dfd < 0) {
 		perror("Accept failure");

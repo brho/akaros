@@ -44,10 +44,11 @@ int main(int argc, char *argv[])
 	}
 	if (gettimeofday(&end_tv, 0))
 		perror("End time error...");
-	usecs = (end_tv.tv_sec - start_tv.tv_sec)*1000000 + (end_tv.tv_usec - start_tv.tv_usec);
+	usecs = (end_tv.tv_sec - start_tv.tv_sec) * 1000000
+		+ (end_tv.tv_usec - start_tv.tv_usec);
 	printf("Read %d bytes of random in %d microseconds\n", amt, usecs);
 	for(i = 0; i < 4; i++)
 		printf("%08x ", data[i]);
 	printf("\n");
-
+	return 0;
 }

@@ -17,6 +17,7 @@ void register_ktest_suite(struct ktest_suite *suite)
 void run_registered_ktest_suites()
 {
 	struct ktest_suite *suite = NULL;
+
 	SLIST_FOREACH(suite, &ktest_suiteq, link) {
 		run_ktest_suite(suite);
 	}
@@ -34,12 +35,14 @@ void run_ktest_suite(struct ktest_suite *suite)
 			uint64_t end = read_tsc();
 			uint64_t et_us = tsc2usec(end - start) % 1000000;
 			uint64_t et_s = tsc2sec(end - start);
-
 			char fmt[] = "\t%s   [%s](%llu.%06llus)   %s\n";
+
 			if (result) {
-				printk(fmt, "PASSED", test->name, et_s, et_us, "");
+				printk(fmt, "PASSED", test->name, et_s, et_us,
+				       "");
 			} else {
-				printk(fmt, "FAILED", test->name, et_s, et_us, ktest_msg);
+				printk(fmt, "FAILED", test->name, et_s, et_us,
+				       ktest_msg);
 			}
 			/* Some older tests disable IRQs */
 			enable_irq();
@@ -50,4 +53,3 @@ void run_ktest_suite(struct ktest_suite *suite)
 
 	printk("<-- END_KERNEL_%s_TESTS -->\n", suite->name);
 }
-

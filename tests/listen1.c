@@ -101,7 +101,8 @@ main(int argc, char **argv)
 		case 0:
 			fd = accept9(nctl, ndir);
 			if(fd < 0){
-				fprintf(stderr, "accept %s: can't open  %s/data: %r\n",
+				fprintf(stderr,
+					"accept %s: can't open  %s/data: %r\n",
 					argv[0], ndir);
 				exit(1);
 			}

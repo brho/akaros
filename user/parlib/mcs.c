@@ -28,8 +28,8 @@ void mcs_lock_lock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 		qnode->locked = 1;
 		wmb();
 		predecessor->next = qnode;
-		/* no need for a wrmb(), since this will only get unlocked after they
-		 * read our previous write */
+		/* no need for a wrmb(), since this will only get unlocked after
+		 * they read our previous write */
 		while (qnode->locked)
 			cpu_relax();
 	}
@@ -40,34 +40,38 @@ void mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
 	/* Check if someone is already waiting on us to unlock */
 	if (qnode->next == 0) {
-		cmb();	/* no need for CPU mbs, since there's an atomic_swap() */
+		cmb(); /* no need for CPU mbs, since there's an atomic_swap() */
 		/* Unlock it */
 		mcs_lock_qnode_t *old_tail = mcs_qnode_swap(&lock->lock,0);
-		/* no one else was already waiting, so we successfully unlocked and can
-		 * return */
+		/* no one else was already waiting, so we successfully unlocked
+		 * and can return */
 		if (old_tail == qnode)
 			return;
-		/* someone else was already waiting on the lock (last one on the list),
-		 * and we accidentally took them off.  Try and put it back. */
+		/* someone else was already waiting on the lock (last one on the
+		 * list), and we accidentally took them off.  Try and put it
+		 * back. */
 		mcs_lock_qnode_t *usurper = mcs_qnode_swap(&lock->lock,old_tail);
-		/* since someone else was waiting, they should have made themselves our
-		 * next.  spin (very briefly!) til it happens. */
+		/* since someone else was waiting, they should have made
+		 * themselves our next.  spin (very briefly!) til it happens. */
 		while (qnode->next == 0)
 			cpu_relax();
 		if (usurper) {
-			/* an usurper is someone who snuck in before we could put the old
-			 * tail back.  They now have the lock.  Let's put whoever is
-			 * supposed to be next as their next one. */
+			/* an usurper is someone who snuck in before we could
+			 * put the old tail back.  They now have the lock.
+			 * Let's put whoever is supposed to be next as their
+			 * next one. */
 			usurper->next = qnode->next;
 		} else {
-			/* No usurper meant we put things back correctly, so we should just
-			 * pass the lock / unlock whoever is next */
+			/* No usurper meant we put things back correctly, so we
+			 * should just pass the lock / unlock whoever is next */
 			qnode->next->locked = 0;
 		}
 	} else {
 		/* mb()s necessary since we didn't call an atomic_swap() */
-		wmb();	/* need to make sure any previous writes don't pass unlocking */
-		rwmb();	/* need to make sure any reads happen before the unlocking */
+		/* need to make sure any previous writes don't pass unlocking */
+		wmb();
+		/* need to make sure any reads happen before the unlocking */
+		rwmb();
 		/* simply unlock whoever is next */
 		qnode->next->locked = 0;
 	}
@@ -80,12 +84,14 @@ void mcs_lock_unlock_cas(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 	/* Check if someone is already waiting on us to unlock */
 	if (qnode->next == 0) {
 		cmb();	/* no need for CPU mbs, since there's an atomic_cas() */
-		/* If we're still the lock, just swap it with 0 (unlock) and return */
+		/* If we're still the lock, just swap it with 0 (unlock) and
+		 * return */
 		if (atomic_cas_ptr((void**)&lock->lock, qnode, 0))
 			return;
-		/* We failed, someone is there and we are some (maybe a different)
-		 * thread's pred.  Since someone else was waiting, they should have made
-		 * themselves our next.  Spin (very briefly!) til it happens. */
+		/* We failed, someone is there and we are some (maybe a
+		 * different) thread's pred.  Since someone else was waiting,
+		 * they should have made themselves our next.  Spin (very
+		 * briefly!) til it happens. */
 		while (qnode->next == 0)
 			cpu_relax();
 		/* Alpha wants a read_barrier_depends() here */
@@ -93,8 +99,10 @@ void mcs_lock_unlock_cas(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 		qnode->next->locked = 0;
 	} else {
 		/* mb()s necessary since we didn't call an atomic_swap() */
-		wmb();	/* need to make sure any previous writes don't pass unlocking */
-		rwmb();	/* need to make sure any reads happen before the unlocking */
+		/* need to make sure any previous writes don't pass unlocking */
+		wmb();
+		/* need to make sure any reads happen before the unlocking */
+		rwmb();
 		/* simply unlock whoever is next */
 		qnode->next->locked = 0;
 	}
@@ -146,26 +154,27 @@ void __mcs_pdro_lock(struct mcs_pdro_lock *lock, struct mcs_pdro_qnode *qnode)
 {
 	struct mcs_pdro_qnode *predecessor;
 	uint32_t pred_vcoreid;
-	/* Now the actual lock */
+
 	qnode->next = 0;
 	cmb();	/* swap provides a CPU mb() */
 	predecessor = atomic_swap_ptr((void**)&lock->lock, qnode);
 	if (predecessor) {
 		qnode->locked = 1;
-		/* Read-in the vcoreid before releasing them.  We won't need to worry
-		 * about their qnode memory being freed/reused (they can't til we fill
-		 * in the 'next' slot), which is a bit of a performance win.  This also
-		 * cuts down on cache-line contention when we ensure they run, which
-		 * helps a lot too. */
+		/* Read-in the vcoreid before releasing them.  We won't need to
+		 * worry about their qnode memory being freed/reused (they can't
+		 * til we fill in the 'next' slot), which is a bit of a
+		 * performance win.  This also cuts down on cache-line
+		 * contention when we ensure they run, which helps a lot too. */
 		pred_vcoreid = ACCESS_ONCE(predecessor->vcoreid);
 		wmb();	/* order the locked write before the next write */
 		predecessor->next = qnode;
-		/* no need for a wrmb(), since this will only get unlocked after they
-		 * read our previous write */
+		/* no need for a wrmb(), since this will only get unlocked after
+		 * they read our previous write */
 		while (qnode->locked) {
-			/* We don't know who the lock holder is (it hurts performance via
-			 * 'true' sharing to track it)  Instead we'll make sure our pred is
-			 * running, which trickles up to the lock holder. */
+			/* We don't know who the lock holder is (it hurts
+			 * performance via 'true' sharing to track it)  Instead
+			 * we'll make sure our pred is running, which trickles
+			 * up to the lock holder. */
 			ensure_vcore_runs(pred_vcoreid);
 			cpu_relax();
 		}
@@ -180,19 +189,23 @@ void __mcs_pdro_unlock(struct mcs_pdro_lock *lock, struct mcs_pdro_qnode *qnode)
 	/* Check if someone is already waiting on us to unlock */
 	if (qnode->next == 0) {
 		cmb();	/* no need for CPU mbs, since there's an atomic_cas() */
-		/* If we're still the lock, just swap it with 0 (unlock) and return */
+		/* If we're still the lock, just swap it with 0 (unlock) and
+		 * return */
 		if (atomic_cas_ptr((void**)&lock->lock, qnode, 0))
 			return;
-		/* Read in the tail (or someone who recently was the tail, but could now
-		 * be farther up the chain), in prep for our spinning. */
+		/* Read in the tail (or someone who recently was the tail, but
+		 * could now be farther up the chain), in prep for our spinning.
+		 */
 		a_tail_vcoreid = ACCESS_ONCE(lock->lock->vcoreid);
-		/* We failed, someone is there and we are some (maybe a different)
-		 * thread's pred.  Since someone else was waiting, they should have made
-		 * themselves our next.  Spin (very briefly!) til it happens. */
+		/* We failed, someone is there and we are some (maybe a
+		 * different) thread's pred.  Since someone else was waiting,
+		 * they should have made themselves our next.  Spin (very
+		 * briefly!) til it happens. */
 		while (qnode->next == 0) {
-			/* We need to get our next to run, but we don't know who they are.
-			 * If we make sure a tail is running, that will percolate up to make
-			 * sure our qnode->next is running */
+			/* We need to get our next to run, but we don't know who
+			 * they are.  If we make sure a tail is running, that
+			 * will percolate up to make sure our qnode->next is
+			 * running */
 			ensure_vcore_runs(a_tail_vcoreid);
 			cpu_relax();
 		}
@@ -201,8 +214,10 @@ void __mcs_pdro_unlock(struct mcs_pdro_lock *lock, struct mcs_pdro_qnode *qnode)
 		qnode->next->locked = 0;
 	} else {
 		/* mb()s necessary since we didn't call an atomic_swap() */
-		wmb();	/* need to make sure any previous writes don't pass unlocking */
-		rwmb();	/* need to make sure any reads happen before the unlocking */
+		/* need to make sure any previous writes don't pass unlocking */
+		wmb();
+		/* need to make sure any reads happen before the unlocking */
+		rwmb();
 		/* simply unlock whoever is next */
 		qnode->next->locked = 0;
 	}
@@ -233,53 +248,59 @@ void __mcs_pdro_unlock_no_cas(struct mcs_pdro_lock *lock,
                              struct mcs_pdro_qnode *qnode)
 {
 	struct mcs_pdro_qnode *old_tail, *usurper;
+
 	/* Check if someone is already waiting on us to unlock */
 	if (qnode->next == 0) {
-		cmb();	/* no need for CPU mbs, since there's an atomic_swap() */
+		cmb(); /* no need for CPU mbs, since there's an atomic_swap() */
 		/* Unlock it */
 		old_tail = atomic_swap_ptr((void**)&lock->lock, 0);
-		/* no one else was already waiting, so we successfully unlocked and can
-		 * return */
+		/* no one else was already waiting, so we successfully unlocked
+		 * and can return */
 		if (old_tail == qnode)
 			return;
-		/* someone else was already waiting on the lock (last one on the list),
-		 * and we accidentally took them off.  Try and put it back. */
+		/* someone else was already waiting on the lock (last one on the
+		 * list), and we accidentally took them off.  Try and put it
+		 * back. */
 		usurper = atomic_swap_ptr((void*)&lock->lock, old_tail);
-		/* since someone else was waiting, they should have made themselves our
-		 * next.  spin (very briefly!) til it happens. */
+		/* since someone else was waiting, they should have made
+		 * themselves our next.  spin (very briefly!) til it happens. */
 		while (qnode->next == 0) {
-			/* make sure old_tail isn't preempted.  best we can do for now is
-			 * to make sure all vcores run, and thereby get our next. */
+			/* make sure old_tail isn't preempted.  best we can do
+			 * for now is to make sure all vcores run, and thereby
+			 * get our next. */
 			for (int i = 0; i < max_vcores(); i++)
 				ensure_vcore_runs(i);
 			cpu_relax();
 		}
 		if (usurper) {
-			/* an usurper is someone who snuck in before we could put the old
-			 * tail back.  They now have the lock.  Let's put whoever is
-			 * supposed to be next as their next one. 
+			/* an usurper is someone who snuck in before we could
+			 * put the old tail back.  They now have the lock.
+			 * Let's put whoever is supposed to be next as their
+			 * next one. 
 			 *
-			 * First, we need to change our next's pred.  There's a slight race
-			 * here, so our next will need to make sure both us and pred are
-			 * done */
-			/* I was trying to do something so we didn't need to ensure all
-			 * vcores run, using more space in the qnode to figure out who our
-			 * pred was a lock time (guessing actually, since there's a race,
-			 * etc). */
+			 * First, we need to change our next's pred.  There's a
+			 * slight race here, so our next will need to make sure
+			 * both us and pred are done */
+			/* I was trying to do something so we didn't need to
+			 * ensure all vcores run, using more space in the qnode
+			 * to figure out who our pred was a lock time (guessing
+			 * actually, since there's a race, etc). */
 			//qnode->next->pred = usurper;
 			//wmb();
 			usurper->next = qnode->next;
-			/* could imagine another wmb() and a flag so our next knows to no
-			 * longer check us too. */
+			/* could imagine another wmb() and a flag so our next
+			 * knows to no longer check us too. */
 		} else {
-			/* No usurper meant we put things back correctly, so we should just
-			 * pass the lock / unlock whoever is next */
+			/* No usurper meant we put things back correctly, so we
+			 * should just pass the lock / unlock whoever is next */
 			qnode->next->locked = 0;
 		}
 	} else {
 		/* mb()s necessary since we didn't call an atomic_swap() */
-		wmb();	/* need to make sure any previous writes don't pass unlocking */
-		rwmb();	/* need to make sure any reads happen before the unlocking */
+		/* need to make sure any previous writes don't pass unlocking */
+		wmb();
+		/* need to make sure any reads happen before the unlocking */
+		rwmb();
 		/* simply unlock whoever is next */
 		qnode->next->locked = 0;
 	}
@@ -298,6 +319,7 @@ void mcs_pdro_unlock(struct mcs_pdro_lock *lock, struct mcs_pdro_qnode *qnode)
 void mcs_pdr_init(struct mcs_pdr_lock *lock)
 {
 	int ret;
+
 	lock->lock = 0;
 	lock->lockholder_vcoreid = MCSPDR_NO_LOCKHOLDER;
 	ret = posix_memalign((void**)&lock->qnodes,
@@ -347,34 +369,40 @@ void __mcs_pdr_lock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 	predecessor = atomic_swap_ptr((void**)&lock->lock, qnode);
 	if (predecessor) {
 		qnode->locked = 1;
-		pred_vcoreid = predecessor - qnode0;	/* can compute this whenever */
+		/* can compute this whenever */
+		pred_vcoreid = predecessor - qnode0;
 		wmb();	/* order the locked write before the next write */
 		predecessor->next = qnode;
 		seq = ACCESS_ONCE(__procinfo.coremap_seqctr);
-		/* no need for a wrmb(), since this will only get unlocked after they
-		 * read our pred->next write */
+		/* no need for a wrmb(), since this will only get unlocked after
+		 * they read our pred->next write */
 		while (qnode->locked) {
-			/* Check to see if anything is amiss.  If someone in the chain is
-			 * preempted, then someone will notice.  Simply checking our pred
-			 * isn't that great of an indicator of preemption.  The reason is
-			 * that the offline vcore is most likely the lockholder (under heavy
-			 * lock contention), and we want someone farther back in the chain
-			 * to notice (someone that will stay preempted long enough for a
-			 * vcore outside the chain to recover them).  Checking the seqctr
-			 * will tell us of any preempts since we started, so if a storm
-			 * starts while we're spinning, we can join in and try to save the
+			/* Check to see if anything is amiss.  If someone in the
+			 * chain is preempted, then someone will notice.  Simply
+			 * checking our pred isn't that great of an indicator of
+			 * preemption.  The reason is that the offline vcore is
+			 * most likely the lockholder (under heavy lock
+			 * contention), and we want someone farther back in the
+			 * chain to notice (someone that will stay preempted
+			 * long enough for a vcore outside the chain to recover
+			 * them).  Checking the seqctr will tell us of any
+			 * preempts since we started, so if a storm starts while
+			 * we're spinning, we can join in and try to save the
 			 * lockholder before its successor gets it.
 			 *
-			 * Also, if we're the lockholder, then we need to let our pred run
-			 * so they can hand us the lock. */
+			 * Also, if we're the lockholder, then we need to let
+			 * our pred run so they can hand us the lock. */
 			if (vcore_is_preempted(pred_vcoreid) ||
 			    seq != __procinfo.coremap_seqctr) {
-				/* Note that we don't normally ensure our *pred* runs. */
-				if (lock->lockholder_vcoreid == MCSPDR_NO_LOCKHOLDER ||
+				/* Note that we don't normally ensure our *pred*
+				 * runs. */
+				if (lock->lockholder_vcoreid ==
+				    MCSPDR_NO_LOCKHOLDER ||
 				    lock->lockholder_vcoreid == vcore_id())
 					ensure_vcore_runs(pred_vcoreid);
 				else
-					ensure_vcore_runs(lock->lockholder_vcoreid);
+					ensure_vcore_runs(
+						lock->lockholder_vcoreid);
 			}
 			cpu_relax();
 		}
@@ -387,33 +415,39 @@ void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 {
 	uint32_t a_tail_vcoreid;
 	struct mcs_pdr_qnode *qnode0 = qnode - vcore_id();
+
 	/* Check if someone is already waiting on us to unlock */
 	if (qnode->next == 0) {
 		cmb();	/* no need for CPU mbs, since there's an atomic_cas() */
-		/* If we're still the lock, just swap it with 0 (unlock) and return */
+		/* If we're still the lock, just swap it with 0 (unlock) and
+		 * return */
 		if (atomic_cas_ptr((void**)&lock->lock, qnode, 0)) {
-			/* This is racy with the new lockholder.  it's possible that we'll
-			 * clobber their legit write, though it doesn't actually hurt
-			 * correctness.  it'll get sorted out on the next unlock. */
+			/* This is racy with the new lockholder.  it's possible
+			 * that we'll clobber their legit write, though it
+			 * doesn't actually hurt correctness.  it'll get sorted
+			 * out on the next unlock. */
 			lock->lockholder_vcoreid = MCSPDR_NO_LOCKHOLDER;
 			return;
 		}
-		/* Get the tail (or someone who recently was the tail, but could now
-		 * be farther up the chain), in prep for our spinning.  Could do an
-		 * ACCESS_ONCE on lock->lock */
+		/* Get the tail (or someone who recently was the tail, but could
+		 * now be farther up the chain), in prep for our spinning.
+		 * Could do an ACCESS_ONCE on lock->lock */
 		a_tail_vcoreid = lock->lock - qnode0;
-		/* We failed, someone is there and we are some (maybe a different)
-		 * thread's pred.  Since someone else was waiting, they should have made
-		 * themselves our next.  Spin (very briefly!) til it happens. */
+		/* We failed, someone is there and we are some (maybe a
+		 * different) thread's pred.  Since someone else was waiting,
+		 * they should have made themselves our next.  Spin (very
+		 * briefly!) til it happens. */
 		while (qnode->next == 0) {
-			/* We need to get our next to run, but we don't know who they are.
-			 * If we make sure a tail is running, that will percolate up to make
-			 * sure our qnode->next is running.
+			/* We need to get our next to run, but we don't know who
+			 * they are.  If we make sure a tail is running, that
+			 * will percolate up to make sure our qnode->next is
+			 * running.
 			 *
-			 * But first, we need to tell everyone that there is no specific
-			 * lockholder.  lockholder_vcoreid is a short-circuit on the "walk
-			 * the chain" PDR.  Normally, that's okay.  But now we need to make
-			 * sure everyone is walking the chain from a_tail up to our pred. */
+			 * But first, we need to tell everyone that there is no
+			 * specific lockholder.  lockholder_vcoreid is a
+			 * short-circuit on the "walk the chain" PDR.  Normally,
+			 * that's okay.  But now we need to make sure everyone
+			 * is walking the chain from a_tail up to our pred. */
 			lock->lockholder_vcoreid = MCSPDR_NO_LOCKHOLDER;
 			ensure_vcore_runs(a_tail_vcoreid);
 			cpu_relax();
@@ -423,14 +457,16 @@ void __mcs_pdr_unlock(struct mcs_pdr_lock *lock, struct mcs_pdr_qnode *qnode)
 		wmb();	/* order the vcoreid write before the unlock */
 		qnode->next->locked = 0;
 	} else {
-		/* Note we're saying someone else is the lockholder, though we still are
-		 * the lockholder until we unlock the next qnode.  Our next knows that
-		 * if it sees itself is the lockholder, that it needs to make sure we
-		 * run. */
+		/* Note we're saying someone else is the lockholder, though we
+		 * still are the lockholder until we unlock the next qnode.  Our
+		 * next knows that if it sees itself is the lockholder, that it
+		 * needs to make sure we run. */
 		lock->lockholder_vcoreid = qnode->next - qnode0;
 		/* mb()s necessary since we didn't call an atomic_swap() */
-		wmb();	/* need to make sure any previous writes don't pass unlocking */
-		rwmb();	/* need to make sure any reads happen before the unlocking */
+		/* need to make sure any previous writes don't pass unlocking */
+		wmb();
+		/* need to make sure any reads happen before the unlocking */
+		rwmb();
 		/* simply unlock whoever is next */
 		qnode->next->locked = 0;
 	}

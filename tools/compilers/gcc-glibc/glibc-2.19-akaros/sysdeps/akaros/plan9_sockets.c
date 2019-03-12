@@ -337,8 +337,8 @@ static int _rock_open_listen_fd(Rock *r)
 	open_flags = O_PATH;
 	open_flags |= (r->sopts & SOCK_CLOEXEC ? O_CLOEXEC : 0);
 	ret = open(listen_file, open_flags);
-	/* Probably a bug in the rock code (or the kernel!) if we couldn't walk to
-	 * our listen. */
+	/* Probably a bug in the rock code (or the kernel!) if we couldn't walk
+	 * to our listen. */
 	assert(ret >= 0);
 	r->listen_fd = ret;
 	r->has_listen_fd = TRUE;

@@ -19,16 +19,16 @@
 #include <parlib/bitmask.h>
 
 struct strace_opts {
-	FILE						*outfile;
-	char						*trace_set;
-	char						**cmd_argv;
-	int							cmd_argc;
-	int							pid;
-	bool						follow_children;
-	bool						verbose;
-	bool						raw_output;
-	bool						with_time;
-	bool						drop_overflow;
+	FILE			*outfile;
+	char			*trace_set;
+	char			**cmd_argv;
+	int			cmd_argc;
+	int			pid;
+	bool			follow_children;
+	bool			verbose;
+	bool			raw_output;
+	bool			with_time;
+	bool			drop_overflow;
 };
 static struct strace_opts opts;
 
@@ -45,15 +45,15 @@ static struct argp_option argp_opts[] = {
 	 "Comma-separated list of syscalls by name (e.g. openat) and sets to trace.  Use '!' to negate (might need to escape the '!'), and traces are handled in order (e.g. -e path,\\!openat)\n"
 	 },
 	{"    Available sets:", 0, 0, OPTION_DOC | OPTION_NO_USAGE,
-	                "\n"
-	                "- path: syscalls that take file paths\n"
-	                "- fd: syscalls that take FDs\n"
-	                "- file: path and fd sets\n"
-	                "- mem: memory related (mmap, shared mem)\n"
-	                "- life: process lifetime (create, fork)\n"
-	                "- proc: anything process related (yields, pop_ctxs, life)\n"
-	                "- sched: requests or yields to the kernel (all resources)\n"
-	                "- vmm: syscalls mostly for VMs\n"
+	         "\n"
+	         "- path: syscalls that take file paths\n"
+	         "- fd: syscalls that take FDs\n"
+	         "- file: path and fd sets\n"
+	         "- mem: memory related (mmap, shared mem)\n"
+	         "- life: process lifetime (create, fork)\n"
+	         "- proc: anything process related (yields, pop_ctxs, life)\n"
+	         "- sched: requests or yields to the kernel (all resources)\n"
+	         "- vmm: syscalls mostly for VMs\n"
 	},
 	{0, 0, 0, 0, ""},
 	{"drop", 'd', 0, 0, "Drop syscalls on overflow"},
@@ -64,8 +64,8 @@ static struct argp_option argp_opts[] = {
 };
 
 struct trace_set {
-	char						*name;
-	unsigned int				syscs[];
+	char			*name;
+	unsigned int		syscs[];
 };
 
 /* To add a trace set, create one here, add it to all_trace_sets, and update the
@@ -251,8 +251,9 @@ static error_t parse_strace_opt(int key, char *arg, struct argp_state *state)
 	case 'o':
 		s_opts->outfile = fopen(arg, "wb");
 		if (!s_opts->outfile) {
-			fprintf(stderr, "Unable to open file '%s' for writing: %s\n",
-					arg, strerror(errno));
+			fprintf(stderr,
+				"Unable to open file '%s' for writing: %s\n",
+				arg, strerror(errno));
 			exit(1);
 		}
 		break;
@@ -283,7 +284,8 @@ static error_t parse_strace_opt(int key, char *arg, struct argp_state *state)
 		if (s_opts->pid)
 			argp_error(state, "PID already set, can't launch a process too");
 		s_opts->cmd_argc = state->argc - state->next + 1;
-		s_opts->cmd_argv = malloc(sizeof(char*) * (s_opts->cmd_argc + 1));
+		s_opts->cmd_argv = malloc(sizeof(char*) * (s_opts->cmd_argc
+							   + 1));
 		assert(s_opts->cmd_argv);
 		s_opts->cmd_argv[0] = arg;
 		memcpy(&s_opts->cmd_argv[1], &state->argv[state->next],
@@ -294,8 +296,9 @@ static error_t parse_strace_opt(int key, char *arg, struct argp_state *state)
 	case ARGP_KEY_END:
 		if (!(s_opts->cmd_argc || s_opts->pid))
 			argp_error(state, "Need either -p or a command to run");
-		/* Note we never fclose outfile.  It'll flush when we exit.  o/w, we'll
-		 * need to be careful whether we're closing stderr or not. */
+		/* Note we never fclose outfile.  It'll flush when we exit.
+		 * o/w, we'll need to be careful whether we're closing stderr or
+		 * not. */
 		if (!s_opts->outfile)
 			s_opts->outfile = stderr;
 		break;
@@ -380,9 +383,9 @@ static void build_ignore_list(char *trace_set)
 			continue;
 		if (handle_raw_syscall(tok, clear))
 			continue;
-		/* You could imaging continuing, but this error would probably be
-		 * missed in the output stream and we'd be wondering why we weren't
-		 * getting a syscall, due to a typo. */
+		/* You could imaging continuing, but this error would probably
+		 * be missed in the output stream and we'd be wondering why we
+		 * weren't getting a syscall, due to a typo. */
 		fprintf(stderr, "Unknown trace_set argument %s, aborting!\n",
 		        tok);
 		exit(-1);
@@ -402,8 +405,9 @@ static char *remove_timestamps(char *full_line)
 {
 	char *close_brace;
 
-	/* Format: E [  13655.986589401]-[      0.000000000] Syscall.  The seconds
-	 * field may vary in size, so we need to find the second ']'. */
+	/* Format: E [  13655.986589401]-[      0.000000000] Syscall. 
+	 * The seconds field may vary in size, so we need to find the second
+	 * ']'. */
 	close_brace = strchr(full_line, ']');
 	if (!close_brace)
 		return full_line;
@@ -436,12 +440,13 @@ static void parse_traces(int fd)
 			_line = remove_timestamps(_line);
 		fprintf(opts.outfile, "%s", _line);
 	}
-	/* This is a little hokey.  If the process exited, then the qio hung up and
-	 * we got a status message from the kernel.  This was the errstr of the last
-	 * failed read.  However, if we're doing a -p and someone kills *us*, we'll
-	 * never see this.  And catching the signal doesn't help either.  The
-	 * process needs to exit (strace_shutdown).  Either that, or change the
-	 * kernel to set_errstr() on close(), and coordinate with a sighandler. */
+	/* This is a little hokey.  If the process exited, then the qio hung up
+	 * and we got a status message from the kernel.  This was the errstr of
+	 * the last failed read.  However, if we're doing a -p and someone kills
+	 * *us*, we'll never see this.  And catching the signal doesn't help
+	 * either.  The process needs to exit (strace_shutdown).  Either that,
+	 * or change the kernel to set_errstr() on close(), and coordinate with
+	 * a sighandler. */
 	if (opts.verbose)
 		fprintf(stderr, "%r\n");
 	free(line);
@@ -466,9 +471,9 @@ int main(int argc, char **argv, char **envp)
 			perror("Unable to spawn child");
 			exit(-1);
 		}
-		/* We need to wait on the child asynchronously.  If we hold a ref (as
-		 * the parent), the child won't proc_free and that won't hangup/wake us
-		 * from a read. */
+		/* We need to wait on the child asynchronously.  If we hold a
+		 * ref (as the parent), the child won't proc_free and that won't
+		 * hangup/wake us from a read. */
 		syscall_async(&sysc, SYS_waitpid, pid, NULL, 0, 0, 0, 0);
 	} else {
 		pid = opts.pid;
@@ -520,8 +525,9 @@ int main(int argc, char **argv, char **envp)
 	}
 
 	if (opts.cmd_argc) {
-		/* now that we've set up the tracing, we can run the process.  isn't it
-		 * great that the process doesn't immediately start when you make it? */
+		/* now that we've set up the tracing, we can run the process.
+		 * isn't it great that the process doesn't immediately start
+		 * when you make it? */
 		sys_proc_run(pid);
 	}
 

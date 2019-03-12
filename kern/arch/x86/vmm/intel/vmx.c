@@ -43,7 +43,8 @@
  * Yep, it's confusing. This is in part because the vmcs is used twice, for two different things.
  * You're left with the feeling that they got part way through and realized they had to have one for
  *
- * 1) your CPU is going to be capable of running VMs, and you need state for that.
+ * 1) your CPU is going to be capable of running VMs, and you need state for
+ * that.
  *
  * 2) you're about to start a guest, and you need state for that.
  *
@@ -67,9 +68,12 @@
  * anyway.
  *
  * Next, call setup_vmcs_config to configure the GLOBAL vmcs_config struct,
- * which contains all the naughty bits settings for all the cpus that can run a VM.
- * Realistically, all VMX-capable cpus in a system will have identical configurations.
- * So: 0 or more cpus can run VMX; all cpus which can run VMX will have the same configuration.
+ * which contains all the naughty bits settings for all the cpus that can run a
+ * VM.
+ * Realistically, all VMX-capable cpus in a system will have identical
+ * configurations.
+ * So: 0 or more cpus can run VMX; all cpus which can run VMX will have the same
+ * configuration.
  *
  * configure the msr_bitmap. This is the bitmap of MSRs which the
  * guest can manipulate.  Currently, we only allow GS and FS base.
@@ -110,13 +114,14 @@
  * }
  *
  * get a vcpu
- * See if the current cpu has a vcpu. If so, and is the same as the vcpu we want,
- * vmcs_load(vcpu->vmcs) -- i.e. issue a VMPTRLD.
+ * See if the current cpu has a vcpu. If so, and is the same as the vcpu we
+ * want, vmcs_load(vcpu->vmcs) -- i.e. issue a VMPTRLD.
  *
- * If it's not the same, see if the vcpu thinks it is on the core. If it is not, call
- * __vmx_get_cpu_helper on the other cpu, to free it up. Else vmcs_clear the one
- * attached to this cpu. Then vmcs_load the vmcs for vcpu on this this cpu,
- * call __vmx_setup_cpu, mark this vcpu as being attached to this cpu, done.
+ * If it's not the same, see if the vcpu thinks it is on the core. If it is not,
+ * call __vmx_get_cpu_helper on the other cpu, to free it up. Else vmcs_clear
+ * the one attached to this cpu. Then vmcs_load the vmcs for vcpu on this this
+ * cpu, call __vmx_setup_cpu, mark this vcpu as being attached to this cpu,
+ * done.
  *
  * vmx_run_vcpu this one gets messy, mainly because it's a giant wad
  * of inline assembly with embedded CPP crap. I suspect we'll want to
@@ -204,10 +209,10 @@ static int guest_cr_num[16] = {
 	-1, -1, -1, -1, -1, -1, -1
 };
 
-__always_inline unsigned long vmcs_readl(unsigned long field);
+static __always_inline unsigned long vmcs_readl(unsigned long field);
+
 /* See section 24-3 of The Good Book */
-void
-show_cr_access(uint64_t val)
+void show_cr_access(uint64_t val)
 {
 	int crnr = val & 0xf;
 	int type = (val >> 4) & 3;
@@ -225,101 +230,92 @@ show_cr_access(uint64_t val)
 	print_unlock();
 }
 
-void
-ept_flush(uint64_t eptp)
+void ept_flush(uint64_t eptp)
 {
 	ept_sync_context(eptp);
 }
 
-static void
-vmcs_clear(struct vmcs *vmcs)
+static void vmcs_clear(struct vmcs *vmcs)
 {
 	uint64_t phys_addr = PADDR(vmcs);
 	uint8_t error;
 
-	asm volatile (ASM_VMX_VMCLEAR_RAX "; setna %0":"=qm"(error):"a"(&phys_addr),
-				  "m"(phys_addr)
-				  :"cc", "memory");
+	asm volatile (ASM_VMX_VMCLEAR_RAX "; setna %0"
+		      : "=qm"(error)
+		      : "a"(&phys_addr), "m"(phys_addr)
+		      :"cc", "memory");
 	if (error)
 		printk("vmclear fail: %p/%llx\n", vmcs, phys_addr);
 }
 
-static void
-vmcs_load(struct vmcs *vmcs)
+static void vmcs_load(struct vmcs *vmcs)
 {
 	uint64_t phys_addr = PADDR(vmcs);
 	uint8_t error;
 
-	asm volatile (ASM_VMX_VMPTRLD_RAX "; setna %0":"=qm"(error):"a"(&phys_addr),
-				  "m"(phys_addr)
-				  :"cc", "memory");
+	asm volatile (ASM_VMX_VMPTRLD_RAX "; setna %0"
+		      : "=qm"(error)
+		      : "a"(&phys_addr), "m"(phys_addr)
+		      : "cc", "memory");
 	if (error)
 		printk("vmptrld %p/%llx failed\n", vmcs, phys_addr);
 }
 
 /* Returns the paddr pointer of the current CPU's VMCS region, or -1 if none. */
-static physaddr_t
-vmcs_get_current(void)
+static physaddr_t vmcs_get_current(void)
 {
 	physaddr_t vmcs_paddr;
+
 	/* RAX contains the addr of the location to store the VMCS pointer.  The
-	 * compiler doesn't know the ASM will deref that pointer, hence the =m */
+	 * compiler doesn't know the ASM will deref that pointer, hence the =m
+	 */
 	asm volatile (ASM_VMX_VMPTRST_RAX:"=m"(vmcs_paddr):"a"(&vmcs_paddr));
 	return vmcs_paddr;
 }
 
-__always_inline unsigned long
-vmcs_readl(unsigned long field)
+static __always_inline unsigned long vmcs_readl(unsigned long field)
 {
 	return vmcs_read(field);
 }
 
-__always_inline uint16_t
-vmcs_read16(unsigned long field)
+static __always_inline uint16_t vmcs_read16(unsigned long field)
 {
 	return vmcs_readl(field);
 }
 
-static __always_inline uint32_t
-vmcs_read32(unsigned long field)
+static __always_inline uint32_t vmcs_read32(unsigned long field)
 {
 	return vmcs_readl(field);
 }
 
-static __always_inline uint64_t
-vmcs_read64(unsigned long field)
+static __always_inline uint64_t vmcs_read64(unsigned long field)
 {
 	return vmcs_readl(field);
 }
 
-void
-vmwrite_error(unsigned long field, unsigned long value)
+void vmwrite_error(unsigned long field, unsigned long value)
 {
 	printk("vmwrite error: reg %lx value %lx (err %d)\n",
-		   field, value, vmcs_read32(VM_INSTRUCTION_ERROR));
+	       field, value, vmcs_read32(VM_INSTRUCTION_ERROR));
 }
 
-void
-vmcs_writel(unsigned long field, unsigned long value)
+void vmcs_writel(unsigned long field, unsigned long value)
 {
 	if (!vmcs_write(field, value))
 		vmwrite_error(field, value);
 }
 
-static void
-vmcs_write16(unsigned long field, uint16_t value)
+static void vmcs_write16(unsigned long field, uint16_t value)
 {
 	vmcs_writel(field, value);
 }
 
-static void
-vmcs_write32(unsigned long field, uint32_t value)
+static void vmcs_write32(unsigned long field, uint32_t value)
 {
 	vmcs_writel(field, value);
 }
 
-static void
-vmcs_write64(unsigned long field, uint64_t value)
+static void vmcs_write64(unsigned long field, uint64_t value)
 {
 	vmcs_writel(field, value);
 }
@@ -424,7 +420,7 @@ static bool check_vmxec_controls(struct vmxec *v, bool have_true_msr,
 
 	if (vmx_msr_low & ~vmx_msr_high)
 		warn("JACKPOT: Conflicting VMX ec ctls for %s, high 0x%08x low 0x%08x",
-			 v->name, vmx_msr_high, vmx_msr_low);
+		     v->name, vmx_msr_high, vmx_msr_low);
 
 	reserved_0 = (~vmx_msr_low) & (~vmx_msr_high);
 	reserved_1 = vmx_msr_low & vmx_msr_high;
@@ -443,35 +439,42 @@ static bool check_vmxec_controls(struct vmxec *v, bool have_true_msr,
 	    (v->must_be_0 & (v->try_set_1 | v->try_set_0)) ||
 	    (v->try_set_1 & v->try_set_0)) {
 		printk("%s: must 0 (0x%x) and must be 1 (0x%x) and try_set_0 (0x%x) and try_set_1 (0x%x) overlap\n",
-		       v->name, v->must_be_0, v->must_be_1, v->try_set_0, v->try_set_1);
+		       v->name, v->must_be_0, v->must_be_1, v->try_set_0,
+		       v->try_set_1);
 		err = true;
 	}
 
 	/* coverage */
-	if (((v->must_be_0 | v->must_be_1 | v->try_set_0 | v->try_set_1) & changeable_bits) != changeable_bits) {
+	if (((v->must_be_0 | v->must_be_1 | v->try_set_0 | v->try_set_1)
+	     & changeable_bits) != changeable_bits) {
 		printk("%s: Need to cover 0x%x and have 0x%x,0x%x\n",
-		       v->name, changeable_bits, v->must_be_0, v->must_be_1, v->try_set_0, v->try_set_1);
+		       v->name, changeable_bits, v->must_be_0, v->must_be_1,
+		       v->try_set_0, v->try_set_1);
 		err = true;
 	}
 
-	if ((v->must_be_0 | v->must_be_1 | v->try_set_0 | v->try_set_1 | reserved_0 | reserved_1) != 0xffffffff) {
+	if ((v->must_be_0 | v->must_be_1 | v->try_set_0 | v->try_set_1
+	     | reserved_0 | reserved_1) != 0xffffffff) {
 		printk("%s: incomplete coverage: have 0x%x, want 0x%x\n",
-		       v->name, v->must_be_0 | v->must_be_1 | v->try_set_0 | v->try_set_1 |
-		       reserved_0 | reserved_1, 0xffffffff);
+		       v->name, v->must_be_0 | v->must_be_1 | v->try_set_0 |
+		       v->try_set_1 | reserved_0 | reserved_1, 0xffffffff);
 		err = true;
 	}
 
 	/* Don't try to change bits that can't be changed. */
 	if ((v->must_be_0 & (reserved_0 | changeable_bits)) != v->must_be_0) {
-		printk("%s: set to 0 (0x%x) can't be done\n", v->name, v->must_be_0);
+		printk("%s: set to 0 (0x%x) can't be done\n", v->name,
+		       v->must_be_0);
 		err = true;
 	}
 
 	if ((v->must_be_1 & (reserved_1 | changeable_bits)) != v->must_be_1) {
-		printk("%s: set to 1 (0x%x) can't be done\n", v->name, v->must_be_1);
+		printk("%s: set to 1 (0x%x) can't be done\n", v->name,
+		       v->must_be_1);
 		err = true;
 	}
-	// Note we don't REQUIRE that try_set_0 or try_set_0 be possible. We just want to try it.
+	// Note we don't REQUIRE that try_set_0 or try_set_0 be possible. We
+	// just want to try it.
 
 	// Clear bits in try_set that can't be set.
 	try1 = v->try_set_1 & (reserved_1 | changeable_bits);
@@ -506,9 +509,9 @@ static struct vmxec pbec = {
 	.truemsr = MSR_IA32_VMX_TRUE_PINBASED_CTLS,
 
 	.must_be_1 = (PIN_BASED_EXT_INTR_MASK |
-		     PIN_BASED_NMI_EXITING |
-		     PIN_BASED_VIRTUAL_NMIS |
-		     PIN_BASED_POSTED_INTR),
+		      PIN_BASED_NMI_EXITING |
+		      PIN_BASED_VIRTUAL_NMIS |
+		      PIN_BASED_POSTED_INTR),
 
 	.must_be_0 = (PIN_BASED_VMX_PREEMPTION_TIMER),
 };
@@ -519,35 +522,35 @@ static struct vmxec cbec = {
 	.truemsr = MSR_IA32_VMX_TRUE_PROCBASED_CTLS,
 
 	.must_be_1 = (
-	         CPU_BASED_MWAIT_EXITING |
-	         CPU_BASED_HLT_EXITING |
-		     CPU_BASED_TPR_SHADOW |
-		     CPU_BASED_RDPMC_EXITING |
-		     CPU_BASED_CR8_LOAD_EXITING |
-		     CPU_BASED_CR8_STORE_EXITING |
-		     CPU_BASED_USE_MSR_BITMAPS |
-		     CPU_BASED_USE_IO_BITMAPS |
-		     CPU_BASED_ACTIVATE_SECONDARY_CONTROLS),
+		      CPU_BASED_MWAIT_EXITING |
+		      CPU_BASED_HLT_EXITING |
+		      CPU_BASED_TPR_SHADOW |
+		      CPU_BASED_RDPMC_EXITING |
+		      CPU_BASED_CR8_LOAD_EXITING |
+		      CPU_BASED_CR8_STORE_EXITING |
+		      CPU_BASED_USE_MSR_BITMAPS |
+		      CPU_BASED_USE_IO_BITMAPS |
+		      CPU_BASED_ACTIVATE_SECONDARY_CONTROLS),
 
 	.must_be_0 = (
-	         CPU_BASED_VIRTUAL_INTR_PENDING |
-		     CPU_BASED_INVLPG_EXITING |
-		     CPU_BASED_USE_TSC_OFFSETING |
-		     CPU_BASED_RDTSC_EXITING |
-		     CPU_BASED_CR3_LOAD_EXITING |
-		     CPU_BASED_CR3_STORE_EXITING |
-		     CPU_BASED_MOV_DR_EXITING |
-		     CPU_BASED_VIRTUAL_NMI_PENDING |
-		     CPU_BASED_MONITOR_TRAP |
-		     CPU_BASED_PAUSE_EXITING |
-		     CPU_BASED_UNCOND_IO_EXITING),
+		      CPU_BASED_VIRTUAL_INTR_PENDING |
+		      CPU_BASED_INVLPG_EXITING |
+		      CPU_BASED_USE_TSC_OFFSETING |
+		      CPU_BASED_RDTSC_EXITING |
+		      CPU_BASED_CR3_LOAD_EXITING |
+		      CPU_BASED_CR3_STORE_EXITING |
+		      CPU_BASED_MOV_DR_EXITING |
+		      CPU_BASED_VIRTUAL_NMI_PENDING |
+		      CPU_BASED_MONITOR_TRAP |
+		      CPU_BASED_PAUSE_EXITING |
+		      CPU_BASED_UNCOND_IO_EXITING),
 
 	.try_set_0 = (CPU_BASED_MONITOR_EXITING),
 	.policy_changeable = (
-	         CPU_BASED_HLT_EXITING |
-	         CPU_BASED_PAUSE_EXITING |
-	         CPU_BASED_MWAIT_EXITING |
-	         0),
+			      CPU_BASED_HLT_EXITING |
+			      CPU_BASED_PAUSE_EXITING |
+			      CPU_BASED_MWAIT_EXITING |
+			      0),
 };
 
 static struct vmxec cb2ec = {
@@ -556,24 +559,24 @@ static struct vmxec cb2ec = {
 	.truemsr = MSR_IA32_VMX_PROCBASED_CTLS2,
 
 	.must_be_1 = (SECONDARY_EXEC_ENABLE_EPT |
-		     SECONDARY_EXEC_APIC_REGISTER_VIRT |
-		     SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
-		     SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
-		     SECONDARY_EXEC_ENABLE_INVPCID |
-		     SECONDARY_EXEC_WBINVD_EXITING),
+		      SECONDARY_EXEC_APIC_REGISTER_VIRT |
+		      SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
+		      SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
+		      SECONDARY_EXEC_ENABLE_INVPCID |
+		      SECONDARY_EXEC_WBINVD_EXITING),
 
 	.must_be_0 = (
-		     SECONDARY_EXEC_DESCRIPTOR_EXITING |
-		     SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
-		     SECONDARY_EXEC_ENABLE_VPID |
-		     SECONDARY_EXEC_UNRESTRICTED_GUEST |
-		     SECONDARY_EXEC_PAUSE_LOOP_EXITING |
-		     SECONDARY_EXEC_RDRAND_EXITING |
-		     SECONDARY_EXEC_ENABLE_VMFUNC |
-		     SECONDARY_EXEC_SHADOW_VMCS |
-		     SECONDARY_EXEC_RDSEED_EXITING |
-		     SECONDARY_EPT_VE |
-		     SECONDARY_ENABLE_XSAV_RESTORE),
+		      SECONDARY_EXEC_DESCRIPTOR_EXITING |
+		      SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
+		      SECONDARY_EXEC_ENABLE_VPID |
+		      SECONDARY_EXEC_UNRESTRICTED_GUEST |
+		      SECONDARY_EXEC_PAUSE_LOOP_EXITING |
+		      SECONDARY_EXEC_RDRAND_EXITING |
+		      SECONDARY_EXEC_ENABLE_VMFUNC |
+		      SECONDARY_EXEC_SHADOW_VMCS |
+		      SECONDARY_EXEC_RDSEED_EXITING |
+		      SECONDARY_EPT_VE |
+		      SECONDARY_ENABLE_XSAV_RESTORE),
 
 	.try_set_1 = SECONDARY_EXEC_RDTSCP,
 
@@ -588,13 +591,13 @@ static struct vmxec vmentry = {
 	/* exact order from vmx.h; only the first two are enabled. */
 
 	.must_be_1 =  (VM_ENTRY_LOAD_DEBUG_CONTROLS | /* can't set to 0 */
-		      VM_ENTRY_LOAD_IA32_EFER |
-		      VM_ENTRY_IA32E_MODE),
+		       VM_ENTRY_LOAD_IA32_EFER |
+		       VM_ENTRY_IA32E_MODE),
 
 	.must_be_0 = (VM_ENTRY_SMM |
-		     VM_ENTRY_DEACT_DUAL_MONITOR |
-		     VM_ENTRY_LOAD_IA32_PERF_GLOBAL_CTRL |
-		     VM_ENTRY_LOAD_IA32_PAT),
+		      VM_ENTRY_DEACT_DUAL_MONITOR |
+		      VM_ENTRY_LOAD_IA32_PERF_GLOBAL_CTRL |
+		      VM_ENTRY_LOAD_IA32_PAT),
 };
 
 static struct vmxec vmexit = {
@@ -603,19 +606,18 @@ static struct vmxec vmexit = {
 	.truemsr = MSR_IA32_VMX_TRUE_EXIT_CTLS,
 
 	.must_be_1 = (VM_EXIT_SAVE_DEBUG_CONTROLS |	/* can't set to 0 */
-				 VM_EXIT_ACK_INTR_ON_EXIT |
-				 VM_EXIT_SAVE_IA32_EFER |
-				VM_EXIT_LOAD_IA32_EFER |
-				VM_EXIT_HOST_ADDR_SPACE_SIZE),	/* 64 bit */
+		      VM_EXIT_ACK_INTR_ON_EXIT |
+		      VM_EXIT_SAVE_IA32_EFER |
+		      VM_EXIT_LOAD_IA32_EFER |
+		      VM_EXIT_HOST_ADDR_SPACE_SIZE),	/* 64 bit */
 
 	.must_be_0 = (VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL |
-				 VM_EXIT_SAVE_IA32_PAT |
-				 VM_EXIT_LOAD_IA32_PAT |
-				VM_EXIT_SAVE_VMX_PREEMPTION_TIMER),
+		      VM_EXIT_SAVE_IA32_PAT |
+		      VM_EXIT_LOAD_IA32_PAT |
+		      VM_EXIT_SAVE_VMX_PREEMPTION_TIMER),
 };
 
-static void
-setup_vmcs_config(void *p)
+static void setup_vmcs_config(void *p)
 {
 	int *ret = p;
 	struct vmcs_config *vmcs_conf = &vmcs_config;
@@ -644,8 +646,8 @@ setup_vmcs_config(void *p)
 	 * Don't worry that one or more of these might fail and leave
 	 * the VMCS in some kind of incomplete state. If one of these
 	 * fails, the caller is going to discard the VMCS.
-	 * It is written this way to ensure we get results of all tests and avoid
-	 * BMAFR behavior.
+	 * It is written this way to ensure we get results of all tests and
+	 * avoid BMAFR behavior.
 	 */
 	ok = check_vmxec_controls(&pbec, have_true_msrs,
 	                          &vmcs_conf->pin_based_exec_ctrl);
@@ -658,7 +660,7 @@ setup_vmcs_config(void *p)
 	                          &vmcs_conf->vmentry_ctrl) && ok;
 	ok = check_vmxec_controls(&vmexit, have_true_msrs,
 	                          &vmcs_conf->vmexit_ctrl) && ok;
-	if (! ok) {
+	if (!ok) {
 		printk("vmxexec controls is no good.\n");
 		return;
 	}
@@ -716,8 +718,7 @@ static struct vmcs *__vmx_alloc_vmcs(int node)
  *
  * Returns a valid VMCS region.
  */
-static struct vmcs *
-vmx_alloc_vmcs(void)
+static struct vmcs *vmx_alloc_vmcs(void)
 {
 	return __vmx_alloc_vmcs(numa_id());
 }
@@ -725,8 +726,7 @@ vmx_alloc_vmcs(void)
 /**
  * vmx_free_vmcs - frees a VMCS region
  */
-static void
-vmx_free_vmcs(struct vmcs *vmcs)
+static void vmx_free_vmcs(struct vmcs *vmcs)
 {
 	kpages_free(vmcs, vmcs_config.size);
 }
@@ -783,19 +783,20 @@ static void __vmx_setup_pcpu(struct guest_pcore *gpc)
 	/* TODO: we might need to also set HOST_IA32_PERF_GLOBAL_CTRL.  Need to
 	 * think about how perf will work with VMs */
 	/* Userspace can request changes to the ctls.  They take effect when we
-	 * reload the GPC, which occurs after a transition from userspace to VM. */
+	 * reload the GPC, which occurs after a transition from userspace to VM.
+	 */
 	vmcs_write(PIN_BASED_VM_EXEC_CONTROL, vmx->pin_exec_ctls);
 	vmcs_write(CPU_BASED_VM_EXEC_CONTROL, vmx->cpu_exec_ctls);
 	vmcs_write(SECONDARY_VM_EXEC_CONTROL, vmx->cpu2_exec_ctls);
 }
 
-uint64_t
-construct_eptp(physaddr_t root_hpa)
+uint64_t construct_eptp(physaddr_t root_hpa)
 {
 	uint64_t eptp;
 
 	/* set WB memory and 4 levels of walk.  we checked these in ept_init */
-	eptp = VMX_EPT_MEM_TYPE_WB | (VMX_EPT_GAW_4_LVL << VMX_EPT_GAW_EPTP_SHIFT);
+	eptp = VMX_EPT_MEM_TYPE_WB | (VMX_EPT_GAW_4_LVL <<
+				      VMX_EPT_GAW_EPTP_SHIFT);
 	if (cpu_has_vmx_ept_ad_bits())
 		eptp |= VMX_EPT_AD_ENABLE_BIT;
 	eptp |= (root_hpa & PAGE_MASK);
@@ -815,7 +816,8 @@ static void vmcs_set_pgaddr(struct proc *p, void *u_addr,
 	/* Enforce page alignment */
 	kva = uva2kva(p, ROUNDDOWN(u_addr, PGSIZE), PGSIZE, PROT_WRITE);
 	if (!kva)
-		error(EINVAL, "Unmapped pgaddr %p for VMCS page %s", u_addr, what);
+		error(EINVAL, "Unmapped pgaddr %p for VMCS page %s",
+		      u_addr, what);
 
 	paddr = PADDR(kva);
 	/* TODO: need to pin the page.  A munmap would actually be okay
@@ -826,8 +828,8 @@ static void vmcs_set_pgaddr(struct proc *p, void *u_addr,
 	 * in the kernel itself. */
 	assert(!PGOFF(paddr));
 	vmcs_writel(field, paddr);
-	/* Pages are inserted twice.  Once, with the full paddr.  The next field is
-	 * the upper 32 bits of the paddr. */
+	/* Pages are inserted twice.  Once, with the full paddr.  The next field
+	 * is the upper 32 bits of the paddr. */
 	vmcs_writel(field + 1, paddr >> 32);
 }
 
@@ -953,8 +955,10 @@ static void vmx_setup_initial_guest_state(struct proc *p,
 }
 
 static void __vmx_disable_intercept_for_msr(unsigned long *msr_bitmap,
-					    uint32_t msr) {
+					    uint32_t msr)
+{
 	int f = sizeof(unsigned long);
+
 	/*
 	 * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals
 	 * have the write-low and read-high bitmap offsets the wrong way round.
@@ -972,11 +976,13 @@ static void __vmx_disable_intercept_for_msr(unsigned long *msr_bitmap,
 
 /* note the io_bitmap is big enough for the 64K port space. */
 static void __vmx_disable_intercept_for_io(unsigned long *io_bitmap,
-					   uint16_t port) {
+					   uint16_t port)
+{
 	__clear_bit(port, io_bitmap);
 }
 
-static void dumpmsrs(void) {
+static void dumpmsrs(void)
+{
 	int i;
 	int set[] = {
 		MSR_LSTAR,
@@ -986,6 +992,7 @@ static void dumpmsrs(void) {
 		MSR_SFMASK,
 		MSR_IA32_PEBS_ENABLE
 	};
+
 	for (i = 0; i < ARRAY_SIZE(set); i++) {
 		printk("%p: %p\n", set[i], read_msr(set[i]));
 	}
@@ -1005,8 +1012,8 @@ static void dumpmsrs(void) {
  * only work on certain architectures. */
 static void setup_msr(struct guest_pcore *gpc)
 {
-	/* Since PADDR(msr_bitmap) is non-zero, and the bitmap is all 0xff, we now
-	 * intercept all MSRs */
+	/* Since PADDR(msr_bitmap) is non-zero, and the bitmap is all 0xff, we
+	 * now intercept all MSRs */
 	vmcs_write64(MSR_BITMAP, PADDR(msr_bitmap));
 
 	vmcs_write64(IO_BITMAP_A, PADDR(io_bitmap));
@@ -1124,7 +1131,8 @@ void destroy_guest_pcore(struct guest_pcore *gpc)
 	kfree(gpc);
 }
 
-static void vmx_step_instruction(void) {
+static void vmx_step_instruction(void)
+{
 	vmcs_writel(GUEST_RIP, vmcs_readl(GUEST_RIP) +
 		    vmcs_read32(VM_EXIT_INSTRUCTION_LEN));
 }
@@ -1133,7 +1141,8 @@ static void vmx_step_instruction(void) {
  * __vmx_enable - low-level enable of VMX mode on the current CPU
  * @vmxon_buf: an opaque buffer for use as the VMXON region
  */
-static int __vmx_enable(struct vmcs *vmxon_buf) {
+static int __vmx_enable(struct vmcs *vmxon_buf)
+{
 	uint64_t phys_addr = PADDR(vmxon_buf);
 	uint64_t old, test_bits;
 
@@ -1174,7 +1183,8 @@ static int __vmx_enable(struct vmcs *vmxon_buf) {
 /**
  * vmx_disable - disables VMX mode on the current CPU
  */
-static void vmx_disable(void *unused) {
+static void vmx_disable(void *unused)
+{
 	if (currentcpu->vmx_enabled) {
 		__vmxoff();
 		lcr4(rcr4() & ~X86_CR4_VMXE);
@@ -1185,7 +1195,8 @@ static void vmx_disable(void *unused) {
 /* Probe the cpus to see which ones can do vmx.
  * Return -errno if it fails, and 1 if it succeeds.
  */
-static bool probe_cpu_vmx(void) {
+static bool probe_cpu_vmx(void)
+{
 	/* The best way to test this code is:
 	 * wrmsr -p <cpu> 0x3a 1
 	 * This will lock vmx off; then modprobe dune.
@@ -1204,7 +1215,8 @@ static bool probe_cpu_vmx(void) {
 	}
 }
 
-static int ept_init(void) {
+static int ept_init(void)
+{
 	if (!cpu_has_vmx_ept()) {
 		printk("VMX doesn't support EPT!\n");
 		return -1;
@@ -1248,12 +1260,13 @@ static int ept_init(void) {
 }
 
 /**
- * vmx_init sets up physical core data areas that are required to run a vm at all.
- * These data areas are not connected to a specific user process in any way. Instead,
- * they are in some sense externalizing what would other wise be a very large ball of
- * state that would be inside the CPU.
+ * vmx_init sets up physical core data areas that are required to run a vm at
+ * all.  These data areas are not connected to a specific user process in any
+ * way. Instead, they are in some sense externalizing what would other wise be a
+ * very large ball of state that would be inside the CPU.
  */
-int intel_vmm_init(void) {
+int intel_vmm_init(void)
+{
 	int r, cpu, ret;
 
 	if (!probe_cpu_vmx()) {
@@ -1293,8 +1306,8 @@ int intel_vmm_init(void) {
 	memset(io_bitmap, 0xff, VMX_IO_BITMAP_SZ);
 
 	/* These are the only MSRs that are not intercepted.  The hardware takes
-	 * care of FS_BASE, GS_BASE, and EFER.  We do the rest manually when loading
-	 * and unloading guest pcores. */
+	 * care of FS_BASE, GS_BASE, and EFER.  We do the rest manually when
+	 * loading and unloading guest pcores. */
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_EFER);
@@ -1303,8 +1316,8 @@ int intel_vmm_init(void) {
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_STAR);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_SFMASK);
 
-	/* TODO: this might be dangerous, since they can do more than just read the
-	 * CMOS */
+	/* TODO: this might be dangerous, since they can do more than just read
+	 * the CMOS */
 	__vmx_disable_intercept_for_io(io_bitmap, CMOS_RAM_IDX);
 	__vmx_disable_intercept_for_io(io_bitmap, CMOS_RAM_DATA);
 
@@ -1313,8 +1326,8 @@ int intel_vmm_init(void) {
 		return ret;
 	}
 	printk("VMX setup succeeded\n");
-	/* If this isn't true (we have VMX but not mwait), then we'll have to look
-	 * closely at CPU_BASED_MWAIT_EXITING. */
+	/* If this isn't true (we have VMX but not mwait), then we'll have to
+	 * look closely at CPU_BASED_MWAIT_EXITING. */
 	assert(cpu_has_feat(CPU_FEAT_X86_MWAIT));
 	return 0;
 }
@@ -1400,22 +1413,24 @@ void vmx_load_guest_pcore(struct guest_pcore *gpc)
 		PERCPU_VAR(gpc_to_clear_to) = NULL;
 		return;
 	}
-	/* Clear ours *before* waiting on someone else; avoids deadlock (circular
-	 * wait). */
+	/* Clear ours *before* waiting on someone else; avoids deadlock
+	 * (circular wait). */
 	__clear_vmcs(0, 0, 0, 0);
 	remote_core = ACCESS_ONCE(gpc->vmcs_core_id);
 	if (remote_core != -1) {
 		/* This is a bit nasty.  It requires the remote core to receive
-		 * interrupts, which means we're now waiting indefinitely for them to
-		 * enable IRQs.  They can wait on another core, and so on.  We cleared
-		 * our vmcs first, so that we won't deadlock on *this*.
+		 * interrupts, which means we're now waiting indefinitely for
+		 * them to enable IRQs.  They can wait on another core, and so
+		 * on.  We cleared our vmcs first, so that we won't deadlock on
+		 * *this*.
 		 *
-		 * However, this means we can't wait on another core with IRQs disabled
-		 * for any *other* reason.  For instance, if some other subsystem
-		 * decides to have one core wait with IRQs disabled on another, the core
-		 * that has our VMCS could be waiting on us to do something that we'll
-		 * never do. */
-		send_kernel_message(remote_core, __clear_vmcs, 0, 0, 0, KMSG_IMMEDIATE);
+		 * However, this means we can't wait on another core with IRQs
+		 * disabled for any *other* reason.  For instance, if some other
+		 * subsystem decides to have one core wait with IRQs disabled on
+		 * another, the core that has our VMCS could be waiting on us to
+		 * do something that we'll never do. */
+		send_kernel_message(remote_core, __clear_vmcs, 0, 0, 0,
+				    KMSG_IMMEDIATE);
 		while (gpc->vmcs_core_id != -1)
 			cpu_relax();
 	}
@@ -1427,8 +1442,9 @@ void vmx_load_guest_pcore(struct guest_pcore *gpc)
 void vmx_unload_guest_pcore(struct guest_pcore *gpc)
 {
 	/* We don't have to worry about races yet.  No one will try to load gpc
-	 * until we've returned and unlocked, and no one will clear an old VMCS to
-	 * this GPC, since it was cleared before we finished loading (above). */
+	 * until we've returned and unlocked, and no one will clear an old VMCS
+	 * to this GPC, since it was cleared before we finished loading (above).
+	 */
 	assert(!irq_is_enabled());
 	gpc->vmcs_core_id = core_id();
 	PERCPU_VAR(gpc_to_clear_to) = gpc;

@@ -34,7 +34,8 @@ _dl_make_stack_executable (void **stack_endp)
   GL(dl_stack_flags) |= PF_X;
 
   int size = USTACK_NUM_PAGES*PGSIZE;
-  void* bottom = USTACKTOP-size;
+  void *bottom = USTACKTOP-size;
+
   return mprotect(bottom,size,PROT_READ|PROT_WRITE|PROT_EXEC);
 }
 rtld_hidden_def (_dl_make_stack_executable)

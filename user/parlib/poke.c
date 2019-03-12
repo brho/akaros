@@ -37,30 +37,35 @@ void poke(struct poke_tracker *tracker, void *arg)
 	atomic_set(&tracker->need_to_run, TRUE);
 	/* will need to repeatedly do it if someone keeps posting work */
 	do {
-		/* want an wrmb() btw posting work/need_to_run and in_progress.  the
-		 * swap provides the HW mb. just need a cmb, which we do in the loop to
-		 * cover the iterations (even though i can't imagine the compiler
-		 * reordering the check it needed to do for the branch).. */
+		/* want an wrmb() btw posting work/need_to_run and in_progress.
+		 * the swap provides the HW mb. just need a cmb, which we do in
+		 * the loop to cover the iterations (even though i can't imagine
+		 * the compiler reordering the check it needed to do for the
+		 * branch).. */
 		cmb();
-		/* poke / make sure someone does it.  if we get a TRUE (1) back, someone
-		 * is already running and will deal with the posted work.  (probably on
-		 * their next loop).  if we got a 0 back, we won the race and have the
-		 * 'lock'. */
+		/* poke / make sure someone does it.  if we get a TRUE (1) back,
+		 * someone is already running and will deal with the posted
+		 * work.  (probably on their next loop).  if we got a 0 back, we
+		 * won the race and have the 'lock'. */
 		if (atomic_swap(&tracker->run_in_progress, TRUE))
 			return;
-		/* if we're here, then we're the one who needs to run the func. */
-		/* clear the 'need to run', since we're running it now.  new users will
-		 * set it again.  this write needs to be wmb()'d after in_progress.  the
-		 * swap provided the HW mb(). */
+		/* if we're here, then we're the one who needs to run the func.
+		 * */
+		/* clear the 'need to run', since we're running it now.  new
+		 * users will set it again.  this write needs to be wmb()'d
+		 * after in_progress.  the swap provided the HW mb(). */
 		cmb();
-		atomic_set(&tracker->need_to_run, FALSE);	/* no internal HW mb */
-		/* run the actual function.  the poke sync makes sure only one caller is
-		 * in that func at a time. */
+		/* no internal HW mb */
+		atomic_set(&tracker->need_to_run, FALSE);
+		/* run the actual function.  the poke sync makes sure only one
+		 * caller is in that func at a time. */
 		assert(tracker->func);
 		tracker->func(arg);
-		wmb();	/* ensure the in_prog write comes after the run_again. */
-		atomic_set(&tracker->run_in_progress, FALSE);	/* no internal HW mb */
+		/* ensure the in_prog write comes after the run_again. */
+		wmb();
+		/* no internal HW mb */
+		atomic_set(&tracker->run_in_progress, FALSE);
 		/* in_prog write must come before run_again read */
 		wrmb();
-	} while (atomic_read(&tracker->need_to_run));	/* while there's more work*/
+	} while (atomic_read(&tracker->need_to_run));
 }

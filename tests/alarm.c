@@ -39,8 +39,8 @@ int main(int argc, char **argv)
 		perror("Alarm setup");
 		exit(-1);
 	}
-	/* Since we're doing SPAM_PUBLIC later, we actually don't need a big ev_q.
-	 * But someone might copy/paste this and change a flag. */
+	/* Since we're doing SPAM_PUBLIC later, we actually don't need a big
+	 * ev_q.  But someone might copy/paste this and change a flag. */
 	register_ev_handler(EV_ALARM, handle_alarm, 0);
 	if (!(ev_q = get_eventq(EV_MBOX_UCQ))) {
 		perror("Failed ev_q");	/* it'll actually PF if malloc fails */
@@ -48,8 +48,8 @@ int main(int argc, char **argv)
 	}
 	ev_q->ev_vcore = 0;
 	/* I think this is all the flags we need; gotta write that dissertation
-	 * chapter (and event how-to)!  We may get more than one event per alarm, if
-	 * we have concurrent preempts/yields. */
+	 * chapter (and event how-to)!  We may get more than one event per
+	 * alarm, if we have concurrent preempts/yields. */
 	ev_q->ev_flags = EVENT_IPI | EVENT_SPAM_PUBLIC | EVENT_WAKEUP;
 	/* Register the ev_q for our alarm */
 	if (devalarm_set_evq(timerfd, ev_q, 0xdeadbeef)) {
@@ -74,8 +74,8 @@ int main(int argc, char **argv)
 	}
 	uthread_sleep(2);
 	close(ctlfd);
-	/* get crazy: post the timerfd to #srv, then sleep (or even try to exit), and
-	 * then echo into it remotely!  A few limitations:
+	/* get crazy: post the timerfd to #srv, then sleep (or even try to
+	 * exit), and then echo into it remotely!  A few limitations:
 	 * - if the process is DYING, you won't be able to send an event to it.
 	 * - the process won't leave DYING til the srv file is removed. */
 	srvfd = open("#srv/alarmtest", O_WRONLY | O_CREAT | O_EXCL, 0666);
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 		perror("Failed to post timerfd");
 		exit(-1);
 	}
-	printf("Sleeping for 10 sec, try to echo 111 > '#srv/alarmtest' now!\n");
+	printf("Sleeping for 10 sec, try to echo 111 > '#srv/alarmtest' now\n");
 	uthread_sleep(10);
 	ret = unlink("#srv/alarmtest");
 	if (ret < 0) {

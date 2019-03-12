@@ -5,8 +5,7 @@
 #include <ros/memlayout.h>
 #include <assert.h>
 
-int
-strlen(const char *s)
+int strlen(const char *s)
 {
 	int n;
 
@@ -15,8 +14,7 @@ strlen(const char *s)
 	return n;
 }
 
-int
-strnlen(const char *s, size_t size)
+int strnlen(const char *s, size_t size)
 {
 	int n;
 
@@ -45,8 +43,7 @@ strcat(char *dst, const char *src)
 }
 */
 
-char *
-strncpy(char *dst, const char *src, size_t size) {
+char *strncpy(char *dst, const char *src, size_t size) {
 	size_t i;
 	char *ret;
 
@@ -60,8 +57,7 @@ strncpy(char *dst, const char *src, size_t size) {
 	return ret;
 }
 
-size_t
-strlcpy(char *dst, const char *src, size_t size)
+size_t strlcpy(char *dst, const char *src, size_t size)
 {
 	if (size > 0) {
 		while (--size > 0 && *src != '\0')
@@ -72,8 +68,7 @@ strlcpy(char *dst, const char *src, size_t size)
 	return strlen(src);
 }
 
-size_t
-strlcat(char *dst, const char *src, size_t size)
+size_t strlcat(char *dst, const char *src, size_t size)
 {
 	size_t rem;	/* Buffer space remaining after null in dst. */
 
@@ -98,16 +93,14 @@ strlcat(char *dst, const char *src, size_t size)
 	return (size - rem) + strlcpy(dst, src, rem);
 }
 
-int
-strcmp(const char *p, const char *q)
+int strcmp(const char *p, const char *q)
 {
 	while (*p && *p == *q)
 		p++, q++;
 	return (int) ((unsigned char) *p - (unsigned char) *q);
 }
 
-int
-strncmp(const char *p, const char *q, size_t n)
+int strncmp(const char *p, const char *q, size_t n)
 {
 	while (n > 0 && *p && *p == *q)
 		n--, p++, q++;
@@ -119,8 +112,7 @@ strncmp(const char *p, const char *q, size_t n)
 
 // Return a pointer to the first occurrence of 'c' in 's',
 // or a null pointer if the string has no 'c'.
-char *
-strchr(const char *s, char c)
+char *strchr(const char *s, char c)
 {
 	for (; *s; s++)
 		if (*s == c)
@@ -130,8 +122,7 @@ strchr(const char *s, char c)
 
 // Return a pointer to the last occurrence of 'c' in 's',
 // or a null pointer if the string has no 'c'.
-char *
-strrchr(const char *s, char c)
+char *strrchr(const char *s, char c)
 {
 	char *lastc = NULL;
 	for (; *s; s++)
@@ -153,8 +144,7 @@ void *memchr(const void *mem, int chr, int len)
 
 // Return a pointer to the first occurrence of 'c' in 's',
 // or a pointer to the string-ending null character if the string has no 'c'.
-char *
-strfind(const char *s, char c)
+char *strfind(const char *s, char c)
 {
 	for (; *s; s++)
 		if (*s == c)
@@ -163,8 +153,7 @@ strfind(const char *s, char c)
 }
 
 // memset aligned words.
-static inline void *
-memsetw(long* _v, long c, size_t n)
+static inline void *memsetw(long* _v, long c, size_t n)
 {
 	long *start, *end, *v;
 
@@ -219,8 +208,7 @@ memsetw(long* _v, long c, size_t n)
 	  *dst++ = *src++; \
   } while(0)
 
-void *
-memset(void *v, int c, size_t _n)
+void *memset(void *v, int c, size_t _n)
 {
 	char *p;
 	size_t n0;
@@ -230,22 +218,19 @@ memset(void *v, int c, size_t _n)
 
 	p = v;
 
-    while (n > 0 && ((uintptr_t)p & (sizeof(long)-1)))
-	{
+	while (n > 0 && ((uintptr_t)p & (sizeof(long)-1))) {
 		*p++ = c;
 		n--;
 	}
 
-	if (n >= sizeof(long))
-	{
+	if (n >= sizeof(long)) {
 		n0 = n / sizeof(long) * sizeof(long);
 		memsetw((long*)p, c, n0);
 		n -= n0;
 		p += n0;
 	}
 
-	while (n > 0)
-	{
+	while (n > 0) {
 		*p++ = c;
 		n--;
 	}
@@ -253,8 +238,7 @@ memset(void *v, int c, size_t _n)
 	return v;
 }
 
-void *
-memcpy(void* dst, const void* src, size_t _n)
+void *memcpy(void* dst, const void* src, size_t _n)
 {
 	const char* s;
 	char* d;
@@ -265,18 +249,13 @@ memcpy(void* dst, const void* src, size_t _n)
 	s = src;
 	d = dst;
 
-	if ((((uintptr_t)s | (uintptr_t)d) & (sizeof(long)-1)) == 0)
-	{
+	if ((((uintptr_t)s | (uintptr_t)d) & (sizeof(long)-1)) == 0) {
 		n0 = n / sizeof(long) * sizeof(long);
 		memcpyw(long, d, s, n0);
-	}
-	else if ((((uintptr_t)s | (uintptr_t)d) & (sizeof(int)-1)) == 0)
-	{
+	} else if ((((uintptr_t)s | (uintptr_t)d) & (sizeof(int)-1)) == 0) {
 		n0 = n / sizeof(int) * sizeof(int);
 		memcpyw(int, d, s, n0);
-	}
-	else if ((((uintptr_t)s | (uintptr_t)d) & (sizeof(short)-1)) == 0)
-	{
+	} else if ((((uintptr_t)s | (uintptr_t)d) & (sizeof(short)-1)) == 0) {
 		n0 = n / sizeof(short) * sizeof(short);
 		memcpyw(short, d, s, n0);
 	}
@@ -291,8 +270,7 @@ memcpy(void* dst, const void* src, size_t _n)
 	return dst;
 }
 
-void *
-memmove(void *dst, const void *src, size_t _n)
+void *memmove(void *dst, const void *src, size_t _n)
 {
 #ifdef CONFIG_X86
 	bcopy(src, dst, _n);
@@ -317,8 +295,7 @@ memmove(void *dst, const void *src, size_t _n)
 #endif
 }
 
-int
-memcmp(const void *v1, const void *v2, size_t n)
+int memcmp(const void *v1, const void *v2, size_t n)
 {
 	const uint8_t *s1 = (const uint8_t *) v1;
 	const uint8_t *s2 = (const uint8_t *) v2;
@@ -332,8 +309,7 @@ memcmp(const void *v1, const void *v2, size_t n)
 	return 0;
 }
 
-void *
-memfind(const void *_s, int c, size_t n)
+void *memfind(const void *_s, int c, size_t n)
 {
 	const void *ends = (const char *) _s + n;
 	const void *s = _s;
@@ -343,8 +319,7 @@ memfind(const void *_s, int c, size_t n)
 	return (void *)s;
 }
 
-long
-strtol(const char *s, char **endptr, int base)
+long strtol(const char *s, char **endptr, int base)
 {
 	int neg = 0;
 	long val = 0;
@@ -390,8 +365,7 @@ strtol(const char *s, char **endptr, int base)
 	return (neg ? -val : val);
 }
 
-unsigned long
-strtoul(const char *s, char **endptr, int base)
+unsigned long strtoul(const char *s, char **endptr, int base)
 {
 	int neg = 0;
 	unsigned long val = 0;

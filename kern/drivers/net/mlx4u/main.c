@@ -77,13 +77,13 @@ void mlx4_ib_mad_cleanup(struct mlx4_ib_dev *dev) {}
 void mlx4_ib_mcg_destroy() { }
 int mlx4_ib_mcg_init(void) { return 0; }
 void mlx4_ib_invalidate_all_guid_record(struct mlx4_ib_dev *dev, int port) {}
-void mlx4_ib_slave_alias_guid_event(struct mlx4_ib_dev *dev, int slave,
-    int port, int slave_init) {}
+void mlx4_ib_slave_alias_guid_event(struct mlx4_ib_dev *dev, int slave, int
+				    port, int slave_init) {}
 void handle_port_mgmt_change_event(struct work_struct *work){}
 void mlx4_ib_tunnels_update_work(struct work_struct *work) {}
-int mlx4_MAD_IFC(struct mlx4_ib_dev *dev, int mad_ifc_flags, int port,
-    struct ib_wc *in_wc, struct ib_grh *in_grh, void *in_mad,
-    void *response_mad) { return 0; }
+int mlx4_MAD_IFC(struct mlx4_ib_dev *dev, int mad_ifc_flags, int port, struct
+		 ib_wc *in_wc, struct ib_grh *in_grh, void *in_mad, void
+		 *response_mad) { return 0; }
 /* STUB END */
 
 #endif	/* AKAROS */

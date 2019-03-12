@@ -69,7 +69,8 @@ static void init_global_pvcalarm(void *arg)
 	global_pvcalarm.handler = NULL;
 
 	/* Preemptively setup timers for all possible vcores */
-	global_pvcalarm.data = malloc(max_vcores() * sizeof(struct pvcalarm_data));
+	global_pvcalarm.data = malloc(max_vcores() *
+				      sizeof(struct pvcalarm_data));
 	for (int i=0; i<max_vcores(); i++) {
 		init_pvcalarm(&global_pvcalarm.data[i], i);
 	}
@@ -136,7 +137,8 @@ int enable_pvcalarms(int method, uint64_t interval, void (*callback) (void))
 
 	/* Start the timer on all vcores to go off after interval usecs */
 	for (int i=0; i<max_vcores(); i++) {
-		start_pvcalarm(&global_pvcalarm.data[i], global_pvcalarm.interval);
+		start_pvcalarm(&global_pvcalarm.data[i],
+			       global_pvcalarm.interval);
 	}
 
 	atomic_set(&global_pvcalarm.state, S_ENABLED);
@@ -196,8 +198,8 @@ static void init_pvcalarm(struct pvcalarm_data *pvcalarm_data, int vcoreid)
 		perror("Pvcalarm: Failed to set evq");
 		return;
 	}
-	/* now the alarm is all set, just need to write the timer whenever we want
-	 * it to go off. */
+	/* now the alarm is all set, just need to write the timer whenever we
+	 * want it to go off. */
 	pvcalarm_data->alarmid = alarmid;
 	pvcalarm_data->ctlfd = ctlfd;
 	pvcalarm_data->timerfd = timerfd;
@@ -215,7 +217,8 @@ static inline bool __vcore_preamble()
 	int state;
 	assert(in_vcore_context());
 	__sync_fetch_and_add(&global_pvcalarm.busy_count, 1);
-	cmb();	/* order the state read after the incref.  __sync provides cpu mb */
+	/* order the state read after the incref.  __sync provides cpu mb */
+	cmb();
 	state = atomic_read(&global_pvcalarm.state);
 	if (state == S_DISABLED || state == S_DISABLING)
 		goto disabled;
@@ -252,7 +255,8 @@ static void handle_alarm_real(struct event_msg *ev_msg, unsigned int ev_type,
                               void *data)
 {
 	global_pvcalarm.callback();
-	start_pvcalarm(&global_pvcalarm.data[vcore_id()], global_pvcalarm.interval);
+	start_pvcalarm(&global_pvcalarm.data[vcore_id()],
+		       global_pvcalarm.interval);
 }
 
 /* The pvcalarm handler for the PROF policy.  Account for any time the vcore

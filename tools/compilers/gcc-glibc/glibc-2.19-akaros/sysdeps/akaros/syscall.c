@@ -44,17 +44,19 @@ static bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
 	int old_flags;
 	sysc->ev_q = ev_q;
 	wrmb();	/* don't let that write pass any future reads (flags) */
-	/* Try and set the SC_UEVENT flag (so the kernel knows to look at ev_q) */
+	/* Try and set the SC_UEVENT flag (so the kernel knows to look at ev_q)
+	 */
 	do {
 		/* no cmb() needed, the atomic_read will reread flags */
 		old_flags = atomic_read(&sysc->flags);
 		/* Spin if the kernel is mucking with syscall flags */
 		while (old_flags & SC_K_LOCK)
 			old_flags = atomic_read(&sysc->flags);
-		/* If the kernel finishes while we are trying to sign up for an event,
-		 * we need to bail out */
+		/* If the kernel finishes while we are trying to sign up for an
+		 * event, we need to bail out */
 		if (old_flags & (SC_DONE | SC_PROGRESS)) {
-			sysc->ev_q = 0;		/* not necessary, but might help with bugs */
+			/* not necessary, but might help with bugs */
+			sysc->ev_q = 0;
 			return FALSE;
 		}
 	} while (!atomic_cas(&sysc->flags, old_flags, old_flags | SC_UEVENT));
@@ -73,23 +75,26 @@ static bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
  * we drop into VC ctx, clear notif pending, and yield. */
 void __ros_early_syscall_blockon(struct syscall *sysc)
 {
-	/* For early SCPs, notif_pending will probably be false anyways.  For SCPs
-	 * in VC ctx, it might be set.  Regardless, when we pop back up,
+	/* For early SCPs, notif_pending will probably be false anyways.  For
+	 * SCPs in VC ctx, it might be set.  Regardless, when we pop back up,
 	 * notif_pending will be set (for a full SCP in VC ctx). */
 	__procdata.vcore_preempt_data[0].notif_pending = FALSE;
-	/* order register after clearing notif_pending, handled by register_evq */
-	/* Ask for a SYSCALL event when the sysc is done.  We don't need a handler,
-	 * we just need the kernel to restart us from proc_yield.  If register
-	 * fails, we're already done. */
+	/* order register after clearing notif_pending, handled by register_evq
+	 */
+	/* Ask for a SYSCALL event when the sysc is done.  We don't need a
+	 * handler, we just need the kernel to restart us from proc_yield.  If
+	 * register fails, we're already done. */
 	if (register_evq(sysc, &__ros_scp_simple_evq)) {
-		/* Sending false for now - we want to signal proc code that we want to
-		 * wait (piggybacking on the MCP meaning of this variable).  If
-		 * notif_pending is set, the kernel will immediately return us. */
+		/* Sending false for now - we want to signal proc code that we
+		 * want to wait (piggybacking on the MCP meaning of this
+		 * variable).  If notif_pending is set, the kernel will
+		 * immediately return us. */
 		__ros_syscall_noerrno(SYS_proc_yield, FALSE, 0, 0, 0, 0, 0);
 	}
-	/* For early SCPs, the kernel turns off notif_pending for us.  For SCPs in
-	 * vcore context that blocked (should be rare!), it'll still be set.  Other
-	 * VC ctx code must handle it later. (could have coalesced notifs) */
+	/* For early SCPs, the kernel turns off notif_pending for us.  For SCPs
+	 * in vcore context that blocked (should be rare!), it'll still be set.
+	 * Other VC ctx code must handle it later. (could have coalesced notifs)
+	 */
 }
 
 /* Function pointer for the blockon function.  MCPs need to switch to the parlib
@@ -100,13 +105,13 @@ void (*ros_syscall_blockon)(struct syscall *sysc) = __ros_early_syscall_blockon;
 static inline void __ros_syscall_sync(struct syscall *sysc)
 {
 	/* There is only one syscall in the syscall array when we want to do it
-	* synchronously */
+	 * synchronously */
 	__ros_arch_syscall((long)sysc, 1);
 	/* Don't proceed til we are done */
 	while (!(atomic_read(&sysc->flags) & SC_DONE))
 		ros_syscall_blockon(sysc);
-	/* Need to wait til it is unlocked.  It's not really done until SC_DONE &
-	 * !SC_K_LOCK. */
+	/* Need to wait til it is unlocked.  It's not really done until SC_DONE
+	 * & !SC_K_LOCK. */
 	while (atomic_read(&sysc->flags) & SC_K_LOCK)
 		cpu_relax();
 }
@@ -132,7 +137,7 @@ __ros_syscall_inline(unsigned int _num, long _a0, long _a1, long _a2, long _a3,
 	sysc.arg3 = _a3;
 	sysc.arg4 = _a4;
 	sysc.arg5 = _a5;
-    __ros_syscall_sync(&sysc);
+	__ros_syscall_sync(&sysc);
 	return sysc;
 }
 

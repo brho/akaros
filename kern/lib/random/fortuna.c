@@ -36,7 +36,6 @@
 #include <random/rijndael.h>
 #include <random/sha2.h>
 
-
 /*
  * Why Fortuna-like: There does not seem to be any definitive reference
  * on Fortuna in the net.  Instead this implementation is based on
@@ -83,31 +82,29 @@
  * In our case the minimal cycle time would be bit longer
  * than the system-randomness feeding frequency.
  */
-enum {
-	numPools = 23,
+enum { numPools = 23,
 
-	/* in microseconds */
-	reseedInterval = 100000, /* 0.1 sec */
+       /* in microseconds */
+       reseedInterval = 100000, /* 0.1 sec */
 
-	/* for one big request, reseed after this many bytes */
-	reseedBytes = (1024 * 1024),
+       /* for one big request, reseed after this many bytes */
+       reseedBytes = (1024 * 1024),
 
-	/*
+       /*
 	* Skip reseed if pool 0 has less than this many
 	* bytes added since last reseed.
 	*/
-	pool0Fill = (256 / 8),
+       pool0Fill = (256 / 8),
 
-	/*
+       /*
 	* Algorithm constants
 	*/
 
-	/* Both cipher key size and hash result size */
-	block = 32,
+       /* Both cipher key size and hash result size */
+       block = 32,
 
-	/* cipher block size */
-	ciphBlock = 16
-};
+       /* cipher block size */
+       ciphBlock = 16 };
 
 /* for internal wrappers */
 typedef SHA256Ctx mdCtx;
@@ -145,7 +142,10 @@ static void ciph_encrypt(ciphCtx *ctx, const uint8_t *in, uint8_t *out)
 	rijndael_encrypt(ctx, (const uint32_t *)in, (uint32_t *)out);
 }
 
-static void md_init(mdCtx *ctx) { SHA256_Init(ctx); }
+static void md_init(mdCtx *ctx)
+{
+	SHA256_Init(ctx);
+}
 
 static void md_update(mdCtx *ctx, const uint8_t *data, int len)
 {

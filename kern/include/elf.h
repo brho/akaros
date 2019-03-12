@@ -151,5 +151,4 @@ bool is_valid_elf(struct file_or_chan *f);
 int load_elf(struct proc *p, struct file_or_chan *f,
              int argc, char *argv[], int envc, char *envp[]);
 ssize_t get_startup_argc(struct proc *p);
-char *get_startup_argv(struct proc *p, size_t idx, char *argp,
-					   size_t max_size);
+char *get_startup_argv(struct proc *p, size_t idx, char *argp, size_t max_size);

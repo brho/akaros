@@ -12,31 +12,31 @@
 /* Macros for assertions.
  * They depend on <stdbool.h> and printk() to be included in the source file.
  */
-#define KT_ASSERT_M(message, test)                                               \
-	do {                                                                         \
-		if (!(test)) {                                                           \
-			extern char *kern_test_msg;                                          \
-			char prefix[] = "Assertion failed: ";                                \
-			int msg_size = sizeof(prefix) + sizeof(message) - 1;                 \
-			kern_test_msg = (char*) kmalloc(msg_size, 0);                        \
-			snprintf(kern_test_msg, msg_size, "%s%s", prefix, message);          \
-			return false;                                                        \
-		}                                                                        \
-	} while (0)
+#define KT_ASSERT_M(message, test)                                             \
+do {                                                                           \
+	if (!(test)) {                                                         \
+		extern char *kern_test_msg;                                    \
+		char prefix[] = "Assertion failed: ";                          \
+		int msg_size = sizeof(prefix) + sizeof(message) - 1;           \
+		kern_test_msg = (char*) kmalloc(msg_size, 0);                  \
+		snprintf(kern_test_msg, msg_size, "%s%s", prefix, message);    \
+		return false;                                                  \
+	}                                                                      \
+} while (0)
 
-#define KT_ASSERT(test)                                                          \
-	do {                                                                         \
-		if (!(test)) {                                                           \
-			return false;                                                        \
-		}                                                                        \
-	} while (0)
+#define KT_ASSERT(test)                                                        \
+do {                                                                           \
+	if (!(test)) {                                                         \
+		return false;                                                  \
+	}                                                                      \
+} while (0)
 
 
 /* Postboot kernel tests: tests ran after boot in kernel mode. */
 
 struct pb_kernel_test {
 	char name[256]; // Name of the test function.
-	bool (*func)(void); // Name of the test function, should be equal to 'name'.
+	bool (*func)(void); // Name of the test function, should be = to 'name'.
 	bool enabled; // Whether to run or not the test.
 };
 

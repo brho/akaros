@@ -46,9 +46,9 @@ int main(int argc, char *argv[])
 	}
 	printd("pipe [%d, %d]\n", talk[0], talk[1]);
 
-	/* parent will read and write on talk[0], and the child does the same for
-	 * talk[1].  internally, writing to talk 0 gets read on talk 1.  the child
-	 * gets talk1 mapped for both stdin (fd 0) and stdout (fd 1). */
+	/* parent will read and write on talk[0], and the child does the same
+	 * for talk[1].  internally, writing to talk 0 gets read on talk 1.  the
+	 * child gets talk1 mapped for both stdin (fd 0) and stdout (fd 1). */
 	childfdmap[0].parentfd = talk[1];
 	childfdmap[0].childfd = 0;
 	childfdmap[1].parentfd = talk[1];
@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 
 	sprintf(filename, "/bin/%s", argv[0]);
 	child_argv[0] = filename;
-	child_argv[1] = "1"; /* dummy arg, signal so we know they're the child */
+	child_argv[1] = "1"; /* dummy arg, signal so we know they're the child*/
 	child_argv[2] = 0;
 
 	kid = sys_proc_create(filename, strlen(filename), child_argv, NULL, 0);
@@ -71,9 +71,9 @@ int main(int argc, char *argv[])
 		exit(2);
 	}
 
-	/* close the pipe endpoint that we duped in the child.  it doesn't matter
-	 * for this test, but after the child exits, the pipe will still be open
-	 * unless we close our side of it. */
+	/* close the pipe endpoint that we duped in the child.  it doesn't
+	 * matter for this test, but after the child exits, the pipe will still
+	 * be open unless we close our side of it. */
 	close(talk[1]);
 
 	sys_proc_run(kid);

@@ -132,18 +132,17 @@ static inline bool spin_locked(spinlock_t *lock)
 static inline void __spin_lock_raw(volatile uint32_t *rlock)
 {
 	uint8_t dicks = 0;
-	asm volatile(
-			"1:                       "
-			"	cmpb $0, %0;          "
-			"	je 2f;                "
-			"	pause;                "
-			"	jmp 1b;               "
-			"2:                       "
-			"	movb $1, %1;          "
-			"	xchgb %1, %0;         "
-			"	cmpb $0, %1;          "
-			"	jne 1b;               "
-	        : : "m"(*rlock), "r"(dicks) : "cc");
+	asm volatile("1:                      "
+	             "	cmpb $0, %0;          "
+	             "	je 2f;                "
+	             "	pause;                "
+	             "	jmp 1b;               "
+	             "2:                      "
+	             "	movb $1, %1;          "
+	             "	xchgb %1, %0;         "
+	             "	cmpb $0, %1;          "
+	             "	jne 1b;               "
+	             : : "m"(*rlock), "r"(dicks) : "cc");
 	cmb();	/* need cmb(), the CPU mb() was handled by the xchg */
 }
 
@@ -154,8 +153,8 @@ static inline void __spin_lock(spinlock_t *lock)
 
 static inline bool __spin_trylock(spinlock_t *lock)
 {
-	/* since this is an or, we're not going to clobber the top bytes (if that
-	 * matters) */
+	/* since this is an or, we're not going to clobber the top bytes (if
+	 * that matters) */
 	return !__sync_fetch_and_or(&lock->rlock, 1);
 }
 

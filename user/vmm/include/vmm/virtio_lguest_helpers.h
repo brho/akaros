@@ -39,7 +39,7 @@ void virtio_add_used_desc(struct virtio_vq *vq, uint32_t head, uint32_t len);
 // and sizes of the buffers it describes to an iovec to make them easy to use.
 // Based on wait_for_vq_desc in Linux lguest.c
 uint32_t virtio_next_avail_vq_desc(struct virtio_vq *vq, struct iovec iov[],
-                            uint32_t *olen, uint32_t *ilen);
+				   uint32_t *olen, uint32_t *ilen);
 
 // After the driver tells us that a queue is ready for processing,
 // we use this to validate the addresses on the vring it gave us.

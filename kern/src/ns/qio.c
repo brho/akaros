@@ -69,19 +69,19 @@ struct queue {
 	struct block *bfirst;		/* buffer */
 	struct block *blast;
 
-	int dlen;					/* data bytes in queue */
-	int limit;					/* max bytes in queue */
-	int inilim;				/* initial limit */
+	int dlen;			/* data bytes in queue */
+	int limit;			/* max bytes in queue */
+	int inilim;			/* initial limit */
 	int state;
-	int eof;					/* number of eofs read by user */
+	int eof;			/* number of eofs read by user */
 	size_t bytes_read;
 
 	void (*kick) (void *);		/* restart output */
-	void (*bypass) (void *, struct block *);	/* bypass queue altogether */
-	void *arg;					/* argument to kick */
+	void (*bypass) (void *, struct block *); /* bypass queue altogether */
+	void *arg;			/* argument to kick */
 
-	struct rendez rr;			/* process waiting to read */
-	struct rendez wr;			/* process waiting to write */
+	struct rendez rr;		/* process waiting to read */
+	struct rendez wr;		/* process waiting to write */
 	qio_wake_cb_t wake_cb;		/* callbacks for qio wakeups */
 	void *wake_data;
 
@@ -91,11 +91,11 @@ struct queue {
 enum {
 	Maxatomic = 64 * 1024,
 	QIO_CAN_ERR_SLEEP = (1 << 0),	/* can throw errors or block/sleep */
-	QIO_LIMIT = (1 << 1),			/* respect q->limit */
-	QIO_DROP_OVERFLOW = (1 << 2),	/* alternative to setting qdropoverflow */
+	QIO_LIMIT = (1 << 1),		/* respect q->limit */
+	QIO_DROP_OVERFLOW = (1 << 2),	/* alternative to qdropoverflow */
 	QIO_JUST_ONE_BLOCK = (1 << 3),	/* when qbreading, just get one block */
-	QIO_NON_BLOCK = (1 << 4),		/* throw EAGAIN instead of blocking */
-	QIO_DONT_KICK = (1 << 5),		/* don't kick when waking */
+	QIO_NON_BLOCK = (1 << 4),	/* throw EAGAIN instead of blocking */
+	QIO_DONT_KICK = (1 << 5),	/* don't kick when waking */
 };
 
 unsigned int qiomaxatomic = Maxatomic;
@@ -251,7 +251,8 @@ struct block *copyblock(struct block *bp, int mem_flags)
 		ebd = &bp->extra_data[i];
 		if (!ebd->base || !ebd->len)
 			continue;
-		amt = copy_to_block_body(newb, (void*)ebd->base + ebd->off, ebd->len);
+		amt = copy_to_block_body(newb, (void*)ebd->base + ebd->off,
+					 ebd->len);
 		assert(amt == ebd->len);
 	}
 	block_copy_metadata(newb, bp);
@@ -290,20 +291,22 @@ struct block *pullupblock(struct block *bp, int n)
 	if (BHLEN(bp) >= n)
 		return bp;
 
-	/* If there's no chance, just bail out now.  This might be slightly wasteful
-	 * if there's a long blist that does have enough data. */
+	/* If there's no chance, just bail out now.  This might be slightly
+	 * wasteful if there's a long blist that does have enough data. */
 	if (n > blocklen(bp))
 		return 0;
 	/* a start at explicit main-body / header management */
 	if (bp->extra_len) {
 		if (n > bp->lim - bp->rp) {
-			/* would need to realloc a new block and copy everything over. */
+			/* would need to realloc a new block and copy everything
+			 * over. */
 			panic("can't pullup %d bytes, no place to put it: bp->lim %p, bp->rp %p, bp->lim-bp->rp %d\n",
-					n, bp->lim, bp->rp, bp->lim-bp->rp);
+			      n, bp->lim, bp->rp, bp->lim-bp->rp);
 		}
 		len = n - BHLEN(bp);
-		/* Would need to recursively call this, or otherwise pull from later
-		 * blocks and put chunks of their data into the block we're building. */
+		/* Would need to recursively call this, or otherwise pull from
+		 * later blocks and put chunks of their data into the block
+		 * we're building. */
 		if (len > bp->extra_len)
 			panic("pullup more than extra (%d, %d, %d)\n",
 			      n, BHLEN(bp), bp->extra_len);
@@ -555,7 +558,8 @@ struct block *adjustblock(struct block *bp, int len)
 		}
 		/* Grow with extra data buffers. */
 		buf = kzmalloc(len - BLEN(bp), MEM_WAIT);
-		block_append_extra(bp, (uintptr_t)buf, 0, len - BLEN(bp), MEM_WAIT);
+		block_append_extra(bp, (uintptr_t)buf, 0, len - BLEN(bp),
+				   MEM_WAIT);
 		QDEBUG checkb(bp, "adjustblock 3");
 		return bp;
 	}
@@ -656,8 +660,9 @@ static size_t copy_from_first_block(struct queue *q, struct block *to,
 	if (copy_amt) {
 		copy_amt = copy_to_block_body(to, from->rp, copy_amt);
 		from->rp += copy_amt;
-		/* We only change dlen, (data len), not q->len, since the q still has
-		 * the same block memory allocation (no kfrees happened) */
+		/* We only change dlen, (data len), not q->len, since the q
+		 * still has the same block memory allocation (no kfrees
+		 * happened) */
 		q->dlen -= copy_amt;
 		q->bytes_read += copy_amt;
 	}
@@ -670,12 +675,15 @@ static size_t copy_from_first_block(struct queue *q, struct block *to,
 		if (len >= ebd->len) {
 			amt = move_ebd(ebd, to, from, q);
 			if (!amt) {
-				/* our internal alloc could have failed.   this ebd is now the
-				 * last one we'll consider.  let's handle it separately and put
-				 * it in the main body. */
+				/* our internal alloc could have failed.   this
+				 * ebd is now the last one we'll consider.
+				 * let's handle it separately and put it in the
+				 * main body. */
 				if (copy_amt)
 					return copy_amt;
-				copy_amt = copy_to_block_body(to, (void*)ebd->base + ebd->off,
+				copy_amt = copy_to_block_body(to,
+							      (void*)ebd->base +
+							      ebd->off,
 				                              ebd->len);
 				block_and_q_lost_extra(from, q, copy_amt);
 				break;
@@ -684,12 +692,12 @@ static size_t copy_from_first_block(struct queue *q, struct block *to,
 			copy_amt += amt;
 			continue;
 		} else {
-			/* If we're here, we reached our final ebd, which we'll need to
-			 * split to get anything from it. */
+			/* If we're here, we reached our final ebd, which we'll
+			 * need to split to get anything from it. */
 			if (copy_amt)
 				return copy_amt;
-			copy_amt = copy_to_block_body(to, (void*)ebd->base + ebd->off,
-			                              len);
+			copy_amt = copy_to_block_body(to, (void*)ebd->base +
+						      ebd->off, len);
 			ebd->off += copy_amt;
 			ebd->len -= copy_amt;
 			block_and_q_lost_extra(from, q, copy_amt);
@@ -736,11 +744,12 @@ static int __try_qbread(struct queue *q, size_t len, int qio_flags,
 			return QBR_FAIL;
 		}
 	}
-	/* We need to check before adjusting q->len.  We're checking the writer's
-	 * sleep condition / tap condition.  When set, we *might* be making an edge
-	 * transition (from unwritable to writable), which needs to wake and fire
-	 * taps.  But, our read might not drain the queue below q->lim.  We'll check
-	 * again later to see if we should really wake them.  */
+	/* We need to check before adjusting q->len.  We're checking the
+	 * writer's sleep condition / tap condition.  When set, we *might* be
+	 * making an edge transition (from unwritable to writable), which needs
+	 * to wake and fire taps.  But, our read might not drain the queue below
+	 * q->lim.  We'll check again later to see if we should really wake
+	 * them.  */
 	was_unwritable = !qwritable(q);
 	blen = BLEN(first);
 	if ((q->state & Qcoalesce) && (blen == 0)) {
@@ -749,20 +758,22 @@ static int __try_qbread(struct queue *q, size_t len, int qio_flags,
 		/* Need to retry to make sure we have a first block */
 		return QBR_AGAIN;
 	}
-	/* Qmsg: just return the first block.  Be careful, since our caller might
-	 * not read all of the block and thus drop bytes.  Similar to SOCK_DGRAM. */
+	/* Qmsg: just return the first block.  Be careful, since our caller
+	 * might not read all of the block and thus drop bytes.  Similar to
+	 * SOCK_DGRAM. */
 	if (q->state & Qmsg) {
 		ret = pop_first_block(q);
 		goto out_ok;
 	}
-	/* Let's get at least something first - makes the code easier.  This way,
-	 * we'll only ever split the block once. */
+	/* Let's get at least something first - makes the code easier.  This
+	 * way, we'll only ever split the block once. */
 	if (blen <= len) {
 		ret = pop_first_block(q);
 		len -= blen;
 	} else {
-		/* need to split the block.  we won't actually take the first block out
-		 * of the queue - we're just extracting a little bit. */
+		/* need to split the block.  we won't actually take the first
+		 * block out of the queue - we're just extracting a little bit.
+		 */
 		if (!spare) {
 			/* We have nothing and need a spare block.  Retry! */
 			spin_unlock_irqsave(&q->lock);
@@ -772,8 +783,8 @@ static int __try_qbread(struct queue *q, size_t len, int qio_flags,
 		ret = spare;
 		goto out_ok;
 	}
-	/* At this point, we just grabbed the first block.  We can try to grab some
-	 * more, up to len (if they want). */
+	/* At this point, we just grabbed the first block.  We can try to grab
+	 * some more, up to len (if they want). */
 	if (qio_flags & QIO_JUST_ONE_BLOCK)
 		goto out_ok;
 	ret_last = ret;
@@ -785,11 +796,12 @@ static int __try_qbread(struct queue *q, size_t len, int qio_flags,
 			continue;
 		}
 		if (blen > len) {
-			/* We could try to split the block, but that's a huge pain.  For
-			 * instance, we might need to move the main body of b into an
-			 * extra_data of ret_last.  lots of ways for that to fail, and lots
-			 * of cases to consider.  Easier to just bail out.  This is why I
-			 * did the first block above: we don't need to worry about this. */
+			/* We could try to split the block, but that's a huge
+			 * pain.  For instance, we might need to move the main
+			 * body of b into an extra_data of ret_last.  lots of
+			 * ways for that to fail, and lots of cases to consider.
+			 * Easier to just bail out.  This is why I did the first
+			 * block above: we don't need to worry about this. */
 			 break;
 		}
 		ret_last->next = pop_first_block(q);
@@ -842,24 +854,28 @@ static struct block *__qbread(struct queue *q, size_t len, int qio_flags,
 			goto out_ret;
 		case QBR_SPARE:
 			assert(!spare);
-			/* Due to some nastiness, we need a fresh block so we can read out
-			 * anything from the queue.  'len' seems like a reasonable amount.
-			 * Maybe we can get away with less. */
+			/* Due to some nastiness, we need a fresh block so we
+			 * can read out anything from the queue.  'len' seems
+			 * like a reasonable amount.  Maybe we can get away with
+			 * less. */
 			spare = block_alloc(len, mem_flags);
 			if (!spare) {
-				/* Careful here: a memory failure (possible with MEM_ATOMIC)
-				 * could look like 'no data in the queue' (QBR_FAIL).  The only
-				 * one who does is this qget(), who happens to know that we
-				 * won't need a spare, due to the len argument.  Spares are only
-				 * needed when we need to split a block. */
+				/* Careful here: a memory failure (possible with
+				 * MEM_ATOMIC) could look like 'no data in the
+				 * queue' (QBR_FAIL).  The only one who does is
+				 * this qget(), who happens to know that we
+				 * won't need a spare, due to the len argument.
+				 * Spares are only needed when we need to split
+				 * a block. */
 				ret = 0;
 				goto out_ret;
 			}
 			break;
 		case QBR_AGAIN:
-			/* if the first block is 0 and we are Qcoalesce, then we'll need to
-			 * try again.  We bounce out of __try so we can perform the "is
-			 * there a block" logic again from the top. */
+			/* if the first block is 0 and we are Qcoalesce, then
+			 * we'll need to try again.  We bounce out of __try so
+			 * we can perform the "is there a block" logic again
+			 * from the top. */
 			break;
 		}
 	}
@@ -893,8 +909,8 @@ size_t qdiscard(struct queue *q, size_t len)
 	size_t removed_amt;
 	size_t sofar = 0;
 
-	/* This is racy.  There could be multiple qdiscarders or other consumers,
-	 * where the consumption could be interleaved. */
+	/* This is racy.  There could be multiple qdiscarders or other
+	 * consumers, where the consumption could be interleaved. */
 	while (qlen(q) && len) {
 		blist = __qbread(q, len, QIO_DONT_KICK, MEM_WAIT);
 		removed_amt = freeblist(blist);
@@ -1006,22 +1022,24 @@ static int __blist_clone_to(struct block *blist, struct block *newb, int len,
 	uint8_t *first_main_body = 0;
 	ssize_t sofar = 0;
 
-	/* find the first block; keep offset relative to the latest b in the list */
+	/* find the first block; keep offset relative to the latest b in the
+	 * list */
 	for (b = blist; b; b = b->next) {
 		if (BLEN(b) > offset)
 			break;
 		offset -= BLEN(b);
 	}
-	/* qcopy semantics: if you asked for an offset outside the block list, you
-	 * get an empty block back */
+	/* qcopy semantics: if you asked for an offset outside the block list,
+	 * you get an empty block back */
 	if (!b)
 		return 0;
 	first = b;
-	sofar -= offset;	/* don't count the remaining offset in the first b */
+	sofar -= offset; /* don't count the remaining offset in the first b */
 	/* upper bound for how many buffers we'll need in newb */
 	for (/* b is set*/; b; b = b->next) {
 		nr_bufs += BHLEN(b) ? 1 : 0;
-		nr_bufs += b->nr_extra_bufs; /* still assuming nr_extra == nr_valid */
+		/* still assuming nr_extra == nr_valid */
+		nr_bufs += b->nr_extra_bufs;
 		sofar += BLEN(b);
 		if (sofar > len)
 			break;
@@ -1036,33 +1054,39 @@ static int __blist_clone_to(struct block *blist, struct block *newb, int len,
 		if (offset) {
 			if (offset < BHLEN(b)) {
 				/* off is in the main body */
-				len -= point_to_body(b, b->rp + offset, newb, newb_idx, len);
+				len -= point_to_body(b, b->rp + offset, newb,
+						     newb_idx, len);
 				newb_idx++;
 			} else {
-				/* off is in one of the buffers (or just past the last one).
-				 * we're not going to point to b's main body at all. */
+				/* off is in one of the buffers (or just past
+				 * the last one).  we're not going to point to
+				 * b's main body at all. */
 				offset -= BHLEN(b);
 				assert(b->extra_data);
-				/* assuming these extrabufs are packed, or at least that len
-				 * isn't gibberish */
+				/* assuming these extrabufs are packed, or at
+				 * least that len isn't gibberish */
 				while (b->extra_data[b_idx].len <= offset) {
 					offset -= b->extra_data[b_idx].len;
 					b_idx++;
 				}
-				/* now offset is set to our offset in the b_idx'th buf */
-				len -= point_to_buf(b, b_idx, offset, newb, newb_idx, len);
+				/* now offset is set to our offset in the
+				 * b_idx'th buf */
+				len -= point_to_buf(b, b_idx, offset, newb,
+						    newb_idx, len);
 				newb_idx++;
 				b_idx++;
 			}
 			offset = 0;
 		} else {
 			if (BHLEN(b)) {
-				len -= point_to_body(b, b->rp, newb, newb_idx, len);
+				len -= point_to_body(b, b->rp, newb, newb_idx,
+						     len);
 				newb_idx++;
 			}
 		}
-		/* knock out all remaining bufs.  we only did one point_to_ op by now,
-		 * and any point_to_ could be our last if it consumed all of len. */
+		/* knock out all remaining bufs.  we only did one point_to_ op
+		 * by now, and any point_to_ could be our last if it consumed
+		 * all of len. */
 		for (int i = b_idx; (i < b->nr_extra_bufs) && len; i++) {
 			len -= point_to_buf(b, i, 0, newb, newb_idx, len);
 			newb_idx++;
@@ -1076,6 +1100,7 @@ struct block *blist_clone(struct block *blist, int header_len, int len,
 {
 	int ret;
 	struct block *newb = block_alloc(header_len, MEM_WAIT);
+
 	do {
 		ret = __blist_clone_to(blist, newb, len, offset);
 		if (ret)
@@ -1095,7 +1120,7 @@ struct block *qclone(struct queue *q, int header_len, int len, uint32_t offset)
 	/* the while loop should rarely be used: it would require someone
 	 * concurrently adding to the queue. */
 	do {
-		/* TODO: RCU: protecting the q list (b->next) (need read lock) */
+		/* TODO: RCU protect the q list (b->next) (need read lock) */
 		spin_lock_irqsave(&q->lock);
 		ret = __blist_clone_to(q->bfirst, newb, len, offset);
 		spin_unlock_irqsave(&q->lock);
@@ -1230,7 +1255,8 @@ static bool qwait_and_ilock(struct queue *q, int qio_flags)
 		if (q->state & Qclosed) {
 			if (++q->eof > 3) {
 				spin_unlock_irqsave(&q->lock);
-				error(EPIPE, "multiple reads on a closed queue");
+				error(EPIPE,
+				      "multiple reads on a closed queue");
 			}
 			if (q->err[0]) {
 				spin_unlock_irqsave(&q->lock);
@@ -1243,18 +1269,20 @@ static bool qwait_and_ilock(struct queue *q, int qio_flags)
 			error(EAGAIN, "queue empty");
 		}
 		spin_unlock_irqsave(&q->lock);
-		/* As with the producer side, we check for a condition while holding the
-		 * q->lock, decide to sleep, then unlock.  It's like the "check, signal,
-		 * check again" pattern, but we do it conditionally.  Both sides agree
-		 * synchronously to do it, and those decisions are made while holding
-		 * q->lock.  I think this is OK.
+		/* As with the producer side, we check for a condition while
+		 * holding the q->lock, decide to sleep, then unlock.  It's like
+		 * the "check, signal, check again" pattern, but we do it
+		 * conditionally.  Both sides agree synchronously to do it, and
+		 * those decisions are made while holding q->lock.  I think this
+		 * is OK.
 		 *
-		 * The invariant is that no reader sleeps when the queue has data.
-		 * While holding the rendez lock, if we see there's no data, we'll
-		 * sleep.  Since we saw there was no data, the next writer will see (or
-		 * already saw) no data, and then the writer decides to rendez_wake,
-		 * which will grab the rendez lock.  If the writer already did that,
-		 * then we'll see notempty when we do our check-again. */
+		 * The invariant is that no reader sleeps when the queue has
+		 * data.  While holding the rendez lock, if we see there's no
+		 * data, we'll sleep.  Since we saw there was no data, the next
+		 * writer will see (or already saw) no data, and then the writer
+		 * decides to rendez_wake, which will grab the rendez lock.  If
+		 * the writer already did that, then we'll see notempty when we
+		 * do our check-again. */
 		rendez_sleep(&q->rr, notempty, q);
 	}
 }
@@ -1292,20 +1320,21 @@ static size_t read_from_block(struct block *b, uint8_t *to, size_t amt)
 	retval += copy_amt;
 	for (int i = 0; (i < b->nr_extra_bufs) && amt; i++) {
 		ebd = &b->extra_data[i];
-		/* skip empty entires.  if we track this in the struct block, we can
-		 * just start the for loop early */
+		/* skip empty entires.  if we track this in the struct block, we
+		 * can just start the for loop early */
 		if (!ebd->base || !ebd->len)
 			continue;
 		copy_amt = MIN(ebd->len, amt);
 		memcpy(to, (void*)(ebd->base + ebd->off), copy_amt);
-		/* we're actually consuming the entries, just like how we advance rp up
-		 * above, and might only consume part of one. */
+		/* we're actually consuming the entries, just like how we
+		 * advance rp up above, and might only consume part of one. */
 		ebd->len -= copy_amt;
 		ebd->off += copy_amt;
 		b->extra_len -= copy_amt;
 		if (!ebd->len) {
-			/* we don't actually have to decref here.  it's also done in
-			 * freeb().  this is the earliest we can free. */
+			/* we don't actually have to decref here.  it's also
+			 * done in freeb().  this is the earliest we can free.
+			 */
 			kfree((void*)ebd->base);
 			ebd->base = ebd->off = 0;
 		}
@@ -1419,7 +1448,8 @@ void qputback(struct queue *q, struct block *b)
  */
 struct block *qbread(struct queue *q, size_t len)
 {
-	return __qbread(q, len, QIO_JUST_ONE_BLOCK | QIO_CAN_ERR_SLEEP, MEM_WAIT);
+	return __qbread(q, len, QIO_JUST_ONE_BLOCK | QIO_CAN_ERR_SLEEP,
+			MEM_WAIT);
 }
 
 struct block *qbread_nonblock(struct queue *q, size_t len)
@@ -1440,8 +1470,8 @@ size_t qread(struct queue *q, void *va, size_t len)
 
 size_t qread_nonblock(struct queue *q, void *va, size_t len)
 {
-	struct block *blist = __qbread(q, len, QIO_CAN_ERR_SLEEP | QIO_NON_BLOCK,
-	                               MEM_WAIT);
+	struct block *blist = __qbread(q, len, QIO_CAN_ERR_SLEEP |
+				       QIO_NON_BLOCK, MEM_WAIT);
 
 	if (!blist)
 		return 0;
@@ -1502,14 +1532,16 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int qio_flags)
 	}
 	if ((qio_flags & QIO_LIMIT) && (q->dlen >= q->limit)) {
 		/* drop overflow takes priority over regular non-blocking */
-		if ((qio_flags & QIO_DROP_OVERFLOW) || (q->state & Qdropoverflow)) {
+		if ((qio_flags & QIO_DROP_OVERFLOW)
+		    || (q->state & Qdropoverflow)) {
 			spin_unlock_irqsave(&q->lock);
 			freeb(b);
 			return -1;
 		}
-		/* People shouldn't set NON_BLOCK without CAN_ERR, but we can be nice
-		 * and catch it. */
-		if ((qio_flags & QIO_CAN_ERR_SLEEP) && (qio_flags & QIO_NON_BLOCK)) {
+		/* People shouldn't set NON_BLOCK without CAN_ERR, but we can be
+		 * nice and catch it. */
+		if ((qio_flags & QIO_CAN_ERR_SLEEP)
+		    && (qio_flags & QIO_NON_BLOCK)) {
 			spin_unlock_irqsave(&q->lock);
 			freeb(b);
 			error(EAGAIN, "queue full");
@@ -1519,15 +1551,17 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int qio_flags)
 	QDEBUG checkb(b, "__qbwrite");
 	spin_unlock_irqsave(&q->lock);
 	/* TODO: not sure if the usage of a kick is mutually exclusive with a
-	 * wakeup, meaning that actual users either want a kick or have qreaders. */
+	 * wakeup, meaning that actual users either want a kick or have
+	 * qreaders. */
 	if (q->kick && (was_unreadable || (q->state & Qkick)))
 		q->kick(q->arg);
 	if (was_unreadable) {
-		/* Unlike the read side, there's no double-check to make sure the queue
-		 * transitioned across an edge.  We know we added something, so that's
-		 * enough.  We wake if the queue was empty.  Both sides are the same, in
-		 * that the condition for which we do the rendez_wakeup() is the same as
-		 * the condition done for the rendez_sleep(). */
+		/* Unlike the read side, there's no double-check to make sure
+		 * the queue transitioned across an edge.  We know we added
+		 * something, so that's enough.  We wake if the queue was empty.
+		 * Both sides are the same, in that the condition for which we
+		 * do the rendez_wakeup() is the same as the condition done for
+		 * the rendez_sleep(). */
 		rendez_wakeup(&q->rr);
 		qwake_cb(q, FDTAP_FILT_READABLE);
 	}
@@ -1545,26 +1579,27 @@ static ssize_t __qbwrite(struct queue *q, struct block *b, int qio_flags)
 	 */
 	if ((qio_flags & QIO_CAN_ERR_SLEEP) &&
 	    !(q->state & Qdropoverflow) && !(qio_flags & QIO_NON_BLOCK)) {
-		/* This is a racy peek at the q status.  If we accidentally block, our
-		 * rendez will return.  The rendez's peak (qwriter_should_wake) is also
-		 * racy w.r.t.  the q's spinlock (that lock protects writes, but not
-		 * reads).
+		/* This is a racy peek at the q status.  If we accidentally
+		 * block, our rendez will return.  The rendez's peak
+		 * (qwriter_should_wake) is also racy w.r.t.  the q's spinlock
+		 * (that lock protects writes, but not reads).
 		 *
-		 * Here's the deal: when holding the rendez lock, if we see the sleep
-		 * condition, the consumer will wake us.  The condition will only ever
-		 * be changed by the next qbread() (consumer, changes q->dlen).  That
-		 * code will do a rendez wake, which will spin on the rendez lock,
-		 * meaning it won't procede until we either see the new state (and
-		 * return) or put ourselves on the rendez, and wake up.
+		 * Here's the deal: when holding the rendez lock, if we see the
+		 * sleep condition, the consumer will wake us.  The condition
+		 * will only ever be changed by the next qbread() (consumer,
+		 * changes q->dlen).  That code will do a rendez wake, which
+		 * will spin on the rendez lock, meaning it won't procede until
+		 * we either see the new state (and return) or put ourselves on
+		 * the rendez, and wake up.
 		 *
-		 * The pattern is one side writes mem, then signals.  Our side checks
-		 * the signal, then reads the mem.  The goal is to not miss seeing the
-		 * signal AND missing the memory write.  In this specific case, the
-		 * signal is actually synchronous (the rendez lock) and not basic shared
-		 * memory.
+		 * The pattern is one side writes mem, then signals.  Our side
+		 * checks the signal, then reads the mem.  The goal is to not
+		 * miss seeing the signal AND missing the memory write.  In this
+		 * specific case, the signal is actually synchronous (the rendez
+		 * lock) and not basic shared memory.
 		 *
-		 * Oh, and we spin in case we woke early and someone else filled the
-		 * queue, mesa-style. */
+		 * Oh, and we spin in case we woke early and someone else filled
+		 * the queue, mesa-style. */
 		while (!qwriter_should_wake(q))
 			rendez_sleep(&q->wr, qwriter_should_wake, q);
 	}
@@ -1596,9 +1631,9 @@ static struct block *build_block(void *from, size_t len, int mem_flags)
 	struct block *b;
 	void *ext_buf;
 
-	/* If len is small, we don't need to bother with the extra_data.  But until
-	 * the whole stack can handle extd blocks, we'll use them unconditionally.
-	 * */
+	/* If len is small, we don't need to bother with the extra_data.  But
+	 * until the whole stack can handle extd blocks, we'll use them
+	 * unconditionally.  */
 #ifdef CONFIG_BLOCK_EXTRAS
 	/* allocb builds in 128 bytes of header space to all blocks, but this is
 	 * only available via padblock (to the left).  we also need some space
@@ -1642,18 +1677,20 @@ static ssize_t __qwrite(struct queue *q, void *vp, size_t len, int mem_flags,
 	uint8_t *p = vp;
 	void *ext_buf;
 
-	/* Only some callers can throw.  Others might be in a context where waserror
-	 * isn't safe. */
+	/* Only some callers can throw.  Others might be in a context where
+	 * waserror isn't safe. */
 	if ((qio_flags & QIO_CAN_ERR_SLEEP) && waserror()) {
-		/* Any error (EAGAIN for nonblock, syscall aborted, even EPIPE) after
-		 * some data has been sent should be treated as a partial write. */
+		/* Any error (EAGAIN for nonblock, syscall aborted, even EPIPE)
+		 * after some data has been sent should be treated as a partial
+		 * write. */
 		if (sofar)
 			goto out_ok;
 		nexterror();
 	}
 	do {
 		n = len - sofar;
-		/* This is 64K, the max amount per single block.  Still a good value? */
+		/* This is 64K, the max amount per single block.  Still a good
+		 * value? */
 		if (n > Maxatomic)
 			n = Maxatomic;
 		b = build_block(p + sofar, n, mem_flags);

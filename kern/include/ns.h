@@ -44,14 +44,14 @@
  * functions (possibly) linked in, complete, from libc.
  */
 enum {
-	UTFmax = 4,					/* maximum bytes per rune */
-	Runesync = 0x80,	/* cannot represent part of a UTF sequence (<) */
+	UTFmax = 4,		/* maximum bytes per rune */
+	Runesync = 0x80, /* cannot represent part of a UTF sequence (<) */
 	Runeself = 0x80,	/* rune and UTF sequences are the same (<) */
 	Runeerror = 0xFFFD,	/* decoding error in UTF */
 	Runemax = 0x10FFFF,	/* 21-bit rune */
 	Runemask = 0x1FFFFF,	/* bits used by runes (see grep) */
-	NUMSIZE32 = 10,	/* max size of formatted 32 bit number (hex or decimal) */
-	NUMSIZE64 = 20,	/* max size of formatted 64 bit number (hex or decimal) */
+	NUMSIZE32 = 10,	/* max size of formatted 32 bit number (hex or deci) */
+	NUMSIZE64 = 20,	/* max size of formatted 64 bit number (hex or deci) */
 };
 
 /*
@@ -67,7 +67,6 @@ extern double pow10(int);
  * one-of-a-kind
  */
 extern char *cleanname(char *unused_char_p_t);
-//extern    uint32_t    getcallerpc(void*);
 static inline uint32_t getcallerpc(void *v)
 {
 	return 0;
@@ -106,8 +105,8 @@ extern int parseether(uint8_t * unused_uint8_p_t, char *unused_char_p_t);
 #define	NRSTR	3	/* restore saved state */
 
 #define	STATMAX	65535U	/* max length of machine-independent stat structure */
-#define	ERRMAX			128	/* max length of error string */
-#define	KNAMELEN		28	/* max length of name held in kernel */
+#define	ERRMAX		128	/* max length of error string */
+#define	KNAMELEN	28	/* max length of name held in kernel */
 
 /* bits in Qid.type */
 #define QTDIR		0x80	/* type bit for directories */
@@ -143,32 +142,32 @@ static inline bool qid_is_file(struct qid q)
 
 struct dir {
 	/* system-modified data */
-	uint16_t type;				/* server type */
-	uint32_t dev;			/* server subtype */
+	uint16_t type;		/* server type */
+	uint32_t dev;		/* server subtype */
 	/* file data */
-	struct qid qid;				/* unique id from server */
-	uint32_t mode;				/* permissions */
+	struct qid qid;		/* unique id from server */
+	uint32_t mode;		/* permissions */
 	/* 9p stat has u32 atime (seconds) here */
 	/* 9p stat has u32 mtime (seconds) here */
-	uint64_t length;			/* file length: see <u.h> */
-	char *name;					/* last element of path */
-	char *uid;					/* owner name */
-	char *gid;					/* group name */
-	char *muid;					/* last modifier name */
-	char *ext;					/* extensions for special files (symlinks) */
-	uint32_t n_uid;				/* numeric owner uid */
-	uint32_t n_gid;				/* numeric group id */
-	uint32_t n_muid;			/* numeric last modifier id */
-	struct timespec atime;		/* last access time */
-	struct timespec btime;		/* file creation time */
-	struct timespec ctime;		/* last attribute change time */
-	struct timespec mtime;		/* last data modification time */
+	uint64_t length;	/* file length: see <u.h> */
+	char *name;		/* last element of path */
+	char *uid;		/* owner name */
+	char *gid;		/* group name */
+	char *muid;		/* last modifier name */
+	char *ext;		/* extensions for special files (symlinks) */
+	uint32_t n_uid;		/* numeric owner uid */
+	uint32_t n_gid;		/* numeric group id */
+	uint32_t n_muid;	/* numeric last modifier id */
+	struct timespec atime;	/* last access time */
+	struct timespec btime;	/* file creation time */
+	struct timespec ctime;	/* last attribute change time */
+	struct timespec mtime;	/* last data modification time */
 };
 
 struct waitmsg {
-	int pid;					/* of loved one */
-	uint32_t time[3];			/* of loved one and descendants */
-	char msg[ERRMAX];			/* actually variable-size in user mode */
+	int pid;		/* of loved one */
+	uint32_t time[3];	/* of loved one and descendants */
+	char msg[ERRMAX];	/* actually variable-size in user mode */
 };
 
 #define	VERSION9P	"9P2000"
@@ -182,69 +181,69 @@ typedef
 	uint16_t tag;
 	/* union { */
 	/* struct { */
-	uint32_t msize;				/* Tversion, Rversion */
-	char *version;				/* Tversion, Rversion */
+	uint32_t msize;			/* Tversion, Rversion */
+	char *version;			/* Tversion, Rversion */
 	/* }; */
 	/* struct { */
-	uint16_t oldtag;			/* Tflush */
+	uint16_t oldtag;		/* Tflush */
 	/* }; */
 	/* struct { */
-	char *ename;				/* Rerror */
+	char *ename;			/* Rerror */
 	/* }; */
 	/* struct { */
-	struct qid qid;				/* Rattach, Ropen, Rcreate */
-	uint32_t iounit;			/* Ropen, Rcreate */
+	struct qid qid;			/* Rattach, Ropen, Rcreate */
+	uint32_t iounit;		/* Ropen, Rcreate */
 	/* }; */
 	/* struct { */
-	struct qid aqid;			/* Rauth */
+	struct qid aqid;		/* Rauth */
 	/* }; */
 	/* struct { */
-	uint32_t afid;				/* Tauth, Tattach */
-	char *uname;				/* Tauth, Tattach */
-	char *aname;				/* Tauth, Tattach */
+	uint32_t afid;			/* Tauth, Tattach */
+	char *uname;			/* Tauth, Tattach */
+	char *aname;			/* Tauth, Tattach */
 	/* }; */
 	/* struct { */
-	uint32_t perm;				/* Tcreate */
-	char *name;					/* Tcreate */
-	uint8_t mode;				/* Tcreate, Topen */
+	uint32_t perm;			/* Tcreate */
+	char *name;			/* Tcreate */
+	uint8_t mode;			/* Tcreate, Topen */
 	/* }; */
 	/* struct { */
-	uint32_t newfid;			/* Twalk */
-	uint16_t nwname;			/* Twalk */
+	uint32_t newfid;		/* Twalk */
+	uint16_t nwname;		/* Twalk */
 	char *wname[MAXWELEM];		/* Twalk */
 	/* }; */
 	/* struct { */
-	uint16_t nwqid;				/* Rwalk */
+	uint16_t nwqid;			/* Rwalk */
 	struct qid wqid[MAXWELEM];	/* Rwalk */
 	/* }; */
 	/* struct { */
-	int64_t offset;				/* Tread, Twrite */
-	uint32_t count;				/* Tread, Twrite, Rread */
-	char *data;					/* Twrite, Rread */
+	int64_t offset;			/* Tread, Twrite */
+	uint32_t count;			/* Tread, Twrite, Rread */
+	char *data;			/* Twrite, Rread */
 	/* }; */
 	/* struct { */
-	uint16_t nstat;				/* Twstat, Rstat */
-	uint8_t *stat;				/* Twstat, Rstat */
+	uint16_t nstat;			/* Twstat, Rstat */
+	uint8_t *stat;			/* Twstat, Rstat */
 	/* }; */
 	/* }; */
 } fcall;
 
-#define	GBIT8(p)	((p)[0])
-#define	GBIT16(p)	((p)[0]|((p)[1]<<8))
-#define	GBIT32(p)	((uint32_t)((p)[0]|((p)[1]<<8)|((p)[2]<<16)|((p)[3]<<24)))
-#define	GBIT64(p)	((uint32_t)((p)[0]|((p)[1]<<8)|((p)[2]<<16)|((p)[3]<<24)) |\
-				((int64_t)((p)[4]|((p)[5]<<8)|((p)[6]<<16)|((p)[7]<<24)) << 32))
+#define	GBIT8(p)  ((p)[0])
+#define	GBIT16(p) ((p)[0]|((p)[1]<<8))
+#define	GBIT32(p) ((uint32_t)((p)[0]|((p)[1]<<8)|((p)[2]<<16)|((p)[3]<<24)))
+#define	GBIT64(p) ((uint32_t)((p)[0]|((p)[1]<<8)|((p)[2]<<16)|((p)[3]<<24)) |\
+	((int64_t)((p)[4]|((p)[5]<<8)|((p)[6]<<16)|((p)[7]<<24)) << 32))
 
-#define	PBIT8(p,v)	(p)[0]=(v)
-#define	PBIT16(p,v)	(p)[0]=(v);(p)[1]=(v)>>8
-#define	PBIT32(p,v)	(p)[0]=(v);(p)[1]=(v)>>8;(p)[2]=(v)>>16;(p)[3]=(v)>>24
-#define	PBIT64(p,v)	(p)[0]=(v);(p)[1]=(v)>>8;(p)[2]=(v)>>16;(p)[3]=(v)>>24;\
-			(p)[4]=(v)>>32;(p)[5]=(v)>>40;(p)[6]=(v)>>48;(p)[7]=(v)>>56
+#define	PBIT8(p,v)  (p)[0]=(v)
+#define	PBIT16(p,v) (p)[0]=(v);(p)[1]=(v)>>8
+#define	PBIT32(p,v) (p)[0]=(v);(p)[1]=(v)>>8;(p)[2]=(v)>>16;(p)[3]=(v)>>24
+#define	PBIT64(p,v) (p)[0]=(v);(p)[1]=(v)>>8;(p)[2]=(v)>>16;(p)[3]=(v)>>24;\
+		(p)[4]=(v)>>32;(p)[5]=(v)>>40;(p)[6]=(v)>>48;(p)[7]=(v)>>56
 
-#define	BIT8SZ		1
-#define	BIT16SZ		2
-#define	BIT32SZ		4
-#define	BIT64SZ		8
+#define	BIT8SZ	1
+#define	BIT16SZ	2
+#define	BIT32SZ	4
+#define	BIT64SZ	8
 #define	QIDSZ	(BIT8SZ+BIT32SZ+BIT64SZ)
 
 /* The 9p STATFIXLENs include the leading 16-bit count.  The count, however,
@@ -293,7 +292,7 @@ typedef
 
 #define	NOTAG		(uint16_t)~0U	/* Dummy tag */
 #define	NOFID		(uint32_t)~0U	/* Dummy fid */
-#define	IOHDRSZ		24	/* ample room for Twrite/Rread header (iounit) */
+#define	IOHDRSZ		24 /* ample room for Twrite/Rread header (iounit) */
 
 enum {
 	Tversion = 100,
@@ -329,17 +328,17 @@ enum {
 
 void init_empty_dir(struct dir *d);
 unsigned int convM2S(uint8_t * unused_uint8_p_t, unsigned int unused_int,
-					 struct fcall *);
+		     struct fcall *);
 unsigned int convS2M(struct fcall *, uint8_t * unused_uint8_p_t, unsigned int);
 unsigned int sizeS2M(struct fcall *);
 
 unsigned int convM2kdirent(uint8_t * buf, unsigned int nbuf, struct kdirent *kd,
-						   char *strs);
+			   char *strs);
 unsigned int convM2kstat(uint8_t * buf, unsigned int nbuf, struct kstat *ks);
 
 void statcheck(uint8_t *buf, size_t nbuf);
 unsigned int convM2D(uint8_t * unused_uint8_p_t, unsigned int unused_int,
-					 struct dir *, char *unused_char_p_t);
+		     struct dir *, char *unused_char_p_t);
 unsigned int convD2M(struct dir *, uint8_t * unused_uint8_p_t, unsigned int);
 unsigned int sizeD2M(struct dir *);
 
@@ -378,14 +377,14 @@ struct alarms {
  * Access types in namec & channel flags
  */
 enum {
-	Aaccess,					/* as in stat, wstat */
-	Abind,						/* for left-hand-side of bind */
-	Atodir,						/* as in chdir */
-	Aopen,						/* for i/o */
-	Amount,						/* to be mounted or mounted upon */
-	Acreate,					/* is to be created */
-	Aremove,					/* will be removed by caller */
-	Arename,					/* new_path of a rename */
+	Aaccess,			/* as in stat, wstat */
+	Abind,				/* for left-hand-side of bind */
+	Atodir,				/* as in chdir */
+	Aopen,				/* for i/o */
+	Amount,				/* to be mounted or mounted upon */
+	Acreate,			/* is to be created */
+	Aremove,			/* will be removed by caller */
+	Arename,			/* new_path of a rename */
 
 	/* internal chan flags, used by the kernel only */
 	COPEN = 		0x0001,	/* for i/o */
@@ -418,7 +417,7 @@ enum {
 	Budpck = (1 << NS_UDPCK_SHIFT),	/* udp checksum (rx), needed (tx) */
 	Btcpck = (1 << NS_TCPCK_SHIFT),	/* tcp checksum (rx), needed (tx) */
 	Bpktck = (1 << NS_PKTCK_SHIFT),	/* packet checksum (rx, maybe) */
-	Btso = (1 << NS_TSO_SHIFT),		/* TSO desired (tx) */
+	Btso = (1 << NS_TSO_SHIFT),	/* TSO desired (tx) */
 };
 #define BLOCK_META_FLAGS (Bipck | Budpck | Btcpck | Bpktck | Btso)
 #define BLOCK_TRANS_TX_CSUM (Budpck | Btcpck)
@@ -434,13 +433,13 @@ struct extra_bdata {
 struct block {
 	struct block *next;
 	struct block *list;
-	uint8_t *rp;				/* first unconsumed byte */
-	uint8_t *wp;				/* first empty byte */
-	uint8_t *lim;				/* 1 past the end of the buffer */
-	uint8_t *base;				/* start of the buffer */
+	uint8_t *rp;			/* first unconsumed byte */
+	uint8_t *wp;			/* first empty byte */
+	uint8_t *lim;			/* 1 past the end of the buffer */
+	uint8_t *base;			/* start of the buffer */
 	void (*free) (struct block *);
 	uint16_t flag;
-	uint16_t mss;               /* TCP MSS for TSO */
+	uint16_t mss;               	/* TCP MSS for TSO */
 	uint16_t network_offset;	/* offset from start */
 	uint16_t transport_offset;	/* offset from start */
 	uint16_t tx_csum_offset;	/* offset from tx_offset to store csum */
@@ -456,42 +455,42 @@ struct block {
 struct chan {
 	spinlock_t lock;
 	struct kref ref;
-	struct chan *next;			/* allocation */
+	struct chan *next;	/* allocation */
 	struct chan *link;
-	int64_t offset;				/* in file */
-	int type;					/* ID for device type, e.g. #mnt, #kfs, #ip */
-	uint32_t dev;				/* device specific; can be an instance ID */
-	uint16_t mode;				/* read/write */
+	int64_t offset;		/* in file */
+	int type;		/* ID for device type, e.g. #mnt, #kfs, #ip */
+	uint32_t dev;		/* device specific; can be an instance ID */
+	uint16_t mode;		/* read/write */
 	int flag;
 	struct qid qid;
-	int fid;					/* for devmnt */
-	uint32_t iounit;			/* chunk size for i/o; 0==default */
-	struct mhead *umh;			/* mount point that derived Chan; used in unionread */
-	struct chan *umc;			/* channel in union; held for union read */
-	qlock_t umqlock;			/* serialize unionreads */
-	int uri;					/* union read index */
-	int dri;					/* devdirread index */
+	int fid;		/* for devmnt */
+	uint32_t iounit;	/* chunk size for i/o; 0==default */
+	struct mhead *umh;	/* mount point that derived Chan */
+	struct chan *umc;	/* channel in union; for union read */
+	qlock_t umqlock;	/* serialize unionreads */
+	int uri;		/* union read index */
+	int dri;		/* devdirread index */
 	uint32_t mountid;
-	struct mntcache *mcp;		/* Mount cache pointer */
-	struct mnt *mux;			/* Mnt for clients using me for messages */
+	struct mntcache *mcp;	/* Mount cache pointer */
+	struct mnt *mux;	/* Mnt for clients using me for messages */
 	union {
 		void *aux;
-		char tag[4];			/* for iproute */
+		char tag[4];	/* for iproute */
 	};
 	/* mountpoint, as discovered during walk.
 	 * Used for rename at present.
 	 */
 	struct chan *mountpoint;
-	struct chan *mchan;			/* channel to mounted server */
-	struct qid mqid;			/* qid of root of mount point */
+	struct chan *mchan;	/* channel to mounted server */
+	struct qid mqid;	/* qid of root of mount point */
 	struct cname *name;
 	/* hack for dir reads to try to get them right. */
 	int ateof;
 	void *buf;
 	int bufused;
-	/* A lot of synthetic files need something generated at open time, which the
-	 * user can read from (including offsets) while the underlying file changes.
-	 * Hang that buffer here. */
+	/* A lot of synthetic files need something generated at open time, which
+	 * the user can read from (including offsets) while the underlying file
+	 * changes.  Hang that buffer here. */
 	void *synth_buf;
 };
 
@@ -499,8 +498,8 @@ extern struct chan *kern_slash;
 
 struct cname {
 	struct kref ref;
-	int alen;					/* allocated length */
-	int len;					/* strlen(s) */
+	int alen;		/* allocated length */
+	int len;		/* strlen(s) */
 	char *s;
 };
 
@@ -526,7 +525,7 @@ struct dev {
 	void (*remove)(struct chan *);
 	void (*rename)(struct chan *, struct chan *, const char *, int);
 	size_t (*wstat)(struct chan *, uint8_t *, size_t);
-	void (*power)(int);		/* power mgt: power(1) → on, power (0) → off */
+	void (*power)(int);	/* power mgt: power(1) → on, power (0) → off */
 //  int (*config)( int unused_int, char *unused_char_p_t, DevConf*);
 	char *(*chaninfo)(struct chan *, char *, size_t);
 	int (*tapfd)(struct chan *, struct fd_tap *, int);
@@ -557,7 +556,7 @@ enum {
 	NSCACHE = (1 << NSLOG),
 };
 
-struct mntwalk {				/* state for /proc/#/ns */
+struct mntwalk {			/* state for /proc/#/ns */
 	int cddone;
 	uint32_t id;
 	struct mhead *mh;
@@ -570,7 +569,7 @@ struct mount {
 	struct mhead *head;
 	struct mount *copy;
 	struct mount *order;
-	struct chan *to;			/* channel replacing channel */
+	struct chan *to;		/* channel replacing channel */
 	int mflag;
 	char *spec;
 };
@@ -578,23 +577,24 @@ struct mount {
 struct mhead {
 	struct kref ref;
 	struct rwlock lock;
-	struct chan *from;			/* channel mounted upon */
+	struct chan *from;		/* channel mounted upon */
 	struct mount *mount;		/* what's mounted upon it */
-	struct mhead *hash;			/* Hash chain */
+	struct mhead *hash;		/* Hash chain */
 };
 
 struct mnt {
 	spinlock_t lock;
-	/* references are counted using c->ref; channels on this mount point incref(c->mchan) == Mnt.c */
-	struct chan *c;				/* Channel to file service */
+	/* references are counted using c->ref; channels on this mount point
+	 * incref(c->mchan) == Mnt.c */
+	struct chan *c;			/* Channel to file service */
 	struct kthread *rip;		/* Reader in progress */
-	struct mntrpc *queue;		/* Queue of pending requests on this channel */
-	uint32_t id;				/* Multiplexer id for channel check */
-	struct mnt *list;			/* Free list */
-	int flags;					/* cache */
-	int msize;					/* data + IOHDRSZ */
-	char *version;				/* 9P version */
-	struct queue *q;			/* input queue */
+	struct mntrpc *queue;		/* Queue of pending requests on chan */
+	uint32_t id;			/* Multiplexer id for channel check */
+	struct mnt *list;		/* Free list */
+	int flags;			/* cache */
+	int msize;			/* data + IOHDRSZ */
+	char *version;			/* 9P version */
+	struct queue *q;		/* input queue */
 };
 
 enum {
@@ -615,10 +615,10 @@ struct mntparam {
 };
 
 struct pgrp {
-	struct kref ref;			/* also used as a lock when mounting */
+	struct kref ref;		/* also used as a lock when mounting */
 	uint32_t pgrpid;
-	qlock_t debug;				/* single access via devproc.c */
-	struct rwlock ns;			/* Namespace n read/one write lock */
+	qlock_t debug;			/* single access via devproc.c */
+	struct rwlock ns;		/* Namespace n read/one write lock */
 	qlock_t nsh;
 	struct mhead *mnthash[MNTHASH];
 	int progmode;
@@ -638,8 +638,8 @@ struct egrp {
 	struct kref ref;
 	qlock_t qlock;
 	struct evalue *entries;
-	uint32_t path;				/* qid.path of next Evalue to be allocated */
-	uint32_t vers;				/* of Egrp */
+	uint32_t path;		/* qid.path of next Evalue to be allocated */
+	uint32_t vers;		/* of Egrp */
 };
 
 struct signerkey {
@@ -666,9 +666,9 @@ struct skeyset {
  */
 enum {
 	/* Mode */
-	Trelative,					/* timer programmed in ns from now */
-	Tabsolute,					/* timer programmed in ns since epoch */
-	Tperiodic,					/* periodic timer, period in ns */
+	Trelative,		/* timer programmed in ns from now */
+	Tabsolute,		/* timer programmed in ns since epoch */
+	Tperiodic,		/* periodic timer, period in ns */
 };
 
 enum {
@@ -688,18 +688,18 @@ struct cmdbuf {
 };
 
 struct cmdtab {
-	int index;					/* used by client to switch on result */
-	char *cmd;					/* command name */
-	int narg;					/* expected #args; 0 ==> variadic */
+	int index;		/* used by client to switch on result */
+	char *cmd;		/* command name */
+	int narg;		/* expected #args; 0 ==> variadic */
 };
 
 /* queue state bits, all can be set in qopen (Qstarve is always set) */
 enum {
-	Qmsg			= (1 << 1),	/* message stream */
-	Qclosed			= (1 << 2),	/* queue has been closed/hungup */
-	Qcoalesce		= (1 << 3),	/* coalesce empty packets on read */
-	Qkick			= (1 << 4),	/* always call the kick routine after qwrite */
-	Qdropoverflow	= (1 << 5),	/* writes that would block will be dropped */
+	Qmsg		= (1 << 1),	/* message stream */
+	Qclosed		= (1 << 2),	/* queue has been closed/hungup */
+	Qcoalesce	= (1 << 3),	/* coalesce empty packets on read */
+	Qkick		= (1 << 4),	/* always call kick() after qwrite */
+	Qdropoverflow	= (1 << 5),	/* drop writes that would block */
 };
 
 /* Per-process structs */
@@ -729,22 +729,22 @@ struct small_fd_set {
 /* Describes an open file.  We need this, since the FD flags are supposed to be
  * per file descriptor, not per file (like the file status flags). */
 struct file_desc {
-	struct chan					*fd_chan;
-	unsigned int				fd_flags;
-	struct fd_tap				*fd_tap;
+	struct chan		*fd_chan;
+	unsigned int		fd_flags;
+	struct fd_tap		*fd_tap;
 };
 
 /* All open files for a process */
 struct fd_table {
-	spinlock_t					lock;
-	bool						closed;
-	int							max_files;		/* max files ptd to by fd */
-	int							max_fdset;		/* max of the current fd_set */
-	int							hint_min_fd;	/* <= min available fd */
-	struct file_desc			*fd;			/* initially pts to fd_array */
-	struct fd_set				*open_fds;		/* init, pts to open_fds_init */
-	struct small_fd_set			open_fds_init;
-	struct file_desc			fd_array[NR_OPEN_FILES_DEFAULT];
+	spinlock_t		lock;
+	bool			closed;
+	int			max_files;	/* max files ptd to by fd */
+	int			max_fdset;	/* max of the current fd_set */
+	int			hint_min_fd;	/* <= min available fd */
+	struct file_desc	*fd;		/* initially pts to fd_array */
+	struct fd_set		*open_fds;	/* init, pts to open_fds_init */
+	struct small_fd_set	open_fds_init;
+	struct file_desc	fd_array[NR_OPEN_FILES_DEFAULT];
 };
 
 ssize_t kread_file(struct file_or_chan *file, void *buf, size_t sz);
@@ -761,7 +761,7 @@ void clone_fdt(struct fd_table *src, struct fd_table *dst);
 #define DEVDOTDOT -1
 
 typedef int Devgen(struct chan *, char *unused_char_p_t, struct dirtab *,
-				   int unused_int, int, struct dir *);
+		   int unused_int, int, struct dir *);
 
 /* inferno portfns.h. Not all these are needed. */
 #define		FPinit() fpinit()	/* remove this if math lib is linked */
@@ -820,15 +820,15 @@ size_t devbwrite(struct chan *, struct block *, off64_t);
 struct chan *devclone(struct chan *);
 void devcreate(struct chan *, char *name, int mode, uint32_t perm, char *ext);
 void devdir(struct chan *, struct qid, char *, int64_t, char *, long,
-			struct dir *);
+	    struct dir *);
 long devdirread(struct chan *, char *, long, struct dirtab *, int, Devgen *);
 Devgen devgen;
 void devinit(void);
 int devno(const char *name, int user);
 void devpower(int);
 struct dev *devbyname(char *unused_char_p_t);
-struct chan *devopen(struct chan *, int unused_int,
-					 struct dirtab *, int unused_int2, Devgen *);
+struct chan *devopen(struct chan *, int unused_int, struct dirtab *,
+		     int unused_int2, Devgen *);
 void devpermcheck(char *unused_char_p_t, uint32_t, int);
 void devremove(struct chan *);
 void devreset(void);
@@ -836,9 +836,9 @@ void devshutdown(void);
 size_t dev_make_stat(struct chan *c, struct dir *dir, uint8_t *dp, size_t n);
 size_t devstat(struct chan *, uint8_t *db, size_t n, struct dirtab *,
                int ntab, Devgen *);
-struct walkqid *devwalk(struct chan *,
-						struct chan *, char **unused_char_pp_t, int unused_int,
-						struct dirtab *, int unused_intw, Devgen *);
+struct walkqid *devwalk(struct chan *, struct chan *, char **unused_char_pp_t,
+			int unused_int, struct dirtab *, int unused_intw,
+			Devgen *);
 size_t devwstat(struct chan *, uint8_t *, size_t);
 char *devchaninfo(struct chan *chan, char *ret, size_t ret_l);
 void disinit(void *);
@@ -905,7 +905,7 @@ struct chan *namec_from(struct chan *c, char *name, int amode, int omode,
 struct chan *newchan(void);
 struct egrp *newegrp(void);
 struct mount *newmount(struct mhead *, struct chan *, int unused_int,
-					   char *unused_char_p_t);
+		       char *unused_char_p_t);
 struct pgrp *newpgrp(void);
 struct proc *newproc(void);
 char *nextelem(char *unused_char_p_t, char *);
@@ -925,7 +925,7 @@ struct block *padblock(struct block *, int);
 void pgrpcpy(struct pgrp *, struct pgrp *);
 
 int progfdprint(struct chan *, int unused_int, int, char *unused_char_p_t,
-				int i);
+		int i);
 int pullblock(struct block **, int);
 struct block *pullupblock(struct block *, int);
 struct block *pullupqueue(struct queue *, int);
@@ -976,10 +976,10 @@ bool qreadable(struct queue *q);
 bool qwritable(struct queue *q);
 
 void *realloc(void *, uint32_t);
-int readmem(unsigned long offset, char *buf, unsigned long n,
-			const void *mem, size_t mem_len);
+int readmem(unsigned long offset, char *buf, unsigned long n, const void *mem,
+	    size_t mem_len);
 int readnum(unsigned long off, char *buf, unsigned long n, unsigned long val,
-			size_t size);
+	    size_t size);
 int readnum_hex(unsigned long off, char *buf, unsigned long n,
                 unsigned long val, size_t size);
 int readstr(unsigned long offset, char *buf, unsigned long n, const char *str);

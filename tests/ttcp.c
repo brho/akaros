@@ -59,6 +59,7 @@ long nread(int fd, char *buf, long len)
 {
 	int cnt, rlen = 0;
 	char *b = buf;
+
 	for (;;) {
 		cnt = read(fd, b, len);
 		ncalls++;
@@ -77,6 +78,7 @@ long nwrite(int fd, char *buf, long len)
 {
 	int cnt, rlen = 0;
 	char *b = buf;
+
 	for (;;) {
 		cnt = write(fd, b, len);
 		ncalls++;
@@ -96,6 +98,7 @@ void pattern(char *buf, int buflen)
 	int i;
 	char ch = ' ';
 	char *b = buf;
+
 	for (i = 0; i < buflen; i++) {
 		*b++ = ch++;
 		if (ch == 127)
@@ -146,7 +149,8 @@ void reader(int udp, char *addr, char *port, int buflen, int nbuf, int sink)
 	fprintf(stderr, "ttcp-r: buflen=%d, nbuf=%d, port=%s %s\n",
 		buflen, nbuf, port, udp ? "udp" : "tcp");
 
-	ds = netmkaddr(addr, udp ? "udp" : "tcp", port, ds_store, sizeof(ds_store));
+	ds = netmkaddr(addr, udp ? "udp" : "tcp", port, ds_store,
+		       sizeof(ds_store));
 	acfd = announce9(ds, adir, 0);
 	if (acfd < 0)
 		sysfatal("announce: %r");
@@ -171,13 +175,15 @@ void reader(int udp, char *addr, char *port, int buflen, int nbuf, int sink)
 		while ((cnt = nread(fd, buf, buflen)) > 0)
 			nbytes += cnt;
 	} else {
-		while ((cnt = nread(fd, buf, buflen)) > 0 && write(1, buf, cnt) == cnt)
+		while ((cnt = nread(fd, buf, buflen)) > 0
+		       && write(1, buf, cnt) == cnt)
 			nbytes += cnt;
 	}
 	elapsed = (nsec() - now) / 1E9;
 
 	tput = rate(nbytes, elapsed);	/* also sets 'unit' */
-	fprintf(stderr, "ttcp-r: %lld bytes in %.2f real seconds = %.2f %s/sec\n",
+	fprintf(stderr,
+		"ttcp-r: %lld bytes in %.2f real seconds = %.2f %s/sec\n",
 	        nbytes, elapsed, tput, unit);
 }
 
@@ -210,13 +216,15 @@ void writer(int udp, char *addr, char *port, int buflen, int nbuf, int src)
 		while (nbuf-- && nwrite(fd, buf, buflen) == buflen)
 			nbytes += buflen;
 	} else {
-		while ((cnt = read(0, buf, buflen)) > 0 && nwrite(fd, buf, cnt) == cnt)
+		while ((cnt = read(0, buf, buflen)) > 0
+		       && nwrite(fd, buf, cnt) == cnt)
 			nbytes += cnt;
 	}
 	elapsed = (nsec() - now) / 1E9;
 
 	tput = rate(nbytes, elapsed);	/* also sets 'unit' */
-	fprintf(stderr, "ttcp-t: %lld bytes in %.2f real seconds = %.2f %s/sec\n",
+	fprintf(stderr,
+		"ttcp-t: %lld bytes in %.2f real seconds = %.2f %s/sec\n",
 	        nbytes, elapsed, tput, unit);
 }
 

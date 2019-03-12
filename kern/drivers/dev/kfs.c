@@ -19,7 +19,7 @@ struct dev kfs_devtab;
 
 struct kfs {
 	struct tree_filesystem		tfs;
-	atomic_t					qid;
+	atomic_t			qid;
 } kfs;
 
 static uint64_t kfs_get_qid_path(void)
@@ -51,9 +51,10 @@ static void __kfs_tf_init(struct tree_file *tf, int dir_type, int dir_dev,
 	fs_file_init_dir(&tf->file, dir_type, dir_dev, user, perm);
 	dir->qid.path = kfs_get_qid_path();
 	dir->qid.vers = 0;
-	/* This is the "+1 for existing" ref.  There is no backing store for the FS,
-	 * such as a disk or 9p, so we can't get rid of a file until it is unlinked
-	 * and decreffed.  Note that KFS doesn't use pruners or anything else. */
+	/* This is the "+1 for existing" ref.  There is no backing store for the
+	 * FS, such as a disk or 9p, so we can't get rid of a file until it is
+	 * unlinked and decreffed.  Note that KFS doesn't use pruners or
+	 * anything else. */
 	__kref_get(&tf->kref, 1);
 }
 
@@ -69,14 +70,14 @@ static void kfs_tf_rename(struct tree_file *tf, struct tree_file *old_parent,
                           struct tree_file *new_parent, const char *name,
                           int flags)
 {
-	/* We don't have a backend, so we don't need to do anything additional for
-	 * rename. */
+	/* We don't have a backend, so we don't need to do anything additional
+	 * for rename. */
 }
 
 static bool kfs_tf_has_children(struct tree_file *parent)
 {
-	/* The tree_file parent list is complete and not merely a cache for a real
-	 * backend. */
+	/* The tree_file parent list is complete and not merely a cache for a
+	 * real backend. */
 	return !list_empty(&parent->children);
 }
 
@@ -97,10 +98,10 @@ static int kfs_pm_readpage(struct page_map *pm, struct page *pg)
 {
 	memset(page2kva(pg), 0, PGSIZE);
 	atomic_or(&pg->pg_flags, PG_UPTODATE);
-	/* Pretend that we blocked while filing this page.  This catches a lot of
-	 * bugs.  It does slightly slow down the kernel, but it's only when filling
-	 * the page cache, and considering we are using a RAMFS, you shouldn't
-	 * measure things that actually rely on KFS's performance. */
+	/* Pretend that we blocked while filing this page.  This catches a lot
+	 * of bugs.  It does slightly slow down the kernel, but it's only when
+	 * filling the page cache, and considering we are using a RAMFS, you
+	 * shouldn't measure things that actually rely on KFS's performance. */
 	kthread_usleep(1);
 	return 0;
 }
@@ -142,7 +143,8 @@ static struct chan *__add_kfs_dir(struct chan *root, char *path,
 		poperror();
 		return NULL;
 	}
-	c = namec_from(root, path, Acreate, O_EXCL, DMDIR | c_bhdr->c_mode, NULL);
+	c = namec_from(root, path, Acreate, O_EXCL, DMDIR | c_bhdr->c_mode,
+		       NULL);
 	poperror();
 	return c;
 }
@@ -183,7 +185,8 @@ static struct chan *__add_kfs_file(struct chan *root, char *path,
 		poperror();
 		return NULL;
 	}
-	c = namec_from(root, path, Acreate, O_EXCL | O_RDWR, c_bhdr->c_mode, NULL);
+	c = namec_from(root, path, Acreate, O_EXCL | O_RDWR, c_bhdr->c_mode,
+		       NULL);
 	poperror();
 	if (waserror()) {
 		warn("failed to modify %s", path);
@@ -234,8 +237,8 @@ static int add_kfs_entry(struct cpio_bin_hdr *c_bhdr, void *cb_arg)
 	ts.tv_sec = c_bhdr->c_mtime;
 	ts.tv_nsec = 0;
 	/* Lockless */
-	__set_acmtime_to(&tf->file, FSF_ATIME | FSF_BTIME | FSF_CTIME | FSF_MTIME,
-	                 &ts);
+	__set_acmtime_to(&tf->file, FSF_ATIME | FSF_BTIME | FSF_CTIME |
+			 FSF_MTIME, &ts);
 	/* TODO: consider UID/GID.  Right now, everything is owned by eve. */
 	cclose(c);
 	return 0;
@@ -286,8 +289,8 @@ static void kfs_init(void)
 	tfs->fs_ops = kfs_fs_ops;
 	/* Note this gives us the "+1 for existing" ref on tfs->root. */
 	__kfs_tf_init(tfs->root, &kfs_devtab - devtab, 0, &eve, DMDIR | 0777);
-	/* Other devices might want to create things like kthreads that run the LRU
-	 * pruner or PM sweeper. */
+	/* Other devices might want to create things like kthreads that run the
+	 * LRU pruner or PM sweeper. */
 	kfs_get_cpio_info(ci);
 	kfs_extract_cpio(ci);
 	kfs_free_cpio(ci);

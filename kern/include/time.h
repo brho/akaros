@@ -16,28 +16,34 @@ void udelay(uint64_t usec);	/* done in arch-specific files */
 uint64_t read_persistent_clock(void);	/* arch-specific */
 
 uint64_t tsc2nsec(uint64_t tsc_time);
+
 static inline uint64_t tsc2usec(uint64_t tsc_time)
 {
 	return tsc2nsec(tsc_time) / NSEC_PER_USEC;
 }
+
 static inline uint64_t tsc2msec(uint64_t tsc_time)
 {
 	return tsc2nsec(tsc_time) / NSEC_PER_MSEC;
 }
+
 static inline uint64_t tsc2sec(uint64_t tsc_time)
 {
 	return tsc2nsec(tsc_time) / NSEC_PER_SEC;
 }
 
 uint64_t nsec2tsc(uint64_t nsec);
+
 static inline uint64_t usec2tsc(uint64_t usec)
 {
 	return nsec2tsc(usec * NSEC_PER_USEC);
 }
+
 static inline uint64_t msec2tsc(uint64_t msec)
 {
 	return nsec2tsc(msec * NSEC_PER_MSEC);
 }
+
 static inline uint64_t sec2tsc(uint64_t sec)
 {
 	return nsec2tsc(sec * NSEC_PER_SEC);
@@ -125,8 +131,8 @@ typedef struct Timer{
 	_timer_##tag->curr_run = start_timing();
 #define TAGGED_TIMING_END(tag)                                              \
 ({                                                                          \
-	_timer_##tag->curr_run = stop_timing(_timer_##tag->curr_run);           \
-	_timer_##tag->aggr_run += _timer_##tag->curr_run;                       \
+	_timer_##tag->curr_run = stop_timing(_timer_##tag->curr_run);       \
+	_timer_##tag->aggr_run += _timer_##tag->curr_run;                   \
 })
 
 #endif

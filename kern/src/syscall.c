@@ -51,13 +51,13 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
 	struct timespec ts_start = tsc2timespec(trace->start_timestamp);
 	struct timespec ts_end = tsc2timespec(trace->end_timestamp);
 
-	/* Slightly different formats between entry and exit.  Entry has retval set
-	 * to ---, and begins with E.  Exit begins with X. */
+	/* Slightly different formats between entry and exit.  Entry has retval
+	 * set to ---, and begins with E.  Exit begins with X. */
 	if (entry) {
 		len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
-		      "E [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
-		      "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: --- proc: %d core: %2d "
-		      "vcore: %2d errno: --- data: ",
+		      "E [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, "
+		      "0x%llx, 0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: --- "
+		      "proc: %d core: %2d vcore: %2d errno: --- data: ",
 		               ts_start.tv_sec,
 		               ts_start.tv_nsec,
 		               ts_end.tv_sec,
@@ -75,9 +75,9 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
 		               trace->vcoreid);
 	} else {
 		len = snprintf(trace->pretty_buf, SYSTR_PRETTY_BUF_SZ - len,
-		      "X [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, 0x%llx, "
-		      "0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: 0x%llx proc: %d core: %2d "
-		      "vcore: -- errno: %3d data: ",
+		      "X [%7d.%09d]-[%7d.%09d] Syscall %3d (%12s):(0x%llx, "
+		      "0x%llx, 0x%llx, 0x%llx, 0x%llx, 0x%llx) ret: 0x%llx "
+		      "proc: %d core: %2d vcore: -- errno: %3d data: ",
 		               ts_start.tv_sec,
 		               ts_start.tv_nsec,
 		               ts_end.tv_sec,
@@ -98,7 +98,8 @@ static size_t systrace_fill_pretty_buf(struct systrace_record *trace,
 	len += printdump(trace->pretty_buf + len, trace->datalen,
 	                 SYSTR_PRETTY_BUF_SZ - len - 1,
 	                 trace->data);
-	len += snprintf(trace->pretty_buf + len, SYSTR_PRETTY_BUF_SZ - len, "\n");
+	len += snprintf(trace->pretty_buf + len, SYSTR_PRETTY_BUF_SZ - len,
+			"\n");
 	return len;
 }
 
@@ -136,16 +137,17 @@ static void systrace_output(struct systrace_record *trace,
 	ERRSTACK(1);
 	size_t pretty_len;
 
-	/* qio ops can throw, especially the blocking qwrite.  I had it block on the
-	 * outbound path of sys_proc_destroy().  The rendez immediately throws. */
+	/* qio ops can throw, especially the blocking qwrite.  I had it block on
+	 * the outbound path of sys_proc_destroy().  The rendez immediately
+	 * throws. */
 	if (waserror()) {
 		poperror();
 		return;
 	}
 	pretty_len = systrace_fill_pretty_buf(trace, entry);
 	if (strace) {
-		/* At this point, we're going to emit the exit trace.  It's just a
-		 * question of whether or not we block while doing it. */
+		/* At this point, we're going to emit the exit trace.  It's just
+		 * a question of whether or not we block while doing it. */
 		if (strace->drop_overflow || !sysc_can_block(trace->syscallno))
 			qiwrite(strace->q, trace->pretty_buf, pretty_len);
 		else
@@ -231,7 +233,8 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 			atomic_inc(&p->strace->nr_drops);
 			return;
 		}
-		/* Avoiding the atomic op.  We sacrifice accuracy for less overhead. */
+		/* Avoiding the atomic op.  We sacrifice accuracy for less
+		 * overhead. */
 		p->strace->appx_nr_sysc++;
 	} else {
 		if (!trace)
@@ -306,14 +309,17 @@ static void systrace_start_trace(struct kthread *kthread, struct syscall *sysc)
 		break;
 	case SYS_tap_fds:
 		for (size_t i = 0; i < (size_t)sysc->arg1; i++) {
-			struct fd_tap_req *tap_reqs = (struct fd_tap_req*)sysc->arg0;
+			struct fd_tap_req *tap_reqs = (struct
+						       fd_tap_req*)sysc->arg0;
 			int fd, cmd, filter;
 
 			tap_reqs += i;
 			copy_from_user(&fd, &tap_reqs->fd, sizeof(fd));
 			copy_from_user(&cmd, &tap_reqs->cmd, sizeof(cmd));
-			copy_from_user(&filter, &tap_reqs->filter, sizeof(filter));
-			snprintf_to_trace(trace, "%d (%d 0x%x), ", fd, cmd, filter);
+			copy_from_user(&filter, &tap_reqs->filter,
+				       sizeof(filter));
+			snprintf_to_trace(trace, "%d (%d 0x%x), ", fd, cmd,
+					  filter);
 			if (trace_data_full(trace))
 				break;
 		}
@@ -337,7 +343,8 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 	trace->end_timestamp = read_tsc();
 	trace->retval = retval;
 	trace->coreid = core_id();
-	/* Can't trust the vcoreid of an exit record.  This'll be ignored later. */
+	/* Can't trust the vcoreid of an exit record.  This'll be ignored later.
+	 */
 	trace->vcoreid = -1;
 	trace->errno = get_errno();
 	trace->datalen = 0;
@@ -360,7 +367,8 @@ static void systrace_finish_trace(struct kthread *kthread, long retval)
 		case SYS_readlink:
 			if (retval <= 0)
 				break;
-			copy_tracedata_from_user(trace, trace->arg0, trace->arg1);
+			copy_tracedata_from_user(trace, trace->arg0,
+						 trace->arg1);
 			snprintf_to_trace(trace, " -> ");
 			copy_tracedata_from_user(trace, trace->arg2, retval);
 			break;
@@ -392,10 +400,11 @@ static void free_sysc_str(struct kthread *kth)
 
 #define sysc_save_str(...)                                                     \
 {                                                                              \
-	struct per_cpu_info *pcpui = this_pcpui_ptr();                             \
+	struct per_cpu_info *pcpui = this_pcpui_ptr();                         \
                                                                                \
-	if (pcpui->cur_kthread->name)                                              \
-		snprintf(pcpui->cur_kthread->name, SYSCALL_STRLEN, __VA_ARGS__);       \
+	if (pcpui->cur_kthread->name)                                          \
+		snprintf(pcpui->cur_kthread->name, SYSCALL_STRLEN,             \
+			 __VA_ARGS__);                                         \
 }
 
 #else
@@ -416,11 +425,11 @@ static void free_sysc_str(struct kthread *kth)
 static void finish_sysc(struct syscall *sysc, struct proc *p, long retval)
 {
 	sysc->retval = retval;
-	/* Atomically turn on the LOCK and SC_DONE flag.  The lock tells userspace
-	 * we're messing with the flags and to not proceed.  We use it instead of
-	 * CASing with userspace.  We need the atomics since we're racing with
-	 * userspace for the event_queue registration.  The 'lock' tells userspace
-	 * to not muck with the flags while we're signalling. */
+	/* Atomically turn on the LOCK and SC_DONE flag.  The lock tells
+	 * userspace we're messing with the flags and to not proceed.  We use it
+	 * instead of CASing with userspace.  We need the atomics since we're
+	 * racing with userspace for the event_queue registration.  The 'lock'
+	 * tells userspace to not muck with the flags while we're signalling. */
 	atomic_or(&sysc->flags, SC_K_LOCK | SC_DONE);
 	__signal_syscall(sysc, p);
 	atomic_and(&sysc->flags, ~SC_K_LOCK);
@@ -556,6 +565,7 @@ char *get_cur_genbuf(void)
 static struct proc *get_controllable_proc(struct proc *p, pid_t pid)
 {
 	struct proc *target = pid2proc(pid);
+
 	if (!target) {
 		set_error(ESRCH, "no proc for pid %d", pid);
 		return 0;
@@ -664,7 +674,8 @@ static int sys_nanosleep(struct proc *p,
 	 * overflow). */
 	if (waserror()) {
 		krem = tsc2timespec(read_tsc() - tsc);
-		if (rem && memcpy_to_user(p, rem, &krem, sizeof(struct timespec)))
+		if (rem &&
+		    memcpy_to_user(p, rem, &krem, sizeof(struct timespec)))
 			set_errno(EFAULT);
 		poperror();
 		return -1;
@@ -748,14 +759,14 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 		set_error(EINVAL, "Failed to copy in the args");
 		goto error_with_file;
 	}
-	/* Unpack the argenv array into more usable variables. Integrity checking
-	 * done along side this as well. */
+	/* Unpack the argenv array into more usable variables. Integrity
+	 * checking done along side this as well. */
 	if (unpack_argenv(kargenv, argenv_l, &argc, &argv, &envc, &envp)) {
 		set_error(EINVAL, "Failed to unpack the args");
 		goto error_with_kargenv;
 	}
-	/* TODO: need to split the proc creation, since you must load after setting
-	 * args/env, since auxp gets set up there. */
+	/* TODO: need to split the proc creation, since you must load after
+	 * setting args/env, since auxp gets set up there. */
 	//new_p = proc_create(program, 0, 0);
 	if (proc_alloc(&new_p, current, flags)) {
 		set_error(ENOMEM, "Failed to alloc new proc");
@@ -777,13 +788,14 @@ static int sys_proc_create(struct proc *p, char *path, size_t path_l,
 	__proc_ready(new_p);
 	pid = new_p->pid;
 	profiler_notify_new_process(new_p);
-	proc_decref(new_p);	/* give up the reference created in proc_create() */
+	/* give up the reference created in proc_create() */
+	proc_decref(new_p);
 	return pid;
 error_with_proc:
 	/* proc_destroy will decref once, which is for the ref created in
 	 * proc_create().  We don't decref again (the usual "+1 for existing"),
-	 * since the scheduler, which usually handles that, hasn't heard about the
-	 * process (via __proc_ready()). */
+	 * since the scheduler, which usually handles that, hasn't heard about
+	 * the process (via __proc_ready()). */
 	proc_destroy(new_p);
 error_with_kargenv:
 	user_memdup_free(p, kargenv);
@@ -794,11 +806,13 @@ error_with_path:
 	return -1;
 }
 
-/* Makes process PID runnable.  Consider moving the functionality to process.c */
+/* Makes process PID runnable.  Consider moving the functionality to process.c
+ */
 static error_t sys_proc_run(struct proc *p, unsigned pid)
 {
 	error_t retval = 0;
 	struct proc *target = get_controllable_proc(p, pid);
+
 	if (!target)
 		return -1;
 	if (target->state != PROC_CREATED) {
@@ -806,8 +820,8 @@ static error_t sys_proc_run(struct proc *p, unsigned pid)
 		proc_decref(target);
 		return -1;
 	}
-	/* Note a proc can spam this for someone it controls.  Seems safe - if it
-	 * isn't we can change it. */
+	/* Note a proc can spam this for someone it controls.  Seems safe - if
+	 * it isn't we can change it. */
 	proc_wakeup(target);
 	proc_decref(target);
 	return 0;
@@ -825,9 +839,10 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 		return -1;
 	if (p_to_die == p) {
 		p->exitcode = exitcode;
-		printd("[PID %d] proc exiting gracefully (code %d)\n", p->pid,exitcode);
+		printd("[PID %d] proc exiting gracefully (code %d)\n",
+		       p->pid,exitcode);
 	} else {
-		p_to_die->exitcode = exitcode; 	/* so its parent has some clue */
+		p_to_die->exitcode = exitcode;
 		printd("[%d] destroying proc %d\n", p->pid, p_to_die->pid);
 	}
 	proc_destroy(p_to_die);
@@ -837,8 +852,9 @@ static error_t sys_proc_destroy(struct proc *p, pid_t pid, int exitcode)
 
 static int sys_proc_yield(struct proc *p, bool being_nice)
 {
-	/* proc_yield() often doesn't return - we need to finish the syscall early.
-	 * If it doesn't return, it expects to eat our reference (for now). */
+	/* proc_yield() often doesn't return - we need to finish the syscall
+	 * early.  If it doesn't return, it expects to eat our reference (for
+	 * now). */
 	finish_current_sysc(0);
 	proc_incref(p, 1);
 	proc_yield(p, being_nice);
@@ -852,7 +868,8 @@ static int sys_change_vcore(struct proc *p, uint32_t vcoreid,
                              bool enable_my_notif)
 {
 	/* Note retvals can be negative, but we don't mess with errno in case
-	 * callers use this in low-level code and want to extract the 'errno'. */
+	 * callers use this in low-level code and want to extract the 'errno'.
+	 */
 	return proc_change_to_vcore(p, vcoreid, enable_my_notif);
 }
 
@@ -867,6 +884,7 @@ static ssize_t sys_fork(env_t* e)
 		return -1;
 	}
 	env_t* env;
+
 	ret = proc_alloc(&env, current, PROC_DUP_FGRP);
 	assert(!ret);
 	assert(env != NULL);
@@ -882,18 +900,19 @@ static ssize_t sys_fork(env_t* e)
 	assert(current == this_pcpui_var(owning_proc));
 	copy_current_ctx_to(&env->scp_ctx);
 
-	/* Make the new process have the same VMRs as the older.  This will copy the
-	 * contents of non MAP_SHARED pages to the new VMRs. */
+	/* Make the new process have the same VMRs as the older.  This will copy
+	 * the contents of non MAP_SHARED pages to the new VMRs. */
 	if (duplicate_vmrs(e, env)) {
-		proc_destroy(env);	/* this is prob what you want, not decref by 2 */
+		proc_destroy(env);
 		proc_decref(env);
 		set_errno(ENOMEM);
 		return -1;
 	}
 	/* Switch to the new proc's address space and finish the syscall.  We'll
-	 * never naturally finish this syscall for the new proc, since its memory
-	 * is cloned before we return for the original process.  If we ever do CoW
-	 * for forked memory, this will be the first place that gets CoW'd. */
+	 * never naturally finish this syscall for the new proc, since its
+	 * memory is cloned before we return for the original process.  If we
+	 * ever do CoW for forked memory, this will be the first place that gets
+	 * CoW'd. */
 	temp = switch_to(env);
 	finish_sysc(current_kthread->sysc, env, 0);
 	switch_back(env, temp);
@@ -903,8 +922,8 @@ static ssize_t sys_fork(env_t* e)
 
 	inherit_strace(e, env);
 
-	/* In general, a forked process should be a fresh process, and we copy over
-	 * whatever stuff is needed between procinfo/procdata. */
+	/* In general, a forked process should be a fresh process, and we copy
+	 * over whatever stuff is needed between procinfo/procdata. */
 	*env->procdata = *e->procdata;
 	env->procinfo->program_end = e->procinfo->program_end;
 
@@ -914,13 +933,13 @@ static ssize_t sys_fork(env_t* e)
 
 	// don't decref the new process.
 	// that will happen when the parent waits for it.
-	// TODO: if the parent doesn't wait, we need to change the child's parent
-	// when the parent dies, or at least decref it
+	// TODO: if the parent doesn't wait, we need to change the child's
+	// parent when the parent dies, or at least decref it
 
 	printd("[PID %d] fork PID %d\n", e->pid, env->pid);
 	ret = env->pid;
 	profiler_notify_new_process(env);
-	proc_decref(env);	/* give up the reference created in proc_alloc() */
+	proc_decref(env); /* give up the reference created in proc_alloc() */
 	return ret;
 }
 
@@ -952,18 +971,20 @@ static int execargs_stringer(struct proc *p, char *d, size_t slen,
 	 * arguments. Please, don't suggest a cpp macro. Thank you. */
 	/* Check the size of the argenv array, error out if too large. */
 	if ((argenv_l < sizeof(struct argenv)) || (argenv_l > ARG_MAX)) {
-		s = seprintf(s, e, "The argenv array has an invalid size: %lu\n",
-				  argenv_l);
+		s = seprintf(s, e,
+			     "The argenv array has an invalid size: %lu\n",
+			     argenv_l);
 		return s - d;
 	}
 	/* Copy the argenv array into a kernel buffer. */
 	kargenv = user_memdup_errno(p, argenv, argenv_l);
 	if (!kargenv) {
-		s = seprintf(s, e, "Failed to copy in the args and environment");
+		s = seprintf(s, e,
+			     "Failed to copy in the args and environment");
 		return s - d;
 	}
-	/* Unpack the argenv array into more usable variables. Integrity checking
-	 * done along side this as well. */
+	/* Unpack the argenv array into more usable variables. Integrity
+	 * checking done along side this as well. */
 	if (unpack_argenv(kargenv, argenv_l, &argc, &argv, &envc, &envp)) {
 		s = seprintf(s, e, "Failed to unpack the args");
 		user_memdup_free(p, kargenv);
@@ -1014,31 +1035,32 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	}
 	assert(current_ctx);
 	/* Before this, we shouldn't have blocked (maybe with strace, though we
-	 * explicitly don't block exec for strace).  The owning proc, cur_proc, and
-	 * cur_ctx checks should catch that.  After this, we might still block, such
-	 * as on accessing the filesystem.
+	 * explicitly don't block exec for strace).  The owning proc, cur_proc,
+	 * and cur_ctx checks should catch that.  After this, we might still
+	 * block, such as on accessing the filesystem.
 	 *
 	 * After this point, we're treated like a yield - we're waiting until
-	 * something wakes us.  The kthread might block, error and fail, or succeed.
-	 * We shouldn't return to userspace before one of those.  The only way out
-	 * of this function is via smp_idle, not returning the way we came.
+	 * something wakes us.  The kthread might block, error and fail, or
+	 * succeed.  We shouldn't return to userspace before one of those.  The
+	 * only way out of this function is via smp_idle, not returning the way
+	 * we came.
 	 *
-	 * Under normal situations, the only thing that will wake us is this kthread
-	 * completing.  I think you can trigger wakeups with events and async
-	 * syscalls started before the exec.  I'm not sure if that could trigger
-	 * more bugs or if that would hurt the kernel.  If so, we could add an
-	 * EXEC_LIMBO state.
+	 * Under normal situations, the only thing that will wake us is this
+	 * kthread completing.  I think you can trigger wakeups with events and
+	 * async syscalls started before the exec.  I'm not sure if that could
+	 * trigger more bugs or if that would hurt the kernel.  If so, we could
+	 * add an EXEC_LIMBO state.
 	 *
-	 * Note that we will 'hard block' if we block at all.  We can't return to
-	 * userspace and then asynchronously finish the exec later. */
+	 * Note that we will 'hard block' if we block at all.  We can't return
+	 * to userspace and then asynchronously finish the exec later. */
 	spin_lock(&p->proc_lock);
 	/* We only need the context for the error case.  We have to save it now,
-	 * since once we leave this core, such as when the kthread blocks, the old
-	 * SCP's context will be gone. */
+	 * since once we leave this core, such as when the kthread blocks, the
+	 * old SCP's context will be gone. */
 	__proc_save_context_s(p);
 	/* We are no longer owning, but we are still current, like any
-	 * kthread-that-blocked-on-behalf of a process.  I think one invariant for
-	 * SCPs is: "RUNNING_S <==> is the owning proc". */
+	 * kthread-that-blocked-on-behalf of a process.  I think one invariant
+	 * for SCPs is: "RUNNING_S <==> is the owning proc". */
 	clear_owning_proc(core_id());
 	__proc_set_state(p, PROC_WAITING);
 	spin_unlock(&p->proc_lock);
@@ -1049,8 +1071,8 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		set_error(EINVAL, "Failed to copy in the args and environment");
 		goto out_error;
 	}
-	/* Unpack the argenv array into more usable variables. Integrity checking
-	 * done along side this as well. */
+	/* Unpack the argenv array into more usable variables. Integrity
+	 * checking done along side this as well. */
 	if (unpack_argenv(kargenv, argenv_l, &argc, &argv, &envc, &envp)) {
 		set_error(EINVAL, "Failed to unpack the args");
 		goto out_error_kargenv;
@@ -1068,8 +1090,8 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 		goto out_error_program;
 	}
 
-	/* This is the point of no return for the process.  Any errors here lead to
-	 * destruction. */
+	/* This is the point of no return for the process.  Any errors here lead
+	 * to destruction. */
 
 	/* progname is argv0, which accounts for symlinks */
 	proc_replace_binary_path(p, t_path);
@@ -1086,16 +1108,19 @@ static int sys_exec(struct proc *p, char *path, size_t path_l,
 	env_user_mem_free(p, 0, UMAPTOP);
 	if (load_elf(p, program, argc, argv, envc, envp)) {
 		set_error(EINVAL, "Failed to load elf");
-		/* At this point, we destroyed memory and can't return to the app.  We
-		 * can't use the error cases, since they assume we'll return. */
+		/* At this point, we destroyed memory and can't return to the
+		 * app.  We can't use the error cases, since they assume we'll
+		 * return. */
 		foc_decref(program);
 		user_memdup_free(p, kargenv);
-		/* We finish the trace and not the sysc, since the sysc is gone. */
+		/* We finish the trace and not the sysc, since the sysc is gone.
+		 */
 		systrace_finish_trace(current_kthread, -1);
-		/* Note this is an inedible reference, but proc_destroy now returns */
+		/* Note this is an inedible reference, but proc_destroy now
+		 * returns */
 		proc_destroy(p);
-		/* We don't want to do anything else - we just need to not accidentally
-		 * return to the user (hence the all_out) */
+		/* We don't want to do anything else - we just need to not
+		 * accidentally return to the user (hence the all_out) */
 		goto all_out;
 	}
 	printd("[PID %d] exec %s\n", p->pid, foc_to_name(program));
@@ -1119,16 +1144,16 @@ out_error:
 	proc_wakeup(p);
 
 all_out:
-	/* This free and setting sysc = NULL may happen twice (early errors do it),
-	 * but they are idempotent. */
+	/* This free and setting sysc = NULL may happen twice (early errors do
+	 * it), but they are idempotent. */
 	free_sysc_str(current_kthread);
 	current_kthread->sysc = NULL;
 	/* we can't return, since we'd write retvals to the old location of the
-	 * syscall struct (which has been freed and is in the old userspace) (or has
-	 * already been written to).*/
-	disable_irq();			/* abandon_core/clear_own wants irqs disabled */
+	 * syscall struct (which has been freed and is in the old userspace) (or
+	 * has already been written to).*/
+	disable_irq();		/* abandon_core/clear_own wants irqs disabled */
 	abandon_core();
-	smp_idle();				/* will reenable interrupts */
+	smp_idle();		/* will reenable interrupts */
 }
 
 /* Helper, will attempt a particular wait on a proc.  Returns the pid of the
@@ -1141,19 +1166,21 @@ static pid_t __try_wait(struct proc *parent, struct proc *child,
                         int *ret_status, int options)
 {
 	if (proc_is_dying(child)) {
-		/* Disown returns -1 if it's already been disowned or we should o/w
-		 * abort.  This can happen if we have concurrent waiters, both with
-		 * pointers to the child (only one should reap).  Note that if we don't
-		 * do this, we could go to sleep and never receive a cv_signal. */
+		/* Disown returns -1 if it's already been disowned or we should
+		 * o/w abort.  This can happen if we have concurrent waiters,
+		 * both with pointers to the child (only one should reap).  Note
+		 * that if we don't do this, we could go to sleep and never
+		 * receive a cv_signal. */
 		if (__proc_disown_child(parent, child))
 			return -1;
-		/* despite disowning, the child won't be freed til we drop this ref
-		 * held by this function, so it is safe to access the memory.
+		/* despite disowning, the child won't be freed til we drop this
+		 * ref held by this function, so it is safe to access the
+		 * memory.
 		 *
-		 * Note the exit code one byte in the 0xff00 spot.  Check out glibc's
-		 * posix/sys/wait.h and bits/waitstatus.h for more info.  If we ever
-		 * deal with signalling and stopping, we'll need to do some more work
-		 * here.*/
+		 * Note the exit code one byte in the 0xff00 spot.  Check out
+		 * glibc's posix/sys/wait.h and bits/waitstatus.h for more info.
+		 * If we ever deal with signalling and stopping, we'll need to
+		 * do some more work here.*/
 		*ret_status = (child->exitcode & 0xff) << 8;
 		return child->pid;
 	}
@@ -1173,11 +1200,13 @@ static pid_t __try_wait_any(struct proc *parent, int *ret_status, int options,
 
 	if (TAILQ_EMPTY(&parent->children))
 		return -1;
-	/* Could have concurrent waiters mucking with the tailq, caller must lock */
+	/* Could have concurrent waiters mucking with the tailq, caller must
+	 * lock */
 	TAILQ_FOREACH_SAFE(i, &parent->children, sibling_link, temp) {
 		retval = __try_wait(parent, i, ret_status, options);
-		/* This catches a thread causing a wait to fail but not taking the
-		 * child off the list before unlocking.  Should never happen. */
+		/* This catches a thread causing a wait to fail but not taking
+		 * the child off the list before unlocking.  Should never
+		 * happen. */
 		assert(retval != -1);
 		/* Succeeded, return the pid of the child we waited on */
 		if (retval) {
@@ -1205,13 +1234,13 @@ static pid_t wait_one(struct proc *parent, struct proc *child, int *ret_status,
 	while (!retval) {
 		cpu_relax();
 		cv_wait(&parent->child_wait);
-		/* If we're dying, then we don't need to worry about waiting.  We don't
-		 * do this yet, but we'll need this outlet when we deal with orphaned
-		 * children and having init inherit them. */
+		/* If we're dying, then we don't need to worry about waiting.
+		 * We don't do this yet, but we'll need this outlet when we deal
+		 * with orphaned children and having init inherit them. */
 		if (proc_is_dying(parent))
 			goto out_unlock;
-		/* Any child can wake us up, but we check for the particular child we
-		 * care about */
+		/* Any child can wake us up, but we check for the particular
+		 * child we care about */
 		retval = __try_wait(parent, child, ret_status, options);
 	}
 	if (retval == -1) {
@@ -1244,8 +1273,9 @@ static pid_t wait_any(struct proc *parent, int *ret_status, int options)
 		cv_wait(&parent->child_wait);
 		if (proc_is_dying(parent))
 			goto out_unlock;
-		/* Any child can wake us up from the CV.  This is a linear __try_wait
-		 * scan.  If we have a lot of children, we could optimize this. */
+		/* Any child can wake us up from the CV.  This is a linear
+		 * __try_wait scan.  If we have a lot of children, we could
+		 * optimize this. */
 		retval = __try_wait_any(parent, ret_status, options, &child);
 	}
 	if (retval == -1)
@@ -1342,15 +1372,15 @@ static int prov_resource(struct proc *target, unsigned int res_type,
                          long res_val)
 {
 	switch (res_type) {
-		case (RES_CORES):
-			/* in the off chance we have a kernel scheduler that can't
-			 * provision, we'll need to change this. */
-			return provision_core(target, res_val);
-		default:
-			printk("[kernel] received provisioning for unknown resource %d\n",
-			       res_type);
-			set_errno(ENOENT);	/* or EINVAL? */
-			return -1;
+	case (RES_CORES):
+		/* in the off chance we have a kernel scheduler that can't
+		 * provision, we'll need to change this. */
+		return provision_core(target, res_val);
+	default:
+		printk("[kernel] got provisioning for unknown resource %d\n",
+		       res_type);
+		set_errno(ENOENT);	/* or EINVAL? */
+		return -1;
 	}
 }
 
@@ -1360,6 +1390,7 @@ static int sys_provision(struct proc *p, int target_pid,
 {
 	struct proc *target = pid2proc(target_pid);
 	int retval;
+
 	if (!target) {
 		if (target_pid == 0)
 			return prov_resource(0, res_type, res_val);
@@ -1381,11 +1412,13 @@ static int sys_notify(struct proc *p, int target_pid, unsigned int ev_type,
 {
 	struct event_msg local_msg = {0};
 	struct proc *target = get_controllable_proc(p, target_pid);
+
 	if (!target)
 		return -1;
 	/* if the user provided an ev_msg, copy it in and use that */
 	if (u_msg) {
-		if (memcpy_from_user(p, &local_msg, u_msg, sizeof(struct event_msg))) {
+		if (memcpy_from_user(p, &local_msg, u_msg,
+				     sizeof(struct event_msg))) {
 			proc_decref(target);
 			set_errno(EINVAL);
 			return -1;
@@ -1406,9 +1439,11 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
                            bool priv)
 {
 	struct event_msg local_msg = {0};
+
 	/* if the user provided an ev_msg, copy it in and use that */
 	if (u_msg) {
-		if (memcpy_from_user(p, &local_msg, u_msg, sizeof(struct event_msg))) {
+		if (memcpy_from_user(p, &local_msg, u_msg,
+				     sizeof(struct event_msg))) {
 			set_errno(EINVAL);
 			return -1;
 		}
@@ -1416,13 +1451,15 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
 		local_msg.ev_type = ev_type;
 	}
 	if (local_msg.ev_type >= MAX_NR_EVENT) {
-		printk("[kernel] received self-notify for vcoreid %d, ev_type %d, "
-		       "u_msg %p, u_msg->type %d\n", vcoreid, ev_type, u_msg,
-		       u_msg ? u_msg->ev_type : 0);
+		printk("[kernel] received self-notify for vcoreid %d, "
+		       "ev_type %d, u_msg %p, u_msg->type %d\n", vcoreid,
+		       ev_type, u_msg, u_msg ? u_msg->ev_type : 0);
 		return -1;
 	}
-	/* this will post a message and IPI, regardless of wants/needs/debutantes.*/
-	post_vcore_event(p, &local_msg, vcoreid, priv ? EVENT_VCORE_PRIVATE : 0);
+	/* this will post a message and IPI, regardless of
+	 * wants/needs/debutantes.*/
+	post_vcore_event(p, &local_msg, vcoreid,
+			 priv ? EVENT_VCORE_PRIVATE : 0);
 	proc_notify(p, vcoreid);
 	return 0;
 }
@@ -1496,12 +1533,13 @@ static int sys_halt_core(struct proc *p, unsigned long usec)
 		return 0;
 	}
 	vcpd = &p->procdata->vcore_preempt_data[pcpui->owning_vcoreid];
-	/* We pretend to not be in vcore context so other cores will send us IPIs
-	 * (__notify).  If we do get a __notify, we'll have set notif_disabled back
-	 * on before we handle the message, since it's a routine KMSG.  Note that
-	 * other vcores will think we are not in vcore context.  This is no
-	 * different to when we pop contexts: 'briefly' leave VC ctx, check
-	 * notif_pending, and (possibly) abort and set notif_disabled. */
+	/* We pretend to not be in vcore context so other cores will send us
+	 * IPIs (__notify).  If we do get a __notify, we'll have set
+	 * notif_disabled back on before we handle the message, since it's a
+	 * routine KMSG.  Note that other vcores will think we are not in vcore
+	 * context.  This is no different to when we pop contexts: 'briefly'
+	 * leave VC ctx, check notif_pending, and (possibly) abort and set
+	 * notif_disabled. */
 	vcpd->notif_disabled = false;
 	cpu_halt_notif_pending(vcpd);
 	__set_cpu_state(pcpui, CPU_STATE_KERNEL);
@@ -1517,6 +1555,7 @@ static int sys_halt_core(struct proc *p, unsigned long usec)
 static int sys_change_to_m(struct proc *p)
 {
 	int retval = proc_change_to_m(p);
+
 	/* convert the kernel error code into (-1, errno) */
 	if (retval) {
 		set_errno(-retval);
@@ -1542,21 +1581,23 @@ static int sys_pop_ctx(struct proc *p, struct user_context *ctx)
 	int vcoreid = pcpui->owning_vcoreid;
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 
-	/* With change_to, there's a bunch of concerns about changing the vcore map,
-	 * since the kernel may have already locked and sent preempts, deaths, etc.
+	/* With change_to, there's a bunch of concerns about changing the vcore
+	 * map, since the kernel may have already locked and sent preempts,
+	 * deaths, etc.
 	 *
 	 * In this case, we don't care as much.  Other than notif_pending and
 	 * notif_disabled, it's more like we're just changing a few registers in
-	 * cur_ctx.  We can safely order-after any kernel messages or other changes,
-	 * as if the user had done all of the changes we'll make and then did a
-	 * no-op syscall.
+	 * cur_ctx.  We can safely order-after any kernel messages or other
+	 * changes, as if the user had done all of the changes we'll make and
+	 * then did a no-op syscall.
 	 *
 	 * Since we are mucking with current_ctx, it is important that we don't
 	 * block before or during this syscall. */
 	arch_finalize_ctx(pcpui->cur_ctx);
 	if (copy_from_user(pcpui->cur_ctx, ctx, sizeof(struct user_context))) {
-		/* The 2LS isn't really in a position to handle errors.  At the very
-		 * least, we can print something and give them a fresh vc ctx. */
+		/* The 2LS isn't really in a position to handle errors.  At the
+		 * very least, we can print something and give them a fresh vc
+		 * ctx. */
 		printk("[kernel] unable to copy user_ctx, 2LS bug\n");
 		memset(pcpui->cur_ctx, 0, sizeof(struct user_context));
 		proc_init_ctx(pcpui->cur_ctx, vcoreid, vcpd->vcore_entry,
@@ -1564,12 +1605,13 @@ static int sys_pop_ctx(struct proc *p, struct user_context *ctx)
 		return -1;
 	}
 	proc_secure_ctx(pcpui->cur_ctx);
-	/* The caller leaves vcore context no matter what.  We'll put them back in
-	 * if they missed a message. */
+	/* The caller leaves vcore context no matter what.  We'll put them back
+	 * in if they missed a message. */
 	vcpd->notif_disabled = FALSE;
 	wrmb();	/* order disabled write before pending read */
 	if (vcpd->notif_pending)
-		send_kernel_message(pcoreid, __notify, (long)p, 0, 0, KMSG_ROUTINE);
+		send_kernel_message(pcoreid, __notify, (long)p, 0, 0,
+				    KMSG_ROUTINE);
 	return 0;
 }
 
@@ -1641,7 +1683,8 @@ static int sys_vmm_ctl(struct proc *p, int cmd, unsigned long arg1,
 		break;
 	case VMM_CTL_SET_FLAGS:
 		if (arg1 & ~VMM_CTL_ALL_FLAGS)
-			error(EINVAL, "Bad vmm_ctl flags.  Got 0x%lx, allowed 0x%lx\n",
+			error(EINVAL,
+			      "Bad vmm_ctl flags.  Got 0x%lx, allowed 0x%lx\n",
 			      arg1, VMM_CTL_ALL_FLAGS);
 		vmm->flags = arg1;
 		ret = 0;
@@ -1666,6 +1709,7 @@ static int sys_poke_ksched(struct proc *p, int target_pid,
 {
 	struct proc *target;
 	int retval = 0;
+
 	if (!target_pid) {
 		poke_ksched(p, res_type);
 		return 0;
@@ -1693,8 +1737,8 @@ static int sys_abort_sysc(struct proc *p, struct syscall *sysc)
 
 static int sys_abort_sysc_fd(struct proc *p, int fd)
 {
-	/* Consider checking for a bad fd.  Doesn't matter now, since we only look
-	 * for actual syscalls blocked that had used fd. */
+	/* Consider checking for a bad fd.  Doesn't matter now, since we only
+	 * look for actual syscalls blocked that had used fd. */
 	return abort_all_sysc_fd(p, fd);
 }
 
@@ -1736,7 +1780,8 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 
 	printd("File %s Open attempt oflag %x mode %x\n", path, oflag, mode);
 	if ((oflag & O_PATH) && (oflag & O_ACCMODE)) {
-		set_error(EINVAL, "Cannot open O_PATH with any I/O perms (O%o)", oflag);
+		set_error(EINVAL, "Cannot open O_PATH with any I/O perms (O%o)",
+			  oflag);
 		return -1;
 	}
 	t_path = copy_in_path(p, path, path_l);
@@ -1783,7 +1828,8 @@ static intreg_t sys_fstat(struct proc *p, int fd, struct kstat *u_stat)
 		kfree(kbuf);
 		return -1;
 	}
-	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
+	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer
+	 */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat))) {
 		kfree(kbuf);
 		return -1;
@@ -1813,7 +1859,8 @@ static intreg_t stat_helper(struct proc *p, const char *path, size_t path_l,
 	retval = sysstatakaros(t_path, (struct kstat *)kbuf, flags);
 	if (retval < 0)
 		goto out_with_kbuf;
-	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer */
+	/* TODO: UMEM: pin the memory, copy directly, and skip the kernel buffer
+	 */
 	if (memcpy_to_user_errno(p, u_stat, kbuf, sizeof(struct kstat)))
 		retval = -1;
 	/* Fall-through */
@@ -1881,7 +1928,8 @@ static intreg_t sys_access(struct proc *p, const char *path, size_t path_l,
 	dir = sysdirstat(t_path);
 	if (!dir)
 		goto out;
-	if ((mode == F_OK) || caller_has_dir_perms(dir, access_bits_to_omode(mode)))
+	if ((mode == F_OK) ||
+	    caller_has_dir_perms(dir, access_bits_to_omode(mode)))
 		retval = 0;
 	kfree(dir);
 out:
@@ -1924,9 +1972,11 @@ intreg_t sys_link(struct proc *p, char *old_path, size_t old_l,
 {
 	int ret;
 	char *t_oldpath = copy_in_path(p, old_path, old_l);
+
 	if (t_oldpath == NULL)
 		return -1;
 	char *t_newpath = copy_in_path(p, new_path, new_l);
+
 	if (t_newpath == NULL) {
 		free_path(p, t_oldpath);
 		return -1;
@@ -1955,9 +2005,11 @@ intreg_t sys_symlink(struct proc *p, char *old_path, size_t old_l,
 {
 	int ret;
 	char *t_oldpath = copy_in_path(p, old_path, old_l);
+
 	if (t_oldpath == NULL)
 		return -1;
 	char *t_newpath = copy_in_path(p, new_path, new_l);
+
 	if (t_newpath == NULL) {
 		free_path(p, t_oldpath);
 		return -1;
@@ -2100,6 +2152,7 @@ intreg_t sys_tcgetattr(struct proc *p, int fd, void *termios_p)
 	/* TODO: actually support this call on tty FDs.  Right now, we just fake
 	 * what my linux box reports for a bash pty. */
 	struct termios *kbuf = kmalloc(sizeof(struct termios), 0);
+
 	kbuf->c_iflag = 0x2d02;
 	kbuf->c_oflag = 0x0005;
 	kbuf->c_cflag = 0x04bf;
@@ -2181,14 +2234,17 @@ intreg_t sys_nbind(struct proc *p,
 {
 	int ret;
 	char *t_srcpath = copy_in_path(p, src_path, src_l);
+
 	if (t_srcpath == NULL) {
 		printd("srcpath dup failed ptr %p size %d\n", src_path, src_l);
 		return -1;
 	}
 	char *t_ontopath = copy_in_path(p, onto_path, onto_l);
+
 	if (t_ontopath == NULL) {
 		free_path(p, t_srcpath);
-		printd("ontopath dup failed ptr %p size %d\n", onto_path, onto_l);
+		printd("ontopath dup failed ptr %p size %d\n", onto_path,
+		       onto_l);
 		return -1;
 	}
 	printd("sys_nbind: %s -> %s flag %d\n", t_srcpath, t_ontopath, flag);
@@ -2213,6 +2269,7 @@ intreg_t sys_nmount(struct proc *p,
 
 	afd = -1;
 	char *t_ontopath = copy_in_path(p, onto_path, onto_l);
+
 	if (t_ontopath == NULL)
 		return -1;
 	ret = sysmount(fd, afd, t_ontopath, flag, /* spec or auth */"/");
@@ -2233,6 +2290,7 @@ intreg_t sys_nunmount(struct proc *p, char *src_path, int src_l,
 {
 	int ret;
 	char *t_ontopath, *t_srcpath;
+
 	t_ontopath = copy_in_path(p, onto_path, onto_l);
 	if (t_ontopath == NULL)
 		return -1;
@@ -2355,13 +2413,13 @@ static intreg_t sys_dup_fds_to(struct proc *p, unsigned int pid,
 static int handle_tap_req(struct proc *p, struct fd_tap_req *req)
 {
 	switch (req->cmd) {
-		case (FDTAP_CMD_ADD):
-			return add_fd_tap(p, req);
-		case (FDTAP_CMD_REM):
-			return remove_fd_tap(p, req->fd);
-		default:
-			set_error(ENOSYS, "FD Tap Command %d not supported", req->cmd);
-			return -1;
+	case (FDTAP_CMD_ADD):
+		return add_fd_tap(p, req);
+	case (FDTAP_CMD_REM):
+		return remove_fd_tap(p, req->fd);
+	default:
+		set_error(ENOSYS, "FD Tap Command %d not supported", req->cmd);
+		return -1;
 	}
 }
 
@@ -2480,8 +2538,10 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 	ERRSTACK(1);
 
 	if (sc_num > max_syscall || syscall_table[sc_num].call == NULL) {
-		printk("[kernel] Invalid syscall %d for proc %d\n", sc_num, p->pid);
-		printk("\tArgs: %p, %p, %p, %p, %p, %p\n", a0, a1, a2, a3, a4, a5);
+		printk("[kernel] Invalid syscall %d for proc %d\n", sc_num,
+		       p->pid);
+		printk("\tArgs: %p, %p, %p, %p, %p, %p\n", a0, a1, a2, a3, a4,
+		       a5);
 		print_user_ctx(this_pcpui_var(cur_ctx));
 		return -1;
 	}
@@ -2500,7 +2560,8 @@ intreg_t syscall(struct proc *p, uintreg_t sc_num, uintreg_t a0, uintreg_t a1,
 	ret = syscall_table[sc_num].call(p, a0, a1, a2, a3, a4, a5);
 	//printd("after syscall errstack base %p\n", get_cur_errbuf());
 	if (get_cur_errbuf() != &errstack[0]) {
-		/* Can't trust coreid and vcoreid anymore, need to check the trace */
+		/* Can't trust coreid and vcoreid anymore, need to check the
+		 * trace */
 		printk("[%16llu] Syscall %3d (%12s):(%p, %p, %p, %p, "
 		       "%p, %p) proc: %d\n", read_tsc(),
 		       sc_num, syscall_table[sc_num].name, a0, a1, a2, a3,
@@ -2518,20 +2579,21 @@ void run_local_syscall(struct syscall *sysc)
 	struct proc *p = pcpui->cur_proc;
 	long retval;
 
-	/* In lieu of pinning, we just check the sysc and will PF on the user addr
-	 * later (if the addr was unmapped).  Which is the plan for all UMEM. */
+	/* In lieu of pinning, we just check the sysc and will PF on the user
+	 * addr later (if the addr was unmapped).  Which is the plan for all
+	 * UMEM. */
 	if (!is_user_rwaddr(sysc, sizeof(struct syscall))) {
-		printk("[kernel] bad user addr %p (+%p) in %s (user bug)\n", sysc,
-		       sizeof(struct syscall), __FUNCTION__);
+		printk("[kernel] bad user addr %p (+%p) in %s (user bug)\n",
+		       sysc, sizeof(struct syscall), __FUNCTION__);
 		return;
 	}
-	pcpui->cur_kthread->sysc = sysc;	/* let the core know which sysc it is */
+	pcpui->cur_kthread->sysc = sysc;/* let the core know which sysc it is */
 	unset_errno();
 	systrace_start_trace(pcpui->cur_kthread, sysc);
 	pcpui = this_pcpui_ptr();	/* reload again */
 	alloc_sysc_str(pcpui->cur_kthread);
-	/* syscall() does not return for exec and yield, so put any cleanup in there
-	 * too. */
+	/* syscall() does not return for exec and yield, so put any cleanup in
+	 * there too. */
 	retval = syscall(pcpui->cur_proc, sysc->num, sysc->arg0, sysc->arg1,
 	                 sysc->arg2, sysc->arg3, sysc->arg4, sysc->arg5);
 	finish_current_sysc(retval);
@@ -2550,8 +2612,8 @@ void prep_syscalls(struct proc *p, struct syscall *sysc, unsigned int nr_syscs)
 	/* For all after the first call, send ourselves a KMSG (TODO). */
 	if (nr_syscs != 1)
 		warn("Only one supported (Debutante calls: %d)\n", nr_syscs);
-	/* Call the first one directly.  (we already checked to make sure there is
-	 * 1) */
+	/* Call the first one directly.  (we already checked to make sure there
+	 * is 1) */
 	run_local_syscall(sysc);
 }
 
@@ -2564,7 +2626,9 @@ void __signal_syscall(struct syscall *sysc, struct proc *p)
 {
 	struct event_queue *ev_q;
 	struct event_msg local_msg;
-	/* User sets the ev_q then atomically sets the flag (races with SC_DONE) */
+
+	/* User sets the ev_q then atomically sets the flag (races with SC_DONE)
+	 */
 	if (atomic_read(&sysc->flags) & SC_UEVENT) {
 		rmb();	/* read the ev_q after reading the flag */
 		ev_q = sysc->ev_q;
@@ -2585,30 +2649,31 @@ void __signal_syscall(struct syscall *sysc, struct proc *p)
 bool syscall_uses_fd(struct syscall *sysc, int fd)
 {
 	switch (sysc->num) {
-		case (SYS_read):
-		case (SYS_write):
-		case (SYS_close):
-		case (SYS_fstat):
-		case (SYS_fcntl):
-		case (SYS_llseek):
-		case (SYS_nmount):
-		case (SYS_fd2path):
-			if (sysc->arg0 == fd)
-				return TRUE;
-			return FALSE;
-		case (SYS_mmap):
-			/* mmap always has to be special. =) */
-			if (sysc->arg4 == fd)
-				return TRUE;
-			return FALSE;
-		default:
-			return FALSE;
+	case (SYS_read):
+	case (SYS_write):
+	case (SYS_close):
+	case (SYS_fstat):
+	case (SYS_fcntl):
+	case (SYS_llseek):
+	case (SYS_nmount):
+	case (SYS_fd2path):
+		if (sysc->arg0 == fd)
+			return TRUE;
+		return FALSE;
+	case (SYS_mmap):
+		/* mmap always has to be special. =) */
+		if (sysc->arg4 == fd)
+			return TRUE;
+		return FALSE;
+	default:
+		return FALSE;
 	}
 }
 
 void print_sysc(struct proc *p, struct syscall *sysc)
 {
 	uintptr_t old_p = switch_to(p);
+
 	printk("SYS_%d, flags %p, a0 %p, a1 %p, a2 %p, a3 %p, a4 %p, a5 %p\n",
 	       sysc->num, atomic_read(&sysc->flags),
 	       sysc->arg0, sysc->arg1, sysc->arg2, sysc->arg3, sysc->arg4,

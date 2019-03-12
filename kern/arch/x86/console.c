@@ -15,30 +15,30 @@
 
 /***** Serial I/O code *****/
 
-#define COM1			0x3F8	/* irq 4 */
-#define COM2			0x2F8	/* irq 3 */
-#define COM3			0x3E8	/* irq 4 */
-#define COM4			0x2E8	/* irq 3 */
+#define COM1		0x3F8	/* irq 4 */
+#define COM2		0x2F8	/* irq 3 */
+#define COM3		0x3E8	/* irq 4 */
+#define COM4		0x2E8	/* irq 3 */
 
-#define	COM_RX			0		// In:	Receive buffer (DLAB=0)
-#define COM_DLL			0		// Out: Divisor Latch Low (DLAB=1)
-#define COM_DLM			1		// Out: Divisor Latch High (DLAB=1)
-#define COM_IER			1		// Out: Interrupt Enable Register
-#define	COM_IER_RDI		0x01	//   Enable receiver data interrupt
-#define COM_IIR			2		// In:	Interrupt ID Register
-#define COM_FCR			2		// Out: FIFO Control Register
-#define COM_LCR			3		// Out: Line Control Register
+#define	COM_RX		0	// In:	Receive buffer (DLAB=0)
+#define COM_DLL		0	// Out: Divisor Latch Low (DLAB=1)
+#define COM_DLM		1	// Out: Divisor Latch High (DLAB=1)
+#define COM_IER		1	// Out: Interrupt Enable Register
+#define	COM_IER_RDI	0x01	//   Enable receiver data interrupt
+#define COM_IIR		2	// In:	Interrupt ID Register
+#define COM_FCR		2	// Out: FIFO Control Register
+#define COM_LCR		3	// Out: Line Control Register
 #define	COM_LCR_DLAB	0x80	//   Divisor latch access bit
 #define	COM_LCR_WLEN8	0x03	//   Wordlength: 8 bits
-#define COM_MCR			4		// Out: Modem Control Register
-#define	COM_MCR_RTS		0x02	// RTS complement
-#define	COM_MCR_DTR		0x01	// DTR complement
+#define COM_MCR		4	// Out: Modem Control Register
+#define	COM_MCR_RTS	0x02	// RTS complement
+#define	COM_MCR_DTR	0x01	// DTR complement
 #define	COM_MCR_OUT2	0x08	// Out2 complement
 #define	COM_MCR_GLB_IRQ	0x08	/* global irq controlled via MCR */
-#define COM_LSR			5		// In:	Line Status Register
+#define COM_LSR		5	// In:	Line Status Register
 #define COM_LSR_DATA	0x01	//   Data available
 #define COM_LSR_READY	0x20	//   Ready to send
-#define COM_SCRATCH		7		/* Scratch register */
+#define COM_SCRATCH	7	/* Scratch register */
 
 /* List of all initialized console devices */
 struct cons_dev_slist cdev_list = SLIST_HEAD_INITIALIZER(cdev_list);
@@ -50,9 +50,10 @@ static int __serial_get_char(int com, uint8_t *data)
 	if (!(inb(com + COM_LSR) & COM_LSR_DATA))
 		return -1;
 	*data = inb(com + COM_RX);
-	/* serial input sends \r a lot, but we interpret them as \n later on.  this
-	 * will help userspace too, which isn't expecting the \rs.  the right answer
-	 * might involve telling userspace what sort of console this is. */
+	/* serial input sends \r a lot, but we interpret them as \n later on.
+	 * this will help userspace too, which isn't expecting the \rs.  the
+	 * right answer might involve telling userspace what sort of console
+	 * this is. */
 	if (*data == '\r')
 		*data = '\n';
 	return 0;
@@ -74,30 +75,30 @@ static void __serial_put_char(int com, uint8_t c)
 static void serial_put_char(struct cons_dev *cdev, uint8_t c)
 {
 	assert(cdev->type == CONS_SER_DEV);
-	/* We do some funky editing of a few chars, to suit what minicom seems to
-	 * expect (at least for brho). */
+	/* We do some funky editing of a few chars, to suit what minicom seems
+	 * to expect (at least for brho). */
 	switch (c & 0xff) {
-		case '\b':
-		case 0x7f:
-		#ifdef CONFIG_PRINTK_NO_BACKSPACE
-			__serial_put_char(cdev->val, (uint8_t)('^'));
-			__serial_put_char(cdev->val, (uint8_t)('H'));
-		#else
-			__serial_put_char(cdev->val, '\b');
-			__serial_put_char(cdev->val, (uint8_t)(' '));
-			__serial_put_char(cdev->val, '\b');
-		#endif /* CONFIG_PRINTK_NO_BACKSPACE */
-			break;
-		case '\n':
-			__serial_put_char(cdev->val, (uint8_t)('\n'));
-			__serial_put_char(cdev->val, (uint8_t)('\r'));
-			break;
-		case '\r':
-			__serial_put_char(cdev->val, (uint8_t)('\r'));
-			break;
-		default:
-			__serial_put_char(cdev->val, (uint8_t)(c & 0xff));
-			break;
+	case '\b':
+	case 0x7f:
+	#ifdef CONFIG_PRINTK_NO_BACKSPACE
+		__serial_put_char(cdev->val, (uint8_t)('^'));
+		__serial_put_char(cdev->val, (uint8_t)('H'));
+	#else
+		__serial_put_char(cdev->val, '\b');
+		__serial_put_char(cdev->val, (uint8_t)(' '));
+		__serial_put_char(cdev->val, '\b');
+	#endif /* CONFIG_PRINTK_NO_BACKSPACE */
+		break;
+	case '\n':
+		__serial_put_char(cdev->val, (uint8_t)('\n'));
+		__serial_put_char(cdev->val, (uint8_t)('\r'));
+		break;
+	case '\r':
+		__serial_put_char(cdev->val, (uint8_t)('\r'));
+		break;
+	default:
+		__serial_put_char(cdev->val, (uint8_t)(c & 0xff));
+		break;
 	}
 }
 
@@ -105,6 +106,7 @@ static void serial_put_char(struct cons_dev *cdev, uint8_t c)
 static void serial_spam_char(int c)
 {
 	struct cons_dev *i;
+
 	SLIST_FOREACH(i, &cdev_list, next) {
 		if (i->type == CONS_SER_DEV)
 			serial_put_char(i, c);
@@ -119,6 +121,7 @@ static char *__serial_detect_type(int com)
 {
 	uint8_t val;
 	char *model = 0;
+
 	/* First, check that the port actually exists.  I haven't seen any
 	 * documentation of the LSR 0xff check, but it seems to work on qemu and
 	 * hardware (brho's nehalem).  Perhaps 0xff is the default state for
@@ -126,8 +129,8 @@ static char *__serial_detect_type(int com)
 	/* Serial port doesn't exist if COM_LSR returns 0xff */
 	if (inb(com + COM_LSR) == 0xff)
 		return model;
-	/* Try to set FIFO, then based on the bits enabled, we can tell what model
-	 * it is */
+	/* Try to set FIFO, then based on the bits enabled, we can tell what
+	 * model it is */
 	outb(com + COM_FCR, 0xe7);
 	val = inb(com + COM_IIR);
 	if (val & (1 << 6)) {
@@ -163,17 +166,17 @@ static void serial_com_init(struct cons_dev *cdev, int com)
 	cdev->type = CONS_SER_DEV;
 	cdev->val = com;
 	switch (com) {
-		case (COM1):
-		case (COM3):
-			cdev->irq = 4;
-			break;
-		case (COM2):
-		case (COM4):
-			cdev->irq = 3;
-			break;
-		default:
-			/* not that printing is the safest thing right now... */
-			panic("Unknown COM %d", com);
+	case COM1:
+	case COM3:
+		cdev->irq = 4;
+		break;
+	case COM2:
+	case COM4:
+		cdev->irq = 3;
+		break;
+	default:
+		/* not that printing is the safest thing right now... */
+		panic("Unknown COM %d", com);
 	}
 	cdev->getc = serial_get_char;
 	/* Turn off the FIFO (not sure this is needed) */
@@ -185,11 +188,12 @@ static void serial_com_init(struct cons_dev *cdev, int com)
 	outb(com + COM_DLM, 0);
 	/* 8 data bits, 1 stop bit, parity off; turn off DLAB latch */
 	outb(com + COM_LCR, COM_LCR_WLEN8 & ~COM_LCR_DLAB);
-	/* This should turn on hardware flow control and make sure the global irq
-	 * bit is on.  This bit is definitely used some hardware's 16550As, though
-	 * not for qemu.  Also, on both qemu and hardware, this whole line is a
-	 * noop, since the COM_MCR is already 0x0b, so we're just making sure the
-	 * three bits are still turned on (and leaving other bits unchanged) */
+	/* This should turn on hardware flow control and make sure the global
+	 * irq bit is on.  This bit is definitely used some hardware's 16550As,
+	 * though not for qemu.  Also, on both qemu and hardware, this whole
+	 * line is a noop, since the COM_MCR is already 0x0b, so we're just
+	 * making sure the three bits are still turned on (and leaving other
+	 * bits unchanged) */
 	outb(com + COM_MCR, inb(com + COM_MCR) | COM_MCR_RTS | COM_MCR_DTR |
 	                                         COM_MCR_GLB_IRQ);
 	/* Enable rx interrupts */
@@ -215,8 +219,7 @@ static void serial_init(void)
 // page.
 
 // Stupid I/O delay routine necessitated by historical PC design flaws
-static void
-delay(void)
+static void delay(void)
 {
 	inb(0x84);
 	inb(0x84);
@@ -224,8 +227,7 @@ delay(void)
 	inb(0x84);
 }
 
-static void
-lpt_putc(int c)
+static void lpt_putc(int c)
 {
 	int i;
 
@@ -259,8 +261,7 @@ static uint16_t scrolling_crt_buf[SCROLLING_CRT_SIZE];
 static uint16_t scrolling_crt_pos;
 static uint8_t	current_crt_buf;
 
-void
-cga_init(void)
+void cga_init(void)
 {
 	volatile uint16_t *cp;
 	uint16_t was;
@@ -298,7 +299,8 @@ static void set_screen(uint8_t screen_num)
 	int offset = scrolling_crt_pos + leftovers - (screen_num + 1)*CRT_SIZE;
 	offset = (offset > 0) ? offset : 0;
 
-	memcpy(crt_buf, scrolling_crt_buf + offset, CRT_SIZE * sizeof(uint16_t));
+	memcpy(crt_buf, scrolling_crt_buf + offset,
+	       CRT_SIZE * sizeof(uint16_t));
 }
 
 static void scroll_screen_up(void)
@@ -321,8 +323,7 @@ static void reset_screen(void)
 	set_screen(current_crt_buf);
 }
 
-void
-cga_putc(int c)
+void cga_putc(int c)
 {
 	// if no attribute given, then use black on white
 	if (!(c & ~0xFF))
@@ -364,13 +365,14 @@ cga_putc(int c)
 		break;
 	}
 
-	// The purpose of this is to allow the screen to appear as if it is scrolling as
-	// more lines are added beyond the size of the monitor.  The top line is dropped
-	// and everything is shifted up by one.
+	// The purpose of this is to allow the screen to appear as if it is
+	// scrolling as more lines are added beyond the size of the monitor.
+	// The top line is dropped and everything is shifted up by one.
 	if (crt_pos >= CRT_SIZE) {
 		int i;
 
-		memcpy(crt_buf, crt_buf + CRT_COLS, (CRT_SIZE - CRT_COLS) * sizeof(uint16_t));
+		memcpy(crt_buf, crt_buf + CRT_COLS,
+		       (CRT_SIZE - CRT_COLS) * sizeof(uint16_t));
 		for (i = CRT_SIZE - CRT_COLS; i < CRT_SIZE; i++)
 			crt_buf[i] = 0x0700 | ' ';
 		crt_pos -= CRT_COLS;
@@ -381,7 +383,8 @@ cga_putc(int c)
 
 		memcpy(scrolling_crt_buf, scrolling_crt_buf + CRT_COLS,
 		       (SCROLLING_CRT_SIZE - CRT_COLS) * sizeof(uint16_t));
-		for (i = SCROLLING_CRT_SIZE - CRT_COLS; i < SCROLLING_CRT_SIZE; i++)
+		for (i = SCROLLING_CRT_SIZE - CRT_COLS; i < SCROLLING_CRT_SIZE;
+		     i++)
 			scrolling_crt_buf[i] = 0x0700 | ' ';
 		scrolling_crt_pos -= CRT_COLS;
 	}
@@ -399,7 +402,7 @@ cga_putc(int c)
 
 #define NO		0
 
-#define SHIFT	(1<<0)
+#define SHIFT		(1<<0)
 #define CTL		(1<<1)
 #define ALT		(1<<2)
 
@@ -502,8 +505,7 @@ static uint32_t shift;
 static bool crt_scrolled = FALSE;
 
 /* TODO: i'm concerned about the (lack of) locking when scrolling the screen. */
-static int
-kbd_proc_data(void)
+static int kbd_proc_data(void)
 {
 #ifdef CONFIG_X86_DISABLE_KEYBOARD
 	/* on some machines with usb keyboards, any keyboard input triggers SMM
@@ -667,22 +669,19 @@ void cons_putc(int c)
 
 // `High'-level console I/O.  Used by readline and cprintf.
 
-void
-cputchar(int c)
+void cputchar(int c)
 {
 	cons_putc(c);
 }
 
-void
-cputbuf(const char*buf, int len)
+void cputbuf(const char*buf, int len)
 {
 	int i;
 	for(i = 0; i < len; i++)
 		cons_putc(buf[i]);
 }
 
-int
-getchar(void)
+int getchar(void)
 {
 	int c;
 
@@ -691,8 +690,7 @@ getchar(void)
 	return c;
 }
 
-int
-iscons(int fdnum)
+int iscons(int fdnum)
 {
 	// used by readline
 	return 1;

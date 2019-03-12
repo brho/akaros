@@ -49,7 +49,8 @@ bool test_set_and_get(void)
 	key = dtls_key_create(0);
 	set_dtls(key, set_val);
 	got_val = get_dtls(key);
-	UT_ASSERT_FMT("Expected %p, got %p", got_val == set_val, set_val, got_val);
+	UT_ASSERT_FMT("Expected %p, got %p", got_val == set_val, set_val,
+		      got_val);
 	destroy_dtls();
 	return TRUE;
 }
@@ -101,7 +102,6 @@ int num_utests = sizeof(utests) / sizeof(struct utest);
 
 int main(int argc, char *argv[])
 {
-	// Run test suite passing it all the args as whitelist of what tests to run.
 	char **whitelist = &argv[1];
 	int whitelist_len = argc - 1;
 

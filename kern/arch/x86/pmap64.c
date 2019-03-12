@@ -37,7 +37,7 @@ physaddr_t boot_cr3;
 segdesc_t *gdt;
 pseudodesc_t gdt_pd;
 
-#define PG_WALK_SHIFT_MASK		0x00ff 		/* first byte = target shift */
+#define PG_WALK_SHIFT_MASK		0x00ff 	/* first byte = target shift */
 #define PG_WALK_CREATE 			0x0100
 
 kpte_t *pml_walk(kpte_t *pml, uintptr_t va, int flags);
@@ -99,25 +99,31 @@ static kpte_t *__pml_walk(kpte_t *pml, uintptr_t va, int flags, int pml_shift)
 			return NULL;
 		new_pml_kva = kpages_alloc(2 * PGSIZE, MEM_WAIT);
 		memset(new_pml_kva, 0, PGSIZE * 2);
-		/* Might want better error handling (we're probably out of memory) */
+		/* Might want better error handling (we're probably out of
+		 * memory) */
 		if (!new_pml_kva)
 			return NULL;
-		/* We insert the new PT into the PML with U and W perms.  Permissions on
-		 * page table walks are anded together (if any of them are !User, the
-		 * translation is !User).  We put the perms on the last entry, not the
-		 * intermediates. */
+		/* We insert the new PT into the PML with U and W perms.
+		 * Permissions on page table walks are anded together (if any of
+		 * them are !User, the translation is !User).  We put the perms
+		 * on the last entry, not the intermediates. */
 		*kpte = PADDR(new_pml_kva) | PTE_P | PTE_U | PTE_W;
-		/* For a dose of paranoia, we'll avoid mapping intermediate eptes when
-		 * we know we're using an address that should never be ept-accesible. */
+		/* For a dose of paranoia, we'll avoid mapping intermediate
+		 * eptes when we know we're using an address that should never
+		 * be ept-accesible. */
 		if (va < ULIM) {
-			/* The physaddr of the new_pml is one page higher than the KPT page.
+			/* The physaddr of the new_pml is one page higher than
+			 * the KPT page.
 			 * A few other things:
 			 * - for the same reason that we have U and X set on all
-			 *   intermediate PTEs, we now set R, X, and W for the EPTE.
+			 *   intermediate PTEs, we now set R, X, and W for the
+			 *   EPTE.
 			 * - All EPTEs have U perms
-			 * - We can't use epte_write since we're workin on intermediate
-			 *   PTEs, and they don't have the memory type set. */
-			*epte = (PADDR(new_pml_kva) + PGSIZE) | EPTE_R | EPTE_X | EPTE_W;
+			 * - We can't use epte_write since we're workin on
+			 *   intermediate PTEs, and they don't have the memory
+			 *   type set. */
+			*epte = (PADDR(new_pml_kva) + PGSIZE) | EPTE_R | EPTE_X
+				| EPTE_W;
 		}
 	}
 	return __pml_walk(kpte2pml(*kpte), va, flags, pml_shift - BITS_PER_PML);
@@ -144,9 +150,9 @@ kpte_t *pml_walk(kpte_t *pml, uintptr_t va, int flags)
  * pml_shift. */
 static uintptr_t amt_til_aligned(uintptr_t va, int pml_shift)
 {
-	/* find the lower bits of va, subtract them from the shift to see what we
-	 * would need to add to get to the shift.  va might be aligned already, and
-	 * we subtracted 0, so we mask off the top part again. */
+	/* find the lower bits of va, subtract them from the shift to see what
+	 * we would need to add to get to the shift.  va might be aligned
+	 * already, and we subtracted 0, so we mask off the top part again. */
 	return ((1UL << pml_shift) - (va & ((1UL << pml_shift) - 1))) &
 	       ((1UL << pml_shift) - 1);
 }
@@ -162,10 +168,11 @@ static uintptr_t amt_of_aligned_bytes(uintptr_t size, int pml_shift)
 static kpte_t *get_next_pte(kpte_t *old_pte, kpte_t *pgdir, uintptr_t va,
                             int flags)
 {
-	/* PTEs (undereferenced) are addresses within page tables.  so long as we
-	 * stay inside the PML, we can just advance via pointer arithmetic.  if we
-	 * advance old_pte and it points to the beginning of a page (offset == 0),
-	 * we've looped outside of our original PML, and need to get a new one. */
+	/* PTEs (undereferenced) are addresses within page tables.  so long as
+	 * we stay inside the PML, we can just advance via pointer arithmetic.
+	 * if we advance old_pte and it points to the beginning of a page
+	 * (offset == 0), we've looped outside of our original PML, and need to
+	 * get a new one. */
 	old_pte++;
 	if (!PGOFF(old_pte))
 		return pml_walk(pgdir, va, flags);
@@ -182,9 +189,11 @@ static void map_my_pages(kpte_t *pgdir, uintptr_t va, size_t size,
 
 	for (size_t i = 0; i < size; i += pgsize, va += pgsize,
 	     pa += pgsize) {
-		kpte = get_next_pte(kpte, pgdir, va, PG_WALK_CREATE | pml_shift);
+		kpte = get_next_pte(kpte, pgdir, va,
+				    PG_WALK_CREATE | pml_shift);
 		assert(kpte);
-		pte_write(kpte, pa, perm | (pml_shift != PML1_SHIFT ? PTE_PS : 0));
+		pte_write(kpte, pa, perm | (pml_shift != PML1_SHIFT ? PTE_PS
+					    			    : 0));
 		printd("Wrote *kpte %p, for va %p to pa %p tried to cover %p\n",
 		       *kpte, va, pa, amt_mapped);
 	}
@@ -264,10 +273,10 @@ void map_segment(pgdir_t pgdir, uintptr_t va, size_t size, physaddr_t pa,
 {
 	int max_shift_possible;
 	if (PGOFF(va) || PGOFF(pa) || PGOFF(size))
-		panic("Asked to map with bad alignment.  va %p, pa %p, size %p\n", va,
-		      pa, size);
-	/* Given the max_page_size, try and use larger pages.  We'll figure out the
-	 * largest possible jumbo page, up to whatever we were asked for. */
+		panic("Asked to map with bad alignment.  va %p, pa %p, size %p\n",
+		      va, pa, size);
+	/* Given the max_page_size, try and use larger pages.  We'll figure out
+	 * the largest possible jumbo page, up to whatever we were asked for. */
 	if (pml_shift != PGSHIFT) {
 		max_shift_possible = max_possible_shift(va, pa);
 		max_shift_possible = MIN(max_shift_possible,
@@ -303,14 +312,14 @@ static int __pml_for_each(kpte_t *pml,  uintptr_t start, size_t len,
 	if (!len)
 		return 0;
 	kpte_s = &pml[PMLx(start, pml_shift)];
-	/* Later, we'll loop up to and including kpte_e.  Since start + len might
-	 * not be page aligned, we'll need to include the final kpte.  If it is
-	 * aligned, we don't want to visit, so we subtract one so that the aligned
-	 * case maps to the index below its normal kpte. */
+	/* Later, we'll loop up to and including kpte_e.  Since start + len
+	 * might not be page aligned, we'll need to include the final kpte.  If
+	 * it is aligned, we don't want to visit, so we subtract one so that the
+	 * aligned case maps to the index below its normal kpte. */
 	kpte_e = &pml[PMLx(start + len - 1, pml_shift)];
 	/* tracks the virt addr kpte_i works on, rounded for this PML */
 	kva = ROUNDDOWN(start, pgsize);
-	printd("PFE, start %p PMLx(S) %d, end-inc %p PMLx(E) %d shift %d, kva %p\n",
+	printd("start %p PMLx(S) %d, end-inc %p PMLx(E) %d shift %d, kva %p\n",
 	       start, PMLx(start, pml_shift), start + len - 1,
 	       PMLx(start + len - 1, pml_shift), pml_shift, kva);
 	for (kpte_i = kpte_s; kpte_i <= kpte_e; kpte_i++, kva += pgsize) {
@@ -318,24 +327,27 @@ static int __pml_for_each(kpte_t *pml,  uintptr_t start, size_t len,
 		/* Complete only on the last level (PML1_SHIFT) or on a jumbo */
 		if (kpte_is_present(kpte_i) &&
 		    (!walk_is_complete(kpte_i, pml_shift, PML1_SHIFT))) {
-			/* only pass truncated end points (e.g. start may not be page
-			 * aligned) when we're on the first (or last) item.  For the middle
-			 * entries, we want the subpmls to process the full range they are
-			 * responsible for: [kva, kva + pgsize). */
+			/* only pass truncated end points (e.g. start may not be
+			 * page aligned) when we're on the first (or last) item.
+			 * For the middle entries, we want the subpmls to
+			 * process the full range they are responsible for:
+			 * [kva, kva + pgsize). */
 			uintptr_t sub_start = MAX(kva, start);
 			size_t sub_len = MIN(start + len - sub_start,
 			                     kva + pgsize - sub_start);
 
-			ret = __pml_for_each(kpte2pml(*kpte_i), sub_start, sub_len,
-			                     callback, arg, pml_shift - BITS_PER_PML);
+			ret = __pml_for_each(kpte2pml(*kpte_i), sub_start,
+					     sub_len, callback, arg,
+					     pml_shift - BITS_PER_PML);
 			if (ret)
 				return ret;
-			/* based on sub_{start,end}, we can tell if our sub visited all of
-			 * its PTES. */
+			/* based on sub_{start,end}, we can tell if our sub
+			 * visited all of its PTES. */
 			if ((sub_start == kva) && (sub_len == pgsize))
 				visited_all_subs = TRUE;
 		}
-		if ((ret = callback(kpte_i, kva, pml_shift, visited_all_subs, arg)))
+		if ((ret = callback(kpte_i, kva, pml_shift, visited_all_subs,
+				    arg)))
 			return ret;
 	}
 	return 0;
@@ -352,8 +364,8 @@ int pml_for_each(kpte_t *pml, uintptr_t start, size_t len, kpte_cb_t callback,
  * page tables, nor does it flush the TLB. */
 int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 {
-	int pt_free_cb(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
-	               void *data)
+	int pt_free_cb(kpte_t *kpte, uintptr_t kva, int shift,
+		       bool visited_subs, void *data)
 	{
 		if (!kpte_is_present(kpte))
 			return 0;
@@ -361,15 +373,16 @@ int unmap_segment(pgdir_t pgdir, uintptr_t va, size_t size)
 			pte_clear(kpte);
 			return 0;
 		}
-		/* Never remove intermediate pages for any kernel mappings.  This is
-		 * also important for x86 so that we don't accidentally free any of the
-		 * boot PMLs, which aren't two-page alloc'd from kpages_arena. */
+		/* Never remove intermediate pages for any kernel mappings.
+		 * This is also important for x86 so that we don't accidentally
+		 * free any of the boot PMLs, which aren't two-page alloc'd from
+		 * kpages_arena. */
 		if (kva >= ULIM)
 			return 0;
-		/* If we haven't visited all of our subs, we might still have some
-		 * mappings hanging off this page table. */
+		/* If we haven't visited all of our subs, we might still have
+		 * some mappings hanging off this page table. */
 		if (!visited_subs) {
-			kpte_t *kpte_i = kpte2pml(*kpte);	/* first kpte == pml */
+			kpte_t *kpte_i = kpte2pml(*kpte);/* first kpte == pml */
 			/* make sure we have no PTEs in use */
 			for (int i = 0; i < NPTENTRIES; i++, kpte_i++) {
 				if (*kpte_i)
@@ -422,8 +435,8 @@ int get_va_perms(pgdir_t pgdir, const void *va)
 
 #define check_sym_va(sym, addr)                                                \
 ({                                                                             \
-	if ((sym) != (addr))                                                       \
-		panic("Error: " #sym " is %p, should be " #addr, sym);                 \
+	if ((sym) != (addr))                                                   \
+		panic("Error: " #sym " is %p, should be " #addr, sym);         \
 })
 
 static void check_syms_va(void)
@@ -459,11 +472,13 @@ void vm_init(void)
 	boot_pgdir.eptp = 0;
 	gdt = KADDR(get_gdt64());
 
-	/* We need to limit our mappings on machines that don't support 1GB pages */
+	/* We need to limit our mappings on machines that don't support 1GB
+	 * pages */
 	max_jumbo_shift = arch_max_jumbo_page_shift();
 	check_syms_va();
-	/* KERNBASE mapping: we already have 512 GB complete (one full PML3_REACH).
-	 * It's okay if we have extra, just need to make sure we reach max_paddr. */
+	/* KERNBASE mapping: we already have 512 GB complete (one full
+	 * PML3_REACH).  It's okay if we have extra, just need to make sure we
+	 * reach max_paddr. */
 	if (KERNBASE + PML3_REACH < (uintptr_t)KADDR(max_paddr)) {
 		map_segment(boot_pgdir, KERNBASE + PML3_REACH,
 		            max_paddr - PML3_REACH, 0x0 + PML3_REACH,
@@ -479,9 +494,9 @@ void vm_init(void)
 	boot_kpt[PML4(UVPT)] = PADDR(boot_kpt) | PTE_USER_RO;
 	/* set up core0s now (mostly for debugging) */
 	setup_default_mtrrs(0);
-	/* Our current gdt_pd (gdt64desc) is pointing to a physical address for the
-	 * GDT.  We need to switch over to pointing to one with a virtual address,
-	 * so we can later unmap the low memory */
+	/* Our current gdt_pd (gdt64desc) is pointing to a physical address for
+	 * the GDT.  We need to switch over to pointing to one with a virtual
+	 * address, so we can later unmap the low memory */
 	gdt_pd = (pseudodesc_t) {sizeof(segdesc_t) * SEG_COUNT - 1,
 	                         (uintptr_t)gdt};
 	asm volatile("lgdt %0" : : "m"(gdt_pd));
@@ -489,9 +504,10 @@ void vm_init(void)
 
 void x86_cleanup_bootmem(void)
 {
-	/* the boot page tables weren't alloc'd the same as other pages, so we'll
-	 * need to do some hackery to 'free' them.  This doesn't actually free
-	 * anything - it just unmaps but leave 2 KPTs (4 pages) sitting around. */
+	/* the boot page tables weren't alloc'd the same as other pages, so
+	 * we'll need to do some hackery to 'free' them.  This doesn't actually
+	 * free anything - it just unmaps but leave 2 KPTs (4 pages) sitting
+	 * around. */
 	//unmap_segment(boot_pgdir, 0, PML3_PTE_REACH);	// want to do this
 	boot_pgdir.kpte[0] = 0;
 	tlb_flush_global();
@@ -511,12 +527,13 @@ int env_user_mem_walk(struct proc *p, void *start, size_t len,
 		mem_walk_callback_t cb;
 		void *cb_arg;
 	};
-	int trampoline_cb(kpte_t *kpte, uintptr_t kva, int shift, bool visited_subs,
-	                  void *data)
+	int trampoline_cb(kpte_t *kpte, uintptr_t kva, int shift,
+			  bool visited_subs, void *data)
 	{
 		struct tramp_package *tp = (struct tramp_package*)data;
 		assert(tp->cb);
-		/* memwalk CBs don't know how to handle intermediates or jumbos */
+		/* memwalk CBs don't know how to handle intermediates or jumbos
+		 */
 		if (shift != PML1_SHIFT)
 			return 0;
 		return tp->cb(tp->p, kpte, (void*)kva, tp->cb_arg);
@@ -561,7 +578,8 @@ static kpte_t __guest_pml_walk(struct proc *p, kpte_t *u_pml, uintptr_t gva,
 
 	if (memcpy_from_user(p, &pte, &u_pml[PMLx(gva, pml_shift)],
 	                     sizeof(kpte_t))) {
-		warn("Buggy pml %p, tried %p\n", u_pml, &u_pml[PMLx(gva, pml_shift)]);
+		warn("Buggy pml %p, tried %p\n", u_pml,
+		     &u_pml[PMLx(gva, pml_shift)]);
 		return 0;
 	}
 	if (walk_is_complete(&pte, pml_shift, flags))
@@ -580,8 +598,9 @@ uintptr_t gva2gpa(struct proc *p, uintptr_t cr3, uintptr_t gva)
 	pte = __guest_pml_walk(p, (kpte_t*)cr3, gva, shift, PML4_SHIFT);
 	if (!pte)
 		return 0;
-	/* TODO: Jumbos mess with us.  We need to know the shift the walk did.  This
-	 * is a little nasty, but will work til we make Akaros more jumbo-aware. */
+	/* TODO: Jumbos mess with us.  We need to know the shift the walk did.
+	 * This is a little nasty, but will work til we make Akaros more
+	 * jumbo-aware. */
 	while (pte & PTE_PS) {
 		shift += BITS_PER_PML;
 		pte = __guest_pml_walk(p, (kpte_t*)cr3, gva, shift, PML4_SHIFT);
@@ -634,21 +653,22 @@ int arch_pgdir_setup(pgdir_t boot_copy, pgdir_t *new_pd)
 	ept = kpte_to_epte(kpt);
 	memset(ept, 0, PGSIZE);
 
-	/* This bit of paranoia slows process creation a little, but makes sure that
-	 * there is nothing below ULIM in boot_pgdir.  Any PML4 entries copied from
-	 * boot_pgdir (e.g. the kernel's memory) will be *shared* among all
-	 * processes, including *everything* under the PML4 entries reach (e.g.
-	 * PML4_PTE_REACH = 512 GB) and any activity would need to be synchronized.
+	/* This bit of paranoia slows process creation a little, but makes sure
+	 * that there is nothing below ULIM in boot_pgdir.  Any PML4 entries
+	 * copied from boot_pgdir (e.g. the kernel's memory) will be *shared*
+	 * among all processes, including *everything* under the PML4 entries
+	 * reach (e.g.  PML4_PTE_REACH = 512 GB) and any activity would need to
+	 * be synchronized.
 	 *
-	 * We could do this once at boot time, but that would miss out on potential
-	 * changes to the boot_pgdir at runtime.
+	 * We could do this once at boot time, but that would miss out on
+	 * potential changes to the boot_pgdir at runtime.
 	 *
 	 * We could also just memset that region to 0.  For now, I want to catch
 	 * whatever mappings exist, since they are probably bugs. */
 	for (int i = 0; i < PML4(ULIM - 1); i++)
 		assert(kpt[i] == 0);
 
-	/* VPT and UVPT map the proc's page table, with different permissions. */
+	/* VPT and UVPT map the proc's page table, with different permissions.*/
 	kpt[PML4(VPT)]  = build_kpte(PADDR(kpt), PTE_KERN_RW);
 	kpt[PML4(UVPT)] = build_kpte(PADDR(kpt), PTE_USER_RO);
 
@@ -711,7 +731,8 @@ void arch_add_intermediate_pts(pgdir_t pgdir, uintptr_t va, size_t len)
 		/* We insert the same as for __pml_walk. */
 		*kpte = PADDR(new_pml_kva) | PTE_P | PTE_U | PTE_W;
 		if (va < ULIM)
-			*epte = (PADDR(new_pml_kva) + PGSIZE) | EPTE_R | EPTE_X | EPTE_W;
+			*epte = (PADDR(new_pml_kva) + PGSIZE) | EPTE_R | EPTE_X
+				| EPTE_W;
 	}
 }
 

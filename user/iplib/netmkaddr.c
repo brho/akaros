@@ -35,12 +35,14 @@ char *netmkaddr(char *linear, char *defnet, char *defsrv, char *buf,
 	if (cp == 0) {
 		if (defnet == 0) {
 			if (defsrv)
-				snprintf(buf, buf_sz, "net!%s!%s", linear, defsrv);
+				snprintf(buf, buf_sz, "net!%s!%s", linear,
+					 defsrv);
 			else
 				snprintf(buf, buf_sz, "net!%s", linear);
 		} else {
 			if (defsrv)
-				snprintf(buf, buf_sz, "%s!%s!%s", defnet, linear, defsrv);
+				snprintf(buf, buf_sz, "%s!%s!%s", defnet,
+					 linear, defsrv);
 			else
 				snprintf(buf, buf_sz, "%s!%s", defnet, linear);
 		}

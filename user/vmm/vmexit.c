@@ -14,7 +14,8 @@
 
 static bool pir_notif_is_set(struct vmm_gpcore_init *gpci)
 {
-	return GET_BITMASK_BIT(gpci->posted_irq_desc, VMX_POSTED_OUTSTANDING_NOTIF);
+	return GET_BITMASK_BIT(gpci->posted_irq_desc,
+			       VMX_POSTED_OUTSTANDING_NOTIF);
 }
 
 /* Returns true if the hardware will trigger an IRQ for the guest.  These
@@ -25,9 +26,9 @@ static bool virtual_irq_is_pending(struct guest_thread *gth)
 	struct vmm_gpcore_init *gpci = gth_to_gpci(gth);
 	uint8_t rvi, vppr;
 
-	/* Currently, the lower 4 bits are various ways to block IRQs, e.g. blocking
-	 * by STI.  The other bits are must be 0.  Presumably any new bits are types
-	 * of IRQ blocking. */
+	/* Currently, the lower 4 bits are various ways to block IRQs, e.g.
+	 * blocking by STI.  The other bits are must be 0.  Presumably any new
+	 * bits are types of IRQ blocking. */
 	if (gth_to_vmtf(gth)->tf_intrinfo1)
 		return false;
 	vppr = read_mmreg32((uintptr_t)gth_to_gpci(gth)->vapic_addr + 0xa0);
@@ -41,31 +42,32 @@ static void sleep_til_irq(struct guest_thread *gth)
 {
 	struct vmm_gpcore_init *gpci = gth_to_gpci(gth);
 
-	/* The invariant is that if an IRQ is posted, but not delivered, we will not
-	 * sleep.  Anyone who posts an IRQ must signal after setting it.
+	/* The invariant is that if an IRQ is posted, but not delivered, we will
+	 * not sleep.  Anyone who posts an IRQ must signal after setting it.
 	 * vmm_interrupt_guest() does this.  If we use alternate sources of IRQ
-	 * posting, we'll need to revist this.  For more details, see the notes in
-	 * the kernel IPI-IRC fast path.
+	 * posting, we'll need to revist this.  For more details, see the notes
+	 * in the kernel IPI-IRC fast path.
 	 *
 	 * Although vmm_interrupt_guest() only writes OUTSTANDING_NOTIF, it's
 	 * possible that the hardware attempted to post the interrupt.  In SDM
-	 * parlance, the processor could have "recognized" the virtual IRQ, but not
-	 * delivered it yet.  This could happen if the guest had executed "sti", but
-	 * not "hlt" yet.  The IRQ was posted and recognized, but not delivered
-	 * ("sti blocking").  Then the guest executes "hlt", and vmexits.
-	 * OUTSTANDING_NOTIF will be clear in this case.  RVI should be set - at
-	 * least to the vector we just sent, but possibly to a greater vector if
-	 * multiple were sent.  RVI should only be cleared after virtual IRQs were
-	 * actually delivered.  So checking OUTSTANDING_NOTIF and RVI should
-	 * suffice.
+	 * parlance, the processor could have "recognized" the virtual IRQ, but
+	 * not delivered it yet.  This could happen if the guest had executed
+	 * "sti", but not "hlt" yet.  The IRQ was posted and recognized, but not
+	 * delivered ("sti blocking").  Then the guest executes "hlt", and
+	 * vmexits.  OUTSTANDING_NOTIF will be clear in this case.  RVI should
+	 * be set - at least to the vector we just sent, but possibly to a
+	 * greater vector if multiple were sent.  RVI should only be cleared
+	 * after virtual IRQs were actually delivered.  So checking
+	 * OUTSTANDING_NOTIF and RVI should suffice.
 	 *
-	 * Note that when we see a notif or pending virtual IRQ, we don't actually
-	 * deliver the IRQ, we'll just restart the guest and the hardware will
-	 * deliver the virtual IRQ at the appropriate time.
+	 * Note that when we see a notif or pending virtual IRQ, we don't
+	 * actually deliver the IRQ, we'll just restart the guest and the
+	 * hardware will deliver the virtual IRQ at the appropriate time.
 	 *
-	 * The more traditional race here is if the halt starts concurrently with
-	 * the post; that's why we sync with the mutex to make sure there is an
-	 * ordering between the actual halt (this function) and the posting. */
+	 * The more traditional race here is if the halt starts concurrently
+	 * with the post; that's why we sync with the mutex to make sure there
+	 * is an ordering between the actual halt (this function) and the
+	 * posting. */
 	uth_mutex_lock(gth->halt_mtx);
 	while (!(pir_notif_is_set(gpci) || virtual_irq_is_pending(gth)))
 		uth_cond_var_wait(gth->halt_cv, gth->halt_mtx);
@@ -73,8 +75,8 @@ static void sleep_til_irq(struct guest_thread *gth)
 }
 
 enum {
-		CPUID_0B_LEVEL_SMT = 0,
-		CPUID_0B_LEVEL_CORE
+	CPUID_0B_LEVEL_SMT = 0,
+	CPUID_0B_LEVEL_CORE
 };
 
 static bool handle_cpuid(struct guest_thread *gth)
@@ -120,7 +122,8 @@ static bool handle_ept_fault(struct guest_thread *gth)
 	int ret;
 
 	if (vm_tf->tf_flags & VMCTX_FL_EPT_VMR_BACKED) {
-		ret = ros_syscall(SYS_populate_va, vm_tf->tf_guest_pa, 1, 0, 0, 0, 0);
+		ret = ros_syscall(SYS_populate_va, vm_tf->tf_guest_pa, 1, 0, 0,
+				  0, 0);
 		if (ret <= 0)
 			panic("[user] handle_ept_fault: populate_va failed: ret = %d\n",
 			      ret);
@@ -140,19 +143,21 @@ static bool handle_ept_fault(struct guest_thread *gth)
 	}
 
 	assert(size >= 0);
-	/* TODO use helpers for some of these addr checks.  the fee/fec ones might
-	 * be wrong too. */
+	/* TODO use helpers for some of these addr checks.  the fee/fec ones
+	 * might be wrong too. */
 	for (int i = 0; i < VIRTIO_MMIO_MAX_NUM_DEV; i++) {
 		if (vm->virtio_mmio_devices[i] == NULL)
 			continue;
 		if (PG_ADDR(gpa) != vm->virtio_mmio_devices[i]->addr)
 			continue;
-		/* TODO: can the guest cause us to spawn off infinite threads? */
+		/* TODO: can the guest cause us to spawn off infinite threads?
+		 */
 		if (store)
-			virtio_mmio_wr(vm, vm->virtio_mmio_devices[i], gpa, size,
-			               (uint32_t *)regp);
+			virtio_mmio_wr(vm, vm->virtio_mmio_devices[i], gpa,
+				       size, (uint32_t *)regp);
 		else
-			*regp = virtio_mmio_rd(vm, vm->virtio_mmio_devices[i], gpa, size);
+			*regp = virtio_mmio_rd(vm, vm->virtio_mmio_devices[i],
+					       gpa, size);
 		vm_tf->tf_rip += advance;
 		return TRUE;
 	}
@@ -194,7 +199,8 @@ static bool handle_vmcall_smpboot(struct guest_thread *gth)
 	struct virtual_machine *vm = gth_to_vm(gth);
 	int cur_pcores = vm->up_gpcs;
 
-	/* Check if we're guest pcore 0. Only the BSP is allowed to start APs. */
+	/* Check if we're guest pcore 0. Only the BSP is allowed to start APs.
+	 */
 	if (vm_tf->tf_guest_pcoreid != 0) {
 		fprintf(stderr,
 		        "Only guest pcore 0 is allowed to start APs. core was %ld\n",
@@ -286,7 +292,8 @@ static bool handle_vmcall(struct guest_thread *gth)
 		trace_printf("ExitQl 0x%08x\n",        vm_tf->tf_exit_qual);
 		trace_printf("Intr1  0x%016lx\n",      vm_tf->tf_intrinfo1);
 		trace_printf("Intr2  0x%016lx\n",      vm_tf->tf_intrinfo2);
-		trace_printf("GIntr  0x----%04x\n",    vm_tf->tf_guest_intr_status);
+		trace_printf("GIntr  0x----%04x\n",
+			     vm_tf->tf_guest_intr_status);
 		trace_printf("GVA    0x%016lx\n",      vm_tf->tf_guest_va);
 		trace_printf("GPA    0x%016lx\n",      vm_tf->tf_guest_pa);
 		retval = true;
@@ -321,9 +328,9 @@ static bool handle_msr(struct guest_thread *gth)
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 
 	if (msrio(gth, gth_to_gpci(gth), vm_tf->tf_exit_reason)) {
-		/* Use event injection through vmctl to send a general protection fault
-		 * vmctl.interrupt gets written to the VM-Entry Interruption-Information
-		 * Field by vmx */
+		/* Use event injection through vmctl to send a general
+		 * protection fault vmctl.interrupt gets written to the VM-Entry
+		 * Interruption-Information Field by vmx */
 		vm_tf->tf_trap_inject = VM_TRAP_VALID
 		                      | VM_TRAP_ERROR_CODE
 		                      | VM_TRAP_HARDWARE
@@ -357,8 +364,9 @@ static bool handle_halt(struct guest_thread *gth)
 
 	if (vm->halt_exit)
 		return FALSE;
-	/* It's possible the guest disabled IRQs and halted, perhaps waiting on an
-	 * NMI or something.  If we need to support that, we can change this.  */
+	/* It's possible the guest disabled IRQs and halted, perhaps waiting on
+	 * an NMI or something.  If we need to support that, we can change this.
+	 */
 	sleep_til_irq(gth);
 	vm_tf->tf_rip += 1;
 	return TRUE;
@@ -410,7 +418,8 @@ bool handle_vmexit(struct guest_thread *gth)
 		/* TODO: just ignore these? */
 		return TRUE;
 	default:
-		fprintf(stderr, "VMM library: don't know how to handle exit %d\n",
+		fprintf(stderr,
+			"VMM library: don't know how to handle exit %d\n",
 		        vm_tf->tf_exit_reason);
 		fprintf(stderr, "RIP %p, shutdown 0x%x\n", vm_tf->tf_rip,
 		        vm_tf->tf_exit_reason);

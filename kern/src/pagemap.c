@@ -16,10 +16,10 @@
 
 void pm_add_vmr(struct page_map *pm, struct vm_region *vmr)
 {
-	/* note that the VMR being reverse-mapped by the PM is protected by the PM's
-	 * lock.  we clearly need a write lock here, but removal also needs a write
-	 * lock, so later when removal holds this, it delays munmaps and keeps the
-	 * VMR connected. */
+	/* note that the VMR being reverse-mapped by the PM is protected by the
+	 * PM's lock.  we clearly need a write lock here, but removal also needs
+	 * a write lock, so later when removal holds this, it delays munmaps and
+	 * keeps the VMR connected. */
 	spin_lock(&pm->pm_lock);
 	TAILQ_INSERT_TAIL(&pm->pm_vmrs, vmr, vm_pm_link);
 	spin_unlock(&pm->pm_lock);
@@ -106,16 +106,17 @@ static struct page *pm_find_page(struct page_map *pm, unsigned long index)
 	void *old_slot_val, *slot_val;
 	struct page *page = 0;
 
-	/* We use rcu to protect our radix walk, specifically the tree_slot pointer.
-	 * We get our own 'pm refcnt' on the slot itself, which doesn't need RCU. */
+	/* We use rcu to protect our radix walk, specifically the tree_slot
+	 * pointer.  We get our own 'pm refcnt' on the slot itself, which
+	 * doesn't need RCU. */
 	rcu_read_lock();
-	/* We're syncing with removal.  The deal is that if we grab the page (and
-	 * we'd only do that if the page != 0), we up the slot ref and clear
-	 * removal.  A remover will only remove it if removal is still set.  If we
-	 * grab and release while removal is in progress, even though we no longer
-	 * hold the ref, we have unset removal.  Also, to prevent removal where we
-	 * get a page well before the removal process, the removal won't even bother
-	 * when the slot refcnt is upped. */
+	/* We're syncing with removal.  The deal is that if we grab the page
+	 * (and we'd only do that if the page != 0), we up the slot ref and
+	 * clear removal.  A remover will only remove it if removal is still
+	 * set.  If we grab and release while removal is in progress, even
+	 * though we no longer hold the ref, we have unset removal.  Also, to
+	 * prevent removal where we get a page well before the removal process,
+	 * the removal won't even bother when the slot refcnt is upped. */
 	tree_slot = radix_lookup_slot(&pm->pm_tree, index);
 	if (!tree_slot)
 		goto out;
@@ -125,7 +126,7 @@ static struct page *pm_find_page(struct page_map *pm, unsigned long index)
 		page = pm_slot_get_page(slot_val);
 		if (!page)
 			goto out;
-		slot_val = pm_slot_inc_refcnt(slot_val);	/* not a page kref */
+		slot_val = pm_slot_inc_refcnt(slot_val); /* not a page kref */
 	} while (!atomic_cas_ptr(tree_slot, old_slot_val, slot_val));
 	assert(page->pg_tree_slot == tree_slot);
 out:
@@ -151,8 +152,9 @@ static int pm_insert_page(struct page_map *pm, unsigned long index,
 
 	page->pg_mapping = pm;	/* debugging */
 	page->pg_index = index;
-	/* no one should be looking at the tree slot til we stop write locking.  the
-	 * only other one who looks is removal, who requires a PM write lock. */
+	/* no one should be looking at the tree slot til we stop write locking.
+	 * the only other one who looks is removal, who requires a PM write
+	 * lock. */
 	page->pg_tree_slot = (void*)0xdeadbeef;	/* poison */
 	slot_val = pm_slot_inc_refcnt(slot_val);
 	/* passing the page ref from the caller to the slot */
@@ -194,29 +196,30 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 	while (!page) {
 		if (kpage_alloc(&page))
 			return -ENOMEM;
-		/* important that UP_TO_DATE is not set.  once we put it in the PM,
-		 * others can find it, and we still need to fill it. */
+		/* important that UP_TO_DATE is not set.  once we put it in the
+		 * PM, others can find it, and we still need to fill it. */
 		atomic_set(&page->pg_flags, PG_LOCKED | PG_PAGEMAP);
-		/* The sem needs to be initted before anyone can try to lock it, meaning
-		 * before it is in the page cache.  We also want it locked preemptively,
-		 * by setting signals = 0. */
+		/* The sem needs to be initted before anyone can try to lock it,
+		 * meaning before it is in the page cache.  We also want it
+		 * locked preemptively, by setting signals = 0. */
 		sem_init(&page->pg_sem, 0);
 		error = pm_insert_page(pm, index, page);
 		switch (error) {
-			case 0:
-				goto load_locked_page;
-				break;
-			case -EEXIST:
-				/* the page was mapped already (benign race), just get rid of
-				 * our page and try again (the only case that uses the while) */
-				atomic_set(&page->pg_flags, 0);
-				page_decref(page);
-				page = pm_find_page(pm, index);
-				break;
-			default:
-				atomic_set(&page->pg_flags, 0);
-				page_decref(page);
-				return error;
+		case 0:
+			goto load_locked_page;
+			break;
+		case -EEXIST:
+			/* the page was mapped already (benign race), just get
+			 * rid of our page and try again (the only case that
+			 * uses the while) */
+			atomic_set(&page->pg_flags, 0);
+			page_decref(page);
+			page = pm_find_page(pm, index);
+			break;
+		default:
+			atomic_set(&page->pg_flags, 0);
+			page_decref(page);
+			return error;
 		}
 	}
 	assert(page);
@@ -229,9 +232,9 @@ int pm_load_page(struct page_map *pm, unsigned long index, struct page **pp)
 		return 0;
 	}
 	lock_page(page);
-	/* double-check.  if we we blocked on lock_page, it was probably for someone
-	 * else loading.  plus, we can't load a page more than once (it could
-	 * clobber newer writes) */
+	/* double-check.  if we we blocked on lock_page, it was probably for
+	 * someone else loading.  plus, we can't load a page more than once (it
+	 * could clobber newer writes) */
 	if (atomic_read(&page->pg_flags) & PG_UPTODATE) {
 		unlock_page(page);
 		*pp = page;
@@ -253,6 +256,7 @@ int pm_load_page_nowait(struct page_map *pm, unsigned long index,
                         struct page **pp)
 {
 	struct page *page = pm_find_page(pm, index);
+
 	if (!page)
 		return -EAGAIN;
 	if (!(atomic_read(&page->pg_flags) & PG_UPTODATE)) {
@@ -290,8 +294,8 @@ static void vmr_for_each(struct vm_region *vmr, unsigned long pg_idx,
 
 	start_va = vmr->vm_base + (file_off - vmr->vm_foff);
 	if (start_va < vmr->vm_base) {
-		warn("wraparound! %p %p %p %p", start_va, vmr->vm_base, vmr->vm_foff,
-		     pg_idx);
+		warn("wraparound! %p %p %p %p", start_va, vmr->vm_base,
+		     vmr->vm_foff, pg_idx);
 		return;
 	}
 	if (start_va >= vmr->vm_end)
@@ -343,9 +347,10 @@ static bool __remove_or_zero_cb(void **slot, unsigned long tree_idx, void *arg)
 		memset(page2kva(page), 0, PGSIZE);
 		return false;
 	}
-	/* We yanked the page out.  The radix tree still has an item until we return
-	 * true, but this is fine.  Future lock-free lookups will now fail (since
-	 * the page is 0), and insertions will block on the write lock. */
+	/* We yanked the page out.  The radix tree still has an item until we
+	 * return true, but this is fine.  Future lock-free lookups will now
+	 * fail (since the page is 0), and insertions will block on the write
+	 * lock. */
 	atomic_set(&page->pg_flags, 0);	/* cause/catch bugs */
 	page_decref(page);
 	return true;
@@ -391,9 +396,10 @@ static void mark_and_clear_dirty_ptes(struct page_map *pm)
 	TAILQ_FOREACH(vmr_i, &pm->pm_vmrs, vm_pm_link) {
 		if (!(vmr_i->vm_prot & PROT_WRITE))
 			continue;
-		/* Only care about shared mappings, not private.  Private mappings have
-		 * a reference to the file, but the pages are not in the page cache -
-		 * they hang directly off the PTEs (for now). */
+		/* Only care about shared mappings, not private.  Private
+		 * mappings have a reference to the file, but the pages are not
+		 * in the page cache - they hang directly off the PTEs (for
+		 * now). */
 		if (!(vmr_i->vm_flags & MAP_SHARED))
 			continue;
 		spin_lock(&vmr_i->vm_proc->pte_lock);
@@ -407,10 +413,10 @@ static void shootdown_vmrs(struct page_map *pm)
 {
 	struct vm_region *vmr_i;
 
-	/* The VMR flag shootdown_needed is owned by the PM.  Each VMR is hooked to
-	 * at most one file, so there's no issue there.  We might have a proc that
-	 * has multiple non-private VMRs in the same file, but it shouldn't be a big
-	 * enough issue to worry about. */
+	/* The VMR flag shootdown_needed is owned by the PM.  Each VMR is hooked
+	 * to at most one file, so there's no issue there.  We might have a proc
+	 * that has multiple non-private VMRs in the same file, but it shouldn't
+	 * be a big enough issue to worry about. */
 	spin_lock(&pm->pm_lock);
 	TAILQ_FOREACH(vmr_i, &pm->pm_vmrs, vm_pm_link) {
 		if (vmr_i->vm_shootdown_needed) {
@@ -431,8 +437,9 @@ static void flush_queued_writebacks(struct page_map *pm)
  * bunch outstanding, we'll send them. */
 static void queue_writeback(struct page_map *pm, struct page *page)
 {
-	/* TODO (WB): add a bulk op (instead of only writepage()), collect extents,
-	 * and send them to the device.  Probably do something similar for reads. */
+	/* TODO (WB): add a bulk op (instead of only writepage()), collect
+	 * extents, and send them to the device.  Probably do something similar
+	 * for reads. */
 	pm->pm_op->writepage(pm, page);
 }
 
@@ -479,31 +486,32 @@ static bool __flush_unused_cb(void **slot, unsigned long tree_idx, void *arg)
 	slot_val = pm_slot_set_page(slot_val, NULL);
 	if (!atomic_cas_ptr(slot, old_slot_val, slot_val))
 		return false;
-	/* At this point, we yanked the page.  any concurrent wait-free users that
-	 * want to get this page will fail (pm_find_page / pm_load_page_nowait).
-	 * They will block on the qlock that we hold when they try to insert a page
-	 * (as part of pm_load_page, for both reading or writing).  We can still
-	 * bail out and everything will be fine, so long as we put the page back.
+	/* At this point, we yanked the page.  any concurrent wait-free users
+	 * that want to get this page will fail (pm_find_page /
+	 * pm_load_page_nowait).  They will block on the qlock that we hold when
+	 * they try to insert a page (as part of pm_load_page, for both reading
+	 * or writing).  We can still bail out and everything will be fine, so
+	 * long as we put the page back.
 	 *
-	 * We can't tell from looking at the page if it was actually faulted into
-	 * the VMR; we just know it was possible.  (currently).  Also, we need to do
-	 * this check after removing the page from the PM slot, since the mm
-	 * faulting code (hpf) will attempt a non-blocking PM lookup. */
+	 * We can't tell from looking at the page if it was actually faulted
+	 * into the VMR; we just know it was possible.  (currently).  Also, we
+	 * need to do this check after removing the page from the PM slot, since
+	 * the mm faulting code (hpf) will attempt a non-blocking PM lookup. */
 	if (pm_has_vmr_with_page(pm, tree_idx)) {
 		slot_val = pm_slot_set_page(slot_val, page);
-		/* No one should be writing to it.  We hold the qlock, and any readers
-		 * should not have increffed while the page was NULL. */
+		/* No one should be writing to it.  We hold the qlock, and any
+		 * readers should not have increffed while the page was NULL. */
 		WRITE_ONCE(*slot, slot_val);
 		return false;
 	}
-	/* Need to check PG_DIRTY *after* checking VMRs.  o/w we could check, PAUSE,
-	 * see no VMRs.  But in the meantime, we had a VMR that munmapped and
-	 * wrote-back the dirty flag. */
+	/* Need to check PG_DIRTY *after* checking VMRs.  o/w we could check,
+	 * PAUSE, see no VMRs.  But in the meantime, we had a VMR that munmapped
+	 * and wrote-back the dirty flag. */
 	if (atomic_read(&page->pg_flags) & PG_DIRTY) {
-		/* If we want to batch these, we'll also have to batch the freeing,
-		 * which isn't a big deal.  Just do it before freeing and before
-		 * unlocking the PM; we don't want someone to load the page from the
-		 * backing store and get an old value. */
+		/* If we want to batch these, we'll also have to batch the
+		 * freeing, which isn't a big deal.  Just do it before freeing
+		 * and before unlocking the PM; we don't want someone to load
+		 * the page from the backing store and get an old value. */
 		pm->pm_op->writepage(pm, page);
 	}
 	/* All clear - the page is unused and (now) clean. */
@@ -550,8 +558,8 @@ void print_page_map_info(struct page_map *pm)
 	TAILQ_FOREACH(vmr_i, &pm->pm_vmrs, vm_pm_link) {
 		printk("\tVMR proc %d: (%p - %p): 0x%08x, 0x%08x, %p, %p\n",
 		       vmr_i->vm_proc->pid, vmr_i->vm_base, vmr_i->vm_end,
-		       vmr_i->vm_prot, vmr_i->vm_flags, foc_pointer(vmr_i->__vm_foc),
-			   vmr_i->vm_foff);
+		       vmr_i->vm_prot, vmr_i->vm_flags,
+		       foc_pointer(vmr_i->__vm_foc), vmr_i->vm_foff);
 	}
 	spin_unlock(&pm->pm_lock);
 }

@@ -10,19 +10,19 @@
 static int sol_socket_sso(Rock *r, int optname, void *optval, socklen_t optlen)
 {
 	switch (optname) {
-		#if 0
-		/* We don't support setting any options yet */
-		case (SO_FOO):
-			if (optlen < foo_len) {
-				__set_errno(EINVAL);
-				return -1;
-			}
-			r->foo = *optval;
-			break;
-		#endif
-		default:
-			__set_errno(ENOPROTOOPT);
+	#if 0
+	/* We don't support setting any options yet */
+	case (SO_FOO):
+		if (optlen < foo_len) {
+			__set_errno(EINVAL);
 			return -1;
+		}
+		r->foo = *optval;
+		break;
+	#endif
+	default:
+		__set_errno(ENOPROTOOPT);
+		return -1;
 	};
 	return 0;
 }
@@ -38,11 +38,11 @@ int __setsockopt(int sockfd, int level, int optname, const __ptr_t __optval,
 		return -1;
 	}
 	switch (level) {
-		case (SOL_SOCKET):
-			return sol_socket_sso(r, optname, optval, optlen);
-		default:
-			__set_errno(ENOPROTOOPT);
-			return -1;
+	case (SOL_SOCKET):
+		return sol_socket_sso(r, optname, optval, optlen);
+	default:
+		__set_errno(ENOPROTOOPT);
+		return -1;
 	};
 }
 weak_alias (__setsockopt, setsockopt)

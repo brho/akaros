@@ -129,7 +129,8 @@ int64_t parseip(uint8_t *to, char *from)
 		return -1; /* parse error */
 	}
 	if (i < IPaddrlen) {
-		memmove(&to[elipsis + IPaddrlen - i], &to[elipsis], i - elipsis);
+		memmove(&to[elipsis + IPaddrlen - i], &to[elipsis],
+			i - elipsis);
 		memset(&to[elipsis], 0, IPaddrlen - i);
 	}
 	if (v4) {
@@ -195,8 +196,8 @@ char *v4parsecidr(uint8_t *addr, uint8_t *mask, char *from)
 	if (*p == '/') {
 		/* as a number of prefix bits */
 		i = strtoul(p + 1, &p, 0);
-		/* We might have been passed a v6 mask - the signal for that will be
-		 * having more than 32 bits. */
+		/* We might have been passed a v6 mask - the signal for that
+		 * will be having more than 32 bits. */
 		if (i >= 32)
 			i -= 128 - 32;
 		memset(mask, 0, IPv4addrlen);

@@ -11,17 +11,17 @@
 #include <ros/common.h>
 
 /* Types of resource requests */
-#define RES_CORES			 0
-#define RES_MEMORY			 1
-#define RES_APPLE_PIES		 2
-#define MAX_NUM_RESOURCES    3
+#define RES_CORES		0
+#define RES_MEMORY		1
+#define RES_APPLE_PIES		2
+#define MAX_NUM_RESOURCES	3
 
 /* Flags */
-#define REQ_ASYNC			0x01 // Sync by default (?)
-#define REQ_SOFT			0x02 // just making something up
+#define REQ_ASYNC		0x01 // Sync by default (?)
+#define REQ_SOFT		0x02 // just making something up
 
 struct resource_req {
-	unsigned long				amt_wanted;
-	unsigned long				amt_wanted_min;
-	int							flags;
+	unsigned long			amt_wanted;
+	unsigned long			amt_wanted_min;
+	int				flags;
 };

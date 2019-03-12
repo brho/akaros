@@ -10,19 +10,18 @@
 #include <ns.h>
 #include <bitmap.h>
 
-#define SYSTRACE_ON					0x01
-#define SYSTRACE_LOUD				0x02
-#define SYSTRACE_ALLPROC			0x04
+#define SYSTRACE_ON		0x01
+#define SYSTRACE_LOUD		0x02
+#define SYSTRACE_ALLPROC	0x04
 
-#define MAX_SYSTRACES				1024
+#define MAX_SYSTRACES		1024
 
-#define SYSCALL_STRLEN				128
+#define SYSCALL_STRLEN		128
 
-#define MAX_ASRC_BATCH				10
+#define MAX_ASRC_BATCH		10
 
-#define SYSTR_RECORD_SZ				256
-#define SYSTR_PRETTY_BUF_SZ			(SYSTR_BUF_SZ -                            \
-                                     sizeof(struct systrace_record))
+#define SYSTR_RECORD_SZ		256
+#define SYSTR_PRETTY_BUF_SZ	(SYSTR_BUF_SZ - sizeof(struct systrace_record))
 struct systrace_record {
 	struct systrace_record_anon {
 		uint64_t		start_timestamp, end_timestamp;
@@ -34,14 +33,14 @@ struct systrace_record {
 		uintreg_t		arg4;
 		uintreg_t		arg5;
 		uintreg_t		retval;
-		int				pid;
+		int			pid;
 		uint32_t		coreid;
 		uint32_t		vcoreid;
 		char			*pretty_buf;
 		uint8_t			datalen;
-		int				errno;
+		int			errno;
 	};
-	uint8_t			data[SYSTR_RECORD_SZ - sizeof(struct systrace_record_anon)];
+	uint8_t	data[SYSTR_RECORD_SZ - sizeof(struct systrace_record_anon)];
 };
 
 struct strace {
@@ -51,7 +50,7 @@ struct strace {
 	atomic_t nr_drops;
 	unsigned long appx_nr_sysc;
 	struct kref procs; /* when procs goes to zero, q is hung up. */
-	struct kref users; /* when users goes to zero, q and struct are freed. */
+	struct kref users; /* when users goes to zero, q and struct are freed.*/
 	struct queue *q;
 	spinlock_t lock;
 	DECLARE_BITMAP(trace_set, MAX_SYSCALL_NR);

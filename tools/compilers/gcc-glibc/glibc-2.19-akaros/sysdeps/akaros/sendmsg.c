@@ -16,7 +16,7 @@ ssize_t __sendto_iov(int fd, const struct iovec *iov, int iovcnt,
  * sent, or -1 for errors.  */
 ssize_t __sendmsg(int fd, const struct msghdr *msg, int flags)
 {
-	return __sendto_iov(fd, msg->msg_iov, msg->msg_iovlen, flags, msg->msg_name,
-	                    msg->msg_namelen);
+	return __sendto_iov(fd, msg->msg_iov, msg->msg_iovlen, flags,
+			    msg->msg_name, msg->msg_namelen);
 }
 weak_alias(__sendmsg, sendmsg)

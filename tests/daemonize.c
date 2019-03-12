@@ -28,7 +28,8 @@ int main(int argc, char *argv[], char *envp[])
 
 	register_ev_handler(EV_USER_IPI, ev_handler, 0);
 	evq = get_eventq(EV_MBOX_UCQ);
-	evq->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP;
+	evq->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_SPAM_INDIR |
+		        EVENT_WAKEUP;
 	register_kevent_q(evq, EV_USER_IPI);
 
 	pid = create_child_with_stdfds(argv[1], argc - 1, argv + 1, envp);

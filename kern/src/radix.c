@@ -48,8 +48,8 @@ static bool __should_not_run_cb(void **slot, unsigned long tree_idx, void *a)
  * slot. */
 void radix_tree_destroy(struct radix_tree *tree)
 {
-	/* Currently, we may have a root node, even if all the elements were removed
-	 */
+	/* Currently, we may have a root node, even if all the elements were
+	 * removed */
 	radix_for_each_slot(tree, __should_not_run_cb, NULL);
 	if (tree->root) {
 		kmem_cache_free(radix_kcache, tree->root);
@@ -68,24 +68,27 @@ int radix_insert(struct radix_tree *tree, unsigned long key, void *item,
 	struct radix_node *r_node;
 	void **slot;
 
-	/* Is the tree tall enough?  if not, it needs to grow a level.  This will
-	 * also create the initial node (upper bound starts at 0). */
+	/* Is the tree tall enough?  if not, it needs to grow a level.  This
+	 * will also create the initial node (upper bound starts at 0). */
 	while (key >= tree->upper_bound) {
 		r_node = kmem_cache_alloc(radix_kcache, MEM_WAIT);
 		memset(r_node, 0, sizeof(struct radix_node));
 		if (tree->root) {
-			/* tree->root is the old root, now a child of the future root */
+			/* tree->root is the old root, now a child of the future
+			 * root */
 			r_node->items[0] = tree->root;
 			tree->root->parent = r_node;
-			tree->root->my_slot = (struct radix_node**)&r_node->items[0];
+			tree->root->my_slot =
+				(struct radix_node**)&r_node->items[0];
 			r_node->num_items = 1;
 		} else {
-			/* if there was no root before, we're both the root and a leaf */
+			/* if there was no root before, we're both the root and
+			 * a leaf */
 			r_node->leaf = TRUE;
 			r_node->parent = 0;
 		}
-		/* Need to atomically change root, depth, and upper_bound for our
-		 * readers, who will check the seq ctr. */
+		/* Need to atomically change root, depth, and upper_bound for
+		 * our readers, who will check the seq ctr. */
 		__seq_start_write(&tree->seq);
 		tree->root = r_node;
 		r_node->my_slot = &tree->root;
@@ -94,11 +97,11 @@ int radix_insert(struct radix_tree *tree, unsigned long key, void *item,
 		__seq_end_write(&tree->seq);
 	}
 	assert(tree->root);
-	/* the tree now thinks it is tall enough, so find the last node, insert in
-	 * it, etc */
+	/* the tree now thinks it is tall enough, so find the last node, insert
+	 * in it, etc */
 	/* This gives us an rcu-protected pointer, though we hold the lock. */
 	r_node = __radix_lookup_node(tree, key, TRUE);
-	assert(r_node);		/* we want an ENOMEM actually, but i want to see this */
+	assert(r_node);	/* we want an ENOMEM actually, but i want to see this */
 	slot = &r_node->items[key & (NR_RNODE_SLOTS - 1)];
 	if (*slot)
 		return -EEXIST;
@@ -124,13 +127,13 @@ static void __radix_remove_slot(struct radix_node *r_node,
 	assert(*slot);		/* make sure there is something there */
 	rcu_assign_pointer(*slot, NULL);
 	r_node->num_items--;
-	/* this check excludes the root, but the if else handles it.  For now, once
-	 * we have a root, we'll always keep it (will need some changing in
+	/* this check excludes the root, but the if else handles it.  For now,
+	 * once we have a root, we'll always keep it (will need some changing in
 	 * radix_insert() */
 	if (!r_node->num_items && r_node->parent) {
 		if (r_node->parent)
 			__radix_remove_slot(r_node->parent, r_node->my_slot);
-		else			/* we're the last node, attached to the actual tree */
+		else	/* we're the last node, attached to the actual tree */
 			*(r_node->my_slot) = 0;
 		call_rcu(&r_node->rcu, __rnode_free_rcu);
 	}
@@ -157,7 +160,8 @@ void *radix_delete(struct radix_tree *tree, unsigned long key)
 	if (retval) {
 		__radix_remove_slot(r_node, (struct radix_node**)slot);
 	} else {
-		/* it's okay to delete an empty, but i want to know about it for now */
+		/* it's okay to delete an empty, but i want to know about it for
+		 * now */
 		warn("Tried to remove a non-existant item from a radix tree!");
 	}
 	return retval;
@@ -170,8 +174,9 @@ void *radix_lookup(struct radix_tree *tree, unsigned long key)
 
 	if (!slot)
 		return 0;
-	/* slot was rcu-protected, pointing into the memory of an r_node.  we also
-	 * want *slot, which is "void *item" to be an rcu-protected pointer. */
+	/* slot was rcu-protected, pointing into the memory of an r_node.  we
+	 * also want *slot, which is "void *item" to be an rcu-protected
+	 * pointer. */
 	return rcu_dereference(*slot);
 }
 
@@ -204,26 +209,30 @@ static struct radix_node *__radix_lookup_node(struct radix_tree *tree,
 
 	if (key	>= upper_bound) {
 		if (extend)
-			warn("Bound (%d) not set for key %d!\n", upper_bound, key);
+			warn("Bound (%d) not set for key %d!\n", upper_bound,
+			     key);
 		return 0;
 	}
 	for (int i = depth; i > 1; i--) {	 /* i = ..., 4, 3, 2 */
-		idx = (key >> (LOG_RNODE_SLOTS * (i - 1))) & (NR_RNODE_SLOTS - 1);
+		idx = (key >> (LOG_RNODE_SLOTS * (i - 1)))
+		      & (NR_RNODE_SLOTS - 1);
 		/* There might not be a node at this part of the tree */
 		if (!r_node->items[idx]) {
 			if (!extend)
 				return 0;
 			child_node = kmem_cache_alloc(radix_kcache, MEM_WAIT);
 			memset(child_node, 0, sizeof(struct radix_node));
-			/* when we are on the last iteration (i == 2), the child will be
-			 * a leaf. */
+			/* when we are on the last iteration (i == 2), the child
+			 * will be a leaf. */
 			child_node->leaf = (i == 2) ? TRUE : FALSE;
 			child_node->parent = r_node;
-			child_node->my_slot = (struct radix_node**)&r_node->items[idx];
+			child_node->my_slot =
+				(struct radix_node**)&r_node->items[idx];
 			r_node->num_items++;
 			rcu_assign_pointer(r_node->items[idx], child_node);
 		}
-		r_node = (struct radix_node*)rcu_dereference(r_node->items[idx]);
+		r_node =
+		    (struct radix_node*)rcu_dereference(r_node->items[idx]);
 	}
 	return r_node;
 }
@@ -237,8 +246,8 @@ void **radix_lookup_slot(struct radix_tree *tree, unsigned long key)
 	if (!r_node)
 		return 0;
 	key = key & (NR_RNODE_SLOTS - 1);
-	/* r_node is rcu-protected.  Our retval is too, since it's a pointer into
-	 * the same object as r_node. */
+	/* r_node is rcu-protected.  Our retval is too, since it's a pointer
+	 * into the same object as r_node. */
 	return &r_node->items[key];
 }
 
@@ -290,26 +299,28 @@ static bool rnode_for_each(struct radix_node *r_node, int depth,
 {
 	unsigned int num_children = ACCESS_ONCE(r_node->num_items);
 
-	/* The tree_idx we were passed was from our parent's perspective.  We need
-	 * shift it over each time we walk down to put it in terms of our
-	 * level/depth.  Or think of it as making room for our bits (the values of
-	 * i). */
+	/* The tree_idx we were passed was from our parent's perspective.  We
+	 * need shift it over each time we walk down to put it in terms of our
+	 * level/depth.  Or think of it as making room for our bits (the values
+	 * of i). */
 	tree_idx <<= LOG_RNODE_SLOTS;
 	for (int i = 0; num_children && (i < NR_RNODE_SLOTS); i++) {
 		if (r_node->items[i]) {
-			/* If we really care, we can try to abort the rest of the loop.  Not
-			 * a big deal */
-			if (!child_overlaps_range(tree_idx + i, depth, glb_start_idx,
-			                          glb_end_idx))
+			/* If we really care, we can try to abort the rest of
+			 * the loop.  Not a big deal */
+			if (!child_overlaps_range(tree_idx + i, depth,
+						  glb_start_idx, glb_end_idx))
 				continue;
 			if (depth > 1) {
-				if (rnode_for_each(r_node->items[i], depth - 1, tree_idx + i,
-				                   glb_start_idx, glb_end_idx, cb, arg))
+				if (rnode_for_each(r_node->items[i], depth - 1,
+						   tree_idx + i, glb_start_idx,
+						   glb_end_idx, cb, arg))
 					num_children--;
 			} else {
 				if (cb(&r_node->items[i], tree_idx + i, arg)) {
 					__radix_remove_slot(r_node,
-					                    (struct radix_node**)&r_node->items[i]);
+						(struct radix_node**)
+						&r_node->items[i]);
 					num_children--;
 				}
 			}
@@ -402,13 +413,14 @@ void print_radix_tree(struct radix_tree *tree)
 		for (int i = 0; i < depth; i++)
 			buf[i] = '\t';
 		printk("%sRnode %p, parent %p, myslot %p, %d items, leaf? %d\n",
-		       buf, r_node, r_node->parent, r_node->my_slot, r_node->num_items,
-		       r_node->leaf);
+		       buf, r_node, r_node->parent, r_node->my_slot,
+		       r_node->num_items, r_node->leaf);
 		for (int i = 0; i < NR_RNODE_SLOTS; i++) {
 			if (!r_node->items[i])
 				continue;
 			if (r_node->leaf)
-				printk("\t%sRnode Item %d: %p\n", buf, i, r_node->items[i]);
+				printk("\t%sRnode Item %d: %p\n", buf, i,
+				       r_node->items[i]);
 			else
 				print_rnode(r_node->items[i], depth + 1);
 		}

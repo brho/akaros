@@ -31,11 +31,13 @@ static void ehci_disable_leg(struct pci_device *pcidev)
 	//ptr = (ctlr->capio->capparms >> Ceecpshift) & Ceecpmask;
 	uintptr_t bar0 = pci_get_membar(pcidev, 0);
 	assert(bar0);
-	uintptr_t ehci_hcc_regs = vmap_pmem_nocache(bar0, pcidev->bar[0].mmio_sz);
+	uintptr_t ehci_hcc_regs = vmap_pmem_nocache(bar0,
+						    pcidev->bar[0].mmio_sz);
 	uint32_t hccparams = read_mmreg32(ehci_hcc_regs + 0x08);
+
 	ptr = (hccparams >> 8) & ((1 << 8) - 1);
 
-	for(; ptr != 0; ptr = pcidev_read8(pcidev, ptr + 1)) {
+	for (; ptr != 0; ptr = pcidev_read8(pcidev, ptr + 1)) {
 		if (ptr < 0x40 || (ptr & ~0xFC))
 			break;
 		cap = pcidev_read8(pcidev, ptr);
@@ -79,8 +81,8 @@ static void xhci_disable_leg(struct pci_device *pcidev)
 	hccparams = read_mmreg32(xhci_hcc_regs + 0x10);
 	xecp = (hccparams >> 16) & 0xffff;
 
-	/* xecp is the rel offset, in 32 bit words, from the base to the extended
-	 * capabilities pointer. */
+	/* xecp is the rel offset, in 32 bit words, from the base to the
+	 * extended capabilities pointer. */
 	for (/* xecp set */; xecp; xecp = (read_mmreg32(xecp) >> 8) & 0xff) {
 		xecp = xhci_hcc_regs + (xecp << 2);
 		val = read_mmreg32(xecp);
@@ -90,10 +92,11 @@ static void xhci_disable_leg(struct pci_device *pcidev)
 		/* bios already does not own it */
 		if (!(val & (1 << 16)))
 			return;
-		/* take ownership.  Note we're allowed to do byte-width writes here. */
+		/* take ownership.  Note we're allowed to do byte-width writes
+		 * here. */
 		write_mmreg8(xecp + 3, 1);
-		/* book says to wait up to a second, though i regularly see it time out
-		 * on my machines. */
+		/* book says to wait up to a second, though i regularly see it
+		 * time out on my machines. */
 		for (i = 0; i < 100000; i++) {
 			if (!(read_mmreg32(xecp) & (1 << 16)))
 				break;
@@ -105,8 +108,8 @@ static void xhci_disable_leg(struct pci_device *pcidev)
 			/* Force the bios's byte clear */
 			write_mmreg8(xecp + 2, 0);
 		}
-		/* Turn off settings in USBLEGCTLSTS.  Not sure if any of this is
-		 * necessary. */
+		/* Turn off settings in USBLEGCTLSTS.  Not sure if any of this
+		 * is necessary. */
 		val = read_mmreg32(xecp + 4);
 		val &= ~((1 << 0) | (1 << 4) | (0x7 << 13));
 		/* These are write-to-clear. */
@@ -127,26 +130,26 @@ static void uhci_disable_leg(struct pci_device *pcidev)
 	       pcidev->bus, pcidev->dev, pcidev->func);
 }
 
-void usb_disable_legacy()
+void usb_disable_legacy(void)
 {
 	struct pci_device *i;
 
 	STAILQ_FOREACH(i, &pci_devices, all_dev) {
 		if ((i->class == 0x0c) && (i->subclass == 0x03)) {
 			switch (i->progif) {
-				case 0x00:
-					uhci_disable_leg(i);
-					break;
-				case 0x20:
-					ehci_disable_leg(i);
-					break;
-				case 0x30:
-					xhci_disable_leg(i);
-					break;
-				default:
-					/* TODO: ohci */
-					printk("PCI USB %x:%x:%x, unknown progif 0x%x\n",
-					       i->bus, i->dev, i->func, i->progif);
+			case 0x00:
+				uhci_disable_leg(i);
+				break;
+			case 0x20:
+				ehci_disable_leg(i);
+				break;
+			case 0x30:
+				xhci_disable_leg(i);
+				break;
+			default:
+				/* TODO: ohci */
+				printk("PCI USB %x:%x:%x unknown progif 0x%x\n",
+				       i->bus, i->dev, i->func, i->progif);
 			}
 		}
 	}

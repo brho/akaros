@@ -48,8 +48,8 @@ mkfilter(int argc, char **argv)
 			first = t;
 		last = t;
 		p = *argv++;
-		if(*p == '@'){			/* @attr=val ? */
-			t->ptr |= Faddr;	/* return resolved address(es) */
+		if (*p == '@'){		/* @attr=val ? */
+			t->ptr |= Faddr;/* return resolved address(es) */
 			p++;
 		}
 		strncpy(t->attr, p, sizeof(t->attr)-1);
@@ -94,15 +94,19 @@ filter(struct ndb *db, struct ndbtuple *t, struct ndbtuple *f)
 
 		/* look through filter */
 		for(nf = f; nf != NULL; nf = nf->entry){
-			if(!(nf->ptr&Fignore) && strcmp(nt->attr, nf->attr) == 0)
+			if (!(nf->ptr&Fignore) && strcmp(nt->attr, nf->attr) ==
+			   0)
 				break;
 		}
 		if(nf == NULL){
 			/* remove nt from t */
 			t = ndbdiscard(t, nt);
 		} else {
-			if(nf->ptr & Faddr)
-				t = ndbsubstitute(t, nt, setattr(ndbgetipaddr(db, nt->val), nt->attr));
+			if (nf->ptr & Faddr)
+				t = ndbsubstitute(t, nt,
+						  setattr(ndbgetipaddr(db,
+								       nt->val),
+							  nt->attr));
 			nf->ptr |= Ffound;
 		}
 	}

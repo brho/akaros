@@ -62,8 +62,8 @@ struct perf_eventsel *perf_parse_event(const char *str);
 struct perf_context *perf_create_context(struct perf_context_config *cfg);
 void perf_free_context(struct perf_context *pctx);
 void perf_context_event_submit(struct perf_context *pctx,
-							   const struct core_set *cores,
-							   const struct perf_eventsel *sel);
+			       const struct core_set *cores,
+			       const struct perf_eventsel *sel);
 void perf_stop_events(struct perf_context *pctx);
 void perf_start_sampling(struct perf_context *pctx);
 void perf_stop_sampling(struct perf_context *pctx);
@@ -71,7 +71,7 @@ uint64_t perf_get_event_count(struct perf_context *pctx, unsigned int idx);
 void perf_context_show_events(struct perf_context *pctx, FILE *file);
 void perf_show_events(const char *rx, FILE *file);
 void perf_convert_trace_data(struct perfconv_context *cctx, const char *input,
-							 FILE *outfile);
+			     FILE *outfile);
 
 static inline const struct perf_arch_info *perf_context_get_arch_info(
 	const struct perf_context *pctx)

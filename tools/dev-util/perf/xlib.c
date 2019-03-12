@@ -84,8 +84,9 @@ FILE *xfdopen(int fd, const char *mode)
 	FILE *file = fdopen(fd, mode);
 
 	if (!file) {
-		fprintf(stderr, "Unable to reopen fd '%d' for mode '%s': %s\n", fd,
-		        mode, strerror(errno));
+		fprintf(stderr,
+			"Unable to reopen fd '%d' for mode '%s': %s\n", fd,
+			mode, strerror(errno));
 		exit(1);
 	}
 
@@ -122,10 +123,12 @@ void xfseek(FILE *file, off_t offset, int whence)
 	if (fseeko(file, offset, whence)) {
 		int error = errno;
 
-		fprintf(stderr, "Unable to seek at offset %ld from %s (fpos=%ld): %s\n",
-				offset, whence == SEEK_SET ? "beginning of file" :
-				(whence == SEEK_END ? "end of file" : "current position"),
-				ftell(file), strerror(error));
+		fprintf(stderr,
+			"Unable to seek at offset %ld from %s (fpos=%ld): %s\n",
+			offset, whence == SEEK_SET ? "beginning of file" :
+				(whence == SEEK_END ? "end of file" :
+				 "current position"),
+			ftell(file), strerror(error));
 		exit(1);
 	}
 }

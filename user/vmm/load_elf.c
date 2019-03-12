@@ -12,9 +12,8 @@
  * We assume that memory is set up correctly, and it will go hard
  * with you if it is not. The reference parameter records the highest
  * address we wrote. The initrd can go there.*/
-uintptr_t
-load_elf(char *filename, uint64_t offset, uint64_t *highest,
-         Elf64_Ehdr *ehdr_out)
+uintptr_t load_elf(char *filename, uint64_t offset, uint64_t *highest,
+		   Elf64_Ehdr *ehdr_out)
 {
 	Elf64_Ehdr *ehdr;
 	Elf *elf;
@@ -33,7 +32,8 @@ load_elf(char *filename, uint64_t offset, uint64_t *highest,
 
 	elf = elf_begin(fd, ELF_C_READ, NULL);
 	if (elf == NULL) {
-		fprintf(stderr, "%s: cannot read %s ELF file.\n", __func__, filename);
+		fprintf(stderr, "%s: cannot read %s ELF file.\n", __func__,
+			filename);
 		close(fd);
 		return 0;
 	}
@@ -88,8 +88,8 @@ load_elf(char *filename, uint64_t offset, uint64_t *highest,
 		        i, h->p_offset, pa, h->p_paddr, h->p_filesz);
 		tot = 0;
 		while (tot < h->p_filesz) {
-			int amt = pread(fd, (void *)(pa + tot + offset), h->p_filesz - tot,
-			                h->p_offset + tot);
+			int amt = pread(fd, (void *)(pa + tot + offset),
+					h->p_filesz - tot, h->p_offset + tot);
 
 			if (amt < 1)
 				break;

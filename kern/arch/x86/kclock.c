@@ -6,23 +6,23 @@
 #include <arch/x86.h>
 #include <atomic.h>
 
-#define	CMOS_RTC_SELECT				0x70
-#define	CMOS_RTC_DATA				0x71
+#define	CMOS_RTC_SELECT			0x70
+#define	CMOS_RTC_DATA			0x71
 
 #define RTC_A_UPDATE_IN_PROGRESS	(1 << 7)
-#define RTC_B_24HOUR_MODE			(1 << 1)
-#define RTC_B_BINARY_MODE			(1 << 2)
-#define RTC_12_HOUR_PM				(1 << 7)
-#define CMOS_RTC_SECOND				0x00
-#define CMOS_RTC_MINUTE				0x02
-#define CMOS_RTC_HOUR				0x04
-#define CMOS_RTC_WEEKDAY			0x06
-#define CMOS_RTC_DAY				0x07
-#define CMOS_RTC_MONTH				0x08
-#define CMOS_RTC_YEAR				0x09
-#define CMOS_RTC_CENTURY			0x32
-#define CMOS_RTC_STATUS_A			0x0A
-#define CMOS_RTC_STATUS_B			0x0B
+#define RTC_B_24HOUR_MODE		(1 << 1)
+#define RTC_B_BINARY_MODE		(1 << 2)
+#define RTC_12_HOUR_PM			(1 << 7)
+#define CMOS_RTC_SECOND			0x00
+#define CMOS_RTC_MINUTE			0x02
+#define CMOS_RTC_HOUR			0x04
+#define CMOS_RTC_WEEKDAY		0x06
+#define CMOS_RTC_DAY			0x07
+#define CMOS_RTC_MONTH			0x08
+#define CMOS_RTC_YEAR			0x09
+#define CMOS_RTC_CENTURY		0x32
+#define CMOS_RTC_STATUS_A		0x0A
+#define CMOS_RTC_STATUS_B		0x0B
 
 /* If we ever disable NMIs, we'll need to make sure we don't reenable them here.
  * (Top bit of the CMOS_RTC_SELECT selector). */

@@ -153,10 +153,11 @@ static inline void native_store_idt(pseudodesc_t *dtr)
 
 static inline unsigned long get_desc_base(const struct desc_struct *desc)
 {
-	return (unsigned)(desc->base0 | ((desc->base1) << 16) | ((desc->base2) << 24));
+	return (unsigned)(desc->base0 | ((desc->base1) << 16) |
+			  ((desc->base2) << 24));
 }
 
-#define store_gdt(dtr)                          native_store_gdt(dtr)
+#define store_gdt(dtr) native_store_gdt(dtr)
 static inline void native_store_gdt(pseudodesc_t *dtr)
 {
         asm volatile("sgdt %0":"=m" (*dtr));
@@ -391,9 +392,9 @@ struct vmxec {
 
 /* Per-VM VMX info */
 struct vmx_vmm {
-	uint32_t					pin_exec_ctls;
-	uint32_t					cpu_exec_ctls;
-	uint32_t					cpu2_exec_ctls;
+	uint32_t			pin_exec_ctls;
+	uint32_t			cpu_exec_ctls;
+	uint32_t			cpu2_exec_ctls;
 };
 
 int intel_vmm_init(void);

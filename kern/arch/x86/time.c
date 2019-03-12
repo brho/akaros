@@ -37,14 +37,16 @@ static void set_tsc_freq(void)
 	bool computed = FALSE;
 
 	if (!read_msr_safe(MSR_PLATFORM_INFO, &msr_val))
-		tsc_freq = __proc_global_info.bus_freq * ((msr_val >> 8) & 0xff);
+		tsc_freq = __proc_global_info.bus_freq
+			   * ((msr_val >> 8) & 0xff);
 	/* Even if we have the MSR, it might have given us 0. (QEMU). */
 	if (!tsc_freq) {
 		tsc_freq = compute_tsc_freq();
 		computed = TRUE;
 	}
 	__proc_global_info.tsc_freq = tsc_freq;
-	printk("TSC Frequency: %llu%s\n", tsc_freq, computed ? " (computed)" : "");
+	printk("TSC Frequency: %llu%s\n", tsc_freq,
+	       computed ? " (computed)" : "");
 }
 
 static uint64_t compute_bus_freq(void)
@@ -58,22 +60,23 @@ static uint64_t compute_bus_freq(void)
 	timercount[0] = apicrget(MSR_LAPIC_CURRENT_COUNT);
 	udelay_pit(1000000);
 	timercount[1] = apicrget(MSR_LAPIC_CURRENT_COUNT);
-	/* The time base for the timer is derived from the processor's bus clock,
-	 * divided by the value specified in the divide configuration register.
-	 * Note we mult and div by the divisor, saving the actual freq (even though
-	 * we don't use it yet). */
+	/* The time base for the timer is derived from the processor's bus
+	 * clock, divided by the value specified in the divide configuration
+	 * register.  Note we mult and div by the divisor, saving the actual
+	 * freq (even though we don't use it yet). */
 	return (timercount[0] - timercount[1]) * LAPIC_TIMER_DIVISOR_VAL;
 }
 
 static uint64_t lookup_bus_freq(void)
 {
-	/* Got these from the good book for any model supporting MSR_PLATFORM_INFO.
-	 * If they don't support that MSR, we're going to compute the TSC anyways.
+	/* Got these from the good book for any model supporting
+	 * MSR_PLATFORM_INFO.  If they don't support that MSR, we're going to
+	 * compute the TSC anyways.
 	 *
 	 * A couple models weren't in the book, but were reported at:
 	 * http://a4lg.com/tech/x86/database/x86-families-and-models.en.html.
-	 * Feel free to add more.  If we fail here, we'll compute it manually and be
-	 * off slightly. */
+	 * Feel free to add more.  If we fail here, we'll compute it manually
+	 * and be off slightly. */
 	switch ((x86_family << 16) | x86_model) {
 	case 0x6001a:
 	case 0x6001e:
@@ -126,7 +129,8 @@ static void set_bus_freq(void)
 		computed = TRUE;
 	}
 	__proc_global_info.bus_freq = bus_freq;
-	printk("Bus Frequency: %llu%s\n", bus_freq, computed ? " (computed)" : "");
+	printk("Bus Frequency: %llu%s\n", bus_freq,
+	       computed ? " (computed)" : "");
 }
 
 void timer_init(void)
@@ -149,18 +153,18 @@ void pit_set_timer(uint32_t divisor, uint32_t mode)
 	// cprintf("timer mode set to %d, divisor %d\n",mode, divisor);
 }
 
-static int getpit()
+static int getpit(void)
 {
-    int high, low;
+	int high, low;
 	// TODO: need a lock to protect access to PIT
-
-    /* Select counter 0 and latch counter value. */
-    outb(TIMER_MODE, TIMER_SEL0 | TIMER_LATCH);
-
-    low = inb(TIMER_CNTR0);
-    high = inb(TIMER_CNTR0);
-
-    return ((high << 8) | low);
+	
+	/* Select counter 0 and latch counter value. */
+	outb(TIMER_MODE, TIMER_SEL0 | TIMER_LATCH);
+	
+	low = inb(TIMER_CNTR0);
+	high = inb(TIMER_CNTR0);
+	
+	return ((high << 8) | low);
 }
 
 // forces cpu to relax for usec miliseconds.  declared in kern/include/time.h

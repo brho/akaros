@@ -65,7 +65,7 @@ struct {
 typedef struct Elemlist Elemlist;
 
 struct Elemlist {
-	char *name;					/* copy of name, so '/' can be overwritten */
+	char *name;		/* copy of name, so '/' can be overwritten */
 	int ARRAY_SIZEs;
 	char **elems;
 	int *off;
@@ -108,7 +108,8 @@ void kstrdup(char **p, char *s)
 	char *t, *prev;
 
 	n = strlen(s) + 1;
-	/* if it's a user, we can wait for memory; if not, something's very wrong */
+	/* if it's a user, we can wait for memory; if not, something's very
+	 * wrong */
 	if (current) {
 		t = kzmalloc(n, 0);
 	} else {
@@ -160,8 +161,8 @@ static void chan_release(struct kref *kref)
 	ERRSTACK(1);
 
 	/* We can be called from RCU callbacks, but close methods can block.  In
-	 * those cases, and any other context that cannot block, we need to defer
-	 * our work to a kernel message. */
+	 * those cases, and any other context that cannot block, we need to
+	 * defer our work to a kernel message. */
 	if (!can_block(this_pcpui_ptr())) {
 		run_as_rkm(chan_release, kref);
 		return;
@@ -201,8 +202,8 @@ struct chan *newchan(void)
 		qlock_init(&c->umqlock);
 	}
 
-	/* if you get an error before associating with a dev, cclose skips calling
-	 * the dev's close */
+	/* if you get an error before associating with a dev, cclose skips
+	 * calling the dev's close */
 	c->type = -1;
 	c->flag = 0;
 	kref_init(&c->ref, chan_release, 1);
@@ -279,7 +280,8 @@ struct cname *addelem(struct cname *n, char *s)
 		n->s = t;
 		n->alen = a;
 	}
-	if (n->len > 0 && n->s[n->len - 1] != '/' && s[0] != '/')	/* don't insert extra slash if one is present */
+	/* don't insert extra slash if one is present */
+	if (n->len > 0 && n->s[n->len - 1] != '/' && s[0] != '/')
 		n->s[n->len++] = '/';
 	memmove(n->s + n->len, s, i + 1);
 	n->len += i;
@@ -391,6 +393,7 @@ int eqchantdqid(struct chan *a, int type, int dev, struct qid qid, int pathonly)
 static void mh_release(struct kref *kref)
 {
 	struct mhead *mh = container_of(kref, struct mhead, ref);
+
 	mh->mount = (struct mount *)0xCafeBeef;
 	kfree(mh);
 }
@@ -423,8 +426,8 @@ int cmount(struct chan *new, struct chan *old, int flag, char *spec)
 	struct mhead *m, **l, *mh;
 	struct mount *nm, *f, *um, **h;
 
-	/* Can bind anything onto a symlink's name.  Otherwise, both the old and the
-	 * new must agree on whether or not it is a directory. */
+	/* Can bind anything onto a symlink's name.  Otherwise, both the old and
+	 * the new must agree on whether or not it is a directory. */
 	if (!(old->qid.type & QTSYMLINK) &&
 	    (QTDIR & (old->qid.type ^ new->qid.type)))
 		error(EINVAL, ERROR_FIXME);
@@ -648,9 +651,8 @@ static bool is_mount_point(struct chan *c)
 	return false;
 }
 
-int
-findmount(struct chan **cp,
-		  struct mhead **mp, int type, int dev, struct qid qid)
+int findmount(struct chan **cp, struct mhead **mp, int type, int dev,
+	      struct qid qid)
 {
 	struct pgrp *pg;
 	struct mhead *m;
@@ -718,12 +720,14 @@ struct chan *undomount(struct chan *c, struct cname *name)
 			for (t = f->mount; t; t = t->next) {
 				if (eqchan(c, t->to, 1)) {
 					/*
-					 * We want to come out on the left hand side of the mount
-					 * point using the element of the union that we entered on.
-					 * To do this, find the element that has a from name of
-					 * c->name->s.
+					 * We want to come out on the left hand
+					 * side of the mount point using the
+					 * element of the union that we entered
+					 * on.  To do this, find the element
+					 * that has a from name of c->name->s.
 					 */
-					if (strcmp(t->head->from->name->s, name->s) != 0)
+					if (strcmp(t->head->from->name->s,
+						   name->s) != 0)
 						continue;
 					nc = t->head->from;
 					chan_incref(nc);
@@ -762,15 +766,17 @@ int walk(struct chan **cp, char **names, int nnames, struct walk_helper *wh,
 	/*
 	 * While we haven't gotten all the way down the path:
 	 *    1. step through a mount point, if any
-	 *    2. send a walk request for initial dotdot or initial prefix without dotdot
+	 *    2. send a walk request for initial dotdot or initial prefix
+	 *    without dotdot
 	 *    3. move to the first mountpoint along the way.
 	 *    4. repeat.
 	 *
-	 * An invariant is that each time through the loop, c is on the undomount
-	 * side of the mount point, and c's name is cname.
+	 * An invariant is that each time through the loop, c is on the
+	 * undomount side of the mount point, and c's name is cname.
 	 */
 	for (nhave = 0; nhave < nnames; nhave += n) {
-		/* We only allow symlink when they are first and it's .. (see below) */
+		/* We only allow symlink when they are first and it's .. (see
+		 * below) */
 		if ((c->qid.type & (QTDIR | QTSYMLINK)) == 0) {
 			if (nerror)
 				*nerror = nhave;
@@ -806,7 +812,8 @@ int walk(struct chan **cp, char **names, int nnames, struct walk_helper *wh,
 		type = c->type;
 		dev = c->dev;
 
-		if ((wq = devtab[type].walk(c, NULL, names + nhave, ntry)) == NULL) {
+		if ((wq = devtab[type].walk(c, NULL, names + nhave, ntry)) ==
+		    NULL) {
 			/* try a union mount, if any */
 			if (mh && wh->can_mount) {
 				/*
@@ -815,8 +822,12 @@ int walk(struct chan **cp, char **names, int nnames, struct walk_helper *wh,
 				rlock(&mh->lock);
 				for (f = mh->mount->next; f; f = f->next)
 					if ((wq =
-						 devtab[f->to->type].walk(f->to, NULL, names + nhave,
-												  ntry)) != NULL)
+					     devtab[f->to->type].walk(f->to,
+								      NULL,
+								      names +
+								      nhave,
+								      ntry)) !=
+					    NULL)
 						break;
 				runlock(&mh->lock);
 				if (f != NULL) {
@@ -847,20 +858,27 @@ int walk(struct chan **cp, char **names, int nnames, struct walk_helper *wh,
 			nc = NULL;
 			if (wh->can_mount)
 				for (i = 0; i < wq->nqid && i < ntry - 1; i++)
-					if (findmount(&nc, &nmh, type, dev, wq->qid[i]))
+					if (findmount(&nc, &nmh, type, dev,
+						      wq->qid[i]))
 						break;
 			if (nc == NULL) {	/* no mount points along path */
 				if (wq->clone == NULL) {
 					cclose(c);
 					cnameclose(cname);
-					if (wq->nqid == 0 || (wq->qid[wq->nqid - 1].type & QTDIR)) {
+					if (wq->nqid == 0 ||
+					    (wq->qid[wq->nqid - 1].type &
+					     QTDIR)) {
 						if (nerror)
-							*nerror = nhave + wq->nqid + 1;
-						set_error(ENOENT, "walk failed");
+							*nerror = nhave +
+								wq->nqid + 1;
+						set_error(ENOENT,
+							  "walk failed");
 					} else {
 						if (nerror)
-							*nerror = nhave + wq->nqid;
-						set_error(ENOTDIR, "walk failed");
+							*nerror = nhave +
+								wq->nqid;
+						set_error(ENOTDIR,
+							  "walk failed");
 					}
 					kfree(wq);
 					if (mh != NULL)
@@ -869,12 +887,15 @@ int walk(struct chan **cp, char **names, int nnames, struct walk_helper *wh,
 				}
 				n = wq->nqid;
 				if (wq->clone->qid.type & QTSYMLINK) {
-					nc = walk_symlink(wq->clone, wh, nnames - nhave - n);
+					nc = walk_symlink(wq->clone, wh, nnames
+							  - nhave - n);
 					if (!nc) {
-						/* walk_symlink() set error.  This seems to be the
-						 * standard walk() error-cleanup. */
+						/* walk_symlink() set error.
+						 * This seems to be the standard
+						 * walk() error-cleanup. */
 						if (nerror)
-							*nerror = nhave + wq->nqid;
+							*nerror = nhave +
+								wq->nqid;
 						cclose(c);
 						cclose(wq->clone);
 						cnameclose(cname);
@@ -1115,8 +1136,9 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 		if (e.ARRAY_SIZEs == 0)
 			error(EEXIST, ERROR_FIXME);
 		e.ARRAY_SIZEs--;
-		/* We're dropping the last element, which O_NOFOLLOW applied to.  Not
-		 * sure if there are any legit reasons to have O_NOFOLLOW with create.*/
+		/* We're dropping the last element, which O_NOFOLLOW applied to.
+		 * Not sure if there are any legit reasons to have O_NOFOLLOW
+		 * with create.*/
 		omode &= ~O_NOFOLLOW;
 		break;
 	case Arename:
@@ -1125,7 +1147,8 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 		e.ARRAY_SIZEs--;
 		omode &= ~O_NOFOLLOW;
 		break;
-	/* the difference for stat and lstat (Aaccess) are handled in sysfile.c */
+	/* the difference for stat and lstat (Aaccess) are handled in sysfile.c
+	 */
 	case Abind:
 	case Amount:
 	case Aremove:
@@ -1141,26 +1164,29 @@ static struct chan *__namec_from(struct chan *c, char *aname, int amode,
 			printd("namec %s walk error npath=%d\n", aname, npath);
 			error(EFAIL, "walk failed");
 		}
-		/* Old plan 9 errors would jump here for the magic error parsing. */
+		/* Old plan 9 errors would jump here for the magic error
+		 * parsing. */
 NameError:
 		if (current_errstr()[0]) {
-			/* errstr is set, we'll just stick with it and error out */
+			/* errstr is set, just stick with it and error out */
 			error_jmp();
 		} else {
 			error(EFAIL, "Name to chan lookup failed");
 		}
-		/* brho: skipping the namec custom error string business, since it hides
-		 * the underlying failure.  implement this if you want the old stuff. */
+		/* brho: skipping the namec custom error string business, since
+		 * it hides the underlying failure.  implement this if you want
+		 * the old stuff. */
 #if 0
 		strlcpy(tmperrbuf, current->errstr, sizeof(tmperrbuf));
-		len = prefix + e.off[npath]; // prefix was name - aname, the start pt
-		if (len < ERRMAX / 3 || (name = memrchr(aname, '/', len)) == NULL
-			|| name == aname)
-			snprintf(get_cur_genbuf(), sizeof current->genbuf, "%.*s", len,
-					 aname);
+		// prefix was name - aname, the start pt
+		len = prefix + e.off[npath];
+		if (len < ERRMAX / 3 || (name = memrchr(aname, '/', len)) ==
+		    NULL || name == aname)
+			snprintf(get_cur_genbuf(), sizeof current->genbuf,
+				 "%.*s", len, aname);
 		else
-			snprintf(get_cur_genbuf(), sizeof current->genbuf, "...%.*s",
-					 (int)(len - (name - aname)), name);
+			snprintf(get_cur_genbuf(), sizeof current->genbuf,
+				 "...%.*s", (int)(len - (name - aname)), name);
 		snprintf(current->errstr, ERRMAX, "%#q %s", get_cur_genbuf(),
 				 tmperrbuf);
 #endif
@@ -1177,123 +1203,220 @@ NameError:
 	}
 
 	switch (amode) {
-		case Aaccess:
-			if (wh->can_mount)
-				domount(&c, NULL);
-			break;
+	case Aaccess:
+		if (wh->can_mount)
+			domount(&c, NULL);
+		break;
 
-		case Abind:
-			m = NULL;
-			if (wh->can_mount)
-				domount(&c, &m);
-			if (c->umh != NULL)
-				putmhead(c->umh);
-			c->umh = m;
-			break;
+	case Abind:
+		m = NULL;
+		if (wh->can_mount)
+			domount(&c, &m);
+		if (c->umh != NULL)
+			putmhead(c->umh);
+		c->umh = m;
+		break;
 
-		case Aremove:
-		case Aopen:
+	case Aremove:
+	case Aopen:
 Open:
-			/* save the name; domount might change c */
-			cname = c->name;
-			kref_get(&cname->ref, 1);
-			m = NULL;
-			if (wh->can_mount)
-				domount(&c, &m);
+		/* save the name; domount might change c */
+		cname = c->name;
+		kref_get(&cname->ref, 1);
+		m = NULL;
+		if (wh->can_mount)
+			domount(&c, &m);
 
-			/* our own copy to open or remove */
-			c = cunique(c);
+		/* our own copy to open or remove */
+		c = cunique(c);
 
-			/* now it's our copy anyway, we can put the name back */
-			cnameclose(c->name);
-			c->name = cname;
+		/* now it's our copy anyway, we can put the name back */
+		cnameclose(c->name);
+		c->name = cname;
 
-			switch (amode) {
-				case Aremove:
-					putmhead(m);
-					break;
+		switch (amode) {
+		case Aremove:
+			putmhead(m);
+			break;
 
-				case Aopen:
-				case Acreate:
-					if (c->umh != NULL) {
-						printd("cunique umh\n");
-						putmhead(c->umh);
-						c->umh = NULL;
-					}
-
-					/* only save the mount head if it's a multiple element union */
-					if (m && m->mount && m->mount->next)
-						c->umh = m;
-					else
-						putmhead(m);
-					/* here is where convert omode/vfs flags to c->flags.
-					 * careful, O_CLOEXEC and O_REMCLO are in there.  might need
-					 * to change that. */
-					c->flag |= omode & CEXTERNAL_FLAGS;
-					c = devtab[c->type].open(c,
-								 omode & ~O_CLOEXEC);
-					/* if you get this from a dev, in the dev's open, you are
-					 * probably saving mode directly, without passing it through
-					 * openmode. */
-					if (c->mode & O_TRUNC)
-						error(EFAIL, "Device %s open failed to clear O_TRUNC",
-						      devtab[c->type].name);
-					break;
+		case Aopen:
+		case Acreate:
+			if (c->umh != NULL) {
+				printd("cunique umh\n");
+				putmhead(c->umh);
+				c->umh = NULL;
 			}
-			break;
 
-		case Atodir:
-			/*
-			 * Directories (e.g. for cd) are left before the mount point,
-			 * so one may mount on / or . and see the effect.
-			 */
-			if (!(c->qid.type & QTDIR))
-				error(ENOTDIR, ERROR_FIXME);
+			/* only save the mount head if it's a multiple element
+			 * union */
+			if (m && m->mount && m->mount->next)
+				c->umh = m;
+			else
+				putmhead(m);
+			/* here is where convert omode/vfs flags to c->flags.
+			 * careful, O_CLOEXEC and O_REMCLO are in there.  might
+			 * need to change that. */
+			c->flag |= omode & CEXTERNAL_FLAGS;
+			c = devtab[c->type].open(c,
+						 omode & ~O_CLOEXEC);
+			/* if you get this from a dev, in the dev's open, you
+			 * are probably saving mode directly, without passing it
+			 * through openmode. */
+			if (c->mode & O_TRUNC)
+				error(EFAIL,
+				      "Device %s open failed to clear O_TRUNC",
+				      devtab[c->type].name);
 			break;
+		}
+		break;
 
-		case Amount:
-			/*
-			 * When mounting on an already mounted upon directory,
-			 * one wants subsequent mounts to be attached to the
-			 * original directory, not the replacement.  Don't domount.
-			 */
-			break;
+	case Atodir:
+		/*
+		 * Directories (e.g. for cd) are left before the mount point,
+		 * so one may mount on / or . and see the effect.
+		 */
+		if (!(c->qid.type & QTDIR))
+			error(ENOTDIR, ERROR_FIXME);
+		break;
 
-		case Arename:
-			/* We already walked to the parent of new_path, which is in c.
-			 * We're a lot like create here - need to find mounts, etc.  On the
-			 * way out, we putmhead if we have an m, and clean up our chans.  On
-			 * success, c becomes cnew (thus close the old c).  On failure, we
-			 * just close cnew. */
-			e.ARRAY_SIZEs++;
-			m = NULL;
-			cnew = NULL;
-			if (waserror()) {
-				/* rename or createdir failed */
-				cclose(cnew);
-				if (m)
-					putmhead(m);
-				nexterror();	/* safe since we're in a waserror() */
-			}
-			if (wh->can_mount && findmount(&cnew, &m, c->type, c->dev,
-			                               c->qid)) {
+	case Amount:
+		/*
+		 * When mounting on an already mounted upon directory,
+		 * one wants subsequent mounts to be attached to the
+		 * original directory, not the replacement.  Don't domount.
+		 */
+		break;
+
+	case Arename:
+		/* We already walked to the parent of new_path, which is in c.
+		 * We're a lot like create here - need to find mounts, etc.  On
+		 * the way out, we putmhead if we have an m, and clean up our
+		 * chans.  On success, c becomes cnew (thus close the old c).
+		 * On failure, we just close cnew. */
+		e.ARRAY_SIZEs++;
+		m = NULL;
+		cnew = NULL;
+		if (waserror()) {
+			/* rename or createdir failed */
+			cclose(cnew);
+			if (m)
+				putmhead(m);
+			nexterror();	/* safe since we're in a waserror() */
+		}
+		if (wh->can_mount && findmount(&cnew, &m, c->type, c->dev,
+		                               c->qid)) {
+			cnew = createdir(cnew, m);
+		} else {
+			cnew = c;
+			chan_incref(cnew);
+		}
+		cnew = cunique(cnew);
+		cnameclose(cnew->name);
+		cnew->name = c->name;
+		kref_get(&cnew->name->ref, 1);
+		/* At this point, we have our new_path parent chan (cnew) and
+		 * the renamee chan */
+		renamee = ext;
+		if (cnew->type != renamee->type)
+			error(EXDEV, "can't rename across device types");
+
+		devtab[cnew->type].rename(renamee, cnew,
+		                          e.elems[e.ARRAY_SIZEs - 1], 0);
+		poperror();
+
+		if (m)
+			putmhead(m);
+		cclose(c);
+		c = cnew;
+		c->name = addelem(c->name, e.elems[e.ARRAY_SIZEs - 1]);
+		break;
+
+	case Acreate:
+		/*
+		 * We've already walked all but the last element.
+		 * If the last exists, try to open it OTRUNC.
+		 * If omode&OEXCL is set, just give up.
+		 */
+		e.ARRAY_SIZEs++;
+		if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, wh, NULL) == 0) {
+			if (omode & O_EXCL)
+				error(EEXIST, ERROR_FIXME);
+			omode |= O_TRUNC;
+			goto Open;
+		}
+
+		/*
+		 * The semantics of the create(2) system call are that if the
+		 * file exists and can be written, it is to be opened with
+		 * truncation.  On the other hand, the create(5) message fails
+		 * if the file exists.
+		 *
+		 * If we get two create(2) calls happening simultaneously, they
+		 * might both get here and send create(5) messages, but only one
+		 * of the messages will succeed.  To provide the expected
+		 * create(2) semantics, the call with the failed message needs
+		 * to try the above walk again, opening for truncation.  This
+		 * correctly solves the create/create race, in the sense that
+		 * any observable outcome can be explained as one happening
+		 * before the other.  The create/create race is quite common.
+		 * For example, it happens when two rc subshells simultaneously
+		 * update the same environment variable.
+		 *
+		 * The implementation still admits a create/create/remove race:
+		 * (A) walk to file, fails
+		 * (B) walk to file, fails
+		 * (A) create file, succeeds, returns
+		 * (B) create file, fails
+		 * (A) remove file, succeeds, returns
+		 * (B) walk to file, return failure.
+		 *
+		 * This is hardly as common as the create/create race, and is
+		 * really not too much worse than what might happen if (B) got a
+		 * hold of a file descriptor and then the file was removed --
+		 * either way (B) can't do anything with the result of the
+		 * create call.  So we don't care about this race.
+		 *
+		 * Applications that care about more fine-grained decision of
+		 * the races can use the OEXCL flag to get at the underlying
+		 * create(5) semantics; by default we provide the common case.
+		 *
+		 * We need to stay behind the mount point in case we
+		 * need to do the first walk again (should the create fail).
+		 *
+		 * We also need to cross the mount point and find the directory
+		 * in the union in which we should be creating.
+		 *
+		 * The channel staying behind is c, the one moving forward is
+		 * cnew.
+		 */
+		m = NULL;
+		cnew = NULL;	/* is this assignment necessary? */
+		/* discard error */
+		if (!waserror()) {	/* try create */
+			if (wh->can_mount &&
+			    findmount(&cnew, &m, c->type, c->dev, c->qid))
 				cnew = createdir(cnew, m);
-			} else {
+			else {
 				cnew = c;
 				chan_incref(cnew);
 			}
+
+			/*
+			 * We need our own copy of the Chan because we're about
+			 * to send a create, which will move it.  Once we have
+			 * our own copy, we can fix the name, which might be
+			 * wrong if findmount gave us a new Chan.
+			 */
 			cnew = cunique(cnew);
 			cnameclose(cnew->name);
 			cnew->name = c->name;
 			kref_get(&cnew->name->ref, 1);
-			/* At this point, we have our new_path parent chan (cnew) and the
-			 * renamee chan */
-			renamee = ext;
-			if (cnew->type != renamee->type)
-				error(EXDEV, "can't rename across device types");
 
-			devtab[cnew->type].rename(renamee, cnew,
-			                          e.elems[e.ARRAY_SIZEs - 1], 0);
+			cnew->flag |= omode & CEXTERNAL_FLAGS;
+			devtab[cnew->type].create(cnew,
+						  e.elems[e.ARRAY_SIZEs - 1],
+						  omode & ~(O_EXCL | O_CLOEXEC),
+						  perm, ext);
 			poperror();
 
 			if (m)
@@ -1302,127 +1425,38 @@ Open:
 			c = cnew;
 			c->name = addelem(c->name, e.elems[e.ARRAY_SIZEs - 1]);
 			break;
+		}
 
-		case Acreate:
-			/*
-			 * We've already walked all but the last element.
-			 * If the last exists, try to open it OTRUNC.
-			 * If omode&OEXCL is set, just give up.
-			 */
-			e.ARRAY_SIZEs++;
-			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, wh, NULL) == 0) {
-				if (omode & O_EXCL)
-					error(EEXIST, ERROR_FIXME);
-				omode |= O_TRUNC;
-				goto Open;
-			}
+		/* create failed */
+		cclose(cnew);
+		if (m)
+			putmhead(m);
+		if (omode & O_EXCL)
+			nexterror();	/* safe since we're in a waserror() */
+		poperror();	/* matching the if(!waserror) */
 
-			/*
-			 * The semantics of the create(2) system call are that if the
-			 * file exists and can be written, it is to be opened with truncation.
-			 * On the other hand, the create(5) message fails if the file exists.
-			 * If we get two create(2) calls happening simultaneously,
-			 * they might both get here and send create(5) messages, but only
-			 * one of the messages will succeed.  To provide the expected create(2)
-			 * semantics, the call with the failed message needs to try the above
-			 * walk again, opening for truncation.  This correctly solves the
-			 * create/create race, in the sense that any observable outcome can
-			 * be explained as one happening before the other.
-			 * The create/create race is quite common.  For example, it happens
-			 * when two rc subshells simultaneously update the same
-			 * environment variable.
-			 *
-			 * The implementation still admits a create/create/remove race:
-			 * (A) walk to file, fails
-			 * (B) walk to file, fails
-			 * (A) create file, succeeds, returns
-			 * (B) create file, fails
-			 * (A) remove file, succeeds, returns
-			 * (B) walk to file, return failure.
-			 *
-			 * This is hardly as common as the create/create race, and is really
-			 * not too much worse than what might happen if (B) got a hold of a
-			 * file descriptor and then the file was removed -- either way (B) can't do
-			 * anything with the result of the create call.  So we don't care about this race.
-			 *
-			 * Applications that care about more fine-grained decision of the races
-			 * can use the OEXCL flag to get at the underlying create(5) semantics;
-			 * by default we provide the common case.
-			 *
-			 * We need to stay behind the mount point in case we
-			 * need to do the first walk again (should the create fail).
-			 *
-			 * We also need to cross the mount point and find the directory
-			 * in the union in which we should be creating.
-			 *
-			 * The channel staying behind is c, the one moving forward is cnew.
-			 */
-			m = NULL;
-			cnew = NULL;	/* is this assignment necessary? */
-			/* discard error */
-			if (!waserror()) {	/* try create */
-				if (wh->can_mount && findmount(&cnew, &m, c->type, c->dev,
-				                               c->qid))
-					cnew = createdir(cnew, m);
-				else {
-					cnew = c;
-					chan_incref(cnew);
-				}
+		/* save error, so walk doesn't clobber our existing errstr */
+		strlcpy(tmperrbuf, current_errstr(), sizeof(tmperrbuf));
+		saved_errno = get_errno();
+		/* note: we depend that walk does not error */
+		if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, wh, NULL) < 0) {
+			set_errno(saved_errno);
+			/* Report the error we had originally */
+			error(EFAIL, tmperrbuf);
+		}
+		strlcpy(current_errstr(), tmperrbuf, MAX_ERRSTR_LEN);
+		omode |= O_TRUNC;
+		goto Open;
 
-				/*
-				 * We need our own copy of the Chan because we're
-				 * about to send a create, which will move it.  Once we have
-				 * our own copy, we can fix the name, which might be wrong
-				 * if findmount gave us a new Chan.
-				 */
-				cnew = cunique(cnew);
-				cnameclose(cnew->name);
-				cnew->name = c->name;
-				kref_get(&cnew->name->ref, 1);
-
-				cnew->flag |= omode & CEXTERNAL_FLAGS;
-				devtab[cnew->type].create(cnew, e.elems[e.ARRAY_SIZEs - 1],
-										  omode & ~(O_EXCL | O_CLOEXEC),
-										  perm, ext);
-				poperror();
-
-				if (m)
-					putmhead(m);
-				cclose(c);
-				c = cnew;
-				c->name = addelem(c->name, e.elems[e.ARRAY_SIZEs - 1]);
-				break;
-			}
-
-			/* create failed */
-			cclose(cnew);
-			if (m)
-				putmhead(m);
-			if (omode & O_EXCL)
-				nexterror();	/* safe since we're in a waserror() */
-			poperror();	/* matching the if(!waserror) */
-
-			/* save error, so walk doesn't clobber our existing errstr */
-			strlcpy(tmperrbuf, current_errstr(), sizeof(tmperrbuf));
-			saved_errno = get_errno();
-			/* note: we depend that walk does not error */
-			if (walk(&c, e.elems + e.ARRAY_SIZEs - 1, 1, wh, NULL) < 0) {
-				set_errno(saved_errno);
-				/* Report the error we had originally */
-				error(EFAIL, tmperrbuf);
-			}
-			strlcpy(current_errstr(), tmperrbuf, MAX_ERRSTR_LEN);
-			omode |= O_TRUNC;
-			goto Open;
-
-		default:
-			panic("unknown namec access %d\n", amode);
+	default:
+		panic("unknown namec access %d\n", amode);
 	}
 
 	poperror();
 
 	if (e.ARRAY_SIZEs > 0)
-		strlcpy(get_cur_genbuf(), e.elems[e.ARRAY_SIZEs - 1], GENBUF_SZ);
+		strlcpy(get_cur_genbuf(), e.elems[e.ARRAY_SIZEs - 1],
+			GENBUF_SZ);
 	else
 		strlcpy(get_cur_genbuf(), ".", GENBUF_SZ);
 
@@ -1449,70 +1483,71 @@ struct chan *namec(char *name, int amode, int omode, uint32_t perm, void *ext)
 	 * evaluate starting there.
 	 */
 	switch (name[0]) {
-		case '/':
-			if (current)
-				c = current->slash;
-			else
-				c = kern_slash;
-			chan_incref(c);
-			break;
+	case '/':
+		if (current)
+			c = current->slash;
+		else
+			c = kern_slash;
+		chan_incref(c);
+		break;
 
-		case '#':
-			wh.can_mount = false;
-			devname = get_cur_genbuf();
-			devname[0] = '\0';
-			n = 0;
-			name++; /* drop the # */
-			while ((*name != '\0') && (*name != '/')) {
-				if (n >= GENBUF_SZ - 1)
-					error(ENAMETOOLONG, ERROR_FIXME);
-				devname[n++] = *name++;
-			}
-			devname[n] = '\0';
-			/* for a name #foo.spec, devname = foo\0, devspec = spec\0.
-			 * genbuf contains foo\0spec\0.  for no spec, devspec = \0 */
-			devspec = strchr(devname, '.');
-			if (devspec) {
-				*devspec = '\0';
-				devspec++;
-			} else {
-				devspec = &devname[n];
-			}
-			/* These devices have special attach functions that treat the char *
-			 * as a blob pointer */
-			if (!strcmp(devname, "mnt"))
-				error(EINVAL, "can't namec-attach #mnt");
-			if (!strcmp(devname, "gtfs"))
-				error(EINVAL, "can't namec-attach #gtfs");
-			/* TODO: deal with this "nodevs" business. */
-			#if 0
-			/*
-			 *  the nodevs exceptions are
-			 *  |  it only gives access to pipes you create
-			 *  e  this process's environment
-			 *  s  private file2chan creation space
-			 *  D private secure sockets name space
-			 *  a private TLS name space
-			 */
-			if (current->pgrp->nodevs &&
-				//          (utfrune("|esDa", r) == NULL
-				((strchr("|esDa", get_cur_genbuf()[1]) == NULL)
-				 || (get_cur_genbuf()[1] == 's'	// || r == 's'
-					 && get_cur_genbuf()[n] != '\0')))
-				error(EINVAL, ERROR_FIXME);
-			#endif
-			devtype = devno(devname, 1);
-			if (devtype == -1)
-				error(EFAIL, "Unknown #device %s (spec %s)", devname, devspec);
-			c = devtab[devtype].attach(devspec);
-			break;
-		default:
-			/* this case also covers \0 */
-			c = current->dot;
-			if (!c)
-				panic("no dot!");
-			chan_incref(c);
-			break;
+	case '#':
+		wh.can_mount = false;
+		devname = get_cur_genbuf();
+		devname[0] = '\0';
+		n = 0;
+		name++; /* drop the # */
+		while ((*name != '\0') && (*name != '/')) {
+			if (n >= GENBUF_SZ - 1)
+				error(ENAMETOOLONG, ERROR_FIXME);
+			devname[n++] = *name++;
+		}
+		devname[n] = '\0';
+		/* for a name #foo.spec, devname = foo\0, devspec = spec\0.
+		 * genbuf contains foo\0spec\0.  for no spec, devspec = \0 */
+		devspec = strchr(devname, '.');
+		if (devspec) {
+			*devspec = '\0';
+			devspec++;
+		} else {
+			devspec = &devname[n];
+		}
+		/* These devices have special attach functions that treat the
+		 * char * as a blob pointer */
+		if (!strcmp(devname, "mnt"))
+			error(EINVAL, "can't namec-attach #mnt");
+		if (!strcmp(devname, "gtfs"))
+			error(EINVAL, "can't namec-attach #gtfs");
+		/* TODO: deal with this "nodevs" business. */
+		#if 0
+		/*
+		 *  the nodevs exceptions are
+		 *  |  it only gives access to pipes you create
+		 *  e  this process's environment
+		 *  s  private file2chan creation space
+		 *  D private secure sockets name space
+		 *  a private TLS name space
+		 */
+		if (current->pgrp->nodevs &&
+			//          (utfrune("|esDa", r) == NULL
+			((strchr("|esDa", get_cur_genbuf()[1]) == NULL)
+			 || (get_cur_genbuf()[1] == 's'	// || r == 's'
+				 && get_cur_genbuf()[n] != '\0')))
+			error(EINVAL, ERROR_FIXME);
+		#endif
+		devtype = devno(devname, 1);
+		if (devtype == -1)
+			error(EFAIL, "Unknown #device %s (spec %s)", devname,
+			      devspec);
+		c = devtab[devtype].attach(devspec);
+		break;
+	default:
+		/* this case also covers \0 */
+		c = current->dot;
+		if (!c)
+			panic("no dot!");
+		chan_incref(c);
+		break;
 	}
 	return __namec_from(c, name, amode, omode, perm, &wh, ext);
 }
@@ -1584,7 +1619,8 @@ void validname(char *aname, int slashok)
 		} else {
 			if (isfrog[c])
 				if (!slashok || c != '/') {
-					error(EINVAL, "%s (%p), at char %c", aname, aname, c);
+					error(EINVAL, "%s (%p), at char %c",
+					      aname, aname, c);
 				}
 			name++;
 		}

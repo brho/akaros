@@ -15,14 +15,14 @@
 __BEGIN_DECLS
 
 /* Pthread states.  These are mostly examples for other 2LSs */
-#define PTH_CREATED			1
+#define PTH_CREATED		1
 #define PTH_RUNNABLE		2
-#define PTH_RUNNING			3
-#define PTH_EXITING			4
-#define PTH_BLK_YIELDING	5	/* brief state btw pth_yield and pth_runnable */
+#define PTH_RUNNING		3
+#define PTH_EXITING		4
+#define PTH_BLK_YIELDING	5	/* btw pth_yield and pth_runnable */
 #define PTH_BLK_SYSC		6	/* blocked on a syscall */
-#define PTH_BLK_MUTEX		7	/* blocked externally, possibly on a mutex */
-#define PTH_BLK_PAUSED		8	/* handed back to us from uthread code */
+#define PTH_BLK_MUTEX		7	/* blocked externally */
+#define PTH_BLK_PAUSED		8	/* handed back from uthread code */
 #define PTH_BLK_MISC		9	/* catch-all from uthread code */
 
 /* Entry for a pthread_cleanup_routine on the stack of cleanup handlers. */
@@ -55,7 +55,7 @@ TAILQ_HEAD(pthread_queue, pthread_tcb);
  * kernel to signal us.  We don't need a lock since this is per-vcore and
  * accessed in vcore context. */
 struct sysc_mgmt {
-	struct event_queue 			*ev_q;
+	struct event_queue 		*ev_q;
 };
 
 #define PTHREAD_ONCE_INIT PARLIB_ONCE_INIT
@@ -72,17 +72,17 @@ typedef struct {
 } pthread_mutexattr_t;
 
 typedef struct {
-	int							type;
-	uth_mutex_t					mtx;
-	uth_recurse_mutex_t			r_mtx;
+	int				type;
+	uth_mutex_t			mtx;
+	uth_recurse_mutex_t		r_mtx;
 } pthread_mutex_t;
 #define PTHREAD_MUTEX_INITIALIZER { PTHREAD_MUTEX_DEFAULT, UTH_MUTEX_INIT, \
                                     UTH_RECURSE_MUTEX_INIT }
 
 typedef int clockid_t;
 typedef struct {
-	int							pshared;
-	clockid_t					clock;
+	int				pshared;
+	clockid_t			clock;
 } pthread_condattr_t;
 #define PTHREAD_COND_INITIALIZER UTH_COND_VAR_INIT
 
@@ -98,12 +98,13 @@ typedef void * pthread_rwlockattr_t;
 
 typedef struct
 {
-	int							total_threads;
-	volatile int				sense;	/* state of barrier, flips btw runs */
-	atomic_t					count;
+	int				total_threads;
+	/* state of barrier, flips btw runs */
+	volatile int			sense;
+	atomic_t			count;
 	struct spin_pdr_lock		lock;
-	uth_sync_t					waiters;
-	int							nr_waiters;
+	uth_sync_t			waiters;
+	int				nr_waiters;
 } pthread_barrier_t;
 
 /* Detach state.  */

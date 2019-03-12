@@ -22,9 +22,9 @@ void corealloc_init(void)
 {
 	/* Allocate all of our pcores. */
 	all_pcores = kzmalloc(sizeof(struct sched_pcore) * num_cores, 0);
-	/* init the idlecore list.  if they turned off hyperthreading, give them the
-	 * odds from 1..max-1.  otherwise, give them everything by 0 (default mgmt
-	 * core).  TODO: (CG/LL) better LL/CG mgmt */
+	/* init the idlecore list.  if they turned off hyperthreading, give them
+	 * the odds from 1..max-1.  otherwise, give them everything by 0
+	 * (default mgmt core).  TODO: (CG/LL) better LL/CG mgmt */
 	for (int i = 0; i < num_cores; i++) {
 		if (is_ll_core(i))
 			continue;
@@ -71,8 +71,10 @@ void __track_core_alloc(struct proc *p, uint32_t pcoreid)
 	spc->alloc_proc = p;
 	/* if the pcore is prov to them and now allocated, move lists */
 	if (spc->prov_proc == p) {
-		TAILQ_REMOVE(&p->ksched_data.crd.prov_not_alloc_me, spc, prov_next);
-		TAILQ_INSERT_TAIL(&p->ksched_data.crd.prov_alloc_me, spc, prov_next);
+		TAILQ_REMOVE(&p->ksched_data.crd.prov_not_alloc_me, spc,
+			     prov_next);
+		TAILQ_INSERT_TAIL(&p->ksched_data.crd.prov_alloc_me, spc,
+				  prov_next);
 	}
 	/* Actually allocate the core, removing it from the idle core list. */
 	TAILQ_REMOVE(&idlecores, spc, alloc_next);
@@ -91,10 +93,10 @@ void __track_core_dealloc(struct proc *p, uint32_t pcoreid)
 	/* if the pcore is prov to them and now deallocated, move lists */
 	if (spc->prov_proc == p) {
 		TAILQ_REMOVE(&p->ksched_data.crd.prov_alloc_me, spc, prov_next);
-		/* this is the victim list, which can be sorted so that we pick the
-		 * right victim (sort by alloc_proc reverse priority, etc).  In this
-		 * case, the core isn't alloc'd by anyone, so it should be the first
-		 * victim. */
+		/* this is the victim list, which can be sorted so that we pick
+		 * the right victim (sort by alloc_proc reverse priority, etc).
+		 * In this case, the core isn't alloc'd by anyone, so it should
+		 * be the first victim. */
 		TAILQ_INSERT_HEAD(&p->ksched_data.crd.prov_not_alloc_me, spc,
 		                  prov_next);
 	}
@@ -128,7 +130,8 @@ void __next_core_to_alloc(uint32_t pcoreid)
 	if (match) {
 		TAILQ_REMOVE(&idlecores, spc_i, alloc_next);
 		TAILQ_INSERT_HEAD(&idlecores, spc_i, alloc_next);
-		printk("Pcore %d will be given out next (from the idles)\n", pcoreid);
+		printk("Pcore %d will be given out next (from the idles)\n",
+		       pcoreid);
 	}
 }
 
@@ -145,7 +148,8 @@ void __sort_idle_cores(void)
 	TAILQ_FOREACH_SAFE(spc_i, &sorter, alloc_next, temp) {
 		TAILQ_REMOVE(&sorter, spc_i, alloc_next);
 		added = FALSE;
-		/* don't need foreach_safe since we break after we muck with the list */
+		/* don't need foreach_safe since we break after we muck with the
+		 * list */
 		TAILQ_FOREACH(spc_j, &idlecores, alloc_next) {
 			if (spc_i < spc_j) {
 				TAILQ_INSERT_BEFORE(spc_j, spc_i, alloc_next);
@@ -167,5 +171,6 @@ void print_idle_core_map(void)
 	printk("Idle cores (unlocked!):\n");
 	TAILQ_FOREACH(spc_i, &idlecores, alloc_next)
 		printk("Core %d, prov to %d (%p)\n", spc2pcoreid(spc_i),
-		       spc_i->prov_proc ? spc_i->prov_proc->pid : 0, spc_i->prov_proc);
+		       spc_i->prov_proc ? spc_i->prov_proc->pid : 0,
+		       spc_i->prov_proc);
 }

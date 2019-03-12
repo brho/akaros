@@ -1,19 +1,19 @@
 #include <arch/arch.h>
-#include <trap.h>
-#include <process.h>
 #include <pmap.h>
+#include <process.h>
 #include <smp.h>
+#include <trap.h>
 
-#include <string.h>
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 void proc_pop_ctx(struct user_context *ctx)
 {
 	struct hw_trapframe *tf = &ctx->tf.hw_tf;
 	assert(ctx->type == ROS_HW_CTX);
-	extern void pop_hw_tf(struct hw_trapframe *tf)
-	  __attribute__((noreturn));	/* in asm */
+	extern void pop_hw_tf(struct hw_trapframe * tf)
+	    __attribute__((noreturn)); /* in asm */
 	pop_hw_tf(tf);
 }
 
@@ -25,23 +25,25 @@ void proc_init_ctx(struct user_context *ctx, uint32_t vcoreid, uintptr_t entryp,
 	ctx->type = ROS_HW_CTX;
 
 	/* TODO: If you'd like, take tls_desc and save it in the ctx somehow, so
-	 * that proc_pop_ctx will set up that TLS before launching.  If you do this,
-	 * you can change _start.c to not reset the TLS in userspace.
+	 * that proc_pop_ctx will set up that TLS before launching.  If you do
+	 * this, you can change _start.c to not reset the TLS in userspace.
 	 *
-	 * This is a bigger deal on amd64, where we take a (fast) syscall to change
-	 * the TLS desc, right after the kernel just 0'd out the TLS desc.  If you
-	 * can change your HW TLS desc with negligible overhead, then feel free to
-	 * do whatever.  Long term, it might be better to do whatever amd64 does. */
+	 * This is a bigger deal on amd64, where we take a (fast) syscall to
+	 * change the TLS desc, right after the kernel just 0'd out the TLS
+	 * desc.  If you can change your HW TLS desc with negligible overhead,
+	 * then feel free to do whatever.  Long term, it might be better to do
+	 * whatever amd64 does. */
 
 	memset(tf, 0, sizeof(*tf));
 
-	tf->gpr[GPR_SP] = stack_top-64;
+	tf->gpr[GPR_SP] = stack_top - 64;
 	tf->sr = SR_U64 | SR_EF;
 
 	tf->epc = entryp;
 
-	/* Coupled closely with user's entry.S.  id is the vcoreid, which entry.S
-	 * uses to determine what to do.  vcoreid == 0 is the main core/context. */
+	/* Coupled closely with user's entry.S.  id is the vcoreid, which
+	 * entry.S uses to determine what to do.  vcoreid == 0 is the main
+	 * core/context. */
 	tf->gpr[GPR_A0] = vcoreid;
 }
 

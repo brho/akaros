@@ -14,6 +14,7 @@
 static struct event_queue *get_ectlr_evq(void)
 {
 	struct event_queue *ev_q = get_eventq(EV_MBOX_UCQ);
+
 	evq_attach_wakeup_ctlr(ev_q);
 	return ev_q;
 }
@@ -32,6 +33,7 @@ int main(int argc, char **argv)
 	/* these need to just exist somewhere.  don't free them. */
 	struct event_queue *evq1 = get_ectlr_evq();
 	struct event_queue *evq2 = get_ectlr_evq();
+
 	evq1->ev_flags |= EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP;
 	evq2->ev_flags |= EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP;
 	/* hack in our own handler for debugging */
@@ -55,12 +57,13 @@ int main(int argc, char **argv)
 	if (devalarm_set_time(timerfd2, now + sec2tsc(2)))
 		return -1;
 
-	/* if we remove this, two will fire first and wake us up.  if we don't exit
-	 * right away, one will eventually fire and do nothing. */
+	/* if we remove this, two will fire first and wake us up.  if we don't
+	 * exit right away, one will eventually fire and do nothing. */
 	uthread_sleep(5);
 	/* then the actual usage: */
 	struct event_msg msg;
 	struct event_queue *which;
+
 	uth_blockon_evqs(&msg, &which, 2, evq1, evq2);
 	printf("Got message type %d on evq %s (%p)\n", msg.ev_type,
 	       which == evq1 ? "one" : "two", which);

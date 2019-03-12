@@ -29,14 +29,14 @@
  */
 #define PADDR(kva)						\
 ({								\
-	physaddr_t __m_pa, __m_kva = (physaddr_t) (kva);		\
+	physaddr_t __m_pa, __m_kva = (physaddr_t) (kva);	\
 	if (__m_kva < KERNBASE)					\
 		panic("PADDR called with invalid kva %p", __m_kva);\
-	if(__m_kva >= KERN_LOAD_ADDR)					\
-		__m_pa = __m_kva - KERN_LOAD_ADDR;					\
-	else					\
-		__m_pa = __m_kva - KERNBASE;					\
-	__m_pa; \
+	if(__m_kva >= KERN_LOAD_ADDR)				\
+		__m_pa = __m_kva - KERN_LOAD_ADDR;		\
+	else							\
+		__m_pa = __m_kva - KERNBASE;			\
+	__m_pa; 						\
 })
 
 #define paddr_low32(p) ((uint32_t)(uintptr_t)PADDR(p))
@@ -48,7 +48,7 @@
 ({								\
 	physaddr_t __m_pa = (pa);				\
 	size_t __m_ppn = LA2PPN(__m_pa);			\
-	if (__m_ppn > max_nr_pages)					\
+	if (__m_ppn > max_nr_pages)				\
 		warn("KADDR called with invalid pa %p", __m_pa);\
 	(void*) (__m_pa + KERNBASE);				\
 })
@@ -56,8 +56,8 @@
 #define KADDR_NOCHECK(pa) ((void*)(pa + KERNBASE))
 #define KBASEADDR(kla) KADDR(PADDR(kla))
 
-extern physaddr_t max_pmem;		/* Total amount of physical memory */
-extern size_t max_nr_pages;		/* Total number of physical memory pages */
+extern physaddr_t max_pmem;	/* Total amount of physical memory */
+extern size_t max_nr_pages;	/* Total number of physical memory pages */
 extern physaddr_t max_paddr;	/* Maximum addressable physical address */
 extern size_t nr_free_pages;
 extern struct multiboot_info *multiboot_kaddr;
@@ -108,7 +108,8 @@ void arch_add_intermediate_pts(pgdir_t pgdir, uintptr_t va, size_t len);
 static inline page_t *ppn2page(size_t ppn)
 {
 	if (ppn >= max_nr_pages)
-		warn("ppn2page called with ppn (%08lu) larger than max_nr_pages", ppn);
+		warn("%s called with ppn (%p) larger than max_nr_pages (%p)",
+		     __func__, ppn, max_nr_pages);
 	return &(pages[ppn]);
 }
 
@@ -125,7 +126,8 @@ static inline physaddr_t page2pa(page_t *pp)
 static inline page_t *pa2page(physaddr_t pa)
 {
 	if (LA2PPN(pa) >= max_nr_pages)
-		warn("pa2page called with pa (%p) larger than max_nr_pages", pa);
+		warn("%s called with pa (%p) larger than max_nr_pages (%p)",
+		     __func__, pa, max_nr_pages);
 	return &pages[LA2PPN(pa)];
 }
 

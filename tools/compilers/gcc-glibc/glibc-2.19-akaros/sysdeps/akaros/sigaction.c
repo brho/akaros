@@ -47,8 +47,9 @@ static void default_core_handler(int signr, siginfo_t *info, void *ctx)
 	else
 		akaros_printf("No ctx for %s\n", __func__);
 	if (info) {
-		/* ghetto, we don't have access to the PF err, since we only have a few
-		 * fields available in siginfo (e.g. there's no si_trapno). */
+		/* ghetto, we don't have access to the PF err, since we only
+		 * have a few fields available in siginfo (e.g. there's no
+		 * si_trapno). */
 		akaros_printf("Fault type %d at addr %p\n", info->si_errno,
 		              info->si_addr);
 	} else {
@@ -117,10 +118,11 @@ void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux)
 	if (sig_nr >= _NSIG || sig_nr < 0)
 		return;
 	action = &sigactions[sig_nr];
-	/* Would like a switch/case here, but they are pointers.  We can also get
-	 * away with this check early since sa_handler and sa_sigaction are macros
-	 * referencing the same union.  The man page isn't specific about whether or
-	 * not you need to care about SA_SIGINFO when sending DFL/ERR/IGN. */
+	/* Would like a switch/case here, but they are pointers.  We can also
+	 * get away with this check early since sa_handler and sa_sigaction are
+	 * macros referencing the same union.  The man page isn't specific about
+	 * whether or not you need to care about SA_SIGINFO when sending
+	 * DFL/ERR/IGN. */
 	if (action->sa_handler == SIG_ERR)
 		return;
 	if (action->sa_handler == SIG_IGN)
@@ -137,15 +139,16 @@ void trigger_posix_signal(int sig_nr, struct siginfo *info, void *aux)
 
 		if (info == NULL)
 			info = &s;
-		/* Make sure the caller either already set singo in the info struct, or
-		 * if they didn't, make sure it has been zeroed out (i.e. not just some
-		 * garbage on the stack. */
+		/* Make sure the caller either already set singo in the info
+		 * struct, or if they didn't, make sure it has been zeroed out
+		 * (i.e. not just some garbage on the stack. */
 		assert(info->si_signo == sig_nr || info->si_signo == 0);
 		info->si_signo = sig_nr;
 		/* TODO: consider info->pid and whatnot */
-		/* We assume that this function follows the proper calling convention
-		 * (i.e. it wasn't written in some crazy assembly function that
-		 * trashes all its registers, i.e GO's default runtime handler) */
+		/* We assume that this function follows the proper calling
+		 * convention (i.e. it wasn't written in some crazy assembly
+		 * function that trashes all its registers, i.e GO's default
+		 * runtime handler) */
 		action->sa_sigaction(sig_nr, info, aux);
 	} else {
 		action->sa_handler(sig_nr);

@@ -29,25 +29,28 @@ static void irq_console(struct hw_trapframe *hw_tf, void *data)
 		return;
 	/* Control code intercepts */
 	switch (c) {
-		case capchar2ctl('G'):
-			/* traditional 'ctrl-g', will put you in the monitor gracefully */
-			send_kernel_message(core_id(), __run_mon, 0, 0, 0, KMSG_ROUTINE);
+	case capchar2ctl('G'):
+		/* traditional 'ctrl-g', will put you in the monitor gracefully
+		 */
+		send_kernel_message(core_id(), __run_mon, 0, 0, 0,
+				    KMSG_ROUTINE);
+		return;
+	case capchar2ctl('Q'):
+		/* force you into the monitor.  you might deadlock. */
+		printk("\nForcing entry to the monitor\n");
+		monitor(hw_tf);
+		return;
+	case capchar2ctl('B'):
+		/* backtrace / debugging for the core receiving the irq */
+		printk("\nForced trapframe and backtrace for core %d\n",
+		       core_id());
+		if (!hw_tf) {
+			printk("(no hw_tf, we probably polled the console)\n");
 			return;
-		case capchar2ctl('Q'):
-			/* force you into the monitor.  you might deadlock. */
-			printk("\nForcing entry to the monitor\n");
-			monitor(hw_tf);
-			return;
-		case capchar2ctl('B'):
-			/* backtrace / debugging for the core receiving the irq */
-			printk("\nForced trapframe and backtrace for core %d\n", core_id());
-			if (!hw_tf) {
-				printk("(no hw_tf, we probably polled the console)\n");
-				return;
-			}
-			print_trapframe(hw_tf);
-			backtrace_hwtf(hw_tf);
-			return;
+		}
+		print_trapframe(hw_tf);
+		backtrace_hwtf(hw_tf);
+		return;
 	}
 	cons_add_char(c);
 }
@@ -74,7 +77,8 @@ static void cons_irq_init(void)
 void ancillary_state_init(void)
 {
 	uint32_t eax, ebx, ecx, edx;
-	uint64_t proc_supported_features; /* proc supported user state components */
+	/* proc supported user state components */
+	uint64_t proc_supported_features;
 
 	// If you don't at least have FXSAVE and FXRSTOR
 	// (includes OSFXSR), you don't boot.
@@ -83,7 +87,8 @@ void ancillary_state_init(void)
 
 	if (cpu_has_feat(CPU_FEAT_X86_XSAVE)) {
 		// Next determine the user state components supported
-		// by the processor and set x86_default_xcr0 in proc_global_info.
+		// by the processor and set x86_default_xcr0 in
+		// proc_global_info.
 		cpuid(0x0d, 0x00, &eax, 0, 0, &edx);
 		proc_supported_features = ((uint64_t)edx << 32) | eax;
 
@@ -93,25 +98,27 @@ void ancillary_state_init(void)
 		                                      proc_supported_features;
 
 		/*
-		 * Make sure CR4.OSXSAVE is set and set the local xcr0 to the default.
-		 * We will do both of these things again during per-cpu init,
-		 * but we are about to use XSAVE to build our default extended state
-		 * record, so we need them enabled.
-		 * You must set CR4_OSXSAVE before setting xcr0, or a #UD fault occurs.
+		 * Make sure CR4.OSXSAVE is set and set the local xcr0 to the
+		 * default.  We will do both of these things again during
+		 * per-cpu init, but we are about to use XSAVE to build our
+		 * default extended state record, so we need them enabled.  You
+		 * must set CR4_OSXSAVE before setting xcr0, or a #UD fault
+		 * occurs.
 		 */
 		lcr4(rcr4() | CR4_OSXSAVE);
 		lxcr0(__proc_global_info.x86_default_xcr0);
 
-		/* Build a default set of extended state values that we can later use
-		 * to initialize extended state on other cores, or restore on this
-		 * core.  FNINIT won't actually do it - if you xsave after fninit, x87
-		 * will show up as active in xstate_bv[0].  Instead, we just need
-		 * the xstate_bv bits zeroed (and memset the rest for sanity's sake).
+		/* Build a default set of extended state values that we can
+		 * later use to initialize extended state on other cores, or
+		 * restore on this core.  FNINIT won't actually do it - if you
+		 * xsave after fninit, x87 will show up as active in
+		 * xstate_bv[0].  Instead, we just need the xstate_bv bits
+		 * zeroed (and memset the rest for sanity's sake).
 		 */
 		memset(&x86_default_fpu, 0x00, sizeof(struct ancillary_state));
 
-		/* We must set the MXCSR field in the default state struct to its
-		 * power-on value of 0x1f80. This masks all SIMD floating
+		/* We must set the MXCSR field in the default state struct to
+		 * its power-on value of 0x1f80. This masks all SIMD floating
 		 * point exceptions and clears all SIMD floating-point exception
 		 * flags, sets rounding control to round-nearest, disables
 		 * flush-to-zero mode, and disables denormals-are-zero mode.
@@ -132,13 +139,14 @@ void ancillary_state_init(void)
 		__proc_global_info.x86_default_xcr0 = 0x0;
 
 		/*
-		 * Build a default set of extended state values that we can later use to
-		 * initialize extended state on other cores, or restore on this core.
-		 * We need to use FNINIT to reset the FPU before saving, in case boot
-		 * agents used the FPU or it is dirty for some reason. An old comment
-		 * that used to be here said "had this happen on c89, which had a full
-		 * FP stack after booting." Note that FNINIT does not clear the data
-		 * registers, but it tags them all as empty (0b11).
+		 * Build a default set of extended state values that we can
+		 * later use to initialize extended state on other cores, or
+		 * restore on this core.  We need to use FNINIT to reset the FPU
+		 * before saving, in case boot agents used the FPU or it is
+		 * dirty for some reason. An old comment that used to be here
+		 * said "had this happen on c89, which had a full FP stack after
+		 * booting." Note that FNINIT does not clear the data registers,
+		 * but it tags them all as empty (0b11).
 		 */
 
 		// Zero the default extended state memory region before saving.
@@ -146,12 +154,14 @@ void ancillary_state_init(void)
 		memset(&x86_default_fpu, 0x00, sizeof(struct ancillary_state));
 
 		/*
-		 * FNINIT clears FIP and FDP and, even though it is technically a
-		 * control instruction, it clears FOP while initializing the FPU.
+		 * FNINIT clears FIP and FDP and, even though it is technically
+		 * a control instruction, it clears FOP while initializing the
+		 * FPU.
 		 *
-		 * This marks the STX/MMX registers as empty in the FPU tag word,
-		 * but does not actually clear the values in the registers,
-		 * so we manually clear them in the xsave area after saving.
+		 * This marks the STX/MMX registers as empty in the FPU tag
+		 * word, but does not actually clear the values in the
+		 * registers, so we manually clear them in the xsave area after
+		 * saving.
 		 */
 		asm volatile ("fninit");
 
@@ -159,7 +169,8 @@ void ancillary_state_init(void)
 		asm volatile("fxsave64 %0" : : "m"(x86_default_fpu));
 
 		/*
-		 * Clear junk that might have been saved from the STX/MMX registers.
+		 * Clear junk that might have been saved from the STX/MMX
+		 * registers.
 		 *
 		 * FXSAVE may have also saved junk from the XMM registers,
 		 * depending on how the hardware was implemented and the setting

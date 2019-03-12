@@ -40,7 +40,8 @@ int main(int argc, char *argv[])
 	}
 
 	if (argc < 2) {
-		fprintf(stderr, "usage: mount [-a|-b|-c|-C] channel onto_path\n");
+		fprintf(stderr,
+			"usage: mount [-a|-b|-c|-C] channel onto_path\n");
 		exit(-1);
 	}
 	fd = open(argv[0], O_RDWR);

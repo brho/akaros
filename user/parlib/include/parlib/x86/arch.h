@@ -11,24 +11,24 @@ __BEGIN_DECLS
 #ifdef __x86_64__
 
 #define internal_function
-#define X86_REG_BP					"rbp"
-#define X86_REG_SP					"rsp"
-#define X86_REG_IP					"rip"
-#define X86_REG_AX					"rax"
-#define X86_REG_BX					"rbx"
-#define X86_REG_CX					"rcx"
-#define X86_REG_DX					"rdx"
+#define X86_REG_BP		"rbp"
+#define X86_REG_SP		"rsp"
+#define X86_REG_IP		"rip"
+#define X86_REG_AX		"rax"
+#define X86_REG_BX		"rbx"
+#define X86_REG_CX		"rcx"
+#define X86_REG_DX		"rdx"
 
 #else /* 32 bit */
 
 #define internal_function   __attribute ((regparm (3), stdcall))
-#define X86_REG_BP					"ebp"
-#define X86_REG_SP					"esp"
-#define X86_REG_IP					"eip"
-#define X86_REG_AX					"eax"
-#define X86_REG_BX					"ebx"
-#define X86_REG_CX					"ecx"
-#define X86_REG_DX					"edx"
+#define X86_REG_BP		"ebp"
+#define X86_REG_SP		"esp"
+#define X86_REG_IP		"eip"
+#define X86_REG_AX		"eax"
+#define X86_REG_BX		"ebx"
+#define X86_REG_CX		"ecx"
+#define X86_REG_DX		"edx"
 
 #endif /* 64bit / 32bit */
 
@@ -38,7 +38,8 @@ __BEGIN_DECLS
 static inline void __attribute__((always_inline))
 set_stack_pointer(void *sp)
 {
-	asm volatile("mov %0,%%"X86_REG_SP"" : : "r"(sp) : "memory", X86_REG_SP);
+	asm volatile("mov %0,%%"X86_REG_SP"" : : "r"(sp)
+		     : "memory", X86_REG_SP);
 }
 
 static inline unsigned long get_stack_pointer(void)
@@ -57,6 +58,7 @@ static inline void breakpoint(void)
 static inline uint64_t read_tsc(void)
 {
 	uint32_t edx, eax;
+
 	asm volatile("rdtsc" : "=d"(edx), "=a"(eax));
 	return (uint64_t)edx << 32 | eax;
 }
@@ -79,43 +81,48 @@ static inline void save_fp_state(struct ancillary_state *silly)
 	uint32_t eax, edx;
 
 	/* PLEASE NOTE:
-	 * AMD CPUs ignore the FOP/FIP/FDP fields when there is
-	 * no pending exception. When you are on AMD, we zero these fields in the
-	 * ancillary_state argument before saving. This way, if you are on AMD and
-	 * re-using an ancillary_state memory region, an old save's information
-	 * won't leak into your new data. The side-effect of this is that you can't
-	 * trust these fields to report accurate information on AMD unless an
-	 * exception was pending. Granted, AMD says that only exception handlers
-	 * should care about FOP/FIP/FDP, so that's probably okay.
+	 * AMD CPUs ignore the FOP/FIP/FDP fields when there is no pending
+	 * exception. When you are on AMD, we zero these fields in the
+	 * ancillary_state argument before saving. This way, if you are on AMD
+	 * and re-using an ancillary_state memory region, an old save's
+	 * information won't leak into your new data. The side-effect of this is
+	 * that you can't trust these fields to report accurate information on
+	 * AMD unless an exception was pending. Granted, AMD says that only
+	 * exception handlers should care about FOP/FIP/FDP, so that's probably
+	 * okay.
 	 *
-	 * You should also note that on newer Intel 64 processors, while the value
-	 * of the FOP is always saved and restored, it contains the opcode of the
-	 * most recent x87 FPU instruction that triggered an unmasked exception,
-	 * rather than simply the most recent opcode. Some older Xeons and P4s had
-	 * the fopcode compatibility mode feature, which you could use to make the
-	 * FOP update on every x87 non-control instruction, but that has been
-	 * eliminated in newer hardware.
+	 * You should also note that on newer Intel 64 processors, while the
+	 * value of the FOP is always saved and restored, it contains the opcode
+	 * of the most recent x87 FPU instruction that triggered an unmasked
+	 * exception, rather than simply the most recent opcode. Some older
+	 * Xeons and P4s had the fopcode compatibility mode feature, which you
+	 * could use to make the FOP update on every x87 non-control
+	 * instruction, but that has been eliminated in newer hardware.
 	 *
 	 */
 	if (cpu_has_feat(CPU_FEAT_X86_VENDOR_AMD)) {
 		silly->fp_head_64d.fop      = 0x0;
 		silly->fp_head_64d.fpu_ip   = 0x0;
 		silly->fp_head_64d.cs       = 0x0;
-		silly->fp_head_64d.padding1 = 0x0; // padding1 is FIP or rsvd, proc dep.
+		// padding1 is FIP or rsvd, proc dep.
+		silly->fp_head_64d.padding1 = 0x0;
 		silly->fp_head_64d.fpu_dp   = 0x0;
 		silly->fp_head_64d.ds       = 0x0;
-		silly->fp_head_64d.padding2 = 0x0; // padding2 is FDP or rsvd, proc dep.
+		// padding2 is FDP or rsvd, proc dep.
+		silly->fp_head_64d.padding2 = 0x0;
 	}
 
 
 	if (cpu_has_feat(CPU_FEAT_X86_XSAVEOPT)) {
 		edx = x86_default_xcr0 >> 32;
 		eax = x86_default_xcr0;
-		asm volatile("xsaveopt64 %0" : : "m"(*silly), "a"(eax), "d"(edx));
+		asm volatile("xsaveopt64 %0"
+			     : : "m"(*silly), "a"(eax), "d"(edx));
 	} else if (cpu_has_feat(CPU_FEAT_X86_XSAVE)) {
 		edx = x86_default_xcr0 >> 32;
 		eax = x86_default_xcr0;
-		asm volatile("xsave64 %0" : : "m"(*silly), "a"(eax), "d"(edx));
+		asm volatile("xsave64 %0"
+			     : : "m"(*silly), "a"(eax), "d"(edx));
 	} else {
 		asm volatile("fxsave64 %0" : : "m"(*silly));
 	}
@@ -142,7 +149,8 @@ static inline void restore_fp_state(struct ancillary_state *silly)
 	 * We check for a pending exception by checking FSW.ES (bit 7)
 	 *
 	 * FNINIT clears FIP and FDP and, even though it is technically a
-	 * control instruction, it clears FOP because it is initializing the FPU.
+	 * control instruction, it clears FOP because it is initializing the
+	 * FPU.
 	 *
 	 * NOTE: This might not be the most efficient way to do things, and
 	 *       could be an optimization target for context switch performance

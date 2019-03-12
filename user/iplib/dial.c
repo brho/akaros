@@ -45,12 +45,14 @@ static int call(char *clone, char *dest, int *cfdp, char *dir, char *local,
 	p = strrchr(clone, '/');
 	*p = 0;
 	if (dir)
-		sprintf(dir, "%.*s/%.*s", 2 * NAMELEN + 1, clone, NAMELEN, name);
+		sprintf(dir, "%.*s/%.*s", 2 * NAMELEN + 1, clone, NAMELEN,
+			name);
 	sprintf(data, "%.*s/%.*s/data", 2 * NAMELEN + 1, clone, NAMELEN, name);
 
 	/* set local side (port number, for example) if we need to */
 	if (local)
-		sprintf(name, "connect %.*s %.*s", 2 * NAMELEN, dest, NAMELEN, local);
+		sprintf(name, "connect %.*s %.*s", 2 * NAMELEN, dest, NAMELEN,
+			local);
 	else
 		sprintf(name, "connect %.*s", 2 * NAMELEN, dest);
 	/* connect */

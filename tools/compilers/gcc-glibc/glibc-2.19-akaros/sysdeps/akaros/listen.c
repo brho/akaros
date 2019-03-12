@@ -43,37 +43,38 @@ int __listen(int fd, int backlog)
 	}
 
 	switch (r->domain) {
-		case PF_INET:
-			lip = (struct sockaddr_in *)&r->addr;
-			if (lip->sin_port >= 0) {
-				if (write(r->ctl_fd, "bind 0", 6) < 0) {
-					errno = EINVAL;	//EGREG;
-					return -1;
-				}
-				snprintf(msg, sizeof msg, "announce %d", ntohs(lip->sin_port));
-			} else
-				strcpy(msg, "announce *");
-			n = write(r->ctl_fd, msg, strlen(msg));
-			if (n < 0) {
-				errno = EOPNOTSUPP;	/* Improve error reporting!!! */
-				return -1;
-			}
-			return 0;
-		case PF_UNIX:
-			if (r->other < 0) {
+	case PF_INET:
+		lip = (struct sockaddr_in *)&r->addr;
+		if (lip->sin_port >= 0) {
+			if (write(r->ctl_fd, "bind 0", 6) < 0) {
 				errno = EINVAL;	//EGREG;
 				return -1;
 			}
-			lunix = (struct sockaddr_un *)&r->addr;
-			if (_sock_srv(lunix->sun_path, r->other) < 0) {
-				r->other = -1;
-				return -1;
-			}
-			r->other = -1;
-			return 0;
-		default:
-			errno = EAFNOSUPPORT;
+			snprintf(msg, sizeof msg, "announce %d",
+				 ntohs(lip->sin_port));
+		} else
+			strcpy(msg, "announce *");
+		n = write(r->ctl_fd, msg, strlen(msg));
+		if (n < 0) {
+			errno = EOPNOTSUPP;	/* Improve error reporting!!! */
 			return -1;
+		}
+		return 0;
+	case PF_UNIX:
+		if (r->other < 0) {
+			errno = EINVAL;	//EGREG;
+			return -1;
+		}
+		lunix = (struct sockaddr_un *)&r->addr;
+		if (_sock_srv(lunix->sun_path, r->other) < 0) {
+			r->other = -1;
+			return -1;
+		}
+		r->other = -1;
+		return 0;
+	default:
+		errno = EAFNOSUPPORT;
+		return -1;
 	}
 }
 

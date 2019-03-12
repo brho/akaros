@@ -81,8 +81,8 @@ devdir(struct chan *c, struct qid qid, char *n,
 	db->gid = eve.name;
 	db->muid = user;
 	db->ext = NULL;
-	/* TODO: once we figure out what to do for uid/gid, then we can try to tie
-	 * that to the n_uid.  Or just ignore it, and only use that as a
+	/* TODO: once we figure out what to do for uid/gid, then we can try to
+	 * tie that to the n_uid.  Or just ignore it, and only use that as a
 	 * pass-through for 9p2000.u. */
 	db->n_uid = 0;
 	db->n_gid = 0;
@@ -115,14 +115,13 @@ devdir(struct chan *c, struct qid qid, char *n,
  *
  * The comment about genning a file's siblings needs a grain of salt too.  Look
  * through ipgen().  I think it's what I call "direct genning." */
-int
-devgen(struct chan *c, char *unused_name, struct dirtab *tab, int ntab,
-       int i, struct dir *dp)
+int devgen(struct chan *c, char *unused_name, struct dirtab *tab, int ntab,
+	   int i, struct dir *dp)
 {
 	if (tab == NULL)
 		return -1;
 	if (i != DEVDOTDOT) {
-		/* Skip over the first element, that for the directory itself. */
+		/* Skip over the first element, that for the directory itself */
 		i++;
 		if (i < 0 || ntab <= i)
 			return -1;
@@ -170,21 +169,22 @@ struct chan *devclone(struct chan *c)
 {
 	struct chan *nc;
 
-	/* In plan 9, you couldn't clone an open chan.  We're allowing it, possibly
-	 * foolishly.  The new chan is a non-open, "kernel internal" chan.  Note
-	 * that c->flag isn't set, for instance.  c->mode is, which might be a
-	 * problem.  The newchan should eventually have a device's open called on
-	 * it, at which point it upgrades from a kernel internal chan to one that
-	 * can refer to an object in the device (e.g. grab a refcnt on a
-	 * conversation in #ip).
+	/* In plan 9, you couldn't clone an open chan.  We're allowing it,
+	 * possibly foolishly.  The new chan is a non-open, "kernel internal"
+	 * chan.  Note that c->flag isn't set, for instance.  c->mode is, which
+	 * might be a problem.  The newchan should eventually have a device's
+	 * open called on it, at which point it upgrades from a kernel internal
+	 * chan to one that can refer to an object in the device (e.g. grab a
+	 * refcnt on a conversation in #ip).
 	 *
-	 * Either we allow devclones of open chans, or O_PATH walks do not open a
-	 * file.  It's nice to allow the device to do something for O_PATH, but
-	 * perhaps that is not critical.  However, if we can't clone an opened chan,
-	 * then we can *only* openat from an FD that is O_PATH, which is not the
-	 * spec (and not as useful). */
+	 * Either we allow devclones of open chans, or O_PATH walks do not open
+	 * a file.  It's nice to allow the device to do something for O_PATH,
+	 * but perhaps that is not critical.  However, if we can't clone an
+	 * opened chan, then we can *only* openat from an FD that is O_PATH,
+	 * which is not the spec (and not as useful). */
 	if ((c->flag & COPEN) && !(c->flag & O_PATH))
-		panic("clone of non-O_PATH open file type %s\n", devtab[c->type].name);
+		panic("clone of non-O_PATH open file type %s\n",
+		      devtab[c->type].name);
 
 	nc = newchan();
 	nc->type = c->type;
@@ -200,13 +200,12 @@ struct chan *devclone(struct chan *c)
 	return nc;
 }
 
-struct walkqid *devwalk(struct chan *c,
-						struct chan *nc, char **name, int nname,
-						struct dirtab *tab, int ntab, Devgen * gen)
+struct walkqid *devwalk(struct chan *c, struct chan *nc, char **name, int nname,
+			struct dirtab *tab, int ntab, Devgen * gen)
 {
 	ERRSTACK(1);
 	int i, j;
-	volatile int alloc;			/* to keep waserror from optimizing this out */
+	volatile int alloc;	/* to keep waserror from optimizing this out */
 	struct walkqid *wq;
 	char *n;
 	struct dir dir;
@@ -226,8 +225,8 @@ struct walkqid *devwalk(struct chan *c,
 	}
 	if (nc == NULL) {
 		nc = devclone(c);
-		/* inferno was setting this to 0, assuming it was devroot.  lining up
-		 * with chanrelease and newchan */
+		/* inferno was setting this to 0, assuming it was devroot.
+		 * lining up with chanrelease and newchan */
 		nc->type = -1;	/* device doesn't know about this channel yet */
 		alloc = 1;
 	}
@@ -264,27 +263,28 @@ Accept:
 		dir.qid.path = 0;
 		for (i = 0;; i++) {
 			switch ((*gen) (nc, n, tab, ntab, i, &dir)) {
-				case -1:
-					printd("DEVWALK -1, i was %d, want path %p\n", i,
-						   c->qid.path);
+			case -1:
+				printd("DEVWALK -1, i was %d, want path %p\n",
+				       i, c->qid.path);
 Notfound:
-					set_error(ENOENT, "could not find name %s, dev %s", n,
-						      c->type == -1 ? "no dev" : devtab[c->type].name);
-					if (j == 0)
-						error_jmp();
-					goto Done;
-				case 0:
-					printd("DEVWALK continue, i was %d\n", i);
-					continue;
-				case 1:
-					printd
-						("DEVWALK gen returns path %p name %s, want path %p\n",
-						 dir.qid.path, dir.name, c->qid.path);
-					if (strcmp(n, dir.name) == 0) {
-						nc->qid = dir.qid;
-						goto Accept;
-					}
-					continue;
+				set_error(ENOENT,
+					  "could not find name %s, dev %s", n,
+					  c->type == -1 ? "no dev" :
+					  devtab[c->type].name);
+				if (j == 0)
+					error_jmp();
+				goto Done;
+			case 0:
+				printd("DEVWALK continue, i was %d\n", i);
+				continue;
+			case 1:
+				printd("DEVWALK gen returns path %p name %s, want path %p\n",
+				       dir.qid.path, dir.name, c->qid.path);
+				if (strcmp(n, dir.name) == 0) {
+					nc->qid = dir.qid;
+					goto Accept;
+				}
+				continue;
 			}
 		}
 	}
@@ -331,41 +331,42 @@ size_t devstat(struct chan *c, uint8_t *db, size_t n, struct dirtab *tab,
 	dir.qid.path = 0;
 	for (i = 0;; i++)
 		switch ((*gen) (c, NULL, tab, ntab, i, &dir)) {
-			case -1:
-				if (c->qid.type & QTDIR) {
-					printd("DEVSTAT got a dir: %llu\n", c->qid.path);
-					if (c->name == NULL)
-						elem = "???";
-					else if (strcmp(c->name->s, "/") == 0)
-						elem = "/";
-					else
-						for (elem = p = c->name->s; *p; p++)
-							if (*p == '/')
-								elem = p + 1;
-					devdir(c, c->qid, elem, 0, eve.name, DMDIR | 0555, &dir);
-					n = convD2M(&dir, db, n);
-					if (n == 0)
-						error(EINVAL, ERROR_FIXME);
-					return n;
-				}
-				printd("DEVSTAT fails:%s %llu\n", devtab[c->type].name,
-					   c->qid.path);
-				error(ENOENT, ERROR_FIXME);
-			case 0:
-				printd("DEVSTAT got 0\n");
-				break;
-			case 1:
-				printd("DEVSTAT gen returns path %p name %s, want path %p\n",
-					   dir.qid.path, dir.name, c->qid.path);
-				if (c->qid.path == dir.qid.path)
-					return dev_make_stat(c, &dir, db, n);
-				break;
+		case -1:
+			if (c->qid.type & QTDIR) {
+				printd("DEVSTAT got a dir: %llu\n",
+				       c->qid.path);
+				if (c->name == NULL)
+					elem = "???";
+				else if (strcmp(c->name->s, "/") == 0)
+					elem = "/";
+				else
+					for (elem = p = c->name->s; *p; p++)
+						if (*p == '/')
+							elem = p + 1;
+				devdir(c, c->qid, elem, 0, eve.name, DMDIR |
+				       0555, &dir);
+				n = convD2M(&dir, db, n);
+				if (n == 0)
+					error(EINVAL, ERROR_FIXME);
+				return n;
+			}
+			printd("DEVSTAT fails:%s %llu\n", devtab[c->type].name,
+				   c->qid.path);
+			error(ENOENT, ERROR_FIXME);
+		case 0:
+			printd("DEVSTAT got 0\n");
+			break;
+		case 1:
+			printd("DEVSTAT gen returns path %p name %s, want path %p\n",
+			       dir.qid.path, dir.name, c->qid.path);
+			if (c->qid.path == dir.qid.path)
+				return dev_make_stat(c, &dir, db, n);
+			break;
 		}
 }
 
-long
-devdirread(struct chan *c, char *d, long n,
-		   struct dirtab *tab, int ntab, Devgen * gen)
+long devdirread(struct chan *c, char *d, long n, struct dirtab *tab, int ntab,
+		Devgen * gen)
 {
 	long m, dsz;
 	/* this is gross. Make it 2 so we have room at the end for
@@ -376,25 +377,26 @@ devdirread(struct chan *c, char *d, long n,
 	dir[0].qid.path = 0;
 	for (m = 0; m < n; c->dri++) {
 		switch ((*gen) (c, NULL, tab, ntab, c->dri, &dir[0])) {
-			case -1:
-				printd("DEVDIRREAD got -1, asked for s = %d\n", c->dri);
+		case -1:
+			printd("DEVDIRREAD got -1, asked for s = %d\n", c->dri);
+			return m;
+
+		case 0:
+			printd("DEVDIRREAD got 0, asked for s = %d\n", c->dri);
+			break;
+
+		case 1:
+			printd("DEVDIRREAD got 1, asked for s = %d\n", c->dri);
+			dsz = convD2M(&dir[0], (uint8_t *) d, n - m);
+			/* <= not < because this isn't stat; read is stuck */
+			if (dsz <= BIT16SZ) {
+				if (m == 0)
+					error(ENODATA, ERROR_FIXME);
 				return m;
-
-			case 0:
-				printd("DEVDIRREAD got 0, asked for s = %d\n", c->dri);
-				break;
-
-			case 1:
-				printd("DEVDIRREAD got 1, asked for s = %d\n", c->dri);
-				dsz = convD2M(&dir[0], (uint8_t *) d, n - m);
-				if (dsz <= BIT16SZ) {	/* <= not < because this isn't stat; read is stuck */
-					if (m == 0)
-						error(ENODATA, ERROR_FIXME);
-					return m;
-				}
-				m += dsz;
-				d += dsz;
-				break;
+			}
+			m += dsz;
+			d += dsz;
+			break;
 		}
 	}
 
@@ -420,22 +422,23 @@ struct chan *devopen(struct chan *c, int omode, struct dirtab *tab, int ntab,
 	dir.qid.path = 0;
 	for (i = 0;; i++) {
 		switch ((*gen) (c, NULL, tab, ntab, i, &dir)) {
-			case -1:
+		case -1:
+			goto Return;
+		case 0:
+			break;
+		case 1:
+			if (c->qid.path == dir.qid.path) {
+				devpermcheck(dir.uid, dir.mode, omode);
 				goto Return;
-			case 0:
-				break;
-			case 1:
-				if (c->qid.path == dir.qid.path) {
-					devpermcheck(dir.uid, dir.mode, omode);
-					goto Return;
-				}
-				break;
+			}
+			break;
 		}
 	}
 Return:
 	c->offset = 0;
 	if ((c->qid.type & QTDIR) && (omode & O_WRITE))
-		error(EACCES, "Tried opening dir with non-read-only mode %o", omode);
+		error(EACCES, "Tried opening dir with non-read-only mode %o",
+		      omode);
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
 	return c;

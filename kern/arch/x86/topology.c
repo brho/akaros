@@ -33,6 +33,7 @@ int *os_coreid_lookup;
 static void adjust_ids(int id_offset)
 {
 	int new_id = 0, old_id = -1;
+
 	for (int i = 0; i < num_cores; i++) {
 		for (int j = 0; j < num_cores; j++) {
 			int *id_field = ((void*)&core_list[j] + id_offset);
@@ -54,15 +55,18 @@ static void adjust_ids(int id_offset)
 static void set_socket_ids(void)
 {
 	int socket_id, raw_socket_id;
+
 	for (int numa_id = 0; numa_id < num_numa; numa_id++) {
 		socket_id = 0;
 		for (int i = 0; i < num_cores; i++) {
 			if (core_list[i].numa_id == numa_id) {
 				if (core_list[i].socket_id == -1) {
 					core_list[i].socket_id = socket_id;
-					raw_socket_id = core_list[i].raw_socket_id;
+					raw_socket_id =
+						core_list[i].raw_socket_id;
 					for (int j = i; j < num_cores; j++) {
-						if (core_list[j].numa_id == numa_id) {
+						if (core_list[j].numa_id ==
+						    numa_id) {
 							if (core_list[j].raw_socket_id == raw_socket_id) {
 								core_list[j].socket_id = socket_id;
 							}
@@ -149,7 +153,8 @@ static int get_num_numa(void)
 		struct Srat *temp = srat->children[i]->tbl;
 
 		if (temp != NULL && temp->type == SRlapic)
-			if (is_unique_numa(temp, srat->children, i + 1, srat->nchildren))
+			if (is_unique_numa(temp, srat->children, i + 1,
+					   srat->nchildren))
 				numa++;
 	}
 
@@ -179,17 +184,18 @@ static void set_max_apic_id(void)
 static void init_os_coreid_lookup(void)
 {
 	/* Allocate (max_apic_id+1) entries in our os_coreid_lookup table.
-	 * There may be holes in this table because of the way apic_ids work, but
-	 * a little wasted space is OK for a constant time lookup of apic_id ->
-	 * logical core id (from the OS's perspective). Memset the array to -1 to
-	 * to represent invalid entries (which it's very possible we might have if
-	 * the apic_id space has holes in it).  */
+	 * There may be holes in this table because of the way apic_ids work,
+	 * but a little wasted space is OK for a constant time lookup of apic_id
+	 * -> logical core id (from the OS's perspective). Memset the array to
+	 *  -1 to to represent invalid entries (which it's very possible we
+	 *  might have if the apic_id space has holes in it).  */
 	os_coreid_lookup = kmalloc((max_apic_id + 1) * sizeof(int), 0);
 	memset(os_coreid_lookup, -1, (max_apic_id + 1) * sizeof(int));
 
-	/* Loop through and set all valid entries to 0 to start with (making them
-	 * temporarily valid, but not yet set to the correct value). This step is
-	 * necessary because there is no ordering to the linked list we are
+	/* Loop through and set all valid entries to 0 to start with (making
+	 * them temporarily valid, but not yet set to the correct value). This
+	 * step is necessary because there is no ordering to the linked list we
+	 * are
 	 * pulling these ids from. After this, loop back through and set the
 	 * mapping appropriately. */
 	for (int i = 0; i < apics->nchildren; i++) {
@@ -199,6 +205,7 @@ static void init_os_coreid_lookup(void)
 			os_coreid_lookup[temp->lapic.id] = 0;
 	}
 	int os_coreid = 0;
+
 	for (int i = 0; i <= max_apic_id; i++)
 		if (os_coreid_lookup[i] == 0)
 			os_coreid_lookup[i] = os_coreid++;
@@ -211,22 +218,24 @@ static void init_core_list(uint32_t core_bits, uint32_t cpu_bits)
 	 * with. */
 	core_list = kzmalloc(num_cores * sizeof(struct core_info), 0);
 
-	/* Loop through all possible apic_ids and fill in the core_list array with
-	 * *relative* topology info. We will change this relative info to absolute
-	 * info in a future step. As part of this step, we update our
+	/* Loop through all possible apic_ids and fill in the core_list array
+	 * with *relative* topology info. We will change this relative info to
+	 * absolute info in a future step. As part of this step, we update our
 	 * os_coreid_lookup array to contain the proper value. */
 	int os_coreid = 0;
 	int max_cpus = (1 << cpu_bits);
 	int max_cores_per_cpu = (1 << core_bits);
 	int max_logical_cores = (1 << (core_bits + cpu_bits));
 	int raw_socket_id = 0, cpu_id = 0, core_id = 0;
+
 	for (int apic_id = 0; apic_id <= max_apic_id; apic_id++) {
 		if (os_coreid_lookup[apic_id] != -1) {
 			raw_socket_id = apic_id & ~(max_logical_cores - 1);
 			cpu_id = (apic_id >> core_bits) & (max_cpus - 1);
 			core_id = apic_id & (max_cores_per_cpu - 1);
 
-			core_list[os_coreid].numa_id = find_numa_domain(apic_id);
+			core_list[os_coreid].numa_id =
+				find_numa_domain(apic_id);
 			core_list[os_coreid].raw_socket_id = raw_socket_id;
 			core_list[os_coreid].socket_id = -1;
 			core_list[os_coreid].cpu_id = cpu_id;
@@ -236,25 +245,25 @@ static void init_core_list(uint32_t core_bits, uint32_t cpu_bits)
 		}
 	}
 
-	/* In general, the various id's set in the previous step are all unique in
-	 * terms of representing the topology (i.e. all cores under the same socket
-	 * have the same socket_id set), but these id's are not necessarily
-	 * contiguous, and are only relative to the level of the hierarchy they
-	 * exist at (e.g.  cpu_id 4 may exist under *both* socket_id 0 and
-	 * socket_id 1). In this step, we squash these id's down so they are
-	 * contiguous. In a following step, we will make them all absolute instead
-	 * of relative. */
+	/* In general, the various id's set in the previous step are all unique
+	 * in terms of representing the topology (i.e. all cores under the same
+	 * socket have the same socket_id set), but these id's are not
+	 * necessarily contiguous, and are only relative to the level of the
+	 * hierarchy they exist at (e.g.  cpu_id 4 may exist under *both*
+	 * socket_id 0 and socket_id 1). In this step, we squash these id's down
+	 * so they are contiguous. In a following step, we will make them all
+	 * absolute instead of relative. */
 	adjust_ids(offsetof(struct core_info, numa_id));
 	adjust_ids(offsetof(struct core_info, raw_socket_id));
 	adjust_ids(offsetof(struct core_info, cpu_id));
 	adjust_ids(offsetof(struct core_info, core_id));
 
 	/* We haven't yet set the socket id of each core yet. So far, all we've
-	 * extracted is a "raw" socket id from the top bits in our apic id, but we
-	 * need to condense these down into something workable for a socket id, per
-	 * numa domain. OSDev has an algorithm for doing so
-	 * (http://wiki.osdev.org/Detecting_CPU_Topology_%2880x86%29). We adapt it
-	 * for our setup. */
+	 * extracted is a "raw" socket id from the top bits in our apic id, but
+	 * we need to condense these down into something workable for a socket
+	 * id, per numa domain. OSDev has an algorithm for doing so
+	 * (http://wiki.osdev.org/Detecting_CPU_Topology_%2880x86%29).
+	 * We adapt it for our setup. */
 	set_socket_ids();
 }
 
@@ -265,9 +274,10 @@ static void init_core_list_flat(void)
 	 * with. */
 	core_list = kzmalloc(num_cores * sizeof(struct core_info), 0);
 
-	/* Loop through all possible apic_ids and fill in the core_list array with
-	 * flat topology info. */
+	/* Loop through all possible apic_ids and fill in the core_list array
+	 * with flat topology info. */
 	int os_coreid = 0;
+
 	for (int apic_id = 0; apic_id <= max_apic_id; apic_id++) {
 		if (os_coreid_lookup[apic_id] != -1) {
 			core_list[os_coreid].numa_id = 0;
@@ -283,9 +293,9 @@ static void init_core_list_flat(void)
 
 static void set_remaining_topology_info(void)
 {
-	/* Assuming we have our core_list set up with relative topology info, loop
-	 * through our core_list and calculate the other statistics that we hold
-	 * in our cpu_topology_info struct. */
+	/* Assuming we have our core_list set up with relative topology info,
+	 * loop through our core_list and calculate the other statistics that we
+	 * hold in our cpu_topology_info struct. */
 	int last_numa = -1, last_socket = -1, last_cpu = -1, last_core = -1;
 	for (int i = 0; i < num_cores; i++) {
 		if (core_list[i].socket_id > last_socket) {
@@ -370,7 +380,7 @@ void topology_init(void)
 		build_flat_topology();
 }
 
-void print_cpu_topology()
+void print_cpu_topology(void)
 {
 	printk("num_numa: %d, num_sockets: %d, num_cpus: %d, num_cores: %d\n",
 	       num_numa, num_sockets, num_cpus, num_cores);

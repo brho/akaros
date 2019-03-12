@@ -54,7 +54,7 @@ struct DS {
 	char *netdir;
 	char *proto;
 	char *rem;
-	char *local;				/* other args */
+	char *local;			/* other args */
 	char *dir;
 	int *cfdp;
 };
@@ -382,8 +382,8 @@ int klisten(char *dir, char *newdir, size_t newdirlen)
 /*
  *  perform the identity translation (in case we can't reach cs)
  */
-static int
-identtrans(char *netdir, char *addr, char *naddr, int na, char *file, int nf)
+static int identtrans(char *netdir, char *addr, char *naddr, int na, char *file,
+		      int nf)
 {
 	char proto[Maxpath];
 	char *p;

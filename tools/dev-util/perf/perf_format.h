@@ -188,20 +188,20 @@ enum perf_event_type {
 	 *	# is fixed relative to header.
 	 *	#
 	 *
-	 *	{ u64			id;	  } && PERF_SAMPLE_IDENTIFIER
-	 *	{ u64			ip;	  } && PERF_SAMPLE_IP
-	 *	{ u32			pid, tid; } && PERF_SAMPLE_TID
-	 *	{ u64			time;	  } && PERF_SAMPLE_TIME
-	 *	{ u64			addr;	  } && PERF_SAMPLE_ADDR
-	 *	{ u64			id;	  } && PERF_SAMPLE_ID
-	 *	{ u64			stream_id;} && PERF_SAMPLE_STREAM_ID
-	 *	{ u32			cpu, res; } && PERF_SAMPLE_CPU
-	 *	{ u64			period;	  } && PERF_SAMPLE_PERIOD
+	 *	{ u64		id;	  } && PERF_SAMPLE_IDENTIFIER
+	 *	{ u64		ip;	  } && PERF_SAMPLE_IP
+	 *	{ u32		pid, tid; } && PERF_SAMPLE_TID
+	 *	{ u64		time;	  } && PERF_SAMPLE_TIME
+	 *	{ u64		addr;	  } && PERF_SAMPLE_ADDR
+	 *	{ u64		id;	  } && PERF_SAMPLE_ID
+	 *	{ u64		stream_id;} && PERF_SAMPLE_STREAM_ID
+	 *	{ u32		cpu, res; } && PERF_SAMPLE_CPU
+	 *	{ u64		period;	  } && PERF_SAMPLE_PERIOD
 	 *
 	 *	{ struct read_format	values;	  } && PERF_SAMPLE_READ
 	 *
-	 *	{ u64			nr,
-	 *	  u64			ips[nr];  } && PERF_SAMPLE_CALLCHAIN
+	 *	{ u64		nr,
+	 *	  u64		ips[nr];  } && PERF_SAMPLE_CALLCHAIN
 	 *
 	 *	#
 	 *	# The RAW record below is opaque data wrt the ABI
@@ -214,24 +214,24 @@ enum perf_event_type {
 	 *	# In other words, PERF_SAMPLE_RAW contents are not an ABI.
 	 *	#
 	 *
-	 *	{ u32			size;
-	 *	  char					data[size];}&& PERF_SAMPLE_RAW
+	 *	{ u32		size;
+	 *	  char		data[size];}&& PERF_SAMPLE_RAW
 	 *
-	 *	{ u64					nr;
-	 *		  { u64 from, to, flags } lbr[nr];} && PERF_SAMPLE_BRANCH_STACK
+	 *	{ u64		nr;
+	 *	{ u64 from, to, flags } lbr[nr];} && PERF_SAMPLE_BRANCH_STACK
 	 *
-	 *	{ u64			abi; # enum perf_sample_regs_abi
-	 *	  u64			regs[weight(mask)]; } && PERF_SAMPLE_REGS_USER
+	 *	{ u64		abi; # enum perf_sample_regs_abi
+	 *	  u64		regs[weight(mask)]; } && PERF_SAMPLE_REGS_USER
 	 *
-	 *	{ u64			size;
-	 *	  char			data[size];
-	 *	  u64			dyn_size; } && PERF_SAMPLE_STACK_USER
+	 *	{ u64		size;
+	 *	  char		data[size];
+	 *	  u64		dyn_size; } && PERF_SAMPLE_STACK_USER
 	 *
-	 *	{ u64			weight;	  } && PERF_SAMPLE_WEIGHT
-	 *	{ u64			data_src; } && PERF_SAMPLE_DATA_SRC
-	 *		{ u64					transaction; } && PERF_SAMPLE_TRANSACTION
-	 *	{ u64			abi; # enum perf_sample_regs_abi
-	 *	  u64			regs[weight(mask)]; } && PERF_SAMPLE_REGS_INTR
+	 *	{ u64		weight;	  } && PERF_SAMPLE_WEIGHT
+	 *	{ u64		data_src; } && PERF_SAMPLE_DATA_SRC
+	 *	{ u64		transaction; } && PERF_SAMPLE_TRANSACTION
+	 *	{ u64		abi; # enum perf_sample_regs_abi
+	 *	  u64		regs[weight(mask)]; } && PERF_SAMPLE_REGS_INTR
 	 * };
 	 */
 	PERF_RECORD_SAMPLE			= 9,
@@ -263,30 +263,30 @@ enum perf_event_type {
 #define PERF_MAX_STACK_DEPTH		127
 
 enum perf_callchain_context {
-	PERF_CONTEXT_HV				= (__uint64_t) -32,
-	PERF_CONTEXT_KERNEL			= (__uint64_t) -128,
-	PERF_CONTEXT_USER			= (__uint64_t) -512,
+	PERF_CONTEXT_HV			= (__uint64_t) -32,
+	PERF_CONTEXT_KERNEL		= (__uint64_t) -128,
+	PERF_CONTEXT_USER		= (__uint64_t) -512,
 
-	PERF_CONTEXT_GUEST			= (__uint64_t) -2048,
+	PERF_CONTEXT_GUEST		= (__uint64_t) -2048,
 	PERF_CONTEXT_GUEST_KERNEL	= (__uint64_t) -2176,
 	PERF_CONTEXT_GUEST_USER		= (__uint64_t) -2560,
 
-	PERF_CONTEXT_MAX			= (__uint64_t) -4095,
+	PERF_CONTEXT_MAX		= (__uint64_t) -4095,
 };
 
 /*
  * attr.type
  */
 enum perf_type_id {
-	PERF_TYPE_HARDWARE						= 0,
-	PERF_TYPE_SOFTWARE						= 1,
-	PERF_TYPE_TRACEPOINT					= 2,
-	PERF_TYPE_HW_CACHE						= 3,
-	PERF_TYPE_RAW							= 4,
-	PERF_TYPE_BREAKPOINT					= 5,
-	PERF_TYPE_INTEL_CQM						= 6,
+	PERF_TYPE_HARDWARE		= 0,
+	PERF_TYPE_SOFTWARE		= 1,
+	PERF_TYPE_TRACEPOINT		= 2,
+	PERF_TYPE_HW_CACHE		= 3,
+	PERF_TYPE_RAW			= 4,
+	PERF_TYPE_BREAKPOINT		= 5,
+	PERF_TYPE_INTEL_CQM		= 6,
 
-	PERF_TYPE_MAX,							/* non-ABI */
+	PERF_TYPE_MAX,			/* non-ABI */
 };
 
 /*
@@ -298,18 +298,18 @@ enum perf_hw_id {
 	/*
 	 * Common hardware events, generalized by the kernel:
 	 */
-	PERF_COUNT_HW_CPU_CYCLES				= 0,
-	PERF_COUNT_HW_INSTRUCTIONS				= 1,
-	PERF_COUNT_HW_CACHE_REFERENCES			= 2,
-	PERF_COUNT_HW_CACHE_MISSES				= 3,
-	PERF_COUNT_HW_BRANCH_INSTRUCTIONS		= 4,
-	PERF_COUNT_HW_BRANCH_MISSES				= 5,
-	PERF_COUNT_HW_BUS_CYCLES				= 6,
+	PERF_COUNT_HW_CPU_CYCLES		= 0,
+	PERF_COUNT_HW_INSTRUCTIONS		= 1,
+	PERF_COUNT_HW_CACHE_REFERENCES		= 2,
+	PERF_COUNT_HW_CACHE_MISSES		= 3,
+	PERF_COUNT_HW_BRANCH_INSTRUCTIONS	= 4,
+	PERF_COUNT_HW_BRANCH_MISSES		= 5,
+	PERF_COUNT_HW_BUS_CYCLES		= 6,
 	PERF_COUNT_HW_STALLED_CYCLES_FRONTEND	= 7,
 	PERF_COUNT_HW_STALLED_CYCLES_BACKEND	= 8,
-	PERF_COUNT_HW_REF_CPU_CYCLES			= 9,
+	PERF_COUNT_HW_REF_CPU_CYCLES		= 9,
 
-	PERF_COUNT_HW_MAX,						/* non-ABI */
+	PERF_COUNT_HW_MAX,			/* non-ABI */
 };
 
 /* We can output a bunch of different versions of perf_event_attr.  The oldest
@@ -398,7 +398,7 @@ struct perf_event_attr {
 
 		exclude_callchain_kernel : 1, /* exclude kernel callchains */
 		exclude_callchain_user	 : 1, /* exclude user callchains */
-		mmap2		   :  1, /* include mmap with inode data	 */
+		mmap2		   :  1, /* include mmap with inode data */
 
 		__reserved_1   : 40;
 
@@ -484,7 +484,7 @@ struct perf_file_section {
 	uint64_t size;		/* Size of the section */
 } __attribute__((packed));
 
-#define PERF_STRING_ALIGN						64
+#define PERF_STRING_ALIGN	64
 
 struct perf_header_string {
 	uint32_t len;
@@ -497,15 +497,15 @@ struct perf_header_string_list {
 };
 
 struct nr_cpus {
-	uint32_t					nr_cpus_online;
-	uint32_t					nr_cpus_available;
+	uint32_t		nr_cpus_online;
+	uint32_t		nr_cpus_available;
 };
 
 struct build_id_event {
-	struct perf_event_header	header;
-	pid_t						pid;
-	uint8_t						build_id[24];	/* BUILD_ID_SIZE aligned u64 */
-	char						filename[];
+	struct perf_event_header header;
+	pid_t			pid;
+	uint8_t			build_id[24];	/* BUILD_ID_SIZE aligned u64 */
+	char			filename[];
 };
 
 #define MAX_EVENT_NAME 64
@@ -525,14 +525,14 @@ struct perf_file_attr {
 static const uint64_t PERF_MAGIC2 = 0x32454c4946524550ULL;
 
 struct perf_pipe_file_header {
-	uint64_t magic;					/* PERFILE2 */
+	uint64_t magic;			/* PERFILE2 */
 	uint64_t size;
 };
 
 struct perf_header {
-	uint64_t magic;					/* PERFILE2 */
-	uint64_t size;					/* Size of the header */
-	uint64_t attr_size;				/* size of an attribute in attrs */
+	uint64_t magic;			/* PERFILE2 */
+	uint64_t size;			/* Size of the header */
+	uint64_t attr_size;		/* size of an attribute in attrs */
 	struct perf_file_section attrs;
 	struct perf_file_section data;
 	struct perf_file_section event_types;

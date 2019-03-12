@@ -59,11 +59,11 @@ static void etherread6(void *a);
 static void etherbind(struct Ipifc *ifc, int argc, char **argv);
 static void etherunbind(struct Ipifc *ifc);
 static void etherbwrite(struct Ipifc *ifc, struct block *bp, int version,
-						uint8_t * ip);
+			uint8_t *ip);
 static void etheraddmulti(struct Ipifc *ifc, uint8_t * a, uint8_t * ia);
 static void etherremmulti(struct Ipifc *ifc, uint8_t * a, uint8_t * ia);
 static struct block *multicastarp(struct Fs *f, struct arpent *a,
-								  struct medium *, uint8_t * mac);
+				  struct medium *m, uint8_t *mac);
 static void sendarp(struct Ipifc *ifc, struct arpent *a);
 static void sendgarp(struct Ipifc *ifc, uint8_t * unused_uint8_p_t);
 static int multicastea(uint8_t * ea, uint8_t * ip);
@@ -105,12 +105,12 @@ struct medium trexmedium = {
 
 typedef struct Etherrock Etherrock;
 struct Etherrock {
-	struct Fs *f;				/* file system we belong to */
-	struct proc *arpp;			/* arp process */
+	struct Fs *f;			/* file system we belong to */
+	struct proc *arpp;		/* arp process */
 	struct proc *read4p;		/* reading process (v4) */
 	struct proc *read6p;		/* reading process (v6) */
 	struct chan *mchan4;		/* Data channel for v4 */
-	struct chan *achan;			/* Arp channel */
+	struct chan *achan;		/* Arp channel */
 	struct chan *cchan4;		/* Control channel for v4 */
 	struct chan *mchan6;		/* Data channel for v6 */
 	struct chan *cchan6;		/* Control channel for v6 */
@@ -356,8 +356,8 @@ static inline void etherfilladdr(uint16_t *pkt, uint16_t *dst, uint16_t *src)
 /*
  *  called by ipoput with a single block to write with ifc rlock'd
  */
-static void
-etherbwrite(struct Ipifc *ifc, struct block *bp, int version, uint8_t * ip)
+static void etherbwrite(struct Ipifc *ifc, struct block *bp, int version,
+			uint8_t *ip)
 {
 	Etherhdr *eh;
 	struct arpent *a;
@@ -372,8 +372,9 @@ etherbwrite(struct Ipifc *ifc, struct block *bp, int version, uint8_t * ip)
 	 * not, sendarp or resolveaddr6 unlocked it for us.  yikes. */
 	a = arpget(er->f->arp, bp, version, ifc, ip, mac);
 	if (a) {
-		/* check for broadcast or multicast.  if it is either, this sorts that
-		 * out and returns the bp for the first packet on the arp's hold list.*/
+		/* check for broadcast or multicast.  if it is either, this
+		 * sorts that out and returns the bp for the first packet on the
+		 * arp's hold list.*/
 		bp = multicastarp(er->f, a, ifc->m, mac);
 		if (bp == NULL) {
 			switch (version) {
@@ -384,7 +385,8 @@ etherbwrite(struct Ipifc *ifc, struct block *bp, int version, uint8_t * ip)
 					resolveaddr6(ifc, a);
 					break;
 				default:
-					panic("etherbwrite: version %d", version);
+					panic("etherbwrite: version %d",
+					      version);
 			}
 			return;
 		}
@@ -397,21 +399,22 @@ etherbwrite(struct Ipifc *ifc, struct block *bp, int version, uint8_t * ip)
 	eh = (Etherhdr *) bp->rp;
 
 	/* copy in mac addresses and ether type */
-	etherfilladdr((uint16_t *)bp->rp, (uint16_t *)mac, (uint16_t *)ifc->mac);
+	etherfilladdr((uint16_t *)bp->rp, (uint16_t *)mac,
+		      (uint16_t *)ifc->mac);
 
 	switch (version) {
-		case V4:
-			eh->t[0] = 0x08;
-			eh->t[1] = 0x00;
-			devtab[er->mchan4->type].bwrite(er->mchan4, bp, 0);
-			break;
-		case V6:
-			eh->t[0] = 0x86;
-			eh->t[1] = 0xDD;
-			devtab[er->mchan6->type].bwrite(er->mchan6, bp, 0);
-			break;
-		default:
-			panic("etherbwrite2: version %d", version);
+	case V4:
+		eh->t[0] = 0x08;
+		eh->t[1] = 0x00;
+		devtab[er->mchan4->type].bwrite(er->mchan4, bp, 0);
+		break;
+	case V6:
+		eh->t[0] = 0x86;
+		eh->t[1] = 0xDD;
+		devtab[er->mchan6->type].bwrite(er->mchan6, bp, 0);
+		break;
+	default:
+		panic("etherbwrite2: version %d", version);
 	}
 	ifc->out++;
 }
@@ -512,14 +515,14 @@ static void etheraddmulti(struct Ipifc *ifc, uint8_t * a, uint8_t * unused)
 	version = multicastea(mac, a);
 	snprintf(buf, sizeof(buf), "addmulti %E", mac);
 	switch (version) {
-		case V4:
-			devtab[er->cchan4->type].write(er->cchan4, buf, strlen(buf), 0);
-			break;
-		case V6:
-			devtab[er->cchan6->type].write(er->cchan6, buf, strlen(buf), 0);
-			break;
-		default:
-			panic("etheraddmulti: version %d", version);
+	case V4:
+		devtab[er->cchan4->type].write(er->cchan4, buf, strlen(buf), 0);
+		break;
+	case V6:
+		devtab[er->cchan6->type].write(er->cchan6, buf, strlen(buf), 0);
+		break;
+	default:
+		panic("etheraddmulti: version %d", version);
 	}
 }
 
@@ -533,14 +536,14 @@ static void etherremmulti(struct Ipifc *ifc, uint8_t * a, uint8_t * unused)
 	version = multicastea(mac, a);
 	snprintf(buf, sizeof(buf), "remmulti %E", mac);
 	switch (version) {
-		case V4:
-			devtab[er->cchan4->type].write(er->cchan4, buf, strlen(buf), 0);
-			break;
-		case V6:
-			devtab[er->cchan6->type].write(er->cchan6, buf, strlen(buf), 0);
-			break;
-		default:
-			panic("etherremmulti: version %d", version);
+	case V4:
+		devtab[er->cchan4->type].write(er->cchan4, buf, strlen(buf), 0);
+		break;
+	case V6:
+		devtab[er->cchan6->type].write(er->cchan6, buf, strlen(buf), 0);
+		break;
+	default:
+		panic("etherremmulti: version %d", version);
 	}
 }
 
@@ -556,17 +559,18 @@ static void sendarp(struct Ipifc *ifc, struct arpent *a)
 	Etherarp *e;
 	Etherrock *er = ifc->arg;
 
-	/* don't do anything if it's been less than a second since the last.  ctime
-	 * is set to 0 for the first time through.  we hold the f->arp qlock, so
-	 * there shouldn't be a problem with another arp request for this same
-	 * arpent coming down til we update ctime again. */
+	/* don't do anything if it's been less than a second since the last.
+	 * ctime is set to 0 for the first time through.  we hold the f->arp
+	 * qlock, so there shouldn't be a problem with another arp request for
+	 * this same arpent coming down til we update ctime again. */
 	if (NOW - a->ctime < 1000) {
 		arprelease(er->f->arp, a);
 		return;
 	}
 
-	/* remove all but the last message.  brho: this might be unnecessary.  we'll
-	 * eventually send them.  but they should be quite stale at this point. */
+	/* remove all but the last message.  brho: this might be unnecessary.
+	 * we'll eventually send them.  but they should be quite stale at this
+	 * point. */
 	while ((bp = a->hold) != NULL) {
 		if (bp == a->last)
 			break;
@@ -695,88 +699,89 @@ static void recvarp(struct Ipifc *ifc)
 
 	e = (Etherarp *) ebp->rp;
 	switch (nhgets(e->op)) {
-		default:
-			break;
+	default:
+		break;
 
-		case ARPREPLY:
-			/* check for machine using my ip address */
-			v4tov6(ip, e->spa);
-			if (iplocalonifc(ifc, ip) || ipproxyifc(er->f, ifc, ip)) {
-				if (memcmp(e->sha, ifc->mac, sizeof(e->sha)) != 0) {
-					printd("arprep: 0x%E/0x%E also has ip addr %V\n",
-						   e->s, e->sha, e->spa);
-					break;
-				}
-			}
-
-			/* make sure we're not entering broadcast addresses */
-			if (ipcmp(ip, ipbroadcast) == 0 ||
-				!memcmp(e->sha, etherbroadcast, sizeof(e->sha))) {
-				printd
-					("arprep: 0x%E/0x%E cannot register broadcast address %I\n",
-					 e->s, e->sha, e->spa);
+	case ARPREPLY:
+		/* check for machine using my ip address */
+		v4tov6(ip, e->spa);
+		if (iplocalonifc(ifc, ip) || ipproxyifc(er->f, ifc, ip)) {
+			if (memcmp(e->sha, ifc->mac, sizeof(e->sha)) != 0) {
+				printd("arprep: 0x%E/0x%E also has ip addr %V\n",
+					   e->s, e->sha, e->spa);
 				break;
 			}
+		}
 
-			arpenter(er->f, V4, e->spa, e->sha, sizeof(e->sha), 0);
+		/* make sure we're not entering broadcast addresses */
+		if (ipcmp(ip, ipbroadcast) == 0 ||
+		    !memcmp(e->sha, etherbroadcast, sizeof(e->sha))) {
+			printd("arprep: 0x%E/0x%E cannot register broadcast address %I\n",
+			       e->s, e->sha, e->spa);
+			break;
+		}
+
+		arpenter(er->f, V4, e->spa, e->sha, sizeof(e->sha), 0);
+		break;
+
+	case ARPREQUEST:
+		/* don't answer arps till we know who we are */
+		if (ifc->lifc == 0)
 			break;
 
-		case ARPREQUEST:
-			/* don't answer arps till we know who we are */
-			if (ifc->lifc == 0)
-				break;
-
-			/* check for machine using my ip or ether address */
-			v4tov6(ip, e->spa);
-			if (iplocalonifc(ifc, ip) || ipproxyifc(er->f, ifc, ip)) {
-				if (memcmp(e->sha, ifc->mac, sizeof(e->sha)) != 0) {
-					if (memcmp(eprinted, e->spa, sizeof(e->spa))) {
-						/* print only once */
-						printd("arpreq: 0x%E also has ip addr %V\n", e->sha,
-							   e->spa);
-						memmove(eprinted, e->spa, sizeof(e->spa));
-					}
-				}
-			} else {
-				if (memcmp(e->sha, ifc->mac, sizeof(e->sha)) == 0) {
-					printd("arpreq: %V also has ether addr %E\n", e->spa,
-						   e->sha);
-					break;
+		/* check for machine using my ip or ether address */
+		v4tov6(ip, e->spa);
+		if (iplocalonifc(ifc, ip) || ipproxyifc(er->f, ifc, ip)) {
+			if (memcmp(e->sha, ifc->mac, sizeof(e->sha)) != 0) {
+				if (memcmp(eprinted, e->spa, sizeof(e->spa))) {
+					/* print only once */
+					printd("arpreq: 0x%E also has ip addr %V\n",
+					       e->sha, e->spa);
+					memmove(eprinted, e->spa,
+						sizeof(e->spa));
 				}
 			}
+		} else {
+			if (memcmp(e->sha, ifc->mac, sizeof(e->sha)) == 0) {
+				printd("arpreq: %V also has ether addr %E\n",
+				       e->spa, e->sha);
+				break;
+			}
+		}
 
-			/* refresh what we know about sender */
-			arpenter(er->f, V4, e->spa, e->sha, sizeof(e->sha), 1);
+		/* refresh what we know about sender */
+		arpenter(er->f, V4, e->spa, e->sha, sizeof(e->sha), 1);
 
-			/* answer only requests for our address or systems we're proxying for */
-			v4tov6(ip, e->tpa);
-			if (!iplocalonifc(ifc, ip))
-				if (!ipproxyifc(er->f, ifc, ip))
-					break;
+		/* answer only requests for our address or systems we're
+		 * proxying for */
+		v4tov6(ip, e->tpa);
+		if (!iplocalonifc(ifc, ip))
+			if (!ipproxyifc(er->f, ifc, ip))
+				break;
 
-			n = sizeof(Etherarp);
-			if (n < ifc->mintu)
-				n = ifc->mintu;
-			rbp = block_alloc(n, MEM_WAIT);
-			r = (Etherarp *) rbp->rp;
-			memset(r, 0, sizeof(Etherarp));
-			hnputs(r->type, ETARP);
-			hnputs(r->hrd, 1);
-			hnputs(r->pro, ETIP4);
-			r->hln = sizeof(r->sha);
-			r->pln = sizeof(r->spa);
-			hnputs(r->op, ARPREPLY);
-			memmove(r->tha, e->sha, sizeof(r->tha));
-			memmove(r->tpa, e->spa, sizeof(r->tpa));
-			memmove(r->sha, ifc->mac, sizeof(r->sha));
-			memmove(r->spa, e->tpa, sizeof(r->spa));
-			memmove(r->d, e->sha, sizeof(r->d));
-			memmove(r->s, ifc->mac, sizeof(r->s));
-			rbp->wp += n;
+		n = sizeof(Etherarp);
+		if (n < ifc->mintu)
+			n = ifc->mintu;
+		rbp = block_alloc(n, MEM_WAIT);
+		r = (Etherarp *) rbp->rp;
+		memset(r, 0, sizeof(Etherarp));
+		hnputs(r->type, ETARP);
+		hnputs(r->hrd, 1);
+		hnputs(r->pro, ETIP4);
+		r->hln = sizeof(r->sha);
+		r->pln = sizeof(r->spa);
+		hnputs(r->op, ARPREPLY);
+		memmove(r->tha, e->sha, sizeof(r->tha));
+		memmove(r->tpa, e->spa, sizeof(r->tpa));
+		memmove(r->sha, ifc->mac, sizeof(r->sha));
+		memmove(r->spa, e->tpa, sizeof(r->spa));
+		memmove(r->d, e->sha, sizeof(r->d));
+		memmove(r->s, ifc->mac, sizeof(r->s));
+		rbp->wp += n;
 
-			n = devtab[er->achan->type].bwrite(er->achan, rbp, 0);
-			if (n < 0)
-				printd("arp: write: %r\n");
+		n = devtab[er->achan->type].bwrite(er->achan, rbp, 0);
+		if (n < 0)
+			printd("arp: write: %r\n");
 	}
 	freeb(ebp);
 }
@@ -804,22 +809,22 @@ static int multicastea(uint8_t * ea, uint8_t * ip)
 	int x;
 
 	switch (x = ipismulticast(ip)) {
-		case V4:
-			ea[0] = 0x01;
-			ea[1] = 0x00;
-			ea[2] = 0x5e;
-			ea[3] = ip[13] & 0x7f;
-			ea[4] = ip[14];
-			ea[5] = ip[15];
-			break;
-		case V6:
-			ea[0] = 0x33;
-			ea[1] = 0x33;
-			ea[2] = ip[12];
-			ea[3] = ip[13];
-			ea[4] = ip[14];
-			ea[5] = ip[15];
-			break;
+	case V4:
+		ea[0] = 0x01;
+		ea[1] = 0x00;
+		ea[2] = 0x5e;
+		ea[3] = ip[13] & 0x7f;
+		ea[4] = ip[14];
+		ea[5] = ip[15];
+		break;
+	case V6:
+		ea[0] = 0x33;
+		ea[1] = 0x33;
+		ea[2] = ip[12];
+		ea[3] = ip[13];
+		ea[4] = ip[14];
+		ea[5] = ip[15];
+		break;
 	}
 	return x;
 }
@@ -829,26 +834,25 @@ static int multicastea(uint8_t * ea, uint8_t * ip)
  *  addresses.  Return the first queued packet for the
  *  IP address.
  */
-static struct block *multicastarp(struct Fs *f,
-								  struct arpent *a, struct medium *medium,
-								  uint8_t * mac)
+static struct block *multicastarp(struct Fs *f, struct arpent *a,
+				  struct medium *medium, uint8_t *mac)
 {
 	/* is it broadcast? */
 	switch (ipforme(f, a->ip)) {
-		case Runi:
-			return NULL;
-		case Rbcast:
-			memset(mac, 0xff, 6);
-			return arpresolve(f->arp, a, medium, mac);
-		default:
-			break;
+	case Runi:
+		return NULL;
+	case Rbcast:
+		memset(mac, 0xff, 6);
+		return arpresolve(f->arp, a, medium, mac);
+	default:
+		break;
 	}
 
 	/* if multicast, fill in mac */
 	switch (multicastea(mac, a->ip)) {
-		case V4:
-		case V6:
-			return arpresolve(f->arp, a, medium, mac);
+	case V4:
+	case V6:
+		return arpresolve(f->arp, a, medium, mac);
 	}
 
 	/* let arp take care of it */

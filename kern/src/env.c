@@ -42,33 +42,38 @@ int env_setup_vm(env_t *e)
 	e->env_cr3 = arch_pgdir_get_cr3(e->env_pgdir);
 
 	/* These need to be contiguous, so the kernel can alias them.  Note the
-	 * pages return with a refcnt, but it's okay to insert them since we free
-	 * them manually when the process is cleaned up. */
-	if (!(e->procinfo = kpages_alloc(PROCINFO_NUM_PAGES * PGSIZE, MEM_WAIT)))
+	 * pages return with a refcnt, but it's okay to insert them since we
+	 * free them manually when the process is cleaned up. */
+	if (!(e->procinfo = kpages_alloc(PROCINFO_NUM_PAGES * PGSIZE,
+					 MEM_WAIT)))
 		goto env_setup_vm_error_i;
-	if (!(e->procdata = kpages_alloc(PROCDATA_NUM_PAGES * PGSIZE, MEM_WAIT)))
+	if (!(e->procdata = kpages_alloc(PROCDATA_NUM_PAGES * PGSIZE,
+					 MEM_WAIT)))
 		goto env_setup_vm_error_d;
 	/* Normally we would 0 the pages here.  We handle it in proc_init_proc*.
 	 * Do not start the process without calling those. */
 	for (int i = 0; i < PROCINFO_NUM_PAGES; i++) {
-		if (page_insert(e->env_pgdir, kva2page((void*)e->procinfo + i *
-		                PGSIZE), (void*)(UINFO + i*PGSIZE), PTE_USER_RO) < 0)
+		if (page_insert(e->env_pgdir,
+				kva2page((void*)e->procinfo + i * PGSIZE),
+				(void*)(UINFO + i * PGSIZE), PTE_USER_RO) < 0)
 			goto env_setup_vm_error;
 	}
 	for (int i = 0; i < PROCDATA_NUM_PAGES; i++) {
-		if (page_insert(e->env_pgdir, kva2page((void*)e->procdata + i *
-		                PGSIZE), (void*)(UDATA + i*PGSIZE), PTE_USER_RW) < 0)
+		if (page_insert(e->env_pgdir,
+				kva2page((void*)e->procdata + i * PGSIZE),
+				(void*)(UDATA + i * PGSIZE), PTE_USER_RW) < 0)
 			goto env_setup_vm_error;
 	}
 	for (int i = 0; i < PROCGINFO_NUM_PAGES; i++) {
 		if (page_insert(e->env_pgdir,
-		                kva2page((void*)&__proc_global_info + i * PGSIZE),
+		                kva2page((void*)&__proc_global_info
+					 + i * PGSIZE),
 		                (void*)(UGINFO + i * PGSIZE), PTE_USER_RO) < 0)
 			goto env_setup_vm_error;
 	}
-	/* Finally, set up the Global Shared Data page for all processes.  Can't be
-	 * trusted, but still very useful at this stage for us.  Consider removing
-	 * when we have real processes (TODO).
+	/* Finally, set up the Global Shared Data page for all processes.  Can't
+	 * be trusted, but still very useful at this stage for us.  Consider
+	 * removing when we have real processes (TODO).
 	 *
 	 * Note the page is alloced only the first time through, and its ref is
 	 * stored in shared_page. */
@@ -76,7 +81,8 @@ int env_setup_vm(env_t *e)
 		if (upage_alloc(e, &shared_page, 1) < 0)
 			goto env_setup_vm_error;
 	}
-	if (page_insert(e->env_pgdir, shared_page, (void*)UGDATA, PTE_USER_RW) < 0)
+	if (page_insert(e->env_pgdir, shared_page, (void*)UGDATA, PTE_USER_RW)
+	    < 0)
 		goto env_setup_vm_error;
 
 	return 0;
@@ -94,7 +100,7 @@ env_setup_vm_error_i:
 /* Frees (decrefs) all memory mapped in the given range */
 void env_user_mem_free(env_t* e, void* start, size_t len)
 {
-	assert((uintptr_t)start + len <= UVPT); //since this keeps fucking happening
+	assert((uintptr_t)start + len <= UVPT);
 	int user_page_free(env_t* e, pte_t pte, void* va, void* arg)
 	{
 		if (!pte_is_mapped(pte))
@@ -102,9 +108,10 @@ void env_user_mem_free(env_t* e, void* start, size_t len)
 		page_t *page = pa2page(pte_get_paddr(pte));
 		pte_clear(pte);
 		page_decref(page);
-		/* TODO: consider other states here (like !P, yet still tracking a page,
-		 * for VM tricks, page map stuff, etc.  Should be okay: once we're
-		 * freeing, everything else about this proc is dead. */
+		/* TODO: consider other states here (like !P, yet still tracking
+		 * a page, for VM tricks, page map stuff, etc.  Should be okay:
+		 * once we're freeing, everything else about this proc is dead.
+		 * */
 		return 0;
 	}
 
@@ -139,7 +146,8 @@ void __set_username(struct username *u, char *name)
 		error(EINVAL, "New username is NULL");
 
 	if (strlen(name) > sizeof(u->name) - 1)
-		error(EINVAL, "New username for process more than %d chars long",
+		error(EINVAL,
+		      "New username for process more than %d chars long",
 		      sizeof(u->name) - 1);
 
 	// 'backward' copy since reads aren't protected

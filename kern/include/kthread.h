@@ -41,18 +41,18 @@ TAILQ_HEAD(kth_db_tailq, kth_db_info);
  * a kthread is running, we make sure its stacktop is the default kernel stack,
  * meaning it will receive the interrupts from userspace. */
 struct kthread {
-	struct jmpbuf				context;
-	uintptr_t					stacktop;
-	struct proc					*proc;
-	struct syscall				*sysc;
-	struct errbuf				*errbuf;
+	struct jmpbuf			context;
+	uintptr_t			stacktop;
+	struct proc			*proc;
+	struct syscall			*sysc;
+	struct errbuf			*errbuf;
 	TAILQ_ENTRY(kthread)		link;
 	/* ID, other shit, etc */
-	int							flags;
-	char						*name;
-	char						generic_buf[GENBUF_SZ];
-	int							errno;
-	char						errstr[MAX_ERRSTR_LEN];
+	int				flags;
+	char				*name;
+	char				generic_buf[GENBUF_SZ];
+	int				errno;
+	char				errstr[MAX_ERRSTR_LEN];
 	struct systrace_record		*strace;
 };
 
@@ -63,8 +63,8 @@ struct kthread {
 
 struct kth_db_info {
 	TAILQ_ENTRY(kth_db_info)	link;
-	unsigned int				type;
-	bool						on_list;
+	unsigned int			type;
+	bool				on_list;
 };
 
 #define KTH_DB_INIT .db         = { .type = KTH_DB_SEM },
@@ -81,44 +81,44 @@ struct kth_db_info {
 
 /* Semaphore for kthreads to sleep on.  0 or less means you need to sleep */
 struct semaphore {
-	struct kth_db_info			db;
+	struct kth_db_info		db;
 	struct kthread_tailq		waiters;
-	int 						nr_signals;
-	spinlock_t 					lock;
+	int 				nr_signals;
+	spinlock_t 			lock;
 };
 
 #define SEMAPHORE_INITIALIZER(name, n)                                         \
 {                                                                              \
     .waiters    = TAILQ_HEAD_INITIALIZER((name).waiters),                      \
-	.nr_signals = (n),                                                         \
+    .nr_signals = (n),                                                         \
     .lock       = SPINLOCK_INITIALIZER,                                        \
-	KTH_DB_INIT                                                                \
+    KTH_DB_INIT                                                                \
 }
 
 #define SEMAPHORE_INITIALIZER_IRQSAVE(name, n)                                 \
 {                                                                              \
     .waiters    = TAILQ_HEAD_INITIALIZER((name).waiters),                      \
-	.nr_signals = (n),                                                         \
+    .nr_signals = (n),                                                         \
     .lock       = SPINLOCK_INITIALIZER_IRQSAVE,                                \
-	KTH_DB_INIT                                                                \
+    KTH_DB_INIT                                                                \
 }
 
 struct cond_var {
-	struct kth_db_info			db;
+	struct kth_db_info		db;
 	struct kthread_tailq		waiters;
-	spinlock_t 					*lock;		/* usually points to internal_ */
-	spinlock_t 					internal_lock;
-	unsigned long				nr_waiters;
+	spinlock_t 			*lock;	/* usually points to internal */
+	spinlock_t 			internal_lock;
+	unsigned long			nr_waiters;
 };
 
 struct cv_lookup_elm {
 	TAILQ_ENTRY(cv_lookup_elm)	link;
-	TAILQ_ENTRY(cv_lookup_elm)	abortall_link;		/* only used in abort_all */
-	struct cond_var				*cv;
-	struct kthread				*kthread;
-	struct syscall				*sysc;
-	struct proc					*proc;
-	atomic_t					abort_in_progress;	/* 0 = no */
+	TAILQ_ENTRY(cv_lookup_elm)	abortall_link;
+	struct cond_var			*cv;
+	struct kthread			*kthread;
+	struct syscall			*sysc;
+	struct proc			*proc;
+	atomic_t			abort_in_progress;	/* 0 = no */
 };
 TAILQ_HEAD(cv_lookup_tailq, cv_lookup_elm);
 

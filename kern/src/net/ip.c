@@ -44,12 +44,12 @@ typedef struct Fragment6 Fragment6;
 typedef struct Ipfrag Ipfrag;
 
 enum {
-	IP4HDR = 20,				/* sizeof(Ip4hdr) */
-	IP6HDR = 40,	/* sizeof(Ip6hdr) */
+	IP4HDR = 20,		/* sizeof(Ip4hdr) */
+	IP6HDR = 40,		/* sizeof(Ip6hdr) */
 	IP_HLEN4 = 0x05,	/* Header length in words */
-	IP_DF = 0x4000,	/* Don't fragment */
-	IP_MF = 0x2000,	/* More fragments */
-	IP6FHDR = 8,	/* sizeof(Fraghdr6) */
+	IP_DF = 0x4000,		/* Don't fragment */
+	IP_MF = 0x2000,		/* More fragments */
+	IP6FHDR = 8,		/* sizeof(Fraghdr6) */
 	IP_MAX = 64 * 1024,	/* Maximum Internet packet size */
 };
 
@@ -118,7 +118,7 @@ struct IP {
 	struct fragment6 *fragfree6;
 	int id6;
 
-	int iprouting;				/* true if we route like a gateway */
+	int iprouting;		/* true if we route like a gateway */
 };
 
 static char *statnames[] = {
@@ -151,8 +151,8 @@ static char *statnames[] = {
 #define BKFG(xp)	((struct Ipfrag*)((xp)->base))
 
 uint16_t ipcsum(uint8_t * unused_uint8_p_t);
-struct block *ip4reassemble(struct IP *, int unused_int,
-							struct block *, struct Ip4hdr *);
+struct block *ip4reassemble(struct IP *, int unused_int, struct block *,
+			    struct Ip4hdr *);
 void ipfragfree4(struct IP *, struct fragment4 *);
 struct fragment4 *ipfragallo4(struct IP *);
 
@@ -186,7 +186,7 @@ void initfrag(struct IP *ip, int size)
 	struct fragment6 *fq6, *eq6;
 
 	ip->fragfree4 =
-		(struct fragment4 *)kzmalloc(sizeof(struct fragment4) * size, 0);
+	    (struct fragment4 *)kzmalloc(sizeof(struct fragment4) * size, 0);
 	if (ip->fragfree4 == NULL)
 		panic("initfrag");
 
@@ -197,7 +197,7 @@ void initfrag(struct IP *ip, int size)
 	ip->fragfree4[size - 1].next = NULL;
 
 	ip->fragfree6 =
-		(struct fragment6 *)kzmalloc(sizeof(struct fragment6) * size, 0);
+	    (struct fragment6 *)kzmalloc(sizeof(struct fragment6) * size, 0);
 	if (ip->fragfree6 == NULL)
 		panic("initfrag");
 
@@ -230,9 +230,8 @@ void iprouting(struct Fs *f, int on)
 		f->ip->stats[Forwarding] = 1;
 }
 
-int
-ipoput4(struct Fs *f,
-		struct block *bp, int gating, int ttl, int tos, struct conv *c)
+int ipoput4(struct Fs *f, struct block *bp, int gating, int ttl, int tos, struct
+	    conv *c)
 {
 	ERRSTACK(1);
 	struct Ipifc *ifc;
@@ -455,7 +454,8 @@ void ipiput4(struct Fs *f, struct Ipifc *ifc, struct block *bp)
 		hl = (h->vihl & 0xF) << 2;
 		if (hl < (IP_HLEN4 << 2)) {
 			ip->stats[InHdrErrors]++;
-			netlog(f, Logip, "ip: %V bad hivl 0x%x\n", h->src, h->vihl);
+			netlog(f, Logip, "ip: %V bad hivl 0x%x\n", h->src,
+			       h->vihl);
 			freeblist(bp);
 			return;
 		}
@@ -592,7 +592,7 @@ struct block *ip4reassemble(struct IP *ip, int offset, struct block *bp,
 	 *  find a reassembly queue for this fragment
 	 */
 	for (f = ip->flisthead4; f; f = fnext) {
-		fnext = f->next;	/* because ipfragfree4 changes the list */
+		fnext = f->next;/* because ipfragfree4 changes the list */
 		if (f->src == src && f->dst == dst && f->id == id)
 			break;
 		if (f->age < NOW) {

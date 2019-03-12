@@ -5,7 +5,8 @@ TEST_SUITE("SIGNALS");
 
 /* <--- Begin definition of test cases ---> */
 
-bool test_sigmask(void) {
+bool test_sigmask(void)
+{
 	int count = 0;
 	pthread_t sigphandle;
 	void *thread_handler(void *arg)
@@ -37,7 +38,8 @@ bool test_sigmask(void) {
 	pthread_join(phandle, NULL);
 
 	UT_ASSERT_M("Should only receive one signal", count == 1); 
-	UT_ASSERT_M("Signal handler run on wrong thread", sigphandle == phandle); 
+	UT_ASSERT_M("Signal handler run on wrong thread", sigphandle ==
+		    phandle); 
 	return true;
 }
 
@@ -49,9 +51,9 @@ struct utest utests[] = {
 int num_utests = sizeof(utests) / sizeof(struct utest);
 
 int main(int argc, char *argv[]) {
-	// Run test suite passing it all the args as whitelist of what tests to run.
 	char **whitelist = &argv[1];
 	int whitelist_len = argc - 1;
+
 	RUN_TEST_SUITE(utests, num_utests, whitelist, whitelist_len);
 }
 

@@ -7,12 +7,12 @@
  *
  * To use this, define a function of the form:
  *
- * 		void my_test(unsigned long nr_loops)
+ * 	void my_test(unsigned long nr_loops)
  *
  * Which does some computation you wish to measure inside a loop that run
  * nr_loops times.  Then in microb_test(), add your function in a line such as:
  *
- * 		test_time_ns(my_test, 100000);
+ * 	test_time_ns(my_test, 100000);
  *
  * This macro will run your test and print the results.  Pick a loop amount that
  * is reasonable for your operation.  You can also use test_time_us() for longer
@@ -62,11 +62,12 @@ void set_tlsdesc_test(unsigned long nr_loops)
 	void *vctls = get_vcpd_tls_desc(vcoreid);
 	segdesc_t tmp = SEG(STA_W, (uint32_t)vctls, 0xffffffff, 3);
 	uint32_t gs = (vcoreid << 3) | 0x07;
-    for (int i = 0; i < nr_loops; i++) {
+
+	for (int i = 0; i < nr_loops; i++) {
 		__procdata.ldt[vcoreid] = tmp;
 		cmb();
 		asm volatile("movl %0,%%gs" : : "r" (gs) : "memory");
-    }
+	}
 	set_tls_desc(mytls);
 #endif
 }
@@ -75,57 +76,64 @@ void set_tlsdesc_test(unsigned long nr_loops)
 
 void loop_overhead(unsigned long nr_loops)
 {
-    for (int i = 0; i < nr_loops; i++) {
+	for (int i = 0; i < nr_loops; i++) {
 		cmb();
-    }
+	}
 }
 
 /* Runs func(loops) and returns the usec elapsed */
 #define __test_time_us(func, loops)                                            \
 ({                                                                             \
-	struct timeval start_tv = {0};                                             \
-	struct timeval end_tv = {0};                                               \
-	if (gettimeofday(&start_tv, 0))                                            \
-		perror("Start time error...");                                         \
-	(func)((loops));                                                           \
-	if (gettimeofday(&end_tv, 0))                                              \
-		perror("End time error...");                                           \
-	((end_tv.tv_sec - start_tv.tv_sec) * 1000000 +                             \
-	 (end_tv.tv_usec - start_tv.tv_usec));                                     \
+	struct timeval start_tv = {0};                                         \
+	struct timeval end_tv = {0};                                           \
+	                                                                       \
+	if (gettimeofday(&start_tv, 0))                                        \
+		perror("Start time error...");                                 \
+	(func)((loops));                                                       \
+	if (gettimeofday(&end_tv, 0))                                          \
+		perror("End time error...");                                   \
+	((end_tv.tv_sec - start_tv.tv_sec) * 1000000 +                         \
+	 (end_tv.tv_usec - start_tv.tv_usec));                                 \
 })
 
 /* Runs func(loops) and returns the nsec elapsed */
 #define __test_time_ns(func, loops)                                            \
 ({                                                                             \
-	(__test_time_us((func), (loops)) * 1000);                                  \
+	(__test_time_us((func), (loops)) * 1000);                              \
 })
 
 /* Runs func(loops), subtracts the loop overhead, and prints the result */
 #define test_time_us(func, loops)                                              \
 ({                                                                             \
-	unsigned long long usec_diff;                                              \
-	usec_diff = __test_time_us((func), (loops)) - nsec_per_loop * loops / 1000;\
-	printf("\"%s\" total: %lluus, per iteration: %lluus\n", #func, usec_diff,  \
-	       usec_diff / (loops));                                               \
+	unsigned long long usec_diff;                                          \
+	                                                                       \
+	usec_diff = __test_time_us((func),                                     \
+				   (loops)) - nsec_per_loop * loops / 1000;    \
+	printf("\"%s\" total: %lluus, per iteration: %lluus\n", #func,         \
+	       usec_diff,                                                      \
+	       usec_diff / (loops));                                           \
 })
 
 /* Runs func(loops), subtracts the loop overhead, and prints the result */
 #define test_time_ns(func, loops)                                              \
 ({                                                                             \
-	unsigned long long nsec_diff;                                              \
-	nsec_diff = __test_time_ns((func), (loops)) - nsec_per_loop * (loops);     \
-	printf("\"%s\" total: %lluns, per iteration: %lluns\n", #func, nsec_diff,  \
-	       nsec_diff / (loops));                                               \
+	unsigned long long nsec_diff;                                          \
+	                                                                       \
+	nsec_diff = __test_time_ns((func), (loops)) - nsec_per_loop * (loops); \
+	printf("\"%s\" total: %lluns, per iteration: %lluns\n", #func,         \
+	       nsec_diff,                                                      \
+	       nsec_diff / (loops));                                           \
 })
 
 static void microb_test(void)
 {
 	unsigned long long nsec_per_loop;
+
 	printf("We are %sin MCP mode, running on vcore %d, pcore %d\n",
 	       (in_multi_mode() ? "" : "not "), vcore_id(),
 	       __get_pcoreid());
-	/* We divide the overhead by loops, and later we multiply again, which drops
-	 * off some accuracy at the expense of usability (can do different
+	/* We divide the overhead by loops, and later we multiply again, which
+	 * drops off some accuracy at the expense of usability (can do different
 	 * iterations for different tests without worrying about recomputing the
 	 * loop overhead). */
 	nsec_per_loop = __test_time_ns(loop_overhead, 100000) / 100000;
@@ -145,6 +153,7 @@ int main(int argc, char** argv)
 {
 	pthread_t child;
 	void *child_ret;
+
 	microb_test();
 	printf("Spawning worker thread, etc...\n");
 	pthread_create(&child, NULL, &worker_thread, NULL);

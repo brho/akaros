@@ -32,8 +32,8 @@ struct dev tmpfs_devtab;
 
 struct tmpfs {
 	struct tree_filesystem		tfs;
-	atomic_t					qid;
-	struct kref					users;
+	atomic_t			qid;
+	struct kref			users;
 };
 
 static uint64_t tmpfs_get_qid_path(struct tmpfs *tmpfs)
@@ -65,9 +65,10 @@ static void __tmpfs_tf_init(struct tree_file *tf, int dir_type, int dir_dev,
 	fs_file_init_dir(&tf->file, dir_type, dir_dev, user, perm);
 	dir->qid.path = tmpfs_get_qid_path((struct tmpfs*)tf->tfs);
 	dir->qid.vers = 0;
-	/* This is the "+1 for existing" ref.  There is no backing store for the FS,
-	 * such as a disk or 9p, so we can't get rid of a file until it is unlinked
-	 * and decreffed.  Note that KFS doesn't use pruners or anything else. */
+	/* This is the "+1 for existing" ref.  There is no backing store for the
+	 * FS, such as a disk or 9p, so we can't get rid of a file until it is
+	 * unlinked and decreffed.  Note that KFS doesn't use pruners or
+	 * anything else. */
 	__kref_get(&tf->kref, 1);
 }
 
@@ -75,22 +76,22 @@ static void __tmpfs_tf_init(struct tree_file *tf, int dir_type, int dir_dev,
 static void tmpfs_tf_create(struct tree_file *parent, struct tree_file *child,
                             int perm)
 {
-	__tmpfs_tf_init(child, parent->file.dir.type, parent->file.dir.dev, &eve,
-	                perm);
+	__tmpfs_tf_init(child, parent->file.dir.type, parent->file.dir.dev,
+			&eve, perm);
 }
 
 static void tmpfs_tf_rename(struct tree_file *tf, struct tree_file *old_parent,
                             struct tree_file *new_parent, const char *name,
                             int flags)
 {
-	/* We don't have a backend, so we don't need to do anything additional for
-	 * rename. */
+	/* We don't have a backend, so we don't need to do anything additional
+	 * for rename. */
 }
 
 static bool tmpfs_tf_has_children(struct tree_file *parent)
 {
-	/* The tree_file parent list is complete and not merely a cache for a real
-	 * backend. */
+	/* The tree_file parent list is complete and not merely a cache for a
+	 * real backend. */
 	return !list_empty(&parent->children);
 }
 
@@ -111,10 +112,10 @@ static int tmpfs_pm_readpage(struct page_map *pm, struct page *pg)
 {
 	memset(page2kva(pg), 0, PGSIZE);
 	atomic_or(&pg->pg_flags, PG_UPTODATE);
-	/* Pretend that we blocked while filing this page.  This catches a lot of
-	 * bugs.  It does slightly slow down the kernel, but it's only when filling
-	 * the page cache, and considering we are using a RAMFS, you shouldn't
-	 * measure things that actually rely on KFS's performance. */
+	/* Pretend that we blocked while filing this page.  This catches a lot
+	 * of bugs.  It does slightly slow down the kernel, but it's only when
+	 * filling the page cache, and considering we are using a RAMFS, you
+	 * shouldn't measure things that actually rely on KFS's performance. */
 	kthread_usleep(1);
 	return 0;
 }
@@ -185,8 +186,8 @@ static struct chan *tmpfs_attach(char *spec)
 	struct tree_filesystem *tfs = kzmalloc(sizeof(struct tmpfs), MEM_WAIT);
 	struct tmpfs *tmpfs = (struct tmpfs*)tfs;
 
-	/* All distinct chans get a ref on the filesystem, so that we can destroy it
-	 * when the last user disconnects/closes. */
+	/* All distinct chans get a ref on the filesystem, so that we can
+	 * destroy it when the last user disconnects/closes. */
 	kref_init(&tmpfs->users, tmpfs_release, 1);
 
 	/* This gives us one ref on root, dropped during tmpfs_release(). */
@@ -194,10 +195,11 @@ static struct chan *tmpfs_attach(char *spec)
 	tfs->tf_ops = tmpfs_tf_ops;
 	tfs->fs_ops = tmpfs_fs_ops;
 
-	/* This gives us an extra refcnt on tfs->root.  This is "+1 for existing."
-	 * It is decreffed during the purge CB. */
-	__tmpfs_tf_init(tfs->root, &tmpfs_devtab - devtab, 0, &eve, DMDIR | 0777);
-	/* This also increfs, copying tfs->root's ref for the chan it returns. */
+	/* This gives us an extra refcnt on tfs->root.  This is "+1 for
+	 * existing." It is decreffed during the purge CB. */
+	__tmpfs_tf_init(tfs->root, &tmpfs_devtab - devtab, 0, &eve, DMDIR |
+			0777);
+	/* This also increfs, copying tfs->root's ref for the chan it returns.*/
 	return tree_file_alloc_chan(tfs->root, &tmpfs_devtab, "#tmpfs");
 }
 

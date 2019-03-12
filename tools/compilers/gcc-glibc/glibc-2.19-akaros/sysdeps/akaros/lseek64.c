@@ -35,13 +35,13 @@ __libc_lseek64 (int fd, off64_t offset, int whence)
 		return -1;
 	}
 	switch (whence) {
-		case SEEK_SET:
-		case SEEK_CUR:
-		case SEEK_END:
-			break;
-		default:
-			__set_errno (EINVAL);
-			return -1;
+	case SEEK_SET:
+	case SEEK_CUR:
+	case SEEK_END:
+		break;
+	default:
+		__set_errno (EINVAL);
+		return -1;
 	}
 	hi = offset >> 32;
 	lo = offset & 0xffffffff;

@@ -29,20 +29,20 @@ const char *virtio_validate_feat(struct virtio_vq_dev *vqdev, uint64_t feat)
 	// as soon as possible, so that they don't skip this when they
 	// implement new devices.
 	switch (vqdev->dev_id) {
-		case VIRTIO_ID_CONSOLE:
-			// No interdependent features for the console.
-			break;
-		case VIRTIO_ID_NET:
-			// There is no "mandatory" feature bit that we always want to have,
-			// either the device can set its own MAC Address (as it does now)
-			// or the driver can set it using a controller thread.
-			break;
-		case VIRTIO_ID_BLOCK:
-			break;
-		case 0:
-			return "Invalid device id (0x0)! On the MMIO transport, this value indicates that the device is a system memory map with placeholder devices at static, well known addresses. In any case, this is not something you validate features for.";
-		default:
-			return "Validation not implemented for this device type! You MUST implement validation for this device! You should add your new code to the virtio_validate_feat function in vmm/virtio.c.";
+	case VIRTIO_ID_CONSOLE:
+		// No interdependent features for the console.
+		break;
+	case VIRTIO_ID_NET:
+		// There is no "mandatory" feature bit that we always want to
+		// have, either the device can set its own MAC Address (as it
+		// does now) or the driver can set it using a controller thread.
+		break;
+	case VIRTIO_ID_BLOCK:
+		break;
+	case 0:
+		return "Invalid device id (0x0)! On the MMIO transport, this value indicates that the device is a system memory map with placeholder devices at static, well known addresses. In any case, this is not something you validate features for.";
+	default:
+		return "Validation not implemented for this device type! You MUST implement validation for this device! You should add your new code to the virtio_validate_feat function in vmm/virtio.c.";
 	}
 
 	// Validate common features

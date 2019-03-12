@@ -38,7 +38,7 @@ struct proc {
 	TAILQ_ENTRY(proc) proc_arsc_link;
 	TAILQ_ENTRY(proc) sibling_link;
 	spinlock_t proc_lock;
-	struct user_context scp_ctx; 	/* context for an SCP.  TODO: move to vc0 */
+	struct user_context scp_ctx; /* context for an SCP. TODO: move to vc0 */
 	struct username user;
 
 	/* This is effectively a (potentially short) version of argv[0].
@@ -51,17 +51,17 @@ struct proc {
 	char *binary_path;
 
 	pid_t pid;
-	/* Tempting to add a struct proc *parent, but we'd need to protect the use
-	 * of that reference from concurrent parent-death (letting init inherit
-	 * children, etc), which is basically what we do when we do pid2proc.  If we
-	 * do add *parent, it'll be a weak ref, and you'll need to lock the child to
-	 * kref_get or to remove the pointer. */
-	pid_t ppid;					/* parent's pid, not a reference */
-	struct proc_list children;	/* protected by the proc lock for now */
-	int exitcode;				/* exit() param or main() return value */
-	struct cond_var child_wait;	/* signal for dying or o/w waitable child */
+	/* Tempting to add a struct proc *parent, but we'd need to protect the
+	 * use of that reference from concurrent parent-death (letting init
+	 * inherit children, etc), which is basically what we do when we do
+	 * pid2proc.  If we do add *parent, it'll be a weak ref, and you'll need
+	 * to lock the child to kref_get or to remove the pointer. */
+	pid_t ppid;		/* parent's pid, not a reference */
+	struct proc_list children; /* protected by the proc lock for now */
+	int exitcode;		/* exit() param or main() return value */
+	struct cond_var child_wait; /* signal for dying or o/w waitable child */
 	uint32_t state;				// Status of the process
-	struct kref p_kref;		/* Refcnt */
+	struct kref p_kref;	/* Refcnt */
 	uint32_t env_flags;
 	/* Lists of vcores */
 	struct vcore_tailq online_vcs;
@@ -77,8 +77,8 @@ struct proc {
 	void *args_base;
 
 	// Address space
-	pgdir_t env_pgdir;			// Kernel virtual address of page dir
-	physaddr_t env_cr3;			// Physical address of page dir
+	pgdir_t env_pgdir;		// Kernel virtual address of page dir
+	physaddr_t env_cr3;		// Physical address of page dir
 	spinlock_t vmr_lock;		/* Protects VMR tree (mem mgmt) */
 	spinlock_t pte_lock;		/* Protects page tables (mem mgmt) */
 	struct vmr_tailq vm_regions;
@@ -88,34 +88,36 @@ struct proc {
  	procinfo_t *procinfo;       // KVA of per-process shared info table (RO)
 	procdata_t *procdata;       // KVA of per-process shared data table (RW)
 
-	// The backring pointers for processing asynchronous system calls from the user
-	// Note this is the actual backring, not a pointer to it somewhere else
+	// The backring pointers for processing asynchronous system calls from
+	// the user Note this is the actual backring, not a pointer to it
+	// somewhere else
 	syscall_back_ring_t syscallbackring;
 
-	// The front ring pointers for pushing asynchronous system events out to the user
-	// Note this is the actual frontring, not a pointer to it somewhere else
+	// The front ring pointers for pushing asynchronous system events out to
+	// the user Note this is the actual frontring, not a pointer to it
+	// somewhere else
 	sysevent_front_ring_t syseventfrontring;
 
 	/* Filesystem info */
-	int							umask;
-	struct fd_table				open_files;
-	struct pgrp					*pgrp;
-	struct chan					*slash;
-	struct chan					*dot;
+	int			umask;
+	struct fd_table		open_files;
+	struct pgrp		*pgrp;
+	struct chan		*slash;
+	struct chan		*dot;
 
 
 	/* UCQ hashlocks */
-	struct hashlock				*ucq_hashlock;
-	struct small_hashlock		ucq_hl_noref;	/* don't reference directly */
+	struct hashlock		*ucq_hashlock;
+	struct small_hashlock	ucq_hl_noref;	/* don't reference directly */
 	/* For devalarm */
-	struct proc_alarm_set		alarmset;
-	struct cv_lookup_tailq		abortable_sleepers;
-	spinlock_t					abort_list_lock;
+	struct proc_alarm_set	alarmset;
+	struct cv_lookup_tailq	abortable_sleepers;
+	spinlock_t		abort_list_lock;
 
 	/* VMMCP */
 	struct vmm vmm;
 
-	struct strace				*strace;
+	struct strace		*strace;
 };
 
 /* Til we remove all Env references */
@@ -124,16 +126,17 @@ typedef struct proc env_t;
 
 /* Process Flags */
 #define PROC_TRANSITION_TO_M	(1 << 0)
-#define PROC_TRACED				(1 << 1)
+#define PROC_TRACED		(1 << 1)
 
-extern atomic_t num_envs;		// Number of envs
+extern atomic_t num_envs;	// Number of envs
 
-int		env_setup_vm(env_t *e);
-void	env_user_mem_free(env_t* e, void* start, size_t len);
-void	env_pagetable_free(env_t* e);
+int env_setup_vm(env_t *e);
+void env_user_mem_free(env_t* e, void* start, size_t len);
+void env_pagetable_free(env_t* e);
 
 typedef int (*mem_walk_callback_t)(env_t* e, pte_t pte, void* va, void* arg);
-int		env_user_mem_walk(env_t* e, void* start, size_t len, mem_walk_callback_t callback, void* arg);
+int env_user_mem_walk(env_t* e, void* start, size_t len,
+		      mem_walk_callback_t callback, void* arg);
 
 static inline void set_traced_proc(struct proc *p, bool traced)
 {

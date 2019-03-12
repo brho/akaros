@@ -40,9 +40,9 @@ bool circular_buffer_init(struct circular_buffer *cb, size_t size, char *mem);
 void circular_buffer_destroy(struct circular_buffer *cb);
 void circular_buffer_clear(struct circular_buffer *cb);
 size_t circular_buffer_write(struct circular_buffer *cb, const char *data,
-							 size_t size);
+			     size_t size);
 size_t circular_buffer_read(struct circular_buffer *cb, char *data, size_t size,
-							size_t off);
+			    size_t off);
 
 static inline size_t circular_buffer_size(const struct circular_buffer *cb)
 {

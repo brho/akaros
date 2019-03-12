@@ -28,14 +28,16 @@ struct serialized_data *serialize_argv_envp(char *const argv[],
 	/* Reserve space in the buffer for each of our arguments (the +1 comes
 	 * from the '\0' character) */
 	int arglens[argc];
+
 	for (int i = 0; i < argc; i++) {
 		arglens[i] = strlen(argv[i]) + 1;
 		bufsize += arglens[i];
 	}
 
-	/* Reserve space in our buffer for each of our environment variables (the
-	 * +1 comes from the '\0' character) */
+	/* Reserve space in our buffer for each of our environment variables
+	 * (the +1 comes from the '\0' character) */
 	int envlens[envc];
+
 	for (int i = 0; i < envc; i++) {
 		envlens[i] = strlen(envp[i]) + 1;
 		bufsize += envlens[i];

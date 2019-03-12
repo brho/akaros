@@ -50,8 +50,8 @@ void print_cpuinfo(void)
 		cpu_set_feat(CPU_FEAT_X86_VENDOR_AMD);
 
 
-	/* intel supports a way to hide the upper leaves of cpuid, beyond 3.  the
-	 * bios might have done this, so we'll make sure it is off. */
+	/* intel supports a way to hide the upper leaves of cpuid, beyond 3.
+	 * the bios might have done this, so we'll make sure it is off. */
 	if (cpu_has_feat(CPU_FEAT_X86_VENDOR_INTEL)) {
 		msr_val = read_msr(IA32_MISC_ENABLE);
 		if (msr_val & (1 << 22))
@@ -218,19 +218,21 @@ void show_mapping(pgdir_t pgdir, uintptr_t start, size_t size)
 
 	printk("   %sVirtual    %sPhysical  Ps Dr Ac G CD WT U W P EPTE\n",
 	       BIT_SPACING, BIT_SPACING);
-	printk("-------------------------------------------------%s\n", BIT_DASHES);
+	printk("-------------------------------------------------%s\n",
+	       BIT_DASHES);
 	for(i = 0; i < size; i += PGSIZE, start += PGSIZE) {
 		pte = pgdir_walk(pgdir, (void*)start, 0);
 		printk("%p  ", start);
 		if (pte_walk_okay(pte)) {
-			/* A note on PTE perms.  If you look at just the PTE, you don't get
-			 * the full picture for W and U.  Those are the intersection of all
-			 * bits.  In Akaros, we do U or not at the earliest point (PML4
-			 * entries).  All other PTEs have U set.  For W, it's the opposite.
-			 * The PTE for the actual page has W or not, and all others has W
-			 * set.  W needs to be more fine-grained, but U doesn't.  Plus the
-			 * UVPT mapping requires the U to see interior pages (but have W
-			 * off). */
+			/* A note on PTE perms.  If you look at just the PTE,
+			 * you don't get the full picture for W and U.  Those
+			 * are the intersection of all bits.  In Akaros, we do U
+			 * or not at the earliest point (PML4 entries).  All
+			 * other PTEs have U set.  For W, it's the opposite.
+			 * The PTE for the actual page has W or not, and all
+			 * others has W set.  W needs to be more fine-grained,
+			 * but U doesn't.  Plus the UVPT mapping requires the U
+			 * to see interior pages (but have W off). */
 			perm = get_va_perms(pgdir, (void*)start);
 			printk("%p  %1d  %1d  %1d  %1d %1d  %1d  %1d %1d %1d 0x%llx\n",
 			       pte_get_paddr(pte),

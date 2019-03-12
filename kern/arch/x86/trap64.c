@@ -28,9 +28,10 @@ static spinlock_t ptf_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 void print_trapframe(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
-	/* This is only called in debug scenarios, and often when the kernel trapped
-	 * and needs to tell us about it.  Disable the lock checker so it doesn't go
-	 * nuts when we print/panic */
+
+	/* This is only called in debug scenarios, and often when the kernel
+	 * trapped and needs to tell us about it.  Disable the lock checker so
+	 * it doesn't go nuts when we print/panic */
 	pcpui->__lock_checking_enabled--;
 	spin_lock_irqsave(&ptf_lock);
 	printk("HW TRAP frame %sat %p on core %d\n",

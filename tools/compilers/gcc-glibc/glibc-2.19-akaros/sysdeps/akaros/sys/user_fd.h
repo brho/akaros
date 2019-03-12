@@ -28,8 +28,8 @@
  * 'magic' can be whatever the client wants - it could be useful to make sure
  * you have the right type of FD. */
 struct user_fd {
-	int							magic;
-	int							fd;
+	int				magic;
+	int				fd;
 	void (*close)(struct user_fd *);
 };
 
@@ -40,15 +40,15 @@ int ufd_get_fd(struct user_fd *ufd);
 /* Given an FD, returns the user_fd struct.  Returns 0 and sets errno if there's
  * an error.  There's no protection for concurrent closes, just like how you
  * shouldn't attempt to use an FD after closing.  So don't do stuff like:
- * 		foo = ufd_lookup(7);
- * 		                                           close(7);
- * 		foo->whatever = 6; // foo could be free!
+ * 	foo = ufd_lookup(7);
+ * 	close(7);
+ * 	foo->whatever = 6; // foo could be free!
  *
  * or
- * 		                                           close(7);
- * 		foo = ufd_lookup(7);
+ * 	close(7);
+ * 	foo = ufd_lookup(7);
  *      // this might succeed if it races with close()
- * 		foo->whatever = 6; // foo could be free!
+ * 	foo->whatever = 6; // foo could be free!
  */
 struct user_fd *ufd_lookup(int fd);
 

@@ -38,14 +38,14 @@
 #include <ros/atomic.h>
 #include <ros/ring_buffer.h>
 
-#define CEQ_OR					1
-#define CEQ_ADD					2
+#define CEQ_OR			1
+#define CEQ_ADD			2
 
 struct ceq_event {
-	atomic_t					coalesce;		/* ev_arg2 */
-	uint64_t					blob_data;		/* ev_arg3 */
-	bool						idx_posted;		/* for syncing with consumer */
-	uint64_t					user_data;		/* for apps, ignored by CEQ */
+	atomic_t			coalesce;	/* ev_arg2 */
+	uint64_t			blob_data;	/* ev_arg3 */
+	bool				idx_posted;	/* syncing with cons */
+	uint64_t			user_data;
 };
 
 /* The events array and the ring buffer are provided by the consumer.
@@ -66,17 +66,17 @@ struct ceq_event {
  * (nr_empty) is the size - (prod - pub). */
 
 struct ceq {
-	struct ceq_event			*events;		/* consumer pointer */
-	unsigned int				nr_events;
-	unsigned int				last_recovered;
-	atomic_t					max_event_ever;
-	int32_t						*ring;			/* consumer pointer */
-	uint32_t					ring_sz;		/* size (power of 2) */
-	uint8_t						operation;		/* e.g. CEQ_OR */
-	bool						ring_overflowed;
-	bool						overflow_recovery;
-	atomic_t					prod_idx;		/* next prod slot to fill */
-	atomic_t					cons_pub_idx;	/* how far has been consumed */
-	atomic_t					cons_pvt_idx;	/* next cons slot to get */
-	uint32_t					u_lock[2];		/* user space lock */
+	struct ceq_event		*events;	/* consumer pointer */
+	unsigned int			nr_events;
+	unsigned int			last_recovered;
+	atomic_t			max_event_ever;
+	int32_t				*ring;		/* consumer pointer */
+	uint32_t			ring_sz;	/* size (power of 2) */
+	uint8_t				operation;	/* e.g. CEQ_OR */
+	bool				ring_overflowed;
+	bool				overflow_recovery;
+	atomic_t			prod_idx;	/* next slot to fill */
+	atomic_t			cons_pub_idx;	/* consumed so far */
+	atomic_t			cons_pvt_idx;	/* next slot to get */
+	uint32_t			u_lock[2];	/* user space lock */
 };

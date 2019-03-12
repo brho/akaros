@@ -77,9 +77,9 @@ pcigen(struct chan *c, char *_1, struct dirtab *_2, int _3, int s,
 	switch (TYPE(c->qid)) {
 	case Qtopdir:
 		if (s == DEVDOTDOT) {
-			q = (struct qid) {
-				QID(0, Qtopdir), 0, QTDIR};
-			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s", pcidevtab.name);
+			q = (struct qid) { QID(0, Qtopdir), 0, QTDIR };
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s",
+				 pcidevtab.name);
 			devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
 			return 1;
 		}
@@ -88,7 +88,8 @@ pcigen(struct chan *c, char *_1, struct dirtab *_2, int _3, int s,
 		if (s == DEVDOTDOT) {
 			q = (struct qid) {
 				QID(0, Qtopdir), 0, QTDIR};
-			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s", pcidevtab.name);
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s",
+				 pcidevtab.name);
 			devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
 			return 1;
 		}
@@ -162,13 +163,13 @@ static size_t pciread(struct chan *c, void *va, size_t n, off64_t offset)
 			error(EINVAL, ERROR_FIXME);
 		ebuf = buf + sizeof(buf) - 1;	/* -1 for newline */
 		w = seprintf(buf, ebuf, "%.2x.%.2x.%.2x %.4x/%.4x %3d",
-		             p->class, p->subclass, p->progif, p->ven_id, p->dev_id,
-		             p->irqline);
+			     p->class, p->subclass, p->progif, p->ven_id,
+			     p->dev_id, p->irqline);
 		for (i = 0; i < COUNT_OF(p->bar); i++) {
 			if (p->bar[i].mmio_sz == 0)
 				continue;
-			w = seprintf(w, ebuf, " %d:%.8lux %d", i, p->bar[i].pio_base,
-			             p->bar[i].mmio_sz);
+			w = seprintf(w, ebuf, " %d:%.8lux %d", i,
+				     p->bar[i].pio_base, p->bar[i].mmio_sz);
 		}
 		*w++ = '\n';
 		*w = '\0';

@@ -11,13 +11,12 @@
  * Storage Device.
  */
 
-
 #include <assert.h>
 #include <cpio.h>
 #include <error.h>
-#include <net/ip.h>
 #include <kmalloc.h>
 #include <kref.h>
+#include <net/ip.h>
 #include <pmap.h>
 #include <slab.h>
 #include <smp.h>
@@ -33,7 +32,8 @@ struct sdifc sdiahciifc;
  * necessary;
  * we can use linker sets at some point, as we do elsewhere in Akaros. */
 struct sdifc *sdifc[] = {
-    &sdiahciifc, NULL,
+    &sdiahciifc,
+    NULL,
 };
 
 static const char Echange[] = "media or partition has changed";
@@ -45,44 +45,42 @@ static struct sdev *devs[sizeof(devletters) - 1];
 
 static qlock_t devslock = QLOCK_INITIALIZER(devslock);
 
-enum {
-	Rawcmd,
-	Rawdata,
-	Rawstatus,
+enum { Rawcmd,
+       Rawdata,
+       Rawstatus,
 };
 
-enum {
-	Qtopdir = 1, /* top level directory */
-	Qtopbase,
-	Qtopctl = Qtopbase,
+enum { Qtopdir = 1, /* top level directory */
+       Qtopbase,
+       Qtopctl = Qtopbase,
 
-	Qunitdir, /* directory per unit */
-	Qunitbase,
-	Qctl = Qunitbase,
-	Qraw,
-	Qpart,
+       Qunitdir, /* directory per unit */
+       Qunitbase,
+       Qctl = Qunitbase,
+       Qraw,
+       Qpart,
 
-	TypeLOG = 4,
-	NType = (1 << TypeLOG),
-	TypeMASK = (NType - 1),
-	TypeSHIFT = 0,
+       TypeLOG = 4,
+       NType = (1 << TypeLOG),
+       TypeMASK = (NType - 1),
+       TypeSHIFT = 0,
 
-	PartLOG = 8,
-	NPart = (1 << PartLOG),
-	PartMASK = (NPart - 1),
-	PartSHIFT = TypeLOG,
+       PartLOG = 8,
+       NPart = (1 << PartLOG),
+       PartMASK = (NPart - 1),
+       PartSHIFT = TypeLOG,
 
-	UnitLOG = 8,
-	NUnit = (1 << UnitLOG),
-	UnitMASK = (NUnit - 1),
-	UnitSHIFT = (PartLOG + TypeLOG),
+       UnitLOG = 8,
+       NUnit = (1 << UnitLOG),
+       UnitMASK = (NUnit - 1),
+       UnitSHIFT = (PartLOG + TypeLOG),
 
-	DevLOG = 8,
-	NDev = (1 << DevLOG),
-	DevMASK = (NDev - 1),
-	DevSHIFT = (UnitLOG + PartLOG + TypeLOG),
+       DevLOG = 8,
+       NDev = (1 << DevLOG),
+       DevMASK = (NDev - 1),
+       DevSHIFT = (UnitLOG + PartLOG + TypeLOG),
 
-	Ncmd = 20,
+       Ncmd = 20,
 };
 
 #define TYPE(q) ((((uint32_t)(q).path) >> TypeSHIFT) & TypeMASK)
@@ -90,7 +88,7 @@ enum {
 #define UNIT(q) ((((uint32_t)(q).path) >> UnitSHIFT) & UnitMASK)
 #define DEV(q) ((((uint32_t)(q).path) >> DevSHIFT) & DevMASK)
 #define QID(d, u, p, t)                                                        \
-	(((d) << DevSHIFT) | ((u) << UnitSHIFT) | ((p) << PartSHIFT) |             \
+	(((d) << DevSHIFT) | ((u) << UnitSHIFT) | ((p) << PartSHIFT) |         \
 	 ((t) << TypeSHIFT))
 
 void sdaddpart(struct sdunit *unit, char *name, uint64_t start, uint64_t end)
@@ -114,7 +112,8 @@ void sdaddpart(struct sdunit *unit, char *name, uint64_t start, uint64_t end)
 			if (strcmp(name, pp->sdperm.name) == 0) {
 				if (pp->start == start && pp->end == end)
 					return;
-				error(EINVAL, "%s: '%s' is not valid", __func__, name);
+				error(EINVAL, "%s: '%s' is not valid", __func__,
+				      name);
 			}
 		}
 	} else {
@@ -133,9 +132,11 @@ void sdaddpart(struct sdunit *unit, char *name, uint64_t start, uint64_t end)
 	if (partno == -1) {
 		if (unit->npart >= NPart)
 			error(ENOMEM, "%s: no memory", __func__);
-		pp = kzmalloc(sizeof(struct sdpart) * (unit->npart + SDnpart), 0);
+		pp = kzmalloc(sizeof(struct sdpart) * (unit->npart + SDnpart),
+		              0);
 		if (pp == NULL)
-			error(ENOMEM, "%s: Can't allocate space for %d partitions",
+			error(ENOMEM,
+			      "%s: Can't allocate space for %d partitions",
 			      unit->npart + SDnpart);
 		memmove(pp, unit->part, sizeof(struct sdpart) * unit->npart);
 		kfree(unit->part);
@@ -150,8 +151,8 @@ void sdaddpart(struct sdunit *unit, char *name, uint64_t start, uint64_t end)
 	if (start > end)
 		error(EINVAL, "%s: start %d > end %d", __func__, start, end);
 	if (end > unit->sectors)
-		error(EINVAL, "%s: end %d > number of sectors %d", __func__, end,
-		      unit->sectors);
+		error(EINVAL, "%s: end %d > number of sectors %d", __func__,
+		      end, unit->sectors);
 	pp = &unit->part[partno];
 	pp->start = start;
 	pp->end = end;
@@ -178,9 +179,10 @@ static void sddelpart(struct sdunit *unit, char *name)
 	if (i >= unit->npart)
 		error(EINVAL, "%s: %d > npart %d", __func__, i, unit->npart);
 
-	/* TODO: Implement permission checking and raise errors as appropriate. */
+	/* TODO: Implement permission checking and raise errors as appropriate.
+	 */
 	// if (strcmp(current->user.name, pp->SDperm.user) && !iseve())
-		// error(Eperm);
+	// error(Eperm);
 
 	pp->valid = 0;
 	pp->vers++;
@@ -401,7 +403,8 @@ void sdadddevs(struct sdev *sdev)
 			if (devs[j] == NULL) {
 				sdev->idno = devletters[j];
 				devs[j] = sdev;
-				snprintf(sdev->name, sizeof(sdev->name), "sd%c", devletters[j]);
+				snprintf(sdev->name, sizeof(sdev->name), "sd%c",
+				         devletters[j]);
 				break;
 			}
 		}
@@ -471,7 +474,8 @@ static int sd2gen(struct chan *c, int i, struct dir *dp)
 		      unit->vers + pp->vers, QTFILE);
 		if (emptystr(pp->sdperm.user))
 			kstrdup(&pp->sdperm.user, eve.name);
-		devdir(c, q, pp->sdperm.name, l, pp->sdperm.user, pp->sdperm.perm, dp);
+		devdir(c, q, pp->sdperm.name, l, pp->sdperm.user,
+		       pp->sdperm.perm, dp);
 		rv = 1;
 		break;
 	}
@@ -507,7 +511,8 @@ static int sdgen(struct chan *c, char *d, struct dirtab *dir, int j, int s,
 	case Qtopdir:
 		if (s == DEVDOTDOT) {
 			mkqid(&q, QID(0, 0, 0, Qtopdir), 0, QTDIR);
-			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s", sddevtab.name);
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s",
+			         sddevtab.name);
 			devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
 			return 1;
 		}
@@ -551,15 +556,16 @@ static int sdgen(struct chan *c, char *d, struct dirtab *dir, int j, int s,
 		mkqid(&q, QID(sdev->idno, s, 0, Qunitdir), 0, QTDIR);
 		if (emptystr(unit->sdperm.user))
 			kstrdup(&unit->sdperm.user, eve.name);
-		devdir(c, q, unit->sdperm.name, 0, unit->sdperm.user, unit->sdperm.perm,
-		       dp);
+		devdir(c, q, unit->sdperm.name, 0, unit->sdperm.user,
+		       unit->sdperm.perm, dp);
 		kref_put(&sdev->r);
 		return 1;
 
 	case Qunitdir:
 		if (s == DEVDOTDOT) {
 			mkqid(&q, QID(0, 0, 0, Qtopdir), 0, QTDIR);
-			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s", sddevtab.name);
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s",
+			         sddevtab.name);
 			devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
 			return 1;
 		}
@@ -580,8 +586,8 @@ static int sdgen(struct chan *c, char *d, struct dirtab *dir, int j, int s,
 		 * will return > 1.
 		 * Online is a bit of a large hammer but does the job.
 		 */
-		if (unit->sectors == 0 ||
-		    (unit->dev->ifc->online && unit->dev->ifc->online(unit) > 1))
+		if (unit->sectors == 0 || (unit->dev->ifc->online &&
+		                           unit->dev->ifc->online(unit) > 1))
 			sdinitpart(unit);
 
 		i = s + Qunitbase;
@@ -608,7 +614,8 @@ static int sdgen(struct chan *c, char *d, struct dirtab *dir, int j, int s,
 		      unit->vers + pp->vers, QTFILE);
 		if (emptystr(pp->sdperm.user))
 			kstrdup(&pp->sdperm.user, eve.name);
-		devdir(c, q, pp->sdperm.name, l, pp->sdperm.user, pp->sdperm.perm, dp);
+		devdir(c, q, pp->sdperm.name, l, pp->sdperm.user,
+		       pp->sdperm.perm, dp);
 		qunlock(&unit->ctl);
 		kref_put(&sdev->r);
 		return 1;
@@ -649,7 +656,8 @@ static struct chan *sdattach(char *spec)
 	}
 
 	if (spec[0] != 's' || spec[1] != 'd')
-		error(EINVAL, "First two characters of spec must be 'sd', not %c%c",
+		error(EINVAL,
+		      "First two characters of spec must be 'sd', not %c%c",
 		      spec[0], spec[1]);
 	idno = spec[2];
 	subno = strtol(&spec[3], &p, 0);
@@ -756,8 +764,7 @@ static void sdclose(struct chan *c)
 	}
 }
 
-static size_t sdbio(struct chan *c, int write, char *a, size_t len,
-                    off64_t off)
+static size_t sdbio(struct chan *c, int write, char *a, size_t len, off64_t off)
 {
 	ERRSTACK(2);
 	int nchange;
@@ -788,7 +795,8 @@ static size_t sdbio(struct chan *c, int write, char *a, size_t len,
 		 * machine use an sdi{ata,ahci} on another machine, and it all
 		 * works. Nobody is going to do that, now, so get_errno() it is.
 		 * if (strcmp(up->errstr, Eio) == 0 ... */
-		if ((get_errno() == EIO) && (unit->sectors == 0) && (nchange++ == 0)) {
+		if ((get_errno() == EIO) && (unit->sectors == 0) &&
+		    (nchange++ == 0)) {
 			sdinitpart(unit);
 			poperror();
 			continue;
@@ -815,7 +823,8 @@ static size_t sdbio(struct chan *c, int write, char *a, size_t len,
 	 * been brought online.
 	 */
 	bno = (off / unit->secsize) + pp->start;
-	nb = ((off + len + unit->secsize - 1) / unit->secsize) + pp->start - bno;
+	nb =
+	    ((off + len + unit->secsize - 1) / unit->secsize) + pp->start - bno;
 	max = SDmaxio / unit->secsize;
 	if (nb > max)
 		nb = max;
@@ -823,8 +832,8 @@ static size_t sdbio(struct chan *c, int write, char *a, size_t len,
 		nb = pp->end - bno;
 	if (bno >= pp->end || nb == 0) {
 		if (write)
-			error(EIO, "bno(%d) >= pp->end(%d) or nb(%d) == 0", bno, pp->end,
-			      nb);
+			error(EIO, "bno(%d) >= pp->end(%d) or nb(%d) == 0", bno,
+			      pp->end, nb);
 		qunlock(&unit->ctl);
 		kref_put(&sdev->r);
 		poperror();
@@ -837,7 +846,8 @@ static size_t sdbio(struct chan *c, int write, char *a, size_t len,
 
 	b = kzmalloc(nb * unit->secsize, MEM_WAIT);
 	if (b == NULL)
-		error(ENOMEM, "%s: could not allocate %d bytes", nb * unit->secsize);
+		error(ENOMEM, "%s: could not allocate %d bytes",
+		      nb * unit->secsize);
 	if (waserror()) {
 		kfree(b);
 		if (!(unit->inquiry[1] & SDinq1removable))
@@ -1161,7 +1171,8 @@ static size_t sdread(struct chan *c, void *a, size_t n, off64_t off)
 		p = kzmalloc(mm, 0);
 		if (p == NULL)
 			error(ENOMEM, "Alloc of %d bytes failed", mm);
-		l = snprintf(p, mm, "inquiry %.48s\n", (char *)unit->inquiry + 8);
+		l = snprintf(p, mm, "inquiry %.48s\n",
+		             (char *)unit->inquiry + 8);
 		qlock(&unit->ctl);
 		/*
 		 * If there's a device specific routine it must
@@ -1174,13 +1185,16 @@ static size_t sdread(struct chan *c, void *a, size_t n, off64_t off)
 			sdinitpart(unit);
 		if (unit->sectors) {
 			if (unit->dev->ifc->rctl == NULL)
-				l += snprintf(p + l, mm - l, "geometry %llu %lu\n",
+				l += snprintf(p + l, mm - l,
+				              "geometry %llu %lu\n",
 				              unit->sectors, unit->secsize);
 			pp = unit->part;
 			for (i = 0; i < unit->npart; i++) {
 				if (pp->valid)
-					l += snprintf(p + l, mm - l, "part %s %llu %llu\n",
-					              pp->sdperm.name, pp->start, pp->end);
+					l += snprintf(p + l, mm - l,
+					              "part %s %llu %llu\n",
+					              pp->sdperm.name,
+					              pp->start, pp->end);
 				pp++;
 			}
 		}
@@ -1320,10 +1334,13 @@ static size_t sdwrite(struct chan *c, void *a, size_t n, off64_t off)
 			error(EIO, "Unit changed");
 
 		if (cb->nf < 1)
-			error(EINVAL, "%s requires at least one argument", cb->f[0]);
+			error(EINVAL, "%s requires at least one argument",
+			      cb->f[0]);
 		if (strcmp(cb->f[0], "part") == 0) {
 			if (cb->nf != 4)
-				error(EINVAL, "Part got %d arguments, requires 4", cb->nf);
+				error(EINVAL,
+				      "Part got %d arguments, requires 4",
+				      cb->nf);
 			if (unit->sectors == 0)
 				error(EINVAL, "unit->sectors was 0");
 			if (!sdinitpart(unit))
@@ -1333,7 +1350,8 @@ static size_t sdwrite(struct chan *c, void *a, size_t n, off64_t off)
 			sdaddpart(unit, cb->f[1], start, end);
 		} else if (strcmp(cb->f[0], "delpart") == 0) {
 			if (cb->nf != 2)
-				error(EINVAL, "delpart got %d args, 2 required");
+				error(EINVAL,
+				      "delpart got %d args, 2 required");
 			if (unit->part == NULL)
 				error(EIO, "partition was NULL");
 			sddelpart(unit, cb->f[1]);
@@ -1361,7 +1379,8 @@ static size_t sdwrite(struct chan *c, void *a, size_t n, off64_t off)
 		switch (unit->state) {
 		case Rawcmd:
 			if (n < 6 || n > sizeof(req->cmd))
-				error(EINVAL, "%d is < 6 or > %d", n, sizeof(req->cmd));
+				error(EINVAL, "%d is < 6 or > %d", n,
+				      sizeof(req->cmd));
 			req = kzmalloc(sizeof(struct sdreq), 0);
 			if (req == NULL)
 				error(ENOMEM, "Can't allocate an sdreq");
@@ -1439,9 +1458,10 @@ static size_t sdwstat(struct chan *c, uint8_t *dp, size_t n)
 		break;
 	}
 
-	/* TODO: Implement permissions checking and raise errors as appropriate. */
+	/* TODO: Implement permissions checking and raise errors as appropriate.
+	 * */
 	// if (strcmp(current->user.name, perm->user) && !iseve())
-		// error(Eperm);
+	// error(Eperm);
 
 	d = kzmalloc(sizeof(struct dir) + n, 0);
 	n = convM2D(dp, n, &d[0], (char *)&d[1]);
@@ -1589,11 +1609,11 @@ static struct devport *getnewport(struct devconf *dc)
 {
 	struct devport *p;
 
-	p = (struct devport *)kzmalloc((dc->nports + 1) * sizeof(struct devport),
-	                               0);
+	p = (struct devport *)kzmalloc(
+	    (dc->nports + 1) * sizeof(struct devport), 0);
 	if (p == NULL)
-		error(ENOMEM, "Can't allocate %d bytes for %d ports", dc->nports,
-		      (dc->nports + 1) * sizeof(struct devport));
+		error(ENOMEM, "Can't allocate %d bytes for %d ports",
+		      dc->nports, (dc->nports + 1) * sizeof(struct devport));
 	if (dc->nports > 0) {
 		memmove(p, dc->ports, dc->nports * sizeof(struct devport));
 		kfree(dc->ports);
@@ -1652,12 +1672,8 @@ static struct {
 	char *name;
 	void (*parse)(struct confdata *, char *unused_char_p_t);
 } options[] = {
-    {"switch", parseswitch},
-    {"spec", parsespec},
-    {"port", parseport},
-    {"size", parsesize},
-    {"irq", parseirq},
-    {"type", parsetype},
+    {"switch", parseswitch}, {"spec", parsespec}, {"port", parseport},
+    {"size", parsesize},     {"irq", parseirq},   {"type", parsetype},
 };
 
 static void legacytopctl(struct cmdbuf *cb)

@@ -13,9 +13,9 @@
 #include <malloc.h>
 
 struct timeout_blob {
-	bool						timed_out;
-	struct uthread				*uth;
-	uth_sync_t					*sync_ptr;
+	bool				timed_out;
+	struct uthread			*uth;
+	uth_sync_t			*sync_ptr;
 	struct spin_pdr_lock		*lock_ptr;
 };
 
@@ -62,8 +62,9 @@ static void __uth_semaphore_init(void *arg)
 
 	spin_pdr_init(&sem->lock);
 	__uth_sync_init(&sem->sync_obj);
-	/* If we used a static initializer for a semaphore, count is already set.
-	 * o/w it will be set by _alloc() or _init() (via uth_semaphore_init()). */
+	/* If we used a static initializer for a semaphore, count is already
+	 * set.  o/w it will be set by _alloc() or _init() (via
+	 * uth_semaphore_init()). */
 }
 
 /* Initializes a sem acquired from somewhere else.  POSIX's sem_init() needs
@@ -103,8 +104,8 @@ static void __semaphore_cb(struct uthread *uth, void *arg)
 	struct uth_semaphore *sem = (struct uth_semaphore*)arg;
 
 	/* We need to tell the 2LS that its thread blocked.  We need to do this
-	 * before unlocking the sem, since as soon as we unlock, the sem could be
-	 * released and our thread restarted.
+	 * before unlocking the sem, since as soon as we unlock, the sem could
+	 * be released and our thread restarted.
 	 *
 	 * Also note the lock-ordering rule.  The sem lock is grabbed before any
 	 * locks the 2LS might grab. */
@@ -123,9 +124,10 @@ bool uth_semaphore_timed_down(uth_semaphore_t *sem,
 	parlib_run_once(&sem->once_ctl, __uth_semaphore_init, sem);
 	spin_pdr_lock(&sem->lock);
 	if (sem->count > 0) {
-		/* Only down if we got one.  This means a sem with no more counts is 0,
-		 * not negative (where -count == nr_waiters).  Doing it this way means
-		 * our timeout function works for sems and CVs. */
+		/* Only down if we got one.  This means a sem with no more
+		 * counts is 0, not negative (where -count == nr_waiters).
+		 * Doing it this way means our timeout function works for sems
+		 * and CVs. */
 		sem->count--;
 		spin_pdr_unlock(&sem->lock);
 		return TRUE;
@@ -134,13 +136,13 @@ bool uth_semaphore_timed_down(uth_semaphore_t *sem,
 		set_timeout_blob(blob, &sem->sync_obj, &sem->lock);
 		set_timeout_alarm(waiter, blob, abs_timeout);
 	}
-	/* the unlock and sync enqueuing is done in the yield callback.  as always,
-	 * we need to do this part in vcore context, since as soon as we unlock the
-	 * uthread could restart.  (atomically yield and unlock). */
+	/* the unlock and sync enqueuing is done in the yield callback.  as
+	 * always, we need to do this part in vcore context, since as soon as we
+	 * unlock the uthread could restart.  (atomically yield and unlock). */
 	uthread_yield(TRUE, __semaphore_cb, sem);
 	if (abs_timeout) {
-		/* We're guaranteed the alarm will either be cancelled or the handler
-		 * complete when unset_alarm() returns. */
+		/* We're guaranteed the alarm will either be cancelled or the
+		 * handler complete when unset_alarm() returns. */
 		unset_alarm(waiter);
 		return blob->timed_out ? FALSE : TRUE;
 	}
@@ -171,7 +173,8 @@ void uth_semaphore_up(uth_semaphore_t *sem)
 {
 	struct uthread *uth;
 
-	/* once-ing the 'up', unlike mtxs 'unlock', since sems can be special. */
+	/* once-ing the 'up', unlike mtxs 'unlock', since sems can be special.
+	 */
 	parlib_run_once(&sem->once_ctl, __uth_semaphore_init, sem);
 	spin_pdr_lock(&sem->lock);
 	uth = __uth_sync_get_next(&sem->sync_obj);
@@ -251,9 +254,9 @@ static void __uth_recurse_mutex_init(void *arg)
 	struct uth_recurse_mutex *r_mtx = (struct uth_recurse_mutex*)arg;
 
 	__uth_mutex_init(&r_mtx->mtx);
-	/* Since we always manually call __uth_mutex_init(), there's no reason to
-	 * mess with the regular mutex's static initializer.  Just say it's been
-	 * done. */
+	/* Since we always manually call __uth_mutex_init(), there's no reason
+	 * to mess with the regular mutex's static initializer.  Just say it's
+	 * been done. */
 	parlib_set_ran_once(&r_mtx->mtx.once_ctl);
 	r_mtx->lockholder = NULL;
 	r_mtx->count = 0;
@@ -272,7 +275,8 @@ void uth_recurse_mutex_destroy(uth_recurse_mutex_t *r_mtx)
 
 uth_recurse_mutex_t *uth_recurse_mutex_alloc(void)
 {
-	struct uth_recurse_mutex *r_mtx = malloc(sizeof(struct uth_recurse_mutex));
+	struct uth_recurse_mutex *r_mtx =
+		malloc(sizeof(struct uth_recurse_mutex));
 
 	assert(r_mtx);
 	uth_recurse_mutex_init(r_mtx);
@@ -290,10 +294,10 @@ bool uth_recurse_mutex_timed_lock(uth_recurse_mutex_t *r_mtx,
 {
 	assert_can_block();
 	parlib_run_once(&r_mtx->once_ctl, __uth_recurse_mutex_init, r_mtx);
-	/* We don't have to worry about races on current_uthread or count.  They are
-	 * only written by the initial lockholder, and this check will only be true
-	 * for the initial lockholder, which cannot concurrently call this function
-	 * twice (a thread is single-threaded).
+	/* We don't have to worry about races on current_uthread or count.  They
+	 * are only written by the initial lockholder, and this check will only
+	 * be true for the initial lockholder, which cannot concurrently call
+	 * this function twice (a thread is single-threaded).
 	 *
 	 * A signal handler running for a thread should not attempt to grab a
 	 * recursive mutex (that's probably a bug).  If we need to support that,
@@ -401,15 +405,16 @@ static void __cv_wait_cb(struct uthread *uth, void *arg)
 	__uth_sync_enqueue(uth, &cv->sync_obj);
 	spin_pdr_unlock(&cv->lock);
 	/* This looks dangerous, since both the CV and MTX could use the
-	 * uth->sync_next TAILQ_ENTRY (or whatever the 2LS uses), but the uthread
-	 * never sleeps on both at the same time.  We *hold* the mtx - we aren't
-	 * *sleeping* on it.  Sleeping uses the sync_next.  Holding it doesn't.
+	 * uth->sync_next TAILQ_ENTRY (or whatever the 2LS uses), but the
+	 * uthread never sleeps on both at the same time.  We *hold* the mtx -
+	 * we aren't *sleeping* on it.  Sleeping uses the sync_next.  Holding it
+	 * doesn't.
 	 *
 	 * Next, consider what happens as soon as we unlock the CV.  Our thread
-	 * could get woken up, and then immediately try to grab the mtx and go to
-	 * sleep! (see below).  If that happens, the uthread is no longer sleeping
-	 * on the CV, and the sync_next is free.  The invariant is that a uthread
-	 * can only sleep on one sync_object at a time. */
+	 * could get woken up, and then immediately try to grab the mtx and go
+	 * to sleep! (see below).  If that happens, the uthread is no longer
+	 * sleeping on the CV, and the sync_next is free.  The invariant is that
+	 * a uthread can only sleep on one sync_object at a time. */
 	if (mtx)
 		uth_mutex_unlock(mtx);
 }
@@ -432,14 +437,14 @@ static void __cv_wait_cb(struct uthread *uth, void *arg)
  * Note that signal/broadcasters do not *need* to hold the mutex, in general,
  * but they do in the basic wake-up flag scenario.  If not, the race is this:
  *
- * Sleeper:								Waker:
+ * Sleeper:					Waker:
  * -----------------------------------------------------------------
  * Hold mutex
  *   See flag is False
  *   Decide to sleep
- *										Set flag True
- * PAUSE!								Grab CV lock
- *										See list is empty, unlock
+ *						Set flag True
+ * PAUSE!					Grab CV lock
+ *						See list is empty, unlock
  *
  *   Grab CV lock
  *     Get put on list
@@ -481,8 +486,8 @@ bool uth_cond_var_timed_wait(uth_cond_var_t *cv, uth_mutex_t *mtx,
 	struct timeout_blob blob[1];
 	bool ret = TRUE;
 
-	/* We're holding the CV PDR lock, so we lose the ability to detect blocking
-	 * violations. */
+	/* We're holding the CV PDR lock, so we lose the ability to detect
+	 * blocking violations. */
 	if (mtx)
 		assert_can_block();
 	parlib_run_once(&cv->once_ctl, __uth_cond_var_init, cv);
@@ -530,7 +535,8 @@ bool uth_cond_var_timed_wait_recurse(uth_cond_var_t *cv,
 	r_mtx->lockholder = NULL;
 	r_mtx->count = 0;
 	ret = uth_cond_var_timed_wait(cv, &r_mtx->mtx, abs_timeout);
-	/* Now we hold the internal mutex again.  Need to restore the tracking. */
+	/* Now we hold the internal mutex again.  Need to restore the tracking.
+	 */
 	r_mtx->lockholder = current_uthread;
 	r_mtx->count = old_count;
 	return ret;

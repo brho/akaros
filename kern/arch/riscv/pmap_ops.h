@@ -14,15 +14,15 @@ static inline bool pte_walk_okay(pte_t pte)
 }
 
 /* PTE states:
- *  - present: the PTE is involved in a valid page table walk, with the physaddr
- *  part pointing to a physical page.
+ * - present: the PTE is involved in a valid page table walk, with the physaddr
+ *   part pointing to a physical page.
  *
- * 	- mapped: the PTE is involved in some sort of mapping, e.g. a VMR.  We're
- * 	storing something in the PTE, but it is isn't necessarily present and
- * 	pointing to an actual physical page.  All present are mapped, but not vice
- * 	versa.  Mapped could also include paged-out, if we support that later.
+ * - mapped: the PTE is involved in some sort of mapping, e.g. a VMR.  We're
+ *   storing something in the PTE, but it is isn't necessarily present and
+ *   pointing to an actual physical page.  All present are mapped, but not vice
+ *   versa.  Mapped could also include paged-out, if we support that later.
  *
- * 	- unmapped: completely unused. (0 value) */
+ * - unmapped: completely unused. (0 value) */
 static inline bool pte_is_present(pte_t pte)
 {
 	return *(kpte_t*)pte & PTE_P ? TRUE : FALSE;

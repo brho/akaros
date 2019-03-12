@@ -11,7 +11,7 @@
 # define KERNBASE       0xFFFFFC0000000000
 # define ULIM           0x0000040000000000
 # define KERN_LOAD_ADDR 0xFFFFFFFF80000000
-# define KERN_VMAP_TOP    	KERN_LOAD_ADDR // upper 2GB reserved (see mmu_init)
+# define KERN_VMAP_TOP      KERN_LOAD_ADDR // upper 2GB reserved (see mmu_init)
 # define NPTLEVELS                       3
 # define L1PGSHIFT              (13+10+10)
 # define L1PGSIZE        (1L << L1PGSHIFT)
@@ -25,7 +25,7 @@
 # define KERNBASE               0x80000000
 # define ULIM                   0x7F000000
 # define KERN_LOAD_ADDR           KERNBASE
-# define KERN_VMAP_TOP    		0xfec00000
+# define KERN_VMAP_TOP          0xfec00000
 # define NPTLEVELS                       2
 # define L1PGSHIFT                 (13+11)
 # define L1PGSIZE         (1 << L1PGSHIFT)

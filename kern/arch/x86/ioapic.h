@@ -44,13 +44,13 @@ enum {
 	ApicLOGICAL	= 0x00000800,
 
 	ApicDELIVS	= 0x00001000,	/* [12] Delivery Status (RO) */
-	ApicHIGH	= 0x00000000,	/* [13] Interrupt Input Pin Polarity (RW) */
+	ApicHIGH	= 0x00000000,	/* [13] IRQ Input Pin Polarity (RW) */
 	ApicLOW		= 0x00002000,
 	ApicRemoteIRR	= 0x00004000,	/* [14] Remote IRR (RO) */
 	ApicEDGE	= 0x00000000,	/* [15] Trigger Mode (RW) */
 	ApicLEVEL	= 0x00008000,
 	ApicIMASK	= 0x00010000,	/* [16] Interrupt Mask */
-	IOAPIC_PBASE    = 0xfec00000, /* default *physical* address */
+	IOAPIC_PBASE    = 0xfec00000,	/* default *physical* address */
 };
 
 extern int mpisabusno;

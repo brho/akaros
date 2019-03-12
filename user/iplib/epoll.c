@@ -6,25 +6,25 @@
  *
  * TODO: There are a few incompatibilities with Linux's epoll, some of which are
  * artifacts of the implementation, and other issues:
- * 	- you can't epoll on an epoll fd (or any user fd).  you can only epoll on a
- * 	kernel FD that accepts your FD taps.
- * 	- there's no EPOLLONESHOT or level-triggered support.
- * 	- you can only tap one FD at a time, so you can't add the same FD to
- * 	multiple epoll sets.
- * 	- closing the epoll is a little dangerous, if there are outstanding INDIR
- * 	events.  this will only pop up if you're yielding cores, maybe getting
- * 	preempted, and are unlucky.
- * 	- epoll_create1 does not support CLOEXEC.  That'd need some work in glibc's
- * 	exec and flags in struct user_fd.
- * 	- EPOLL_CTL_MOD is just a DEL then an ADD.  There might be races associated
- * 	with that.
- * 	- epoll_pwait is probably racy.
- * 	- You can't dup an epoll fd (same as other user FDs).
- * 	- If you add a BSD socket FD to an epoll set, you'll get taps on both the
- * 	data FD and the listen FD.
- * 	- If you add the same BSD socket listener to multiple epoll sets, you will
- * 	likely fail.  This is in addition to being able to tap only one FD at a
- * 	time.
+ * - you can't epoll on an epoll fd (or any user fd).  you can only epoll on a
+ * kernel FD that accepts your FD taps.
+ * - there's no EPOLLONESHOT or level-triggered support.
+ * - you can only tap one FD at a time, so you can't add the same FD to
+ * multiple epoll sets.
+ * - closing the epoll is a little dangerous, if there are outstanding INDIR
+ * events.  this will only pop up if you're yielding cores, maybe getting
+ * preempted, and are unlucky.
+ * - epoll_create1 does not support CLOEXEC.  That'd need some work in glibc's
+ * exec and flags in struct user_fd.
+ * - EPOLL_CTL_MOD is just a DEL then an ADD.  There might be races associated
+ * with that.
+ * - epoll_pwait is probably racy.
+ * - You can't dup an epoll fd (same as other user FDs).
+ * - If you add a BSD socket FD to an epoll set, you'll get taps on both the
+ * data FD and the listen FD.
+ * - If you add the same BSD socket listener to multiple epoll sets, you will
+ * likely fail.  This is in addition to being able to tap only one FD at a
+ * time.
  * */
 
 #include <sys/epoll.h>
@@ -55,17 +55,17 @@
  * INDIRs and RCU-style grace periods.  Not a big deal, since the number of
  * these is the number of threads that concurrently do epoll timeouts. */
 struct ep_alarm {
-	struct event_queue			*alarm_evq;
-	struct syscall				sysc;
+	struct event_queue		*alarm_evq;
+	struct syscall			sysc;
 };
 
 static struct kmem_cache *ep_alarms_cache;
 
 struct epoll_ctlr {
 	TAILQ_ENTRY(epoll_ctlr)		link;
-	struct event_queue			*ceq_evq;
-	uth_mutex_t					*mtx;
-	struct user_fd				ufd;
+	struct event_queue		*ceq_evq;
+	uth_mutex_t			*mtx;
+	struct user_fd			ufd;
 };
 
 TAILQ_HEAD(epoll_ctlrs, epoll_ctlr);
@@ -79,15 +79,16 @@ static uth_mutex_t *ctlrs_mtx;
  * If we ever do not maintain a 1:1 mapping from FDs to CEQ IDs, we can use this
  * to track the CEQ ID and FD. */
 struct ep_fd_data {
-	struct epoll_event			ep_event;
-	int							fd;
-	int							filter;
+	struct epoll_event		ep_event;
+	int				fd;
+	int				filter;
 };
 
 /* Converts epoll events to FD taps. */
 static int ep_events_to_taps(uint32_t ep_ev)
 {
 	int taps = 0;
+
 	if (ep_ev & EPOLLIN)
 		taps |= FDTAP_FILT_READABLE;
 	if (ep_ev & EPOLLOUT)
@@ -108,6 +109,7 @@ static int ep_events_to_taps(uint32_t ep_ev)
 static uint32_t taps_to_ep_events(int taps)
 {
 	uint32_t ep_ev = 0;
+
 	if (taps & FDTAP_FILT_READABLE)
 		ep_ev |= EPOLLIN;
 	if (taps & FDTAP_FILT_WRITABLE)
@@ -138,6 +140,7 @@ static struct ceq_event *ep_get_ceq_ev(struct epoll_ctlr *ep, size_t idx)
 static struct epoll_ctlr *fd_to_cltr(int fd)
 {
 	struct user_fd *ufd = ufd_lookup(fd);
+
 	if (!ufd)
 		return 0;
 	if (ufd->magic != EPOLL_UFD_MAGIC) {
@@ -151,6 +154,7 @@ static struct epoll_ctlr *fd_to_cltr(int fd)
 static struct event_queue *ep_get_ceq_evq(unsigned int ceq_ring_sz)
 {
 	struct event_queue *ceq_evq = get_eventq_raw();
+
 	ceq_evq->ev_mbox->type = EV_MBOX_CEQ;
 	ceq_init(&ceq_evq->ev_mbox->ceq, CEQ_OR, NR_FILE_DESC_MAX, ceq_ring_sz);
 	ceq_evq->ev_flags = EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP;
@@ -162,6 +166,7 @@ static struct event_queue *ep_get_alarm_evq(void)
 {
 	/* Don't care about the actual message, just using it for a wakeup */
 	struct event_queue *alarm_evq = get_eventq(EV_MBOX_BITMAP);
+
 	alarm_evq->ev_flags = EVENT_INDIR | EVENT_SPAM_INDIR | EVENT_WAKEUP;
 	evq_attach_wakeup_ctlr(alarm_evq);
 	return alarm_evq;
@@ -213,10 +218,11 @@ static void epoll_close(struct user_fd *ufd)
 		tap_req_i->cmd = FDTAP_CMD_REM;
 		free(ep_fd_i);
 	}
-	/* Requests could fail if the tapped files are already closed.  We need to
-	 * skip the failed one (the +1) and untap the rest. */
+	/* Requests could fail if the tapped files are already closed.  We need
+	 * to skip the failed one (the +1) and untap the rest. */
 	do {
-		nr_done += sys_tap_fds(tap_reqs + nr_done, nr_tap_req - nr_done);
+		nr_done += sys_tap_fds(tap_reqs + nr_done,
+				       nr_tap_req - nr_done);
 		nr_done += 1;	/* nr_done could be more than nr_tap_req now */
 	} while (nr_done < nr_tap_req);
 	free(tap_reqs);
@@ -235,8 +241,8 @@ static int init_ep_ctlr(struct epoll_ctlr *ep, int size)
 	ep->mtx = uth_mutex_alloc();
 	ep->ufd.magic = EPOLL_UFD_MAGIC;
 	ep->ufd.close = epoll_close;
-	/* Size is a hint for the CEQ concurrency.  We can actually handle as many
-	 * kernel FDs as is possible. */
+	/* Size is a hint for the CEQ concurrency.  We can actually handle as
+	 * many kernel FDs as is possible. */
 	ep->ceq_evq = ep_get_ceq_evq(ROUNDUPPWR2(size));
 	return 0;
 }
@@ -267,9 +273,9 @@ static void ep_alarm_dtor(void *obj, void *priv)
 	struct ep_alarm *ep_a = (struct ep_alarm*)obj;
 
 	/* TODO: (RCU/SLAB).  Somehow the slab allocator is trying to reap our
-	 * objects.  Note that when we update userspace to use magazines, the dtor
-	 * will fire earlier (when the object is given to the slab layer).  We'll
-	 * need to be careful about the final freeing of the ev_q. */
+	 * objects.  Note that when we update userspace to use magazines, the
+	 * dtor will fire earlier (when the object is given to the slab layer).
+	 * We'll need to be careful about the final freeing of the ev_q. */
 	panic("Epoll alarms should never be destroyed!");
 	ep_put_alarm_evq(ep_a->alarm_evq);
 }
@@ -281,9 +287,9 @@ static void epoll_init(void *arg)
 	register_close_cb(&epoll_close_cb);
 	ctlrs_mtx = uth_mutex_alloc();
 	ep_alarms_cache = kmem_cache_create("epoll alarms",
-	                                    sizeof(struct ep_alarm),
-	                                    __alignof__(sizeof(struct ep_alarm)), 0,
-	                                    ep_alarm_ctor, ep_alarm_dtor, NULL);
+	                  	sizeof(struct ep_alarm),
+	                  	__alignof__(sizeof(struct ep_alarm)), 0,
+	                  	ep_alarm_ctor, ep_alarm_dtor, NULL);
 	assert(ep_alarms_cache);
 }
 
@@ -316,8 +322,9 @@ int epoll_create(int size)
 
 int epoll_create1(int flags)
 {
-	/* TODO: we're supposed to support CLOEXEC.  Our FD is a user_fd, so that'd
-	 * require some support in glibc's exec to close our epoll ctlr. */
+	/* TODO: we're supposed to support CLOEXEC.  Our FD is a user_fd, so
+	 * that'd require some support in glibc's exec to close our epoll ctlr.
+	 * */
 	return epoll_create(1);
 }
 
@@ -397,8 +404,8 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 	int ret, sock_listen_fd, sock_ctl_fd;
 	struct epoll_event listen_event;
 
-	/* Only support ET.  Also, we just ignore EPOLLONESHOT.  That might work,
-	 * logically, just with spurious events firing. */
+	/* Only support ET.  Also, we just ignore EPOLLONESHOT.  That might
+	 * work, logically, just with spurious events firing. */
 	if (!(event->events & EPOLLET)) {
 		errno = EPERM;
 		werrstr("Epoll level-triggered not supported");
@@ -409,20 +416,20 @@ static int __epoll_ctl_add(struct epoll_ctlr *ep, int fd,
 		werrstr("Epoll one-shot not supported");
 		return -1;
 	}
-	/* The sockets-to-plan9 networking shims are a bit inconvenient.  The user
-	 * asked us to epoll on an FD, but that FD is actually a Qdata FD.  We might
-	 * need to actually epoll on the listen_fd.  Further, we don't know yet
-	 * whether or not they want the listen FD.  They could epoll on the socket,
-	 * then listen later and want to wake up on the listen.
+	/* The sockets-to-plan9 networking shims are a bit inconvenient.  The
+	 * user asked us to epoll on an FD, but that FD is actually a Qdata FD.
+	 * We might need to actually epoll on the listen_fd.  Further, we don't
+	 * know yet whether or not they want the listen FD.  They could epoll on
+	 * the socket, then listen later and want to wake up on the listen.
 	 *
 	 * So in the case we have a socket FD, we'll actually open the listen FD
 	 * regardless (glibc handles this), and we'll epoll on both FDs.
-	 * Technically, either FD could fire and they'd get an epoll event for it,
-	 * but I think socket users will use only listen or data.
+	 * Technically, either FD could fire and they'd get an epoll event for
+	 * it, but I think socket users will use only listen or data.
 	 *
 	 * As far as tracking the FD goes for epoll_wait() reporting, if the app
-	 * wants to track the FD they think we are using, then they already passed
-	 * that in event->data. */
+	 * wants to track the FD they think we are using, then they already
+	 * passed that in event->data. */
 	_sock_lookup_rock_fds(fd, TRUE, &sock_listen_fd, &sock_ctl_fd);
 	if (sock_listen_fd >= 0) {
 		listen_event.events = EPOLLET | EPOLLIN | EPOLLHUP;
@@ -454,8 +461,8 @@ static int __epoll_ctl_del_raw(struct epoll_ctlr *ep, int fd,
 	assert(ep_fd->fd == fd);
 	tap_req.fd = fd;
 	tap_req.cmd = FDTAP_CMD_REM;
-	/* ignoring the return value; we could have failed to remove it if the FD
-	 * has already closed and the kernel removed the tap. */
+	/* ignoring the return value; we could have failed to remove it if the
+	 * FD has already closed and the kernel removed the tap. */
 	sys_tap_fds(&tap_req, 1);
 	ceq_ev->user_data = 0;
 	free(ep_fd);
@@ -467,20 +474,22 @@ static int __epoll_ctl_del(struct epoll_ctlr *ep, int fd,
 {
 	int sock_listen_fd, sock_ctl_fd;
 
-	/* If we were dealing with a socket shim FD, we tapped both the listen and
-	 * the data file and need to untap both of them.
+	/* If we were dealing with a socket shim FD, we tapped both the listen
+	 * and the data file and need to untap both of them.
 	 *
-	 * We could be called from a close_cb, and we already closed the listen FD.
-	 * In that case, we don't want to try and open it.  If the listen FD isn't
-	 * open, then we know it isn't in an epoll set.  We also know the data FD
-	 * isn't epolled either, since we always epoll both FDs for rocks. */
+	 * We could be called from a close_cb, and we already closed the listen
+	 * FD.  In that case, we don't want to try and open it.  If the listen
+	 * FD isn't open, then we know it isn't in an epoll set.  We also know
+	 * the data FD isn't epolled either, since we always epoll both FDs for
+	 * rocks. */
 	_sock_lookup_rock_fds(fd, FALSE, &sock_listen_fd, &sock_ctl_fd);
 	if (sock_listen_fd >= 0) {
-		/* It's possible to fail here.  Even though we tapped it already, if the
-		 * deletion was triggered from close callbacks, it's possible for the
-		 * sock_listen_fd to be closed first, which would have triggered an
-		 * epoll_ctl_del.  When we get around to closing the Rock FD, the listen
-		 * FD was already closed. */
+		/* It's possible to fail here.  Even though we tapped it
+		 * already, if the deletion was triggered from close callbacks,
+		 * it's possible for the sock_listen_fd to be closed first,
+		 * which would have triggered an epoll_ctl_del.  When we get
+		 * around to closing the Rock FD, the listen FD was already
+		 * closed. */
 		__epoll_ctl_del_raw(ep, sock_listen_fd, event);
 	}
 	return __epoll_ctl_del_raw(ep, fd, event);
@@ -501,25 +510,25 @@ int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 	}
 	uth_mutex_lock(ep->mtx);
 	switch (op) {
-		case (EPOLL_CTL_MOD):
-			/* In lieu of a proper MOD, just remove and readd.  The errors might
-			 * not work out well, and there could be a missed event in the
-			 * middle.  Not sure what the guarantees are, but we can fake a
-			 * poke. (TODO). */
-			ret = __epoll_ctl_del(ep, fd, 0);
-			if (ret)
-				break;
-			ret = __epoll_ctl_add(ep, fd, event);
+	case (EPOLL_CTL_MOD):
+		/* In lieu of a proper MOD, just remove and readd.  The errors
+		 * might not work out well, and there could be a missed event in
+		 * the middle.  Not sure what the guarantees are, but we can
+		 * fake a poke. (TODO). */
+		ret = __epoll_ctl_del(ep, fd, 0);
+		if (ret)
 			break;
-		case (EPOLL_CTL_ADD):
-			ret = __epoll_ctl_add(ep, fd, event);
-			break;
-		case (EPOLL_CTL_DEL):
-			ret = __epoll_ctl_del(ep, fd, event);
-			break;
-		default:
-			errno = EINVAL;
-			ret = -1;
+		ret = __epoll_ctl_add(ep, fd, event);
+		break;
+	case (EPOLL_CTL_ADD):
+		ret = __epoll_ctl_add(ep, fd, event);
+		break;
+	case (EPOLL_CTL_DEL):
+		ret = __epoll_ctl_del(ep, fd, event);
+		break;
+	default:
+		errno = EINVAL;
+		ret = -1;
 	}
 	uth_mutex_unlock(ep->mtx);
 	return ret;
@@ -588,22 +597,25 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 		return nr_ret;
 	if (timeout == 0)
 		return 0;
-	/* From here on down, we're going to block until there is some activity */
+	/* From here on down, we're going to block until there is some activity
+	 */
 	if (timeout != -1) {
 		ep_a = kmem_cache_alloc(ep_alarms_cache, 0);
 		assert(ep_a);
 		syscall_async_evq(&ep_a->sysc, ep_a->alarm_evq, SYS_block,
 		                  timeout * 1000);
-		uth_blockon_evqs(&msg, &which_evq, 2, ep->ceq_evq, ep_a->alarm_evq);
+		uth_blockon_evqs(&msg, &which_evq, 2, ep->ceq_evq,
+				 ep_a->alarm_evq);
 		if (which_evq == ep_a->alarm_evq) {
 			kmem_cache_free(ep_alarms_cache, ep_a);
 			return 0;
 		}
-		/* The alarm sysc may or may not have finished yet.  This will force it
-		 * to *start* to finish iff it is still a submitted syscall. */
+		/* The alarm sysc may or may not have finished yet.  This will
+		 * force it to *start* to finish iff it is still a submitted
+		 * syscall. */
 		sys_abort_sysc(&ep_a->sysc);
-		/* But we still need to wait until the syscall completed.  Need a
-		 * dummy msg, since we don't want to clobber the real msg. */
+		/* But we still need to wait until the syscall completed.  Need
+		 * a dummy msg, since we don't want to clobber the real msg. */
 		uth_blockon_evqs(&dummy_msg, 0, 1, ep_a->alarm_evq);
 		kmem_cache_free(ep_alarms_cache, ep_a);
 	} else {
@@ -613,13 +625,13 @@ static int __epoll_wait(struct epoll_ctlr *ep, struct epoll_event *events,
 	if (get_ep_event_from_msg(ep, &msg, &events[0]))
 		nr_ret = 1;
 	uth_mutex_unlock(ep->mtx);
-	/* We had to extract one message already as part of the blocking process.
-	 * We might be able to get more. */
+	/* We had to extract one message already as part of the blocking
+	 * process.  We might be able to get more. */
 	nr_ret += __epoll_wait_poll(ep, events + nr_ret, maxevents - nr_ret);
 	/* This is a little nasty and hopefully a rare race.  We still might not
-	 * have a ret, but we expected to block until we had something.  We didn't
-	 * time out yet, but we spuriously woke up.  We need to try again (ideally,
-	 * we'd subtract the time left from the original timeout). */
+	 * have a ret, but we expected to block until we had something.  We
+	 * didn't time out yet, but we spuriously woke up.  We need to try again
+	 * (ideally, we'd subtract the time left from the original timeout). */
 	if (!nr_ret)
 		return __epoll_wait(ep, events, maxevents, timeout);
 	return nr_ret;
@@ -648,6 +660,7 @@ int epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
 {
 	int ready;
 	sigset_t origmask;
+
 	/* TODO: this is probably racy */
 	sigprocmask(SIG_SETMASK, sigmask, &origmask);
 	ready = epoll_wait(epfd, events, maxevents, timeout);

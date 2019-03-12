@@ -39,6 +39,7 @@ void vmm_init(void)
 	/* Check first for intel capabilities. This is hence two back-to-back
 	 * implementationd-dependent checks. That's ok, it's all msr dependent.
 	 */
+
 	ret = intel_vmm_init();
 	if (! ret) {
 		x86_supports_vmx = TRUE;
@@ -96,7 +97,8 @@ static void __vmm_grow_gpc_array(struct vmm *vmm, unsigned int new_nr_gpcs)
 
 	if (new_nr_gpcs <= vmm->gpc_array_elem)
 		return;
-	/* TODO: (RCU) we could defer the free, maybe with an RCU-safe krealloc. */
+	/* TODO: (RCU) we could defer the free, maybe with an RCU-safe krealloc.
+	 */
 	old_array = vmm->guest_pcores;
 	new_nr_elem = MAX(vmm->gpc_array_elem * 2, new_nr_gpcs);
 	new_array = kzmalloc(new_nr_elem * sizeof(void*), MEM_WAIT);
@@ -123,10 +125,13 @@ void __vmm_add_gpcs(struct proc *p, unsigned int nr_more_gpcs,
 		error(EINVAL, "Can't add %u new gpcs", new_nr_gpcs);
 	__vmm_grow_gpc_array(vmm, new_nr_gpcs);
 	for (int i = 0; i < nr_more_gpcs; i++) {
-		if (copy_from_user(&gpci, &u_gpcis[i], sizeof(struct vmm_gpcore_init)))
+		if (copy_from_user(&gpci, &u_gpcis[i],
+				   sizeof(struct vmm_gpcore_init)))
 			error(EINVAL, "Bad pointer %p for gps", u_gpcis);
-		vmm->guest_pcores[vmm->nr_guest_pcores] = create_guest_pcore(p, &gpci);
-		wmb();	/* concurrent readers will check nr_guest_pcores first */
+		vmm->guest_pcores[vmm->nr_guest_pcores] =
+			create_guest_pcore(p, &gpci);
+		/* concurrent readers will check nr_guest_pcores first */
+		wmb();
 		vmm->nr_guest_pcores++;
 	}
 }
@@ -137,6 +142,7 @@ void __vmm_add_gpcs(struct proc *p, unsigned int nr_more_gpcs,
 void __vmm_struct_cleanup(struct proc *p)
 {
 	struct vmm *vmm = &p->vmm;
+
 	if (!vmm->vmmcp)
 		return;
 	for (int i = 0; i < vmm->nr_guest_pcores; i++) {
@@ -162,11 +168,11 @@ int vmm_poke_guest(struct proc *p, int guest_pcoreid)
 	 * best effort service. */
 	pcoreid = ACCESS_ONCE(gpc->cpu);
 	if (pcoreid == -1) {
-		/* So we know that we'll miss the poke for the posted IRQ.  We could
-		 * return an error.  However, error handling for this case isn't
-		 * particularly helpful (yet).  The absence of the error does not mean
-		 * the IRQ was posted.  We'll still return 0, meaning "the user didn't
-		 * mess up; we tried." */
+		/* So we know that we'll miss the poke for the posted IRQ.  We
+		 * could return an error.  However, error handling for this case
+		 * isn't particularly helpful (yet).  The absence of the error
+		 * does not mean the IRQ was posted.  We'll still return 0,
+		 * meaning "the user didn't mess up; we tried." */
 		return 0;
 	}
 	send_ipi(pcoreid, I_POKE_GUEST);
@@ -208,7 +214,8 @@ struct guest_pcore *load_guest_pcore(struct proc *p, int guest_pcoreid)
 	}
 	gpc->cpu = core_id();
 	spin_unlock(&p->vmm.lock);
-	/* We've got dibs on the gpc; we don't need to hold the lock any longer. */
+	/* We've got dibs on the gpc; we don't need to hold the lock any longer.
+	 */
 	pcpui->guest_pcoreid = guest_pcoreid;
 	vmx_load_guest_pcore(gpc);
 	/* Load guest's xcr0 */
@@ -391,8 +398,8 @@ static bool emsr_lapic_icr_write(struct emmsr *msr, struct vm_trapframe *tf)
 	target_coreid = ACCESS_ONCE(gpc->cpu);
 	if (target_coreid == -1)
 		return false;
-	/* If it's us, we'll send_ipi when we restart the VMTF.  Note this is rare:
-	 * the guest will usually use the self_ipi virtualization. */
+	/* If it's us, we'll send_ipi when we restart the VMTF.  Note this is
+	 * rare: the guest will usually use the self_ipi virtualization. */
 	if (target_coreid != core_id())
 		send_ipi(target_coreid, I_POKE_GUEST);
 	/* No MBs needed here: only that it happens after setting notif */
@@ -524,8 +531,9 @@ bool emsr_fake_apicbase(struct emmsr *msr, struct vm_trapframe *vm_tf,
 	uint32_t eax, edx;
 
 	if (!msr->written) {
-		/* TODO: tightly coupled to the addr in vmrunkernel.  We want this func
-		 * to return the val that vmrunkernel put into the VMCS. */
+		/* TODO: tightly coupled to the addr in vmrunkernel.  We want
+		 * this func to return the val that vmrunkernel put into the
+		 * VMCS. */
 		eax = 0xfee00d00;
 		if (vm_tf->tf_guest_pcoreid != 0) {
 			// Remove BSP bit if not core 0

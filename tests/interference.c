@@ -32,15 +32,15 @@ static void os_init(void)
 
 struct sample_stats {
 	int (*get_sample)(void **data, int i, int j, uint64_t *sample);
-	uint64_t					avg_time;
-	uint64_t					var_time;
-	uint64_t					max_time;
-	uint64_t					min_time;
-	unsigned int				lat_50;
-	unsigned int				lat_75;
-	unsigned int				lat_90;
-	unsigned int				lat_99;
-	uint64_t					total_samples;
+	uint64_t		avg_time;
+	uint64_t		var_time;
+	uint64_t		max_time;
+	uint64_t		min_time;
+	unsigned int		lat_50;
+	unsigned int		lat_75;
+	unsigned int		lat_90;
+	unsigned int		lat_99;
+	uint64_t		total_samples;
 };
 
 void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
@@ -90,8 +90,8 @@ int main(int argc, char **argv)
 	int nr_samples = 1000;
 	uint64_t deadline = sec2tsc(5);	/* assumes TSC and cycles are close */
 
-	/* Normally we'd use a 2D array, but since we're just one thread, we just
-	 * need our first thread's array. */
+	/* Normally we'd use a 2D array, but since we're just one thread, we
+	 * just need our first thread's array. */
 	delays = malloc(sizeof(uint64_t) * nr_samples);
 	os_init();
 	pcoreid = get_pcoreid();

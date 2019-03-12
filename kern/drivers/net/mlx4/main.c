@@ -3910,7 +3910,8 @@ static int mlx4_pnp(struct ether *edev)
 	probed = true;
 
 	STAILQ_FOREACH(pdev, &pci_devices, all_dev) {
-		/* This checks that pcidev is a Network Controller for Ethernet */
+		/* This checks that pcidev is a Network Controller for Ethernet
+		 */
 		if (pdev->class != 0x02 || pdev->subclass != 0x00)
 			continue;
 

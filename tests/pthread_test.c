@@ -45,12 +45,13 @@ void *yield_thread(void* arg)
 	/* Wait til all threads are created */
 	pthread_barrier_wait(&barrier);
 	for (int i = 0; i < nr_yield_loops; i++) {
-		printf_safe("[A] pthread %d %p on vcore %d, itr: %d\n", pthread_id(),
-		            pthread_self(), vcore_id(), i);
-		/* Fakes some work by spinning a bit.  Amount varies per uth/vcore,
-		 * scaled by fake_work */
+		printf_safe("[A] pthread %d %p on vcore %d, itr: %d\n",
+			    pthread_id(), pthread_self(), vcore_id(), i);
+		/* Fakes some work by spinning a bit.  Amount varies per
+		 * uth/vcore, scaled by fake_work */
 		if (amt_fake_work)
-			udelay(amt_fake_work * (pthread_id() * (vcore_id() + 2)));
+			udelay(amt_fake_work * (pthread_id() * (vcore_id() +
+								2)));
 		pthread_yield();
 		printf_safe("[A] pthread %p returned from yield on vcore %d, itr: %d\n",
 		            pthread_self(), vcore_id(), i);
@@ -83,7 +84,7 @@ int main(int argc, char** argv)
 		/* Only do the vcore trickery if requested */
 		parlib_never_yield = TRUE;
 		pthread_need_tls(FALSE);
-		pthread_mcp_init();					/* gives us one vcore */
+		pthread_mcp_init();		/* gives us one vcore */
 		vcore_request_total(nr_vcores);
 		parlib_never_vc_request = TRUE;
 		for (int i = 0; i < nr_vcores; i++) {
@@ -115,10 +116,11 @@ int main(int argc, char** argv)
 	uthread_join_arr(join_reqs, nr_yield_threads);
 #else
 	for (int i = 0; i < nr_yield_threads; i++) {
-		printf_safe("[A] About to join on thread %d(%p)\n", i, my_threads[i]);
+		printf_safe("[A] About to join on thread %d(%p)\n",
+			    i, my_threads[i]);
 		pthread_join(my_threads[i], &my_retvals[i]);
-		printf_safe("[A] Successfully joined on thread %d (retval: %p)\n", i,
-		            my_retvals[i]);
+		printf_safe("[A] Successful join on thread %d (retval: %p)\n",
+			    i, my_retvals[i]);
 	}
 #endif
 	if (gettimeofday(&end_tv, 0))

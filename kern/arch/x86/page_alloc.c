@@ -25,8 +25,8 @@ static void parse_mboot_region(struct multiboot_mmap_entry *entry, void *data)
 		return;
 	if (start + len > max_paddr)
 		len = max_paddr - start;
-	/* For paranoia, skip anything below EXTPHYSMEM.  If we ever change this,
-	 * we'll need to deal with smp_boot's trampoline page. */
+	/* For paranoia, skip anything below EXTPHYSMEM.  If we ever change
+	 * this, we'll need to deal with smp_boot's trampoline page. */
 	if ((start < EXTPHYSMEM) && (start + len < EXTPHYSMEM))
 		return;
 	if ((start < EXTPHYSMEM) && (EXTPHYSMEM <= start + len)) {
@@ -35,13 +35,15 @@ static void parse_mboot_region(struct multiboot_mmap_entry *entry, void *data)
 	}
 	/* Skip over any pages already allocated in boot_alloc().
 	 * (boot_freemem_paddr is the next free addr.) */
-	if ((start < boot_freemem_paddr) && (boot_freemem_paddr <= start + len)) {
+	if ((start < boot_freemem_paddr)
+	    && (boot_freemem_paddr <= start + len)) {
 		len = start + len - boot_freemem_paddr;
 		start = boot_freemem_paddr;
 	}
-	/* Skip any part that intersects with the kernel, which is linked and loaded
-	 * from EXTPHYSMEM to end in kernel64.ld */
-	if (regions_collide_unsafe(EXTPHYSMEM, PADDR(end), start, start + len)) {
+	/* Skip any part that intersects with the kernel, which is linked and
+	 * loaded from EXTPHYSMEM to end in kernel64.ld */
+	if (regions_collide_unsafe(EXTPHYSMEM, PADDR(end), start, start + len))
+	{
 		len = start + len - PADDR(end);
 		start = PADDR(end);
 	}
@@ -72,11 +74,11 @@ static void parse_mboot_region(struct multiboot_mmap_entry *entry, void *data)
  *
  * So we'll go with two free memory regions:
  *
- * 		[ 0, ROUNDUP(boot_freemem_paddr, PGSIZE) ) = busy
- * 		[ ROUNDUP(boot_freemem_paddr, PGSIZE), TOP_OF_1 ) = free
- * 		[ MAGIC_HOLE, 0x0000000100000000 ) = busy
- * 		(and maybe this:)
- * 		[ 0x0000000100000000, max_paddr ) = free
+ * 	[ 0, ROUNDUP(boot_freemem_paddr, PGSIZE) ) = busy
+ * 	[ ROUNDUP(boot_freemem_paddr, PGSIZE), TOP_OF_1 ) = free
+ * 	[ MAGIC_HOLE, 0x0000000100000000 ) = busy
+ * 	(and maybe this:)
+ * 	[ 0x0000000100000000, max_paddr ) = free
  *
  * where TOP_OF_1 is the min of IOAPIC_PBASE and max_paddr.
  *
@@ -89,19 +91,19 @@ static void account_for_pages(physaddr_t boot_freemem_paddr)
 	physaddr_t top_of_free_1 = MIN(0xc0000000, max_paddr);
 	physaddr_t start_of_free_2;
 
-	printk("Warning: poor memory detection (qemu?).  May lose 1GB of RAM\n");
+	printk("Warning: poor memory detection (qemu?). May lose 1GB of RAM\n");
 	arena_add(base_arena, KADDR(top_of_busy), top_of_free_1 - top_of_busy,
 	          MEM_WAIT);
 	/* If max_paddr is less than the start of our potential second free mem
-	 * region, we can just leave.  We also don't want to poke around the pages
-	 * array either (and accidentally run off the end of the array).
+	 * region, we can just leave.  We also don't want to poke around the
+	 * pages array either (and accidentally run off the end of the array).
 	 *
 	 * Additionally, 32 bit doesn't acknowledge pmem above the 4GB mark. */
 	start_of_free_2 = 0x0000000100000000;
 	if (max_paddr < start_of_free_2)
 		return;
-	arena_add(base_arena, KADDR(start_of_free_2), max_paddr - start_of_free_2,
-	          MEM_WAIT);
+	arena_add(base_arena, KADDR(start_of_free_2), max_paddr -
+		  start_of_free_2, MEM_WAIT);
 }
 
 /* Initialize base arena based on available free memory.  After this, do not use
@@ -110,11 +112,12 @@ void base_arena_init(struct multiboot_info *mbi)
 {
 	/* First, all memory is busy / not free by default.
 	 *
-	 * To avoid a variety of headaches, any memory below 1MB is considered busy.
-	 * Likewise, everything in the kernel, up to _end is also busy.  And
-	 * everything we've already boot_alloc'd is busy.  These chunks of memory
-	 * are reported as 'free' by multiboot.  All of this memory is below
-	 * boot_freemem_paddr.  We don't treat anything below that as free.
+	 * To avoid a variety of headaches, any memory below 1MB is considered
+	 * busy.  Likewise, everything in the kernel, up to _end is also busy.
+	 * And everything we've already boot_alloc'd is busy.  These chunks of
+	 * memory are reported as 'free' by multiboot.  All of this memory is
+	 * below boot_freemem_paddr.  We don't treat anything below that as
+	 * free.
 	 *
 	 * We'll also abort the mapping for any addresses over max_paddr, since
 	 * we'll never use them.  'pages' does not track them either.
@@ -131,9 +134,11 @@ void base_arena_init(struct multiboot_info *mbi)
 	                           0);
 	boot_freemem_paddr = PADDR(ROUNDUP(boot_freemem, PGSIZE));
 	if (mboot_has_mmaps(mbi)) {
-		mboot_foreach_mmap(mbi, parse_mboot_region, (void*)boot_freemem_paddr);
+		mboot_foreach_mmap(mbi, parse_mboot_region,
+				   (void*)boot_freemem_paddr);
 	} else {
-		/* No multiboot mmap regions (probably run from qemu with -kernel) */
+		/* No multiboot mmap regions (probably run from qemu with
+		 * -kernel) */
 		account_for_pages(boot_freemem_paddr);
 	}
 }

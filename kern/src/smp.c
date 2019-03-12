@@ -38,6 +38,7 @@ atomic_t outstanding_calls = 0;
 static void try_run_proc(void)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
 	/* There was a process running here, and we should return to it. */
 	if (pcpui->owning_proc) {
 		assert(!pcpui->cur_kthread->sysc);
@@ -45,12 +46,12 @@ static void try_run_proc(void)
 		__proc_startcore(pcpui->owning_proc, pcpui->cur_ctx);
 		assert(0);
 	} else {
-		/* Make sure we have abandoned core.  It's possible to have an owner
-		 * without a current (smp_idle, __startcore, __death).
+		/* Make sure we have abandoned core.  It's possible to have an
+		 * owner without a current (smp_idle, __startcore, __death).
 		 *
-		 * If we had a current process, we might trigger __proc_free, which
-		 * could send us a KMSG.  Since we're called after PRKM, let's just
-		 * restart the idle loop. */
+		 * If we had a current process, we might trigger __proc_free,
+		 * which could send us a KMSG.  Since we're called after PRKM,
+		 * let's just restart the idle loop. */
 		if (abandon_core())
 			smp_idle();
 	}
@@ -70,17 +71,17 @@ static void __attribute__((noreturn)) __smp_idle(void *arg)
 
 	pcpui->cur_kthread->flags = KTH_DEFAULT_FLAGS;
 	while (1) {
-		/* This might wake a kthread (the gp ktask), so be sure to run PRKM
-		 * after reporting the quiescent state. */
+		/* This might wake a kthread (the gp ktask), so be sure to run
+		 * PRKM after reporting the quiescent state. */
 		rcu_report_qs();
 		/* If this runs an RKM, we'll call smp_idle from the top. */
 		process_routine_kmsg();
 		try_run_proc();
 		cpu_bored();		/* call out to the ksched */
 		/* cpu_halt() atomically turns on interrupts and halts the core.
-		 * Important to do this, since we could have a RKM come in via an
-		 * interrupt right while PRKM is returning, and we wouldn't catch
-		 * it.  When it returns, IRQs are back off. */
+		 * Important to do this, since we could have a RKM come in via
+		 * an interrupt right while PRKM is returning, and we wouldn't
+		 * catch it.  When it returns, IRQs are back off. */
 		__set_cpu_state(pcpui, CPU_STATE_IDLE);
 		cpu_halt();
 		__set_cpu_state(pcpui, CPU_STATE_KERNEL);
@@ -108,11 +109,12 @@ void smp_percpu_init(void)
 	__arch_pcpu_init(coreid);
 	/* init our kthread (tracks our currently running context) */
 	kthread = __kthread_zalloc();
-	kthread->stacktop = get_stack_top();	/* assumes we're on the 1st page */
+	/* assumes we're on the 1st page */
+	kthread->stacktop = get_stack_top();
 	pcpui->cur_kthread = kthread;
-	/* Treat the startup threads as ktasks.  This will last until smp_idle when
-	 * they clear it, either in anticipation of being a user-backing kthread or
-	 * to handle an RKM. */
+	/* Treat the startup threads as ktasks.  This will last until smp_idle
+	 * when they clear it, either in anticipation of being a user-backing
+	 * kthread or to handle an RKM. */
 	kthread->flags = KTH_KTASK_FLAGS;
 	per_cpu_info[coreid].spare = 0;
 	/* Init relevant lists */
@@ -129,8 +131,9 @@ void smp_percpu_init(void)
 	for (int i = 0; i < NR_CPU_STATES; i++)
 		pcpui->state_ticks[i] = 0;
 	pcpui->last_tick_cnt = read_tsc();
-	/* Core 0 is in the KERNEL state, called from smp_boot.  The other cores are
-	 * too, at least on x86, where we were called from asm (woken by POKE). */
+	/* Core 0 is in the KERNEL state, called from smp_boot.  The other cores
+	 * are too, at least on x86, where we were called from asm (woken by
+	 * POKE). */
 	pcpui->cpu_state = CPU_STATE_KERNEL;
 	/* Enable full lock debugging, after all pcpui work is done */
 	pcpui->__lock_checking_enabled = 1;
@@ -144,14 +147,16 @@ void smp_percpu_init(void)
 void __set_cpu_state(struct per_cpu_info *pcpui, int state)
 {
 	uint64_t now_ticks;
+
 	assert(!irq_is_enabled());
 	/* TODO: could put in an option to enable/disable state tracking. */
 	now_ticks = read_tsc();
-	pcpui->state_ticks[pcpui->cpu_state] += now_ticks - pcpui->last_tick_cnt;
+	pcpui->state_ticks[pcpui->cpu_state] += now_ticks -
+					        pcpui->last_tick_cnt;
 	/* TODO: if the state was user, we could account for the vcore's time,
-	 * similar to the total_ticks in struct vcore.  the difference is that the
-	 * total_ticks tracks the vcore's virtual time, while this tracks user time.
-	 * something like vcore->user_ticks. */
+	 * similar to the total_ticks in struct vcore.  the difference is that
+	 * the total_ticks tracks the vcore's virtual time, while this tracks
+	 * user time.  something like vcore->user_ticks. */
 	pcpui->cpu_state = state;
 	pcpui->last_tick_cnt = now_ticks;
 }
@@ -160,10 +165,11 @@ void reset_cpu_state_ticks(int coreid)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[coreid];
 	uint64_t now_ticks;
+
 	if (coreid >= num_cores)
 		return;
-	/* need to update last_tick_cnt, so the current value doesn't get added in
-	 * next time we update */
+	/* need to update last_tick_cnt, so the current value doesn't get added
+	 * in next time we update */
 	now_ticks = read_tsc();
 	for (int i = 0; i < NR_CPU_STATES; i++) {
 		pcpui->state_ticks[i] = 0;
@@ -212,6 +218,7 @@ static void pcpui_trace_fn(void *event, void *data)
 {
 	struct pcpu_trace_event *te = (struct pcpu_trace_event*)event;
 	int desired_type = (int)(long)data;
+
 	if (te->type >= PCPUI_NR_TYPES)
 		printk("Bad trace type %d\n", te->type);
 	/* desired_type == 0 means all types */
@@ -271,8 +278,9 @@ void smp_do_in_cores(const struct core_set *cset, void (*func)(void *),
 			if (i == cpu)
 				func(opaque);
 			else
-				send_kernel_message(i, smp_do_core_work, (long) &acw, 0, 0,
-									KMSG_ROUTINE);
+				send_kernel_message(i, smp_do_core_work,
+						    (long)&acw, 0, 0,
+						    KMSG_ROUTINE);
 		}
 	}
 	completion_wait(&acw.comp);

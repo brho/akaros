@@ -67,7 +67,8 @@ int main(int argc, char** argv)
 		exit(-1);
 	}
 	nr_pgs = MIN(nr_pgs, (ROUNDUP(statbuf.st_size, PGSIZE) >> PGSHIFT));
-	addr = mmap(0, nr_pgs * PGSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	addr = mmap(0, nr_pgs * PGSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
+		    0);
 	if (addr == MAP_FAILED) {
 		perror("mmap failed");
 		exit(-1);

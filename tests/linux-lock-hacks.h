@@ -54,7 +54,7 @@ struct mcs_pdro_qnode
 
 typedef struct mcs_lock
 {
-	mcs_lock_qnode_t* lock;
+	mcs_lock_qnode_t *lock;
 } mcs_lock_t;
 
 void __attribute__((noinline)) mcs_lock_init(struct mcs_lock *lock)
@@ -78,8 +78,8 @@ mcs_lock_lock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 		qnode->locked = 1;
 		wmb();
 		predecessor->next = qnode;
-		/* no need for a wrmb(), since this will only get unlocked after they
-		 * read our previous write */
+		/* no need for a wrmb(), since this will only get unlocked
+		 * after they read our previous write */
 		while (qnode->locked)
 			cpu_relax();
 	}
@@ -91,34 +91,40 @@ mcs_lock_unlock(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 {
 	/* Check if someone is already waiting on us to unlock */
 	if (qnode->next == 0) {
-		cmb();	/* no need for CPU mbs, since there's an atomic_swap() */
+		cmb(); /* no need for CPU mbs, since there's an atomic_swap() */
 		/* Unlock it */
 		mcs_lock_qnode_t *old_tail = mcs_qnode_swap(&lock->lock,0);
-		/* no one else was already waiting, so we successfully unlocked and can
-		 * return */
+		/* no one else was already waiting, so we successfully unlocked
+		 * and can return */
 		if (old_tail == qnode)
 			return;
-		/* someone else was already waiting on the lock (last one on the list),
-		 * and we accidentally took them off.  Try and put it back. */
-		mcs_lock_qnode_t *usurper = mcs_qnode_swap(&lock->lock,old_tail);
-		/* since someone else was waiting, they should have made themselves our
-		 * next.  spin (very briefly!) til it happens. */
+		/* someone else was already waiting on the lock (last one on
+		 * the list), and we accidentally took them off.  Try and put
+		 * it back. */
+		mcs_lock_qnode_t *usurper = mcs_qnode_swap(&lock->lock,
+							   old_tail);
+		/* since someone else was waiting, they should have made
+		 * themselves our next.  spin (very briefly!) til it happens.
+		 * */
 		while (qnode->next == 0)
 			cpu_relax();
 		if (usurper) {
-			/* an usurper is someone who snuck in before we could put the old
-			 * tail back.  They now have the lock.  Let's put whoever is
-			 * supposed to be next as their next one. */
+			/* an usurper is someone who snuck in before we could
+			 * put the old tail back.  They now have the lock.
+			 * Let's put whoever is supposed to be next as their
+			 * next one. */
 			usurper->next = qnode->next;
 		} else {
-			/* No usurper meant we put things back correctly, so we should just
-			 * pass the lock / unlock whoever is next */
+			/* No usurper meant we put things back correctly, so we
+			 * should just pass the lock / unlock whoever is next */
 			qnode->next->locked = 0;
 		}
 	} else {
 		/* mb()s necessary since we didn't call an atomic_swap() */
-		wmb();	/* need to make sure any previous writes don't pass unlocking */
-		rwmb();	/* need to make sure any reads happen before the unlocking */
+		/* need to make sure any previous writes don't pass unlocking */
+		wmb();
+		/* need to make sure any reads happen before the unlocking */
+		rwmb();
 		/* simply unlock whoever is next */
 		qnode->next->locked = 0;
 	}
@@ -132,12 +138,14 @@ mcs_lock_unlock_cas(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 	/* Check if someone is already waiting on us to unlock */
 	if (qnode->next == 0) {
 		cmb();	/* no need for CPU mbs, since there's an atomic_cas() */
-		/* If we're still the lock, just swap it with 0 (unlock) and return */
+		/* If we're still the lock, just swap it with 0 (unlock) and
+		 * return */
 		if (__sync_bool_compare_and_swap((void**)&lock->lock, qnode, 0))
 			return;
-		/* We failed, someone is there and we are some (maybe a different)
-		 * thread's pred.  Since someone else was waiting, they should have made
-		 * themselves our next.  Spin (very briefly!) til it happens. */
+		/* We failed, someone is there and we are some (maybe a
+		 * different) thread's pred.  Since someone else was waiting,
+		 * they should have made themselves our next.  Spin (very
+		 * briefly!) til it happens. */
 		while (qnode->next == 0)
 			cpu_relax();
 		/* Alpha wants a read_barrier_depends() here */
@@ -145,8 +153,10 @@ mcs_lock_unlock_cas(struct mcs_lock *lock, struct mcs_lock_qnode *qnode)
 		qnode->next->locked = 0;
 	} else {
 		/* mb()s necessary since we didn't call an atomic_swap() */
-		wmb();	/* need to make sure any previous writes don't pass unlocking */
-		rwmb();	/* need to make sure any reads happen before the unlocking */
+		/* need to make sure any previous writes don't pass unlocking */
+		wmb();
+		/* need to make sure any reads happen before the unlocking */
+		rwmb();
 		/* simply unlock whoever is next */
 		qnode->next->locked = 0;
 	}

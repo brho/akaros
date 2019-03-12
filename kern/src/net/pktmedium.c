@@ -41,7 +41,7 @@
 static void pktbind(struct Ipifc *i, int unused_int, char **unused_char_pp_t);
 static void pktunbind(struct Ipifc *i);
 static void pktbwrite(struct Ipifc *i, struct block *, int unused_int,
-					  uint8_t * unused_uint8_p_t);
+		      uint8_t *unused_uint8_p_t);
 static void pktin(struct Fs *f, struct Ipifc *i, struct block *b);
 
 struct medium pktmedium = {

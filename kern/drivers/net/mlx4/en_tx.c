@@ -432,7 +432,8 @@ static bool mlx4_en_process_tx_cq(struct ether *dev,
 
 		if (unlikely((cqe->owner_sr_opcode & MLX4_CQE_OPCODE_MASK) ==
 			     MLX4_CQE_OPCODE_ERROR)) {
-			struct mlx4_err_cqe *cqe_err = (struct mlx4_err_cqe *)cqe;
+			struct mlx4_err_cqe *cqe_err =
+				(struct mlx4_err_cqe *)cqe;
 
 			en_err(priv, "CQE error - vendor syndrome: 0x%x syndrome: 0x%x\n",
 			       cqe_err->vendor_err_syndrome,
@@ -775,10 +776,11 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct mlx4_en_priv *priv,
 		if (ebd->base && ebd->len > 0)
 			nr_frags++;
 	}
-	/* Transport stack should always put the packet headers in the main body. */
+	/* Transport stack should always put the packet headers in the main
+	 * body. */
 	assert(!(lso_header_size > BHLEN(block)));
-	/* == means there is nothing in the block main body other than the headers.
-	 * in which case, we won't need an extra data_seg. */
+	/* == means there is nothing in the block main body other than the
+	 * headers.  in which case, we won't need an extra data_seg. */
 	is_linear = lso_header_size < BHLEN(block);
 
 	real_size = CTRL_SIZE + nr_frags * DS_SIZE;
@@ -873,8 +875,9 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct mlx4_en_priv *priv,
 	/* Prepare ctrl segement apart opcode+ownership */
 	tx_desc->ctrl.srcrb_flags = priv->ctrl_flags;
 	if (likely(block->flag & BLOCK_TRANS_TX_CSUM)) {
-		tx_desc->ctrl.srcrb_flags |= cpu_to_be32(MLX4_WQE_CTRL_IP_CSUM |
-		                                         MLX4_WQE_CTRL_TCP_UDP_CSUM);
+		tx_desc->ctrl.srcrb_flags |=
+			cpu_to_be32(MLX4_WQE_CTRL_IP_CSUM |
+				    MLX4_WQE_CTRL_TCP_UDP_CSUM);
 		ring->tx_csum++;
 	}
 
@@ -885,7 +888,8 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct mlx4_en_priv *priv,
 		 * so that VFs and PF can communicate with each other
 		 */
 		ethh = (struct ethhdr *)block->rp;
-		tx_desc->ctrl.srcrb_flags16[0] = get_unaligned((__be16 *)ethh->h_dest);
+		tx_desc->ctrl.srcrb_flags16[0] =
+			get_unaligned((__be16 *)ethh->h_dest);
 		tx_desc->ctrl.imm = get_unaligned((__be32 *)(ethh->h_dest + 2));
 	}
 
@@ -904,7 +908,8 @@ netdev_tx_t mlx4_send_packet(struct block *block, struct mlx4_en_priv *priv,
 
 		/* Copy headers;
 		 * note that we already verified that it is linear.
-		 * brho - meaning that the lso_header_size is within block->rp. */
+		 * brho - meaning that the lso_header_size is within block->rp.
+		 */
 		memcpy(tx_desc->lso.header, block->rp, lso_header_size);
 
 		ring->tso_packets++;

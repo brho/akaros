@@ -20,7 +20,7 @@ void *thread(void *arg)
 {	
 	while (!run_barriertest)
 		cpu_relax();
-	for(int i = 0; i < nr_loops; i++) {
+	for (int i = 0; i < nr_loops; i++) {
 		pthread_barrier_wait(&barrier);
 	}
 	return (void*)(long)pthread_self()->id;
@@ -31,6 +31,7 @@ int main(int argc, char** argv)
 	struct timeval start_tv = {0};
 	struct timeval end_tv = {0};
 	long usec_diff;
+
 	if (argc > 1)
 		nr_threads = strtol(argv[1], 0, 10);
 	if (argc > 2)
@@ -47,12 +48,12 @@ int main(int argc, char** argv)
 	if (nr_vcores) {
 		/* Only do the vcore trickery if requested */
 		parlib_never_yield = TRUE;
-		pthread_mcp_init();					/* gives us one vcore */
+		pthread_mcp_init();		/* gives us one vcore */
 		vcore_request_total(nr_vcores);
 		parlib_never_vc_request = TRUE;
 		for (int i = 0; i < nr_vcores; i++) {
 			printd("Vcore %d mapped to pcore %d\n", i,
-				   __procinfo.vcoremap[i].pcoreid);
+			       __procinfo.vcoremap[i].pcoreid);
 		}
 	}
 	pthread_barrier_init(&barrier, NULL, nr_threads);

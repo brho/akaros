@@ -22,10 +22,10 @@ void fs_file_init(struct fs_file *f, const char *name, struct fs_file_ops *ops)
 	qlock_init(&f->qlock);
 	fs_file_set_basename(f, name);
 	f->ops = ops;
-	/* TODO: consider holding off on initializing the PM, since only walked and
-	 * opened entries could use it.  pm == NULL means no PM yet.  Negative
-	 * entries will never be used in this manner.  Doing it now avoids races,
-	 * though it's mostly zeroing cache-hot fields. */
+	/* TODO: consider holding off on initializing the PM, since only walked
+	 * and opened entries could use it.  pm == NULL means no PM yet.
+	 * Negative entries will never be used in this manner.  Doing it now
+	 * avoids races, though it's mostly zeroing cache-hot fields. */
 	f->pm = &f->static_pm;
 	pm_init(f->pm, (struct page_map_operations*)ops, f);
 }
@@ -84,14 +84,14 @@ void fs_file_init_dir(struct fs_file *f, int dir_type, int dir_dev,
 		dir->qid.type |= QTEXCL;
 	if (perm & DMSYMLINK)
 		dir->qid.type |= QTSYMLINK;
-	/* dir->mode stores all the DM bits, but note that userspace can only affect
-	 * the permissions (S_PMASK) bits. */
+	/* dir->mode stores all the DM bits, but note that userspace can only
+	 * affect the permissions (S_PMASK) bits. */
 	dir->mode = perm;
 	__set_acmtime(f, FSF_ATIME | FSF_BTIME | FSF_MTIME | FSF_CTIME);
 	dir->length = 0;
-	/* TODO: this is a mess if you use anything other than eve.  If you use a
-	 * process, that memory is sitting in the proc struct, but we have weak refs
-	 * on it.  What happens when that proc exits?  Disaster. */
+	/* TODO: this is a mess if you use anything other than eve.  If you use
+	 * a process, that memory is sitting in the proc struct, but we have
+	 * weak refs on it.  What happens when that proc exits?  Disaster. */
 	assert(user == &eve);
 	dir->uid = user->name;
 	dir->gid = user->name;
@@ -116,9 +116,9 @@ void fs_file_copy_from_dir(struct fs_file *f, struct dir *dir)
 {
 	memcpy(&f->dir, dir, sizeof(struct dir));
 	fs_file_set_basename(f, dir->name);
-	/* TODO: sort out usernames.  Not only are these just eve, but they are not
-	 * struct user or something and they ignore whatever the name was from the
-	 * remote end. */
+	/* TODO: sort out usernames.  Not only are these just eve, but they are
+	 * not struct user or something and they ignore whatever the name was
+	 * from the remote end. */
 	f->dir.uid = eve.name;
 	f->dir.gid = eve.name;
 	f->dir.muid = eve.name;
@@ -129,8 +129,8 @@ void cleanup_fs_file(struct fs_file *f)
 {
 	if (f->dir.name != f->static_name)
 		kfree(f->dir.name);
-	/* TODO: Not sure if these will be refcounted objects in the future.  Keep
-	 * this in sync with other code that manages/sets uid/gid/muid. */
+	/* TODO: Not sure if these will be refcounted objects in the future.
+	 * Keep this in sync with other code that manages/sets uid/gid/muid. */
 	f->dir.uid = NULL;
 	f->dir.gid = NULL;
 	f->dir.muid = NULL;
@@ -289,8 +289,8 @@ static void fs_file_punch_hole(struct fs_file *f, off64_t begin, off64_t end)
 	assert((long)end >= 0);
 	if (end <= begin)
 		return;
-	/* We're punching for the range [begin, end), but inclusive for the pages:
-	 * [first_pg_idx, last_pg_idx]. */
+	/* We're punching for the range [begin, end), but inclusive for the
+	 * pages: [first_pg_idx, last_pg_idx]. */
 	first_pg_idx = LA2PPN(begin);
 	last_pg_idx = LA2PPN(ROUNDUP(end, PGSIZE)) - 1;
 	nr_pages = last_pg_idx - first_pg_idx + 1;
@@ -308,8 +308,8 @@ static void fs_file_punch_hole(struct fs_file *f, off64_t begin, off64_t end)
 			return;
 	}
 	if (PGOFF(end)) {
-		/* if this unaligned end is beyond the EOF, we might pull in a page of
-		 * zeros, then zero the first part of it. */
+		/* if this unaligned end is beyond the EOF, we might pull in a
+		 * page of zeros, then zero the first part of it. */
 		error = pm_load_page(f->pm, last_pg_idx, &page);
 		if (error)
 			error(-error, "punch_hole pm_load_page failed");
@@ -322,10 +322,11 @@ static void fs_file_punch_hole(struct fs_file *f, off64_t begin, off64_t end)
 			return;
 	}
 	pm_remove_or_zero_pages(f->pm, first_pg_idx, nr_pages);
-	/* After we removed the pages from the PM, but before we tell the backend,
-	 * someone could load a backend page.  Note that we only tell the backend
-	 * about the intermediate pages - we already dealt with the edge pages
-	 * above, and the PM has the latest, dirty version of them. */
+	/* After we removed the pages from the PM, but before we tell the
+	 * backend, someone could load a backend page.  Note that we only tell
+	 * the backend about the intermediate pages - we already dealt with the
+	 * edge pages above, and the PM has the latest, dirty version of them.
+	 * */
 	f->ops->punch_hole(f, first_pg_idx << PGSHIFT,
 	                   (first_pg_idx + nr_pages) << PGSHIFT);
 }
@@ -339,8 +340,8 @@ void fs_file_truncate(struct fs_file *f, off64_t to)
 		error(EINVAL, "can't grow file to %lu bytes", to);
 	write_metadata(f, to, true);
 	if (to < old_len) {
-		/* Round up the old_len to avoid making an unnecessary partial page of
-		 * zeros at the end of the file. */
+		/* Round up the old_len to avoid making an unnecessary partial
+		 * page of zeros at the end of the file. */
 		fs_file_punch_hole(f, to, ROUNDUP(old_len, PGSIZE));
 	}
 }
@@ -370,8 +371,8 @@ size_t fs_file_read(struct fs_file *f, uint8_t *buf, size_t count,
 		nexterror();
 	}
 	while (buf < buf_end) {
-		/* Check early, so we don't load pages beyond length needlessly.  The
-		 * PM/FSF op might just create zeroed pages when asked. */
+		/* Check early, so we don't load pages beyond length needlessly.
+		 * The PM/FSF op might just create zeroed pages when asked. */
 		if (offset + so_far >= fs_file_get_length(f))
 			break;
 		pg_off = PGOFF(offset + so_far);
@@ -380,8 +381,9 @@ size_t fs_file_read(struct fs_file *f, uint8_t *buf, size_t count,
 		if (error)
 			error(-error, "read pm_load_page failed");
 		copy_amt = MIN(PGSIZE - pg_off, buf_end - buf);
-		/* Lockless peak.  Check the len so we don't read beyond EOF.  We have a
-		 * page, but we don't necessarily have access to all of it. */
+		/* Lockless peak.  Check the len so we don't read beyond EOF.
+		 * We have a page, but we don't necessarily have access to all
+		 * of it. */
 		total_remaining = fs_file_get_length(f) - (offset + so_far);
 		if (copy_amt > total_remaining) {
 			copy_amt = total_remaining;
@@ -423,7 +425,8 @@ size_t fs_file_write(struct fs_file *f, const uint8_t *buf, size_t count,
 	};
 	if (offset + count > fs_file_get_length(f)) {
 		if (!f->ops->can_grow_to(f, offset + count))
-			error(EINVAL, "can't write file to %lu bytes", offset + count);
+			error(EINVAL, "can't write file to %lu bytes", offset +
+			      count);
 	}
 	while (buf < buf_end) {
 		pg_off = PGOFF(offset + so_far);
@@ -455,8 +458,8 @@ size_t fs_file_write(struct fs_file *f, const uint8_t *buf, size_t count,
 	assert(count == so_far);
 	/* We set the len *after* writing for our lockless reads.  If we set len
 	 * before, then read() could start as soon as we loaded the page (all
-	 * zeros), but before we wrote the actual data.  They'd get zeros instead of
-	 * what we added. */
+	 * zeros), but before we wrote the actual data.  They'd get zeros
+	 * instead of what we added. */
 	write_metadata(f, offset + so_far, false);
 	poperror();
 	return so_far;
@@ -474,8 +477,8 @@ static void wstat_mode(struct fs_file *f, int new_mode)
 	}
 	if (!caller_is_username(f->dir.uid))
 		error(EPERM, "wrong user for wstat, need %s", f->dir.uid);
-	/* Only allowing changes in permissions, not random stuff like whether it is
-	 * a directory or symlink. */
+	/* Only allowing changes in permissions, not random stuff like whether
+	 * it is a directory or symlink. */
 	static_assert(!(DMMODE_BITS & S_PMASK));
 	mode = (f->dir.mode & ~S_PMASK) | (new_mode & S_PMASK);
 	WRITE_ONCE(f->dir.mode, mode);
@@ -489,9 +492,10 @@ size_t fs_file_wstat(struct fs_file *f, uint8_t *m_buf, size_t m_buf_sz)
 	struct dir *m_dir;
 	size_t m_sz;
 
-	/* common trick in wstats.  we want the dir and any strings in the M.  the
-	 * strings are smaller than the entire M (which is strings plus the real dir
-	 * M).  the strings will be placed right after the dir (dir[1]) */
+	/* common trick in wstats.  we want the dir and any strings in the M.
+	 * the strings are smaller than the entire M (which is strings plus the
+	 * real dir M).  the strings will be placed right after the dir
+	 * (dir[1]). */
 	m_dir = kzmalloc(sizeof(struct dir) + m_buf_sz, MEM_WAIT);
 	m_sz = convM2D(m_buf, m_buf_sz, &m_dir[0], (char*)&m_dir[1]);
 	if (!m_sz) {

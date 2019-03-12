@@ -67,18 +67,18 @@ void event_mbox_init(struct event_mbox *ev_mbox, int mbox_type)
 {
 	ev_mbox->type = mbox_type;
 	switch (ev_mbox->type) {
-		case (EV_MBOX_UCQ):
-			ucq_init(&ev_mbox->ucq);
-			break;
-		case (EV_MBOX_BITMAP):
-			evbitmap_init(&ev_mbox->evbm);
-			break;
-		case (EV_MBOX_CEQ):
-			ceq_init(&ev_mbox->ceq, CEQ_OR, CEQ_DEFAULT_SZ, CEQ_DEFAULT_SZ);
-			break;
-		default:
-			printf("Unknown mbox type %d!\n", ev_mbox->type);
-			break;
+	case (EV_MBOX_UCQ):
+		ucq_init(&ev_mbox->ucq);
+		break;
+	case (EV_MBOX_BITMAP):
+		evbitmap_init(&ev_mbox->evbm);
+		break;
+	case (EV_MBOX_CEQ):
+		ceq_init(&ev_mbox->ceq, CEQ_OR, CEQ_DEFAULT_SZ, CEQ_DEFAULT_SZ);
+		break;
+	default:
+		printf("Unknown mbox type %d!\n", ev_mbox->type);
+		break;
 	}
 }
 
@@ -86,9 +86,9 @@ void event_mbox_init(struct event_mbox *ev_mbox, int mbox_type)
  * aren't in use (unregistered, etc). (TODO: consider some checks for this) */
 void put_eventq_raw(struct event_queue *ev_q)
 {
-	/* if we use something other than malloc, we'll need to be aware that ev_q
-	 * is actually an event_queue_big.  One option is to use the flags, though
-	 * this could be error prone. */
+	/* if we use something other than malloc, we'll need to be aware that
+	 * ev_q is actually an event_queue_big.  One option is to use the flags,
+	 * though this could be error prone. */
 	free(ev_q);
 }
 
@@ -101,18 +101,18 @@ void put_eventq(struct event_queue *ev_q)
 void event_mbox_cleanup(struct event_mbox *ev_mbox)
 {
 	switch (ev_mbox->type) {
-		case (EV_MBOX_UCQ):
-			ucq_free_pgs(&ev_mbox->ucq);
-			break;
-		case (EV_MBOX_BITMAP):
-			evbitmap_cleanup(&ev_mbox->evbm);
-			break;
-		case (EV_MBOX_CEQ):
-			ceq_cleanup(&ev_mbox->ceq);
-			break;
-		default:
-			printf("Unknown mbox type %d!\n", ev_mbox->type);
-			break;
+	case (EV_MBOX_UCQ):
+		ucq_free_pgs(&ev_mbox->ucq);
+		break;
+	case (EV_MBOX_BITMAP):
+		evbitmap_cleanup(&ev_mbox->evbm);
+		break;
+	case (EV_MBOX_CEQ):
+		ceq_cleanup(&ev_mbox->ceq);
+		break;
+	default:
+		printf("Unknown mbox type %d!\n", ev_mbox->type);
+		break;
 	}
 }
 
@@ -140,8 +140,8 @@ struct event_queue *get_eventq_vcpd(uint32_t vcoreid, int ev_flags)
 
 void put_eventq_slim(struct event_queue *ev_q)
 {
-	/* if we use something other than malloc, we'll need to be aware that ev_q
-	 * is not an event_queue_big. */
+	/* if we use something other than malloc, we'll need to be aware that
+	 * ev_q is not an event_queue_big. */
 	free(ev_q);
 }
 
@@ -161,6 +161,7 @@ void register_kevent_q(struct event_queue *ev_q, unsigned int ev_type)
 struct event_queue *clear_kevent_q(unsigned int ev_type)
 {
 	struct event_queue *ev_q = __procdata.kernel_evts[ev_type];
+
 	__procdata.kernel_evts[ev_type] = 0;
 	return ev_q;
 }
@@ -175,6 +176,7 @@ struct event_queue *clear_kevent_q(unsigned int ev_type)
 void enable_kevent(unsigned int ev_type, uint32_t vcoreid, int ev_flags)
 {
 	struct event_queue *ev_q = get_eventq_vcpd(vcoreid, ev_flags);
+
 	ev_q->ev_flags = ev_flags;
 	ev_q->ev_vcore = vcoreid;
 	ev_q->ev_handler = 0;
@@ -215,19 +217,22 @@ unsigned int get_event_type(struct event_mbox *ev_mbox)
 bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
 {
 	int old_flags;
+
 	sysc->ev_q = ev_q;
 	wrmb();	/* don't let that write pass any future reads (flags) */
-	/* Try and set the SC_UEVENT flag (so the kernel knows to look at ev_q) */
+	/* Try and set the SC_UEVENT flag (so the kernel knows to look at ev_q)
+	 */
 	do {
 		/* no cmb() needed, the atomic_read will reread flags */
 		old_flags = atomic_read(&sysc->flags);
 		/* Spin if the kernel is mucking with syscall flags */
 		while (old_flags & SC_K_LOCK)
 			old_flags = atomic_read(&sysc->flags);
-		/* If the kernel finishes while we are trying to sign up for an event,
-		 * we need to bail out */
+		/* If the kernel finishes while we are trying to sign up for an
+		 * event, we need to bail out */
 		if (old_flags & (SC_DONE | SC_PROGRESS)) {
-			sysc->ev_q = 0;		/* not necessary, but might help with bugs */
+			/* not necessary, but might help with bugs */
+			sysc->ev_q = 0;
 			return FALSE;
 		}
 	} while (!atomic_cas(&sysc->flags, old_flags, old_flags | SC_UEVENT));
@@ -248,6 +253,7 @@ bool register_evq(struct syscall *sysc, struct event_queue *ev_q)
 void deregister_evq(struct syscall *sysc)
 {
 	int old_flags;
+
 	sysc->ev_q = 0;
 	wrmb();	/* don't let that write pass any future reads (flags) */
 	/* Try and unset the SC_UEVENT flag */
@@ -257,8 +263,8 @@ void deregister_evq(struct syscall *sysc)
 		/* Spin if the kernel is mucking with syscall flags */
 		while (old_flags & SC_K_LOCK)
 			old_flags = atomic_read(&sysc->flags);
-		/* Note we don't care if the SC_DONE flag is getting set.  We just need
-		 * to avoid clobbering flags */
+		/* Note we don't care if the SC_DONE flag is getting set.  We
+		 * just need to avoid clobbering flags */
 	} while (!atomic_cas(&sysc->flags, old_flags, old_flags & ~SC_UEVENT));
 }
 
@@ -298,6 +304,7 @@ int deregister_ev_handler(unsigned int ev_type, handle_event_t handler,
 static void run_ev_handlers(unsigned int ev_type, struct event_msg *ev_msg)
 {
 	struct ev_handler *handler;
+
 	/* TODO: RCU read lock */
 	handler = ev_handlers[ev_type];
 	while (handler) {
@@ -311,15 +318,15 @@ static void run_ev_handlers(unsigned int ev_type, struct event_msg *ev_msg)
 bool extract_one_mbox_msg(struct event_mbox *ev_mbox, struct event_msg *ev_msg)
 {
 	switch (ev_mbox->type) {
-		case (EV_MBOX_UCQ):
-			return get_ucq_msg(&ev_mbox->ucq, ev_msg);
-		case (EV_MBOX_BITMAP):
-			return get_evbitmap_msg(&ev_mbox->evbm, ev_msg);
-		case (EV_MBOX_CEQ):
-			return get_ceq_msg(&ev_mbox->ceq, ev_msg);
-		default:
-			printf("Unknown mbox type %d!\n", ev_mbox->type);
-			return FALSE;
+	case (EV_MBOX_UCQ):
+		return get_ucq_msg(&ev_mbox->ucq, ev_msg);
+	case (EV_MBOX_BITMAP):
+		return get_evbitmap_msg(&ev_mbox->evbm, ev_msg);
+	case (EV_MBOX_CEQ):
+		return get_ceq_msg(&ev_mbox->ceq, ev_msg);
+	default:
+		printf("Unknown mbox type %d!\n", ev_mbox->type);
+		return FALSE;
 	}
 }
 
@@ -328,6 +335,7 @@ int handle_one_mbox_msg(struct event_mbox *ev_mbox)
 {
 	struct event_msg local_msg;
 	unsigned int ev_type;
+
 	/* extract returns TRUE on success, we return 1. */
 	if (!extract_one_mbox_msg(ev_mbox, &local_msg))
 		return 0;
@@ -344,7 +352,8 @@ int handle_one_mbox_msg(struct event_mbox *ev_mbox)
 int handle_mbox(struct event_mbox *ev_mbox)
 {
 	int retval = 0;
-	printd("[event] handling ev_mbox %08p on vcore %d\n", ev_mbox, vcore_id());
+	printd("[event] handling ev_mbox %08p on vcore %d\n", ev_mbox,
+	       vcore_id());
 	/* Some stack-smashing bugs cause this to fail */
 	assert(ev_mbox);
 	/* Handle all full messages, tracking if we do at least one. */
@@ -357,15 +366,15 @@ int handle_mbox(struct event_mbox *ev_mbox)
 bool mbox_is_empty(struct event_mbox *ev_mbox)
 {
 	switch (ev_mbox->type) {
-		case (EV_MBOX_UCQ):
-			return ucq_is_empty(&ev_mbox->ucq);
-		case (EV_MBOX_BITMAP):
-			return evbitmap_is_empty(&ev_mbox->evbm);
-		case (EV_MBOX_CEQ):
-			return ceq_is_empty(&ev_mbox->ceq);
-		default:
-			printf("Unknown mbox type %d!\n", ev_mbox->type);
-			return FALSE;
+	case (EV_MBOX_UCQ):
+		return ucq_is_empty(&ev_mbox->ucq);
+	case (EV_MBOX_BITMAP):
+		return evbitmap_is_empty(&ev_mbox->evbm);
+	case (EV_MBOX_CEQ):
+		return ceq_is_empty(&ev_mbox->ceq);
+	default:
+		printf("Unknown mbox type %d!\n", ev_mbox->type);
+		return FALSE;
 	}
 }
 
@@ -373,20 +382,22 @@ bool mbox_is_empty(struct event_mbox *ev_mbox)
 void handle_ev_ev(struct event_msg *ev_msg, unsigned int ev_type, void *data)
 {
 	struct event_queue *ev_q;
-	/* EV_EVENT can't handle not having a message / being a bit.  If we got a
-	 * bit message, it's a bug somewhere */
+
+	/* EV_EVENT can't handle not having a message / being a bit.  If we got
+	 * a bit message, it's a bug somewhere */
 	assert(ev_msg);
 	ev_q = ev_msg->ev_arg3;
-	/* Same deal, a null ev_q is probably a bug, or someone being a jackass */
+	/* Same deal, a null ev_q is probably a bug, or someone being a jackass
+	 */
 	assert(ev_q);
-	/* Clear pending, so we can start getting INDIRs and IPIs again.  We must
-	 * set this before (compared to handle_events, then set it, then handle
-	 * again), since there is no guarantee handle_event_q() will return.  If
-	 * there is a pending preemption, the vcore quickly yields and will deal
-	 * with the remaining events in the future - meaning it won't return to
-	 * here. */
+	/* Clear pending, so we can start getting INDIRs and IPIs again.  We
+	 * must set this before (compared to handle_events, then set it, then
+	 * handle again), since there is no guarantee handle_event_q() will
+	 * return.  If there is a pending preemption, the vcore quickly yields
+	 * and will deal with the remaining events in the future - meaning it
+	 * won't return to here. */
 	ev_q->ev_alert_pending = FALSE;
-	wmb();	/* don't let the pending write pass the signaling of an ev recv */
+	wmb();/* don't let the pending write pass the signaling of an ev recv */
 	handle_event_q(ev_q);
 }
 
@@ -402,6 +413,7 @@ int handle_events(uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	int retval = 0;
+
 	vcpd->notif_pending = FALSE;
 	wrmb();	/* prevent future reads from happening before notif_p write */
 	retval += handle_mbox(&vcpd->ev_mbox_private);
@@ -422,7 +434,8 @@ void handle_event_q(struct event_queue *ev_q)
 	}
 	/* Raw ev_qs that haven't been connected to an mbox, user bug: */
 	assert(ev_q->ev_mbox);
-	/* The "default" ev_handler, common enough that I don't want a func ptr */
+	/* The "default" ev_handler, common enough that I don't want a func ptr
+	 */
 	handle_mbox(ev_q->ev_mbox);
 }
 
@@ -434,12 +447,13 @@ void handle_event_q(struct event_queue *ev_q)
 void send_self_vc_msg(struct event_msg *ev_msg)
 {
 	// TODO: try to use UCQs (requires additional support)
-	/* ev_type actually gets ignored currently.  ev_msg is what matters if it is
-	 * non-zero.  FALSE means it's going to the public mbox */
+	/* ev_type actually gets ignored currently.  ev_msg is what matters if
+	 * it is non-zero.  FALSE means it's going to the public mbox */
 	sys_self_notify(vcore_id(), ev_msg->ev_type, ev_msg, FALSE);
 }
 
-/* Helper: makes the current core handle a remote vcore's VCPD public mbox events.
+/* Helper: makes the current core handle a remote vcore's VCPD public mbox
+ * events.
  *
  * Both cases (whether we are handling someone else's already or not) use some
  * method of telling our future self what to do.  When we aren't already
@@ -462,7 +476,7 @@ void handle_vcpd_mbox(uint32_t rem_vcoreid)
 	uint32_t vcoreid = vcore_id();
 	struct preempt_data *vcpd = vcpd_of(vcoreid);
 	struct event_msg local_msg = {0};
-	assert(vcoreid != rem_vcoreid);			/* this shouldn't happen */
+	assert(vcoreid != rem_vcoreid);
 	/* If they are empty, then we're done */
 	if (mbox_is_empty(&vcpd_of(rem_vcoreid)->ev_mbox_public))
 		return;
@@ -470,8 +484,8 @@ void handle_vcpd_mbox(uint32_t rem_vcoreid)
 		/* we might be already handling them, in which case, abort */
 		if (__vc_rem_vcoreid == rem_vcoreid)
 			return;
-		/* Already handling message for someone, need to send ourselves a
-		 * message to check rem_vcoreid, which we'll process later. */
+		/* Already handling message for someone, need to send ourselves
+		 * a message to check rem_vcoreid, which we'll process later. */
 		local_msg.ev_type = EV_CHECK_MSGS;
 		local_msg.ev_arg2 = rem_vcoreid;	/* 32bit arg */
 		send_self_vc_msg(&local_msg);
@@ -494,9 +508,10 @@ void try_handle_remote_mbox(void)
 {
 	if (__vc_handle_an_mbox) {
 		handle_mbox(&vcpd_of(__vc_rem_vcoreid)->ev_mbox_public);
-		/* only clear the flag when we have returned from handling messages.  if
-		 * an event handler (like preempt_recover) doesn't return, we'll clear
-		 * this flag elsewhere. (it's actually not a big deal if we don't). */
+		/* only clear the flag when we have returned from handling
+		 * messages.  if an event handler (like preempt_recover) doesn't
+		 * return, we'll clear this flag elsewhere. (it's actually not a
+		 * big deal if we don't). */
 		cmb();
 		__vc_handle_an_mbox = FALSE;
 	}
@@ -517,16 +532,19 @@ bool ev_might_not_return(void)
 	struct event_msg local_msg = {0};
 	bool were_handling_remotes = FALSE;
 	if (__vc_handle_an_mbox) {
-		/* slight chance we finished with their mbox (were on the last one) */
-		if (!mbox_is_empty(&vcpd_of(__vc_rem_vcoreid)->ev_mbox_public)) {
+		/* slight chance we finished with their mbox (were on the last
+		 * one) */
+		if (!mbox_is_empty(&vcpd_of(__vc_rem_vcoreid)->ev_mbox_public))
+		{
 			/* But we aren't, so we'll need to send a message */
 			local_msg.ev_type = EV_CHECK_MSGS;
 			local_msg.ev_arg2 = __vc_rem_vcoreid;	/* 32bit arg */
 			send_self_vc_msg(&local_msg);
 		}
-		/* Either way, we're not working on this one now.  Note this is more of
-		 * an optimization - it'd be harmless (I think) to poll another vcore's
-		 * pub mbox once when we pop up in vc_entry in the future */
+		/* Either way, we're not working on this one now.  Note this is
+		 * more of an optimization - it'd be harmless (I think) to poll
+		 * another vcore's pub mbox once when we pop up in vc_entry in
+		 * the future */
 		__vc_handle_an_mbox = FALSE;
 		return TRUE;
 	}
@@ -595,11 +613,11 @@ TAILQ_HEAD(wait_link_tailq, evq_wait_link);
  * written to by handlers.  The tailq is only used by the uthread.  blocked is
  * never concurrently *written*; see __uth_wakeup_poke() for details. */
 struct uth_sleep_ctlr {
-	struct uthread				*uth;
+	struct uthread			*uth;
 	struct spin_pdr_lock		in_use;
-	bool						check_evqs;
-	bool						blocked;
-	struct poke_tracker			poker;
+	bool				check_evqs;
+	bool				blocked;
+	struct poke_tracker		poker;
 	struct wait_link_tailq		evqs;
 };
 
@@ -626,14 +644,15 @@ struct evq_wait_link {
 static void __uth_wakeup_poke(void *arg)
 {
 	struct uth_sleep_ctlr *uctlr = arg;
+
 	/* There are no concurrent writes to 'blocked'.  Blocked is only ever
 	 * written when the uth sleeps and only ever cleared here.  Once the uth
 	 * writes it, it does not write it again until after we clear it.
 	 *
-	 * This is still racy - we could see !blocked, then blocked gets set.  In
-	 * that case, the poke failed, and that is harmless.  The uth will see
-	 * 'check_evqs', which was set before poke, which would be before writing
-	 * blocked, and the uth checks 'check_evqs' after writing. */
+	 * This is still racy - we could see !blocked, then blocked gets set.
+	 * In that case, the poke failed, and that is harmless.  The uth will
+	 * see 'check_evqs', which was set before poke, which would be before
+	 * writing blocked, and the uth checks 'check_evqs' after writing. */
 	if (uctlr->blocked) {
 		uctlr->blocked = FALSE;
 		cmb();	/* clear blocked before starting the uth */
@@ -665,10 +684,11 @@ void evq_wakeup_handler(struct event_queue *ev_q)
 {
 	struct evq_wakeup_ctlr *ectlr = ev_q->ev_udata;
 	struct evq_wait_link *i;
+
 	assert(ectlr);
 	spin_pdr_lock(&ectlr->lock);
-	/* Note we wake up all sleepers, even though only one is likely to get the
-	 * message.  See the notes in unlink_ectlr() for more info. */
+	/* Note we wake up all sleepers, even though only one is likely to get
+	 * the message.  See the notes in unlink_ectlr() for more info. */
 	TAILQ_FOREACH(i, &ectlr->waiters, link_evq) {
 		i->uth_ctlr->check_evqs = TRUE;
 		cmb();	/* order check write before poke (poke has atomic) */
@@ -681,6 +701,7 @@ void evq_wakeup_handler(struct event_queue *ev_q)
 void evq_attach_wakeup_ctlr(struct event_queue *ev_q)
 {
 	struct evq_wakeup_ctlr *ectlr = malloc(sizeof(struct evq_wakeup_ctlr));
+
 	memset(ectlr, 0, sizeof(struct evq_wakeup_ctlr));
 	spin_pdr_init(&ectlr->lock);
 	TAILQ_INIT(&ectlr->waiters);
@@ -702,7 +723,8 @@ static void link_uctlr_ectlr(struct uth_sleep_ctlr *uctlr,
 	/* No lock needed for the uctlr; we're the only one modifying evqs */
 	link->uth_ctlr = uctlr;
 	TAILQ_INSERT_HEAD(&uctlr->evqs, link, link_uth);
-	/* Once we add ourselves to the ectrl list, we could start getting poked */
+	/* Once we add ourselves to the ectrl list, we could start getting poked
+	 */
 	link->evq_ctlr = ectlr;
 	spin_pdr_lock(&ectlr->lock);
 	TAILQ_INSERT_HEAD(&ectlr->waiters, link, link_evq);
@@ -723,6 +745,7 @@ static void link_uctlr_ectlr(struct uth_sleep_ctlr *uctlr,
 static void unlink_ectlr(struct evq_wait_link *link)
 {
 	struct evq_wakeup_ctlr *ectlr = link->evq_ctlr;
+
 	spin_pdr_lock(&ectlr->lock);
 	TAILQ_REMOVE(&ectlr->waiters, link, link_evq);
 	spin_pdr_unlock(&ectlr->lock);
@@ -737,6 +760,7 @@ static bool extract_evqs_msg(struct event_queue *evqs[], size_t nr_evqs,
 {
 	struct event_queue *evq_i;
 	bool ret = FALSE;
+
 	/* We need to have notifs disabled when extracting messages from some
 	 * mboxes.  Many mboxes have some form of busy waiting between consumers
 	 * (userspace).  If we're just a uthread, we could wind up on a runqueue
@@ -764,8 +788,8 @@ static void __uth_blockon_evq_cb(struct uthread *uth, void *arg)
 	cmb();	/* actually block before saying 'blocked' */
 	uctlr->blocked = TRUE;	/* can be woken up now */
 	wrmb();	/* write 'blocked' before read 'check_evqs' */
-	/* If someone set check_evqs, we should wake up.  We're competing with other
-	 * wakers via poke (we may have already woken up!). */
+	/* If someone set check_evqs, we should wake up.  We're competing with
+	 * other wakers via poke (we may have already woken up!). */
 	if (uctlr->check_evqs)
 		poke(&uctlr->poker, uctlr);
 	/* Once we say we're blocked, we could be woken up (possibly by our poke
@@ -783,9 +807,9 @@ void uth_blockon_evqs_arr(struct event_msg *ev_msg,
 	struct uth_sleep_ctlr uctlr;
 	struct evq_wait_link linkage[nr_evqs];
 
-	/* Catch user mistakes.  If they lack a handler, they didn't attach.  They
-	 * are probably using our evq_wakeup_handler, but they might have their own
-	 * wrapper function. */
+	/* Catch user mistakes.  If they lack a handler, they didn't attach.
+	 * They are probably using our evq_wakeup_handler, but they might have
+	 * their own wrapper function. */
 	for (int i = 0; i < nr_evqs; i++)
 		assert(evqs[i]->ev_handler);
 	/* Check for activity on the evqs before going through the hassle of
@@ -795,30 +819,35 @@ void uth_blockon_evqs_arr(struct event_msg *ev_msg,
 	uth_sleep_ctlr_init(&uctlr, current_uthread);
 	memset(linkage, 0, sizeof(struct evq_wait_link) * nr_evqs);
 	for (int i = 0; i < nr_evqs; i++)
-		link_uctlr_ectlr(&uctlr, (struct evq_wakeup_ctlr*)evqs[i]->ev_udata,
+		link_uctlr_ectlr(&uctlr,
+				 (struct evq_wakeup_ctlr*)evqs[i]->ev_udata,
 		                 &linkage[i]);
-	/* Mesa-style sleep until we get a message.  Mesa helps a bit here, since we
-	 * can just deregister from them all when we're done.  o/w it is tempting to
-	 * have us deregister from *the* one in the handler and extract the message
-	 * there; which can be tricky and harder to reason about. */
+	/* Mesa-style sleep until we get a message.  Mesa helps a bit here,
+	 * since we can just deregister from them all when we're done.  o/w it
+	 * is tempting to have us deregister from *the* one in the handler and
+	 * extract the message there; which can be tricky and harder to reason
+	 * about. */
 	while (1) {
-		/* We need to make sure only one 'version/ctx' of this thread is active
-		 * at a time.  Later on, we'll unlock in vcore ctx on the other side of
-		 * a yield.  We could restart from the yield, return, and free the uctlr
-		 * before that ctx has a chance to finish. */
+		/* We need to make sure only one 'version/ctx' of this thread is
+		 * active at a time.  Later on, we'll unlock in vcore ctx on the
+		 * other side of a yield.  We could restart from the yield,
+		 * return, and free the uctlr before that ctx has a chance to
+		 * finish. */
 		spin_pdr_lock(&uctlr.in_use);
-		/* We're signed up.  We might already have been told to check the evqs,
-		 * or there could be messages still sitting in the evqs.  check_evqs is
-		 * only ever cleared here, and only ever set in evq handlers. */
+		/* We're signed up.  We might already have been told to check
+		 * the evqs, or there could be messages still sitting in the
+		 * evqs.  check_evqs is only ever cleared here, and only ever
+		 * set in evq handlers. */
 		uctlr.check_evqs = FALSE;
 		cmb();	/* look for messages after clearing check_evqs */
 		if (extract_evqs_msg(evqs, nr_evqs, ev_msg, which_evq))
 			break;
 		uthread_yield(TRUE, __uth_blockon_evq_cb, &uctlr);
 	}
-	/* On the one hand, it's not necessary to unlock, since the memory will be
-	 * freed.  But we do need to go through the process to turn on notifs and
-	 * adjust the notif_disabled_depth for the case where we don't yield. */
+	/* On the one hand, it's not necessary to unlock, since the memory will
+	 * be freed.  But we do need to go through the process to turn on notifs
+	 * and adjust the notif_disabled_depth for the case where we don't
+	 * yield. */
 	spin_pdr_unlock(&uctlr.in_use);
 	for (int i = 0; i < nr_evqs; i++)
 		unlink_ectlr(&linkage[i]);
@@ -833,6 +862,7 @@ void uth_blockon_evqs(struct event_msg *ev_msg, struct event_queue **which_evq,
 {
 	struct event_queue *evqs[nr_evqs];
 	va_list va;
+
 	va_start(va, nr_evqs);
 	for (int i = 0; i < nr_evqs; i++)
 		evqs[i] = va_arg(va, struct event_queue *);
@@ -849,6 +879,7 @@ bool uth_check_evqs(struct event_msg *ev_msg, struct event_queue **which_evq,
 {
 	struct event_queue *evqs[nr_evqs];
 	va_list va;
+
 	va_start(va, nr_evqs);
 	for (int i = 0; i < nr_evqs; i++)
 		evqs[i] = va_arg(va, struct event_queue *);

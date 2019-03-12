@@ -160,13 +160,13 @@ typedef struct x86_pgdir {
 /* The kernel needs to be loaded in the top 2 GB of memory, since we compile it
  * with -mcmodel=kernel (helps with relocations).  We're actually loading it in
  * the top 1 GB. */
-#define KERN_LOAD_ADDR  0xffffffffc0000000
+#define KERN_LOAD_ADDR  	0xffffffffc0000000
 /* Static kernel mappings */
 #define APIC_SIZE 		0x100000
 #define IOAPIC_BASE		(KERN_LOAD_ADDR - APIC_SIZE)
 /* This is the range of the dynamic virtual mappings. */
-#define KERN_DYN_TOP	0xffffffff80000000
-#define KERN_DYN_BOT	0xfffffff000000000
+#define KERN_DYN_TOP		0xffffffff80000000
+#define KERN_DYN_BOT		0xfffffff000000000
 
 /* Virtual page table.  Every PML4 has a PTE at the slot (PML4(VPT))
  * corresponding to VPT that points to that PML4's base.  In essence, the 512
@@ -183,7 +183,7 @@ typedef struct x86_pgdir {
  * PML4 (using PML3(va)), say 9 bits = "9X".  The VA 9v9v9v9X000 will map to
  * that PML3. */
 #define VPT_TOP			0xffffff0000000000
-#define VPT				(VPT_TOP - PML4_PTE_REACH)
+#define VPT			(VPT_TOP - PML4_PTE_REACH)
 /* Helper to return the current outer pgdir via the VPT mapping. */
 #define PML4_VIA_VPT (VPT + ((VPT & 0x0000ffffffffffff) >> 9) +                \
                      ((VPT & 0x0000ffffffffffff) >> 18) +                      \
@@ -192,11 +192,11 @@ typedef struct x86_pgdir {
 /* Top of the kernel virtual mapping area (KERNBASE) */
 #define KERN_VMAP_TOP	(VPT)
 /* Base of the physical memory map. This maps from 0 physical to max_paddr */
-#define KERNBASE        0xffff800000000000
+#define KERNBASE 		0xffff800000000000
 
 /* Highest user address: 0x00007fffffffffff: 1 zero, 47 ones, sign extended.
  * From here down to UWLIM is User Read-only */
-#define ULIM            0x0000800000000000
+#define ULIM			0x0000800000000000
 /* Same as VPT but read-only for users */
 #define UVPT			(ULIM - PML4_PTE_REACH)
 /* Arbitrary boundary between the break and the start of
@@ -231,7 +231,7 @@ typedef struct x86_pgdir {
 #define PML3_SHIFT		30
 #define PML2_SHIFT		21
 #define PML1_SHIFT		12
-#define BITS_PER_PML	9
+#define BITS_PER_PML		9
 
 /* PTE reach is the amount of VM an entry can map, either as a jumbo or as
  * further page tables.  I'd like to write these as shifts, but I can't please
@@ -260,7 +260,7 @@ typedef struct x86_pgdir {
 #define PGSHIFT			PML1_SHIFT
 #define PGSIZE			PML1_PTE_REACH
 #define LA2PPN(la)		((uintptr_t)(la) >> PGSHIFT)
-#define PTE2PPN(pte)	LA2PPN(pte)
+#define PTE2PPN(pte)		LA2PPN(pte)
 #define PGOFF(la)		((uintptr_t)(la) & (PGSIZE - 1))
 #define NPTENTRIES		512
 
@@ -287,7 +287,7 @@ typedef struct x86_pgdir {
 #define __PTE_JPAT		(1 << 12)	/* Jumbo PAT */
 #define PTE_XD			(1 << 63)	/* Execute disabled */
 #define PTE_NOCACHE		(__PTE_PWT | __PTE_PCD)
-#define PTE_WRITECOMB	(__PTE_PCD)
+#define PTE_WRITECOMB		(__PTE_PCD)
 
 /* Permissions fields and common access modes.  These should be read as 'just
  * kernel or user too' and 'RO or RW'.  USER_RO means read-only for everyone. */
@@ -339,39 +339,39 @@ typedef struct x86_pgdir {
 /* 64 bit code segment.  This is for long mode, no compatibility.  If we want
  * to support 32 bit apps later, we'll want to adjust this. */
 #define SEG_CODE_64(dpl)                                                    \
-	.word 0, 0;                                                             \
-	.byte 0;                                                                \
-	.byte (((1/*p*/) << 7) | ((dpl) << 5) | 0x18 | ((0/*c*/) << 2));        \
-	.byte (((0/*d*/) << 6) | ((1/*l*/) << 5));                              \
+	.word 0, 0;                                                         \
+	.byte 0;                                                            \
+	.byte (((1/*p*/) << 7) | ((dpl) << 5) | 0x18 | ((0/*c*/) << 2));    \
+	.byte (((0/*d*/) << 6) | ((1/*l*/) << 5));                          \
 	.byte 0;
 
 /* 64 bit data segment.  These are pretty much completely ignored (except if we
  * use them for fs/gs, or compatibility mode */
 #define SEG_DATA_64(dpl)                                                    \
-	.word 0xffff, 0;                                                        \
-	.byte 0;                                                                \
-	.byte (0x92 | ((dpl) << 5));                                            \
-	.byte 0x8f;                                                             \
+	.word 0xffff, 0;                                                    \
+	.byte 0;                                                            \
+	.byte (0x92 | ((dpl) << 5));                                        \
+	.byte 0x8f;                                                         \
 	.byte 0;
 
 /* System segments (TSS/LDT) are twice as long as usual (16 bytes). */
 #define SEG_SYS_64(type, base, lim, dpl)                                       \
-	.word ((lim) & 0xffff);                                                    \
-	.word ((base) & 0xffff);                                                   \
-	.byte (((base) >> 16) & 0xff);                                             \
-	.byte ((1 << 7) | ((dpl) << 5) | (type));                                  \
-	.byte (((1/*g*/) << 7) | (((lim) >> 16) & 0xf));                           \
-	.byte (((base) >> 24) & 0xff);                                             \
-	.quad ((base) >> 32);                                                      \
+	.word ((lim) & 0xffff);                                                \
+	.word ((base) & 0xffff);                                               \
+	.byte (((base) >> 16) & 0xff);                                         \
+	.byte ((1 << 7) | ((dpl) << 5) | (type));                              \
+	.byte (((1/*g*/) << 7) | (((lim) >> 16) & 0xf));                       \
+	.byte (((base) >> 24) & 0xff);                                         \
+	.quad ((base) >> 32);                                                  \
 	.quad 0;
 
 /* Default segment (32 bit style).  Would work for fs/gs, if needed */
 #define SEG(type, base, lim)                                                \
-	.word (((lim) >> 12) & 0xffff);                                         \
-	.word ((base) & 0xffff);                                                \
-	.byte (((base) >> 16) & 0xff);                                          \
-	.byte (0x90 | (type));                                                  \
-	.byte (0xC0 | (((lim) >> 28) & 0xf));                                   \
+	.word (((lim) >> 12) & 0xffff);                                     \
+	.word ((base) & 0xffff);                                            \
+	.byte (((base) >> 16) & 0xff);                                      \
+	.byte (0x90 | (type));                                              \
+	.byte (0xC0 | (((lim) >> 28) & 0xf));                               \
 	.byte (((base) >> 24) & 0xff)
 
 #else	// not __ASSEMBLER__
@@ -399,16 +399,16 @@ struct x86_sysseg64 {
 	unsigned sd_base_15_0 : 16;	/* Low bits of segment base address */
 	unsigned sd_base_23_16 : 8;	/* Middle bits of segment base address */
 	unsigned sd_type : 4;		/* Segment type (see STS_ constants) */
-	unsigned sd_s : 1;			/* 0 = system, 1 = application */
+	unsigned sd_s : 1;		/* 0 = system, 1 = application */
 	unsigned sd_dpl : 2;		/* Descriptor Privilege Level */
-	unsigned sd_p : 1;			/* Present */
+	unsigned sd_p : 1;		/* Present */
 	unsigned sd_lim_19_16 : 4;	/* High bits of segment limit */
-	unsigned sd_avl : 1;		/* Unused (available for software use) */
+	unsigned sd_avl : 1;		/* Unused (available for software ) */
 	unsigned sd_rsv2 : 2;		/* Reserved */
-	unsigned sd_g : 1;			/* Granularity: limit scaled by 4K when set */
+	unsigned sd_g : 1;	/* Granularity: limit scaled by 4K when set */
 	unsigned sd_base_31_24 : 8;	/* 24-31 bits of segment base address */
 	unsigned sd_base_63_32;		/* top 32 bits of the base */
-	unsigned sd_reserved;		/* some parts must be zero, just zero it all */
+	unsigned sd_reserved;	/* some parts must be zero, just zero it all */
 };
 typedef struct x86_sysseg64 syssegdesc_t;
 
@@ -432,36 +432,36 @@ typedef struct x86_sysseg64 syssegdesc_t;
 
 /* 64 bit task state segment (AMD 2:12.2.5) */
 typedef struct taskstate {
-	uint32_t					ts_rsv1;	/* reserved / ignored */
-	uint64_t					ts_rsp0;	/* stack ptr in ring 0 */
-	uint64_t					ts_rsp1;	/* stack ptr in ring 1 */
-	uint64_t					ts_rsp2;	/* stack ptr in ring 2 */
-	uint64_t					ts_rsv2;	/* reserved / ignored */
-	uint64_t					ts_ist1;	/* IST stacks: unconditional rsp */
-	uint64_t					ts_ist2;	/* check AMD 2:8.9.4 for info */
-	uint64_t					ts_ist3;
-	uint64_t					ts_ist4;
-	uint64_t					ts_ist5;
-	uint64_t					ts_ist6;
-	uint64_t					ts_ist7;
-	uint64_t					ts_rsv3;	/* reserved / ignored */
-	uint16_t					ts_rsv4;	/* reserved / ignored */
-	uint16_t					ts_iobm;	/* IO base map (offset) */
+	uint32_t		ts_rsv1;	/* reserved / ignored */
+	uint64_t		ts_rsp0;	/* stack ptr in ring 0 */
+	uint64_t		ts_rsp1;	/* stack ptr in ring 1 */
+	uint64_t		ts_rsp2;	/* stack ptr in ring 2 */
+	uint64_t		ts_rsv2;	/* reserved / ignored */
+	uint64_t		ts_ist1;	/* IST: unconditional rsp */
+	uint64_t		ts_ist2;	/* check AMD 2:8.9.4 for info */
+	uint64_t		ts_ist3;
+	uint64_t		ts_ist4;
+	uint64_t		ts_ist5;
+	uint64_t		ts_ist6;
+	uint64_t		ts_ist7;
+	uint64_t		ts_rsv3;	/* reserved / ignored */
+	uint16_t		ts_rsv4;	/* reserved / ignored */
+	uint16_t		ts_iobm;	/* IO base map (offset) */
 } __attribute__((packed)) taskstate_t;
 
 /* 64 bit gate descriptors for interrupts and traps */
 typedef struct Gatedesc {
 	unsigned gd_off_15_0 : 16;	/* low 16 bits of offset in segment */
 	unsigned gd_ss : 16;		/* segment selector */
-	unsigned gd_ist : 3;		/* interrupt stack table selector (0 = none) */
+	unsigned gd_ist : 3;	/* interrupt stack table selector (0 = none) */
 	unsigned gd_rsv1 : 5;		/* ignored */
 	unsigned gd_type : 4;		/* type(STS_{TG,IG32,TG32}) */
-	unsigned gd_s : 1;			/* must be 0 (system) */
-	unsigned gd_dpl : 2;		/* DPL - highest ring allowed to use this */
-	unsigned gd_p : 1;			/* Present */
+	unsigned gd_s : 1;		/* must be 0 (system) */
+	unsigned gd_dpl : 2;	/* DPL - highest ring allowed to use this */
+	unsigned gd_p : 1;		/* Present */
 	unsigned gd_off_31_16 : 16;	/* 16-31 bits of offset in segment */
 	unsigned gd_off_63_32;		/* top 32 bits of offset */
-	unsigned gd_rsv2;			/* reserved / unsused */
+	unsigned gd_rsv2;		/* reserved / unsused */
 } gatedesc_t;
 
 /* Set up an IST-capable 64 bit interrupt/trap gate descriptor.  IST selects a
@@ -469,17 +469,17 @@ typedef struct Gatedesc {
  * unconditionally when we hit this gate  - regardless of privelege change. */
 #define SETGATE64(gate, istrap, sel, off, dpl, ist)                            \
 {                                                                              \
-	(gate).gd_off_15_0 = (uintptr_t) (off) & 0xffff;                           \
-	(gate).gd_ss = (sel);                                                      \
-	(gate).gd_ist = (ist);                                                     \
-	(gate).gd_rsv1 = 0;                                                        \
-	(gate).gd_type = (istrap) ? STS_TG32 : STS_IG32;                           \
-	(gate).gd_s = 0;                                                           \
-	(gate).gd_dpl = (dpl);                                                     \
-	(gate).gd_p = 1;                                                           \
-	(gate).gd_off_31_16 = (uintptr_t) (off) >> 16;                             \
-	(gate).gd_off_63_32 = (uintptr_t) (off) >> 32;                             \
-	(gate).gd_rsv2 = 0;                                                        \
+	(gate).gd_off_15_0 = (uintptr_t) (off) & 0xffff;                       \
+	(gate).gd_ss = (sel);                                                  \
+	(gate).gd_ist = (ist);                                                 \
+	(gate).gd_rsv1 = 0;                                                    \
+	(gate).gd_type = (istrap) ? STS_TG32 : STS_IG32;                       \
+	(gate).gd_s = 0;                                                       \
+	(gate).gd_dpl = (dpl);                                                 \
+	(gate).gd_p = 1;                                                       \
+	(gate).gd_off_31_16 = (uintptr_t) (off) >> 16;                         \
+	(gate).gd_off_63_32 = (uintptr_t) (off) >> 32;                         \
+	(gate).gd_rsv2 = 0;                                                    \
 }
 
 /* Set up a normal, 64 bit interrupt/trap gate descriptor.

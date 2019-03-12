@@ -23,7 +23,7 @@
  * MultiProcessor Specification Version 1.[14].
  */
 typedef struct {				/* MP Floating Pointer */
-	uint8_t signature[4];		/* "_MP_" */
+	uint8_t signature[4];			/* "_MP_" */
 	uint8_t addr[4];			/* PCMP */
 	uint8_t length;				/* 1 */
 	uint8_t revision;			/* [14] */
@@ -32,7 +32,7 @@ typedef struct {				/* MP Floating Pointer */
 } _MP_;
 
 typedef struct {				/* MP Configuration Table */
-	uint8_t signature[4];		/* "PCMP" */
+	uint8_t signature[4];			/* "PCMP" */
 	uint8_t length[2];
 	uint8_t revision;			/* [14] */
 	uint8_t checksum;
@@ -108,35 +108,36 @@ static uint32_t mpmkintr(uint8_t * p)
 			return 0;
 		}
 		switch (p[0]) {
-			default:
-				mpintrprint("INTIN botch", p);
+		default:
+			mpintrprint("INTIN botch", p);
+			return 0;
+		case 3:	/* IOINTR */
+			apic = &xioapic[p[6]];
+			if (!apic->useable) {
+				mpintrprint("unuseable ioapic", p);
 				return 0;
-			case 3:	/* IOINTR */
-				apic = &xioapic[p[6]];
-				if (!apic->useable) {
-					mpintrprint("unuseable ioapic", p);
-					return 0;
-				}
-				if (p[7] >= apic->nrdt) {
-					mpintrprint("IO INTIN out of range", p);
-					return 0;
-				}
-				break;
-			case 4:	/* LINTR */
-				apic = &xlapic[p[6]];
-				if (!apic->useable) {
-					mpintrprint("unuseable lapic", p);
-					return 0;
-				}
-				if (p[7] >= ARRAY_SIZE(apic->lvt)) {
-					mpintrprint("LOCAL INTIN out of range", p);
-					return 0;
-				}
-				break;
+			}
+			if (p[7] >= apic->nrdt) {
+				mpintrprint("IO INTIN out of range", p);
+				return 0;
+			}
+			break;
+		case 4:	/* LINTR */
+			apic = &xlapic[p[6]];
+			if (!apic->useable) {
+				mpintrprint("unuseable lapic", p);
+				return 0;
+			}
+			if (p[7] >= ARRAY_SIZE(apic->lvt)) {
+				mpintrprint("LOCAL INTIN out of range", p);
+				return 0;
+			}
+			break;
 		}
 	}
 	n = l16get(p + 2);
-	if ((polarity = (n & 0x03)) == 2 || (trigger = ((n >> 2) & 0x03)) == 2) {
+	if ((polarity = (n & 0x03)) == 2 || (trigger = ((n >> 2) & 0x03)) == 2)
+	{
 		mpintrprint("invalid polarity/trigger", p);
 		return 0;
 	}
@@ -151,42 +152,42 @@ static uint32_t mpmkintr(uint8_t * p)
 	 */
 	v = Im;
 	switch (p[1]) {
-		default:
-			mpintrprint("invalid type", p);
-			return 0;
-		case 0:	/* INT */
-			switch (polarity) {
-				case 0:
-					v |= mpbus[p[4]]->polarity;
-					break;
-				case 1:
-					v |= IPhigh;
-					break;
-				case 3:
-					v |= IPlow;
-					break;
-			}
-			switch (trigger) {
-				case 0:
-					v |= mpbus[p[4]]->trigger;
-					break;
-				case 1:
-					v |= TMedge;
-					break;
-				case 3:
-					v |= TMlevel;
-					break;
-			}
+	default:
+		mpintrprint("invalid type", p);
+		return 0;
+	case 0:	/* INT */
+		switch (polarity) {
+		case 0:
+			v |= mpbus[p[4]]->polarity;
 			break;
-		case 1:	/* NMI */
-			v |= TMedge | IPhigh | MTnmi;
+		case 1:
+			v |= IPhigh;
 			break;
-		case 2:	/* SMI */
-			v |= TMedge | IPhigh | MTsmi;
+		case 3:
+			v |= IPlow;
 			break;
-		case 3:	/* ExtINT */
-			v |= TMedge | IPhigh | MTei;
+		}
+		switch (trigger) {
+		case 0:
+			v |= mpbus[p[4]]->trigger;
 			break;
+		case 1:
+			v |= TMedge;
+			break;
+		case 3:
+			v |= TMlevel;
+			break;
+		}
+		break;
+	case 1:	/* NMI */
+		v |= TMedge | IPhigh | MTnmi;
+		break;
+	case 2:	/* SMI */
+		v |= TMedge | IPhigh | MTsmi;
+		break;
+	case 3:	/* ExtINT */
+		v |= TMedge | IPhigh | MTei;
+		break;
 	}
 
 	return v;
@@ -202,138 +203,145 @@ static int mpparse(PCMP * pcmp, int maxcores)
 	e = ((uint8_t *) pcmp) + l16get(pcmp->length);
 	while (p < e)
 		switch (*p) {
-			default:
-				printd("mpparse: unknown PCMP type %d (e-p %#ld)\n", *p, e - p);
-				for (i = 0; p < e; i++) {
-					if (i && ((i & 0x0f) == 0))
-						printd("\n");
-					printd(" 0x%#2.2x", *p);
-					p++;
-				}
-				printd("\n");
+		default:
+			printd("mpparse: unknown PCMP type %d (e-p %#ld)\n", *p,
+			       e - p);
+			for (i = 0; p < e; i++) {
+				if (i && ((i & 0x0f) == 0))
+					printd("\n");
+				printd(" 0x%#2.2x", *p);
+				p++;
+			}
+			printd("\n");
+			break;
+		case 0:	/* processor */
+			/*
+			 * Initialise the APIC if it is enabled (p[3] & 0x01).
+			 * p[1] is the APIC ID, the memory mapped address comes
+			 * from the PCMP structure as the addess is local to the
+			 * CPU and identical for all. Indicate whether this is
+			 * the bootstrap processor (p[3] & 0x02).
+			 */
+			printd("mpparse: cpu %d pa %p bp %d\n",
+				   p[1], l32get(pcmp->apicpa), p[3] & 0x02);
+			if ((p[3] & 0x01) != 0 && maxcores > 0) {
+				maxcores--;
+				apicinit(p[1], l32get(pcmp->apicpa), p[3] &
+					 0x02);
+			}
+			p += 20;
+			break;
+		case 1:	/* bus */
+			printd("mpparse: bus: %d type %6.6s\n", p[1], (char *)p
+			       + 2);
+			if (p[1] >= Nbus) {
+				printk("mpparse: bus %d out of range\n", p[1]);
+				p += 8;
 				break;
-			case 0:	/* processor */
-				/*
-				 * Initialise the APIC if it is enabled (p[3] & 0x01).
-				 * p[1] is the APIC ID, the memory mapped address comes
-				 * from the PCMP structure as the addess is local to the
-				 * CPU and identical for all. Indicate whether this is
-				 * the bootstrap processor (p[3] & 0x02).
-				 */
-				printd("mpparse: cpu %d pa %p bp %d\n",
-					   p[1], l32get(pcmp->apicpa), p[3] & 0x02);
-				if ((p[3] & 0x01) != 0 && maxcores > 0) {
-					maxcores--;
-					apicinit(p[1], l32get(pcmp->apicpa), p[3] & 0x02);
-				}
-				p += 20;
+			}
+			if (mpbus[p[1]] != NULL) {
+				printk("mpparse: bus %d already allocated\n",
+				       p[1]);
+				p += 8;
 				break;
-			case 1:	/* bus */
-				printd("mpparse: bus: %d type %6.6s\n", p[1], (char *)p + 2);
-				if (p[1] >= Nbus) {
-					printk("mpparse: bus %d out of range\n", p[1]);
-					p += 8;
-					break;
-				}
-				if (mpbus[p[1]] != NULL) {
-					printk("mpparse: bus %d already allocated\n", p[1]);
-					p += 8;
-					break;
-				}
-				for (i = 0; i < ARRAY_SIZE(mpbusdef); i++) {
-					if (memcmp(p + 2, mpbusdef[i].type, 6) != 0)
+			}
+			for (i = 0; i < ARRAY_SIZE(mpbusdef); i++) {
+				if (memcmp(p + 2, mpbusdef[i].type, 6) != 0)
+					continue;
+				if (memcmp(p + 2, "ISA   ", 6) == 0) {
+					if (mpisabusno != -1) {
+						printk("mpparse: bus %d already have ISA bus %d\n",
+						       p[1], mpisabusno);
 						continue;
-					if (memcmp(p + 2, "ISA   ", 6) == 0) {
-						if (mpisabusno != -1) {
-							printk("mpparse: bus %d already have ISA bus %d\n",
-								   p[1], mpisabusno);
-							continue;
-						}
-						mpisabusno = p[1];
 					}
-					mpbus[p[1]] = &mpbusdef[i];
-					break;
+					mpisabusno = p[1];
 				}
-				if (mpbus[p[1]] == NULL)
-					printk("mpparse: bus %d type %6.6s unknown\n",
-						   p[1], (char *)p + 2);
+				mpbus[p[1]] = &mpbusdef[i];
+				break;
+			}
+			if (mpbus[p[1]] == NULL)
+				printk("mpparse: bus %d type %6.6s unknown\n",
+					   p[1], (char *)p + 2);
 
+			p += 8;
+			break;
+		case 2:	/* IOAPIC */
+			/*
+			 * Initialise the IOAPIC if it is enabled (p[3] & 0x01).
+			 * p[1] is the APIC ID, p[4-7] is the memory mapped
+			 * address.
+			 */
+			if (p[3] & 0x01)
+				ioapicinit(p[1], -1, l32get(p + 4));
+
+			p += 8;
+			break;
+		case 3:	/* IOINTR */
+			/*
+			 * p[1] is the interrupt type;
+			 * p[2-3] contains the polarity and trigger mode;
+			 * p[4] is the source bus;
+			 * p[5] is the IRQ on the source bus;
+			 * p[6] is the destination IOAPIC;
+			 * p[7] is the INITIN pin on the destination IOAPIC.
+			 */
+			if (p[6] == 0xff) {
+				mpintrprint("routed to all IOAPICs", p);
 				p += 8;
 				break;
-			case 2:	/* IOAPIC */
-				/*
-				 * Initialise the IOAPIC if it is enabled (p[3] & 0x01).
-				 * p[1] is the APIC ID, p[4-7] is the memory mapped address.
-				 */
-				if (p[3] & 0x01)
-					ioapicinit(p[1], -1, l32get(p + 4));
-
-				p += 8;
-				break;
-			case 3:	/* IOINTR */
-				/*
-				 * p[1] is the interrupt type;
-				 * p[2-3] contains the polarity and trigger mode;
-				 * p[4] is the source bus;
-				 * p[5] is the IRQ on the source bus;
-				 * p[6] is the destination IOAPIC;
-				 * p[7] is the INITIN pin on the destination IOAPIC.
-				 */
-				if (p[6] == 0xff) {
-					mpintrprint("routed to all IOAPICs", p);
-					p += 8;
-					break;
-				}
-				if ((lo = mpmkintr(p)) == 0) {
-					if (MP_VERBOSE_DEBUG)
-						mpintrprint("iointr skipped", p);
-					p += 8;
-					break;
-				}
+			}
+			if ((lo = mpmkintr(p)) == 0) {
 				if (MP_VERBOSE_DEBUG)
-					mpintrprint("iointr", p);
-
-				/*
-				 * Always present the device number in the style
-				 * of a PCI Interrupt Assignment Entry. For the ISA
-				 * bus the IRQ is the device number but unencoded.
-				 * May need to handle other buses here in the future
-				 * (but unlikely).
-				 *
-				 * For PCI devices, this field's lowest two bits are INT#A == 0,
-				 * INT#B == 1, etc.  Bits 2-6 are the PCI device number.
-				 */
-				devno = p[5];
-				if (memcmp(mpbus[p[4]]->type, "PCI   ", 6) != 0)
-					devno <<= 2;
-				ioapicintrinit(p[4], p[6], p[7], devno, lo);
-
+					mpintrprint("iointr skipped", p);
 				p += 8;
 				break;
-			case 4:	/* LINTR */
-				/*
-				 * Format is the same as IOINTR above.
-				 */
-				if ((lo = mpmkintr(p)) == 0) {
-					p += 8;
-					break;
+			}
+			if (MP_VERBOSE_DEBUG)
+				mpintrprint("iointr", p);
+
+			/*
+			 * Always present the device number in the style
+			 * of a PCI Interrupt Assignment Entry. For the ISA
+			 * bus the IRQ is the device number but unencoded.
+			 * May need to handle other buses here in the future
+			 * (but unlikely).
+			 *
+			 * For PCI devices, this field's lowest two bits are
+			 * INT#A == 0, INT#B == 1, etc.  Bits 2-6 are the PCI
+			 * device number.
+			 */
+			devno = p[5];
+			if (memcmp(mpbus[p[4]]->type, "PCI   ", 6) != 0)
+				devno <<= 2;
+			ioapicintrinit(p[4], p[6], p[7], devno, lo);
+
+			p += 8;
+			break;
+		case 4:	/* LINTR */
+			/*
+			 * Format is the same as IOINTR above.
+			 */
+			if ((lo = mpmkintr(p)) == 0) {
+				p += 8;
+				break;
+			}
+			if (MP_VERBOSE_DEBUG)
+				mpintrprint("LINTR", p);
+
+			/*
+			 * Everything was checked in mpmkintr above.
+			 */
+			if (p[6] == 0xff) {
+				for (i = 0; i < Napic; i++) {
+					if (!xlapic[i].useable ||
+					    xlapic[i].addr)
+						continue;
+					xlapic[i].lvt[p[7]] = lo;
 				}
-				if (MP_VERBOSE_DEBUG)
-					mpintrprint("LINTR", p);
-
-				/*
-				 * Everything was checked in mpmkintr above.
-				 */
-				if (p[6] == 0xff) {
-					for (i = 0; i < Napic; i++) {
-						if (!xlapic[i].useable || xlapic[i].addr)
-							continue;
-						xlapic[i].lvt[p[7]] = lo;
-					}
-				} else
-					xlapic[p[6]].lvt[p[7]] = lo;
-				p += 8;
-				break;
+			} else
+				xlapic[p[6]].lvt[p[7]] = lo;
+			p += 8;
+			break;
 		}
 
 	/*
@@ -344,34 +352,36 @@ static int mpparse(PCMP * pcmp, int maxcores)
 	e = p + l16get(pcmp->xlength);
 	while (p < e)
 		switch (*p) {
-			default:
-				n = p[1];
-				printd("mpparse: unknown extended entry %d length %d\n", *p, n);
-				for (i = 0; i < n; i++) {
-					if (i && ((i & 0x0f) == 0))
-						printd("\n");
-					printd(" %#2.2ux", *p);
-					p++;
-				}
-				printd("\n");
-				break;
-			case 128:
-				printd("address space mapping\n");
-				printd(" bus %d type %d base %#llux length %#llux\n",
-					   p[2], p[3], l64get(p + 4), l64get(p + 12));
-				p += p[1];
-				break;
-			case 129:
-				printd("bus hierarchy descriptor\n");
-				printd(" bus %d sd %d parent bus %d\n", p[2], p[3], p[4]);
-				p += p[1];
-				break;
-			case 130:
-				printd("compatibility bus address space modifier\n");
-				printd(" bus %d pr %d range list %d\n",
-					   p[2], p[3], l32get(p + 4));
-				p += p[1];
-				break;
+		default:
+			n = p[1];
+			printd("mpparse: unknown extended entry %d length %d\n",
+			       *p, n);
+			for (i = 0; i < n; i++) {
+				if (i && ((i & 0x0f) == 0))
+					printd("\n");
+				printd(" %#2.2ux", *p);
+				p++;
+			}
+			printd("\n");
+			break;
+		case 128:
+			printd("address space mapping\n");
+			printd(" bus %d type %d base %#llux length %#llux\n",
+				   p[2], p[3], l64get(p + 4), l64get(p + 12));
+			p += p[1];
+			break;
+		case 129:
+			printd("bus hierarchy descriptor\n");
+			printd(" bus %d sd %d parent bus %d\n", p[2], p[3],
+			       p[4]);
+			p += p[1];
+			break;
+		case 130:
+			printd("compatibility bus address space modifier\n");
+			printd(" bus %d pr %d range list %d\n",
+				   p[2], p[3], l32get(p + 4));
+			p += p[1];
+			break;
 		}
 	return maxcores;
 }
@@ -421,8 +431,8 @@ int mpsinit(int maxcores)
 		printk("No mp tables found, might have issues!\n");
 		return maxcores;
 	}
-	/* TODO: if an IMCR exists, we should set it to 1, though i've heard that
-	 * ACPI-capable HW doesn't have the IMCR anymore. */
+	/* TODO: if an IMCR exists, we should set it to 1, though i've heard
+	 * that ACPI-capable HW doesn't have the IMCR anymore. */
 
 	if (MP_VERBOSE_DEBUG) {
 		printk("_MP_ @ %#p, addr %p length %ud rev %d",

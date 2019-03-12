@@ -24,9 +24,9 @@
 #define udelay(usec) usleep(usec)
 #define ndelay(nsec)                                                           \
 {                                                                              \
-	struct timespec ts = {0, 0};                                               \
-	ts.tv_nsec = (nsec);                                                       \
-	nanosleep(&ts, 0);                                                         \
+	struct timespec ts = {0, 0};                                           \
+	ts.tv_nsec = (nsec);                                                   \
+	nanosleep(&ts, 0);                                                     \
 }
 
 /* not quite a normal relax, which also pauses, but this works for all archs */

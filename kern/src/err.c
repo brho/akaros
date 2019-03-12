@@ -27,7 +27,7 @@
  * 0, and we'll set cur_eb to slot 0.  When we leave, curindex is set to the
  * next free slot. */
 struct errbuf *errpush(struct errbuf *errstack, int stacksize, int *curindex,
-					   struct errbuf **prev_errbuf)
+		       struct errbuf **prev_errbuf)
 {
 	struct errbuf *cbuf;
 
@@ -52,9 +52,9 @@ struct errbuf *errpush(struct errbuf *errstack, int stacksize, int *curindex,
  * When we enter, curindex is the slot of the next *free* errstack (the one we'd
  * push into if we were pushing.  When we leave, it will be decreased by one,
  * and will still point to the next free errstack (the one we are popping).
- * */
+ */
 struct errbuf *errpop(struct errbuf *errstack, int stacksize, int *curindex,
-					  struct errbuf *prev_errbuf)
+		      struct errbuf *prev_errbuf)
 {
 	struct errbuf *cbuf;
 
@@ -62,8 +62,9 @@ struct errbuf *errpop(struct errbuf *errstack, int stacksize, int *curindex,
 	/* curindex now points to the slot we are popping*/
 	*curindex = *curindex - 1;
 	/* We still need to advertise the previous slot, which is one back from
-	 * curindex.  If curindex is 0, that means the next free slot is the first
-	 * of our errstack.  In this case, we need to advertise the prev. */
+	 * curindex.  If curindex is 0, that means the next free slot is the
+	 * first of our errstack.  In this case, we need to advertise the prev.
+	 */
 	if (*curindex < 0)
 		panic("Error stack underflow");
 

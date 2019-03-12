@@ -10,12 +10,14 @@
 int main(int argc, char *argv[]) 
 { 
 	int retval;
+
 	if (argc < 2) {
 		printf("Prints out stats for a file\n");
 		printf("Usage: stat FILENAME\n");
 		return -1;
 	}
 	struct stat st = {0};
+
 	retval = stat(argv[1], &st);
 	if (retval < 0) {
 		perror("Stat failed");

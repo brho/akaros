@@ -30,7 +30,7 @@ extern void (*pre_fork_2ls)(void);
 extern void (*post_fork_2ls)(pid_t ret);
 
 struct fork_cb {
-	struct fork_cb				*next;
+	struct fork_cb *next;
 	void (*func)(void);
 };
 

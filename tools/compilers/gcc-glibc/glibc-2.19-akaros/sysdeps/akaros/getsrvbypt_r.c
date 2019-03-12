@@ -27,6 +27,7 @@ int __getservbyport_r(int port, const char *proto, struct servent *result_buf,
 
 	snprintf(port_buf, sizeof(port_buf), "%d", port);
 	/* the plan 9 version can handle a port or a name */
-	return getservbyname_r(port_buf, proto, result_buf, buf, buflen, result);
+	return getservbyname_r(port_buf, proto, result_buf, buf, buflen,
+			       result);
 }
 weak_alias(__getservbyport_r, getservbyport_r);

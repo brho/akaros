@@ -319,9 +319,9 @@ struct block *arpresolve(struct arp *arp, struct arpent *a, struct medium *type,
 	a->utime = NOW;
 	bp = a->hold;
 	a->hold = NULL;
-	/* brho: it looks like we return the entire hold list, though it might be
-	 * purged by now via some other crazy arp list management.  our callers
-	 * can't handle the arp's b->list stuff. */
+	/* brho: it looks like we return the entire hold list, though it might
+	 * be purged by now via some other crazy arp list management.  our
+	 * callers can't handle the arp's b->list stuff. */
 	assert(!bp->list);
 	qunlock(&arp->qlock);
 
@@ -407,7 +407,8 @@ void arpenter(struct Fs *fs, int version, uint8_t *ip, uint8_t *mac, int n,
 						nexterror();
 					}
 					if (ifc->m != NULL)
-						ifc->m->bwrite(ifc, bp, version, ip);
+						ifc->m->bwrite(ifc, bp, version,
+							       ip);
 					else
 						freeb(bp);
 					runlock(&ifc->rwlock);
@@ -484,7 +485,8 @@ int arpwrite(struct Fs *fs, char *s, long len)
 				else
 					r = v6lookup(fs, ip, NULL);
 				if (r == NULL)
-					error(EHOSTUNREACH, "Destination unreachable");
+					error(EHOSTUNREACH,
+					      "Destination unreachable");
 				m = r->rt.ifc->m;
 				n = parsemac(mac, f[2], m->maclen);
 				break;
@@ -573,7 +575,8 @@ int arpread(struct arp *arp, char *p, uint32_t offset, int len)
 		len--;
 		left--;
 		qlock(&arp->qlock);
-		amt = snprintf(p + n, left, aformat, a->type->name, arpstate[a->state],
+		amt = snprintf(p + n, left, aformat, a->type->name,
+			       arpstate[a->state],
 		               a->ip, a->mac);
 		n += amt;
 		left -= amt;

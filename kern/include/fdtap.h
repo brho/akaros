@@ -19,15 +19,15 @@ struct fd_tap;
 SLIST_HEAD(fdtap_slist, fd_tap);
 
 struct fd_tap {
-	SLIST_ENTRY(fd_tap)			link;	/* for device use */
-	struct kref					kref;
-	struct chan					*chan;
-	int							fd;
-	int							filter;
-	struct proc					*proc;
-	struct event_queue			*ev_q;
-	int							ev_id;
-	void						*data;
+	SLIST_ENTRY(fd_tap)		link;	/* for device use */
+	struct kref			kref;
+	struct chan			*chan;
+	int				fd;
+	int				filter;
+	struct proc			*proc;
+	struct event_queue		*ev_q;
+	int				ev_id;
+	void				*data;
 };
 
 int add_fd_tap(struct proc *p, struct fd_tap_req *tap_req);

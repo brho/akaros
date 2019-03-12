@@ -56,13 +56,13 @@ struct kprof {
 
 struct dev kprofdevtab;
 struct dirtab kproftab[] = {
-	{".",			{Kprofdirqid,		0, QTDIR}, 0,	DMDIR|0550},
-	{"kpdata",		{Kprofdataqid},		0,	0600},
-	{"kpctl",		{Kprofctlqid},		0,	0600},
+	{".",		{Kprofdirqid, 0, QTDIR},0,	DMDIR|0550},
+	{"kpdata",	{Kprofdataqid},		0,	0600},
+	{"kpctl",	{Kprofctlqid},		0,	0600},
 	{"kptrace_ctl",	{Kptracectlqid},	0,	0660},
-	{"kptrace",		{Kptraceqid},		0,	0600},
-	{"kprintx",		{Kprintxqid},		0,	0600},
-	{"mpstat",		{Kmpstatqid},		0,	0600},
+	{"kptrace",	{Kptraceqid},		0,	0600},
+	{"kprintx",	{Kprintxqid},		0,	0600},
+	{"mpstat",	{Kmpstatqid},		0,	0600},
 	{"mpstat-raw",	{Kmpstatrawqid},	0,	0600},
 };
 
@@ -186,7 +186,8 @@ static void kprof_shutdown(void)
 static struct walkqid *kprof_walk(struct chan *c, struct chan *nc, char **name,
                                   unsigned int nname)
 {
-	return devwalk(c, nc, name, nname, kproftab, ARRAY_SIZE(kproftab), devgen);
+	return devwalk(c, nc, name, nname, kproftab, ARRAY_SIZE(kproftab),
+		       devgen);
 }
 
 static size_t kprof_profdata_size(void)
@@ -215,16 +216,17 @@ static struct chan *kprof_open(struct chan *c, int omode)
 	}
 	switch ((int) c->qid.path) {
 	case Kprofctlqid:
-		/* We have one global profiler.  Only one FD may be opened at a time for
-		 * it.  If we ever have separate profilers, we can create the profiler
-		 * here, and every open would get a separate instance. */
+		/* We have one global profiler.  Only one FD may be opened at a
+		 * time for it.  If we ever have separate profilers, we can
+		 * create the profiler here, and every open would get a separate
+		 * instance. */
 		qlock(&kprof.lock);
 		if (kprof.opened) {
 			qunlock(&kprof.lock);
 			error(EBUSY, "Global profiler is already open");
 		}
 		kprof.opened = TRUE;
-		/* TODO: have a real creation function for a non-global profiler */
+		/* TODO: have a creation function for a non-global profiler */
 		profiler_setup();
 		qunlock(&kprof.lock);
 		break;
@@ -265,8 +267,9 @@ static long mpstat_read(void *va, long n, int64_t off)
 
 	len += snprintf(buf + len, bufsz - len, "  CPU: ");
 	for (int j = 0; j < NR_CPU_STATES; j++)
-		len += snprintf(buf + len, bufsz - len, "%23s%s", cpu_state_names[j],
-		                j != NR_CPU_STATES - 1 ? "   " : "  \n");
+		len += snprintf(buf + len, bufsz - len, "%23s%s",
+				cpu_state_names[j],
+				j != NR_CPU_STATES - 1 ? " " : "  \n");
 
 	for (int i = 0; i < num_cores; i++) {
 		pcpui = &per_cpu_info[i];
@@ -277,9 +280,11 @@ static long mpstat_read(void *va, long n, int64_t off)
 		cpu_total = MAX(cpu_total, 1);	/* for the divide later */
 		for (int j = 0; j < NR_CPU_STATES; j++) {
 			ts = tsc2timespec(pcpui->state_ticks[j]);
-			len += snprintf(buf + len, bufsz - len, "%10d.%06d (%3d%%)%s",
+			len += snprintf(buf + len, bufsz - len,
+					"%10d.%06d (%3d%%)%s",
 			                ts.tv_sec, ts.tv_nsec / 1000,
-			                MIN((pcpui->state_ticks[j] * 100) / cpu_total, 100),
+					MIN((pcpui->state_ticks[j] * 100) /
+					    cpu_total, 100),
 			                j != NR_CPU_STATES - 1 ? ", " : " \n");
 		}
 	}
@@ -295,14 +300,16 @@ static long mpstatraw_read(void *va, long n, int64_t off)
 	int len = 0;
 	struct per_cpu_info *pcpui;
 
-	/* could spit it all out in binary, though then it'd be harder to process
-	 * the data across a mnt (if we export #K).  probably not a big deal. */
+	/* could spit it all out in binary, though then it'd be harder to
+	 * process the data across a mnt (if we export #K).  probably not a big
+	 * deal. */
 
 	/* header line: version, num_cores, tsc freq, state names */
-	len += snprintf(buf + len, bufsz - len, "v%03d %5d %16llu", 1, num_cores,
-	                __proc_global_info.tsc_freq);
+	len += snprintf(buf + len, bufsz - len, "v%03d %5d %16llu", 1,
+			num_cores, __proc_global_info.tsc_freq);
 	for (int j = 0; j < NR_CPU_STATES; j++)
-		len += snprintf(buf + len, bufsz - len, " %6s", cpu_state_names[j]);
+		len += snprintf(buf + len, bufsz - len, " %6s",
+				cpu_state_names[j]);
 	len += snprintf(buf + len, bufsz - len, "\n");
 
 	for (int i = 0; i < num_cores; i++) {
@@ -328,7 +335,8 @@ static size_t kprof_read(struct chan *c, void *va, size_t n, off64_t off)
 
 	switch ((int) c->qid.path) {
 	case Kprofdirqid:
-		return devdirread(c, va, n, kproftab, ARRAY_SIZE(kproftab), devgen);
+		return devdirread(c, va, n, kproftab, ARRAY_SIZE(kproftab),
+				  devgen);
 	case Kprofdataqid:
 		n = kprof_profdata_read(va, n, off);
 		break;
@@ -488,16 +496,16 @@ static struct trace_printk_buffer *kprof_get_printk_buffer(void)
 	if (unlikely(booting))
 		return &boot_tpb;
 	if (unlikely(!cpu_tpbs)) {
-		/* Poor man per-CPU data structure. I really do no like littering global
-		 * data structures with module specific data.
-		 * We cannot take the ktrace_lock to protect the kzmalloc() call, as
-		 * that might trigger printk()s, and we would reenter here.
-		 * Let only one core into the kzmalloc() path, and let the others get
-		 * the boot_tpb until finished.
-		 */
+		/* Poor man per-CPU data structure. I really do no like
+		 * littering global data structures with module specific data.
+		 * We cannot take the ktrace_lock to protect the kzmalloc()
+		 * call, as that might trigger printk()s, and we would reenter
+		 * here.  Let only one core into the kzmalloc() path, and let
+		 * the others get the boot_tpb until finished. */
 		if (!atomic_cas(&alloc_done, 0, 1))
 			return &boot_tpb;
-		cpu_tpbs = kzmalloc(num_cores * sizeof(struct trace_printk_buffer), 0);
+		cpu_tpbs = kzmalloc(num_cores *
+				    sizeof(struct trace_printk_buffer), 0);
 	}
 
 	return cpu_tpbs + core_id_early();
@@ -510,7 +518,8 @@ void trace_vprintk(const char *fmt, va_list args)
 		char *top;
 	};
 
-	void emit_print_buf_str(struct print_buf *pb, const char *str, ssize_t size)
+	void emit_print_buf_str(struct print_buf *pb, const char *str,
+				ssize_t size)
 	{
 		if (size < 0) {
 			for (; *str && (pb->ptr < pb->top); str++)
@@ -543,8 +552,8 @@ void trace_vprintk(const char *fmt, va_list args)
 
 	if (pb.ptr[-1] != '\n')
 		emit_print_buf_str(&pb, "\n", 1);
-	/* snprintf null terminates the buffer, and does not count that as part of
-	 * the len.  If we maxed out the buffer, let's make sure it has a \n.
+	/* snprintf null terminates the buffer, and does not count that as part
+	 * of the len.  If we maxed out the buffer, let's make sure it has a \n.
 	 */
 	if (pb.ptr == pb.top)
 		pb.ptr[-1] = '\n';

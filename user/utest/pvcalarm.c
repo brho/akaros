@@ -18,20 +18,21 @@ bool test_pvcalarms(void) {
 	pthread_mcp_init();
 	vcore_request_total(max_vcores());
 	parlib_never_vc_request = TRUE;
-	for (int i=0; i<max_vcores(); i++)
+	for (int i = 0; i < max_vcores(); i++)
 		count[i] = 0;
 	
 	uint64_t now, then;
 	now = tsc2usec(read_tsc());
 	enable_pvcalarms(PVCALARM_PROF, INTERVAL, pvcalarm_callback);
-	for (int i=0; i<max_vcores(); i++)
+	for (int i = 0; i < max_vcores(); i++)
 		while(count[i] < ITERS)
 			cpu_relax();
 	disable_pvcalarms();
 	then = tsc2usec(read_tsc());
 
 	UT_ASSERT_M("Alarms finished too soon", then > (now + INTERVAL*ITERS));
-	UT_ASSERT_M("Alarms finished too late", then < (now + 2*INTERVAL*ITERS));
+	UT_ASSERT_M("Alarms finished too late", then < (now +
+							2*INTERVAL*ITERS));
 	return true;
 }
 
@@ -53,8 +54,10 @@ bool test_sigperf(void)
 		pthread_sigmask(SIG_UNBLOCK, &s, NULL);
 		int old_count = 0, new_count = 0;
 		while(1) {
-			while((new_count = atomic_read((atomic_t)__count)) <= old_count);
-			if (new_count >= ITERATIONS) break;
+			while ((new_count = atomic_read((atomic_t)__count)) <=
+			      old_count);
+			if (new_count >= ITERATIONS)
+				break;
 			old_count = new_count;
 			pthread_yield();
 		}
@@ -74,16 +77,17 @@ bool test_sigperf(void)
 	sigaddset(&s, SIGPROF);
 	pthread_sigmask(SIG_BLOCK, &s, NULL);
 	struct sigaction sigact = {.sa_handler = signal_handler, 0};
+
 	sigaction(SIGPROF, &sigact, 0);
-	for (int i=0; i<NUM_PTHREADS; i++)
+	for (int i = 0; i < NUM_PTHREADS; i++)
 		count[i] = 0;
 
 	enable_profalarm(INTERVAL);
-	for (int i=0; i<NUM_PTHREADS; i++)
+	for (int i = 0; i < NUM_PTHREADS; i++)
 		pthread_create(&threads[i], NULL, thread_handler, &count[i]);
 
-	for (int i=0; i<NUM_PTHREADS; i++)
-		while(count[i] < ITERATIONS)
+	for (int i = 0; i < NUM_PTHREADS; i++)
+		while (count[i] < ITERATIONS)
 			cpu_relax();
 
 	disable_pvcalarms();
@@ -99,8 +103,8 @@ struct utest utests[] = {
 int num_utests = sizeof(utests) / sizeof(struct utest);
 
 int main(int argc, char *argv[]) {
-	// Run test suite passing it all the args as whitelist of what tests to run.
 	char **whitelist = &argv[1];
 	int whitelist_len = argc - 1;
+
 	RUN_TEST_SUITE(utests, num_utests, whitelist, whitelist_len);
 }

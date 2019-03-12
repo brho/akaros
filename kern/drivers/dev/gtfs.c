@@ -25,7 +25,7 @@ static char *devname(void)
 
 struct gtfs {
 	struct tree_filesystem		tfs;
-	struct kref					users;
+	struct kref			users;
 };
 
 /* Blob hanging off the fs_file->priv.  The backend chans are only accessed,
@@ -51,13 +51,13 @@ struct gtfs {
  * Also note that you can't trust be_length for directories.  You'll often get
  * 4096 or 0, depending on the 9p server you're talking to. */
 struct gtfs_priv {
-	struct chan					*be_walk;	/* never opened */
-	struct chan					*be_read;
-	struct chan					*be_write;
-	uint64_t					be_length;
-	uint32_t					be_mode;
-	struct timespec				be_mtime;
-	bool						was_removed;
+	struct chan			*be_walk;	/* never opened */
+	struct chan			*be_read;
+	struct chan			*be_write;
+	uint64_t			be_length;
+	uint32_t			be_mode;
+	struct timespec			be_mtime;
+	bool				was_removed;
 };
 
 static inline struct gtfs_priv *fsf_to_gtfs_priv(struct fs_file *f)
@@ -146,10 +146,10 @@ static void sync_metadata(struct fs_file *f)
 		nexterror();
 	}
 	wstat_dir(f, &dir);
-	/* We set these after the wstat succeeds.  If we set them earlier, we'd have
-	 * to roll back.  Remember the invariant: the be_values match the backend's
-	 * file's values.  We should be able to stat be_walk and check these (though
-	 * the 9p server might muck with atime/mtime). */
+	/* We set these after the wstat succeeds.  If we set them earlier, we'd
+	 * have to roll back.  Remember the invariant: the be_values match the
+	 * backend's file's values.  We should be able to stat be_walk and check
+	 * these (though the 9p server might muck with atime/mtime). */
 	if (f->dir.length != gp->be_length)
 		gp->be_length = f->dir.length;
 	if (f->dir.mode != gp->be_mode)
@@ -164,18 +164,19 @@ static void sync_metadata(struct fs_file *f)
 static void writeback_file(struct fs_file *f)
 {
 	sync_metadata(f);
-	/* This is a lockless peak.  Once a file is dirtied, we never undirty it.
-	 * To do so, we need the file qlock (not a big deal, though that may replace
-	 * the PM qlock), and we still need to handle/scan mmaps.  Specifically, we
-	 * only dirty when an mmap attaches (PROT_WRITE and MAP_SHARED), but we
-	 * don't know if an existing mapping has caused more dirtying (an mmap can
-	 * re-dirty then detach before our next writeback).  That usually requires a
-	 * scan.  This is all an optimization to avoid scanning the entire PM's
-	 * pages for whether or not they are dirty.
+	/* This is a lockless peak.  Once a file is dirtied, we never undirty
+	 * it.  To do so, we need the file qlock (not a big deal, though that
+	 * may replace the PM qlock), and we still need to handle/scan mmaps.
+	 * Specifically, we only dirty when an mmap attaches (PROT_WRITE and
+	 * MAP_SHARED), but we don't know if an existing mapping has caused more
+	 * dirtying (an mmap can re-dirty then detach before our next
+	 * writeback).  That usually requires a scan.  This is all an
+	 * optimization to avoid scanning the entire PM's pages for whether or
+	 * not they are dirty.
 	 *
-	 * Also, our writeback pm op grabs the file's qlock.  So be careful; though
-	 * we could use another qlock, since we're mostly protecting backend state.
-	 */
+	 * Also, our writeback pm op grabs the file's qlock.  So be careful;
+	 * though we could use another qlock, since we're mostly protecting
+	 * backend state. */
 	if (qid_is_file(f->dir.qid) && (f->flags & FSF_DIRTY))
 		pm_writeback_pages(f->pm);
 }
@@ -245,9 +246,9 @@ static void setup_be_chans(struct chan *c, int omode)
 		qunlock(&f->qlock);
 		nexterror();
 	}
-	/* Readers and writers both need be_read.  With fs files you can't have a
-	 * writable-only file, since we need to load the page into the page cache,
-	 * which is a readpage. */
+	/* Readers and writers both need be_read.  With fs files you can't have
+	 * a writable-only file, since we need to load the page into the page
+	 * cache, which is a readpage. */
 	if (!gp->be_read)
 		gp->be_read = cclone_and_open(gp->be_walk, O_READ);
 	if (!gp->be_write && (omode & O_WRITE))
@@ -258,8 +259,8 @@ static void setup_be_chans(struct chan *c, int omode)
 
 static struct chan *gtfs_open(struct chan *c, int omode)
 {
-	/* truncate can happen before we setup the be_chans.  if we need those, we
-	 * can swap the order */
+	/* truncate can happen before we setup the be_chans.  if we need those,
+	 * we can swap the order */
 	c = tree_chan_open(c, omode);
 	setup_be_chans(c, omode);
 	return c;
@@ -270,8 +271,8 @@ static void gtfs_create(struct chan *c, char *name, int omode, uint32_t perm,
                         char *ext)
 {
 	tree_chan_create(c, name, omode, perm, ext);
-	/* We have to setup *after* create, since it moves the chan from the parent
-	 * to the new file. */
+	/* We have to setup *after* create, since it moves the chan from the
+	 * parent to the new file. */
 	setup_be_chans(c, omode);
 }
 
@@ -301,9 +302,9 @@ static size_t gtfs_wstat(struct chan *c, uint8_t *m_buf, size_t m_buf_sz)
 	size_t ret;
 
 	ret = tree_chan_wstat(c, m_buf, m_buf_sz);
-	/* Tell the backend so that any metadata changes take effect immediately.
-	 * Consider chmod +w.  We need to tell the 9p server so that it will allow
-	 * future accesses. */
+	/* Tell the backend so that any metadata changes take effect
+	 * immediately.  Consider chmod +w.  We need to tell the 9p server so
+	 * that it will allow future accesses. */
 	sync_metadata(&chan_to_tree_file(c)->file);
 	return ret;
 }
@@ -424,25 +425,27 @@ static void gtfs_tf_unlink(struct tree_file *parent, struct tree_file *child)
 	struct gtfs_priv *gp = tf_to_gtfs_priv(child);
 	struct chan *be_walk = gp->be_walk;
 
-	/* Remove clunks the be_walk chan/fid.  if it succeeded (and I think even if
-	 * it didn't), we shouldn't close that fid again, which is what will happen
-	 * soon after this function.  The TF code calls unlink, then when the last
-	 * ref closes the TF, it'll get freed and we'll call back to gtfs_tf_free().
+	/* Remove clunks the be_walk chan/fid.  if it succeeded (and I think
+	 * even if it didn't), we shouldn't close that fid again, which is what
+	 * will happen soon after this function.  The TF code calls unlink, then
+	 * when the last ref closes the TF, it'll get freed and we'll call back
+	 * to gtfs_tf_free().
 	 *
 	 * This is the same issue we run into with all of the device remove ops
-	 * where we want to refcnt something hanging off e.g. c->aux.  In 9p, you're
-	 * not supposed to close a chan/fid that was already removed.
+	 * where we want to refcnt something hanging off e.g. c->aux.  In 9p,
+	 * you're not supposed to close a chan/fid that was already removed.
 	 *
-	 * Now here's the weird thing.  We can close the be_walk chan after remove,
-	 * but it's possible that someone has walked and perhaps opened a frontend
-	 * chan + TF, but hasn't done a read yet.  So someone might want to set up
-	 * be_read, but they can't due to be_walk being closed.  We could give them
-	 * a 'phase error' (one of 9p's errors for I/O on a removed file).
+	 * Now here's the weird thing.  We can close the be_walk chan after
+	 * remove, but it's possible that someone has walked and perhaps opened
+	 * a frontend chan + TF, but hasn't done a read yet.  So someone might
+	 * want to set up be_read, but they can't due to be_walk being closed.
+	 * We could give them a 'phase error' (one of 9p's errors for I/O on a
+	 * removed file).
 	 *
-	 * Alternatively, we can mark the gtfs_priv so that when we do free it, we
-	 * skip the dev.remove, similar to what sysremove() does.  That's probably
-	 * easier.  This is technically racy, but we know that the release/free
-	 * method won't be called until we return. */
+	 * Alternatively, we can mark the gtfs_priv so that when we do free it,
+	 * we skip the dev.remove, similar to what sysremove() does.  That's
+	 * probably easier.  This is technically racy, but we know that the
+	 * release/free method won't be called until we return. */
 	gp->was_removed = true;
 	devtab[be_walk->type].remove(be_walk);
 }
@@ -457,15 +460,17 @@ static void gtfs_tf_lookup(struct tree_file *parent, struct tree_file *child)
 	struct chan *be_walk = tf_to_gtfs_priv(parent)->be_walk;
 	struct chan *child_be_walk;
 
-	wq = devtab[be_walk->type].walk(be_walk, NULL, &child->file.dir.name, 1);
+	wq = devtab[be_walk->type].walk(be_walk, NULL, &child->file.dir.name,
+					1);
 	if (!wq || !wq->clone) {
 		kfree(wq);
-		/* This isn't racy, since the child isn't linked to the tree yet */
+		/* This isn't racy, since the child isn't linked to the tree
+		 * yet. */
 		child->flags |= TF_F_NEGATIVE | TF_F_HAS_BEEN_USED;
 		return;
 	}
-	/* walk shouldn't give us the same chan struct since we gave it a name and a
-	 * NULL nc. */
+	/* walk shouldn't give us the same chan struct since we gave it a name
+	 * and a NULL nc. */
 	assert(wq->clone != be_walk);
 	/* only gave it one name, and it didn't fail. */
 	assert(wq->nqid == 1);
@@ -489,10 +494,10 @@ static void gtfs_tf_create(struct tree_file *parent, struct tree_file *child,
 	devtab[c->type].create(c, tree_file_to_name(child), 0, perm,
 	                       child->file.dir.ext);
 	/* The chan c is opened, which we don't want.  We can't cclone it either
-	 * (since it is opened).  All we can do is have the parent walk again so we
-	 * can get the child's unopened be_walk chan.  Conveniently, that's
-	 * basically a lookup, so create is really two things: make it, then look it
-	 * up from the backend. */
+	 * (since it is opened).  All we can do is have the parent walk again so
+	 * we can get the child's unopened be_walk chan.  Conveniently, that's
+	 * basically a lookup, so create is really two things: make it, then
+	 * look it up from the backend. */
 	cclose(c);
 	poperror();
 	if (waserror()) {
@@ -521,8 +526,8 @@ static void gtfs_tf_rename(struct tree_file *tf, struct tree_file *old_parent,
 	struct chan *np_c = tf_to_gtfs_priv(new_parent)->be_walk;
 
 	if (!devtab[tf_c->type].rename) {
-		/* 9p can handle intra-directory renames, though some Akaros #devices
-		 * might throw. */
+		/* 9p can handle intra-directory renames, though some Akaros
+		 * #devices might throw. */
 		if (old_parent == new_parent) {
 			gtfs_wstat_rename(&tf->file, name);
 			return;
@@ -541,8 +546,9 @@ static bool gtfs_tf_has_children(struct tree_file *parent)
 	/* Any read should work, but there might be issues asking for something
 	 * smaller than a dir.
 	 *
-	 * Note we use the unlocked read here.  The fs_file's qlock is held by our
-	 * caller, and we reuse that qlock for the sync for reading/writing. */
+	 * Note we use the unlocked read here.  The fs_file's qlock is held by
+	 * our caller, and we reuse that qlock for the sync for reading/writing.
+	 */
 	return __gtfs_fsf_read(&parent->file, dir, sizeof(struct dir), 0) > 0;
 }
 
@@ -570,10 +576,10 @@ static int gtfs_pm_readpage(struct page_map *pm, struct page *pg)
 		poperror();
 		return -get_errno();
 	}
-	/* If offset is beyond the length of the file, the 9p device/server should
-	 * return 0.  We'll just init an empty page.  The length on the frontend (in
-	 * the fsf->dir.length) will be adjusted.  The backend will hear about it on
-	 * the next sync. */
+	/* If offset is beyond the length of the file, the 9p device/server
+	 * should return 0.  We'll just init an empty page.  The length on the
+	 * frontend (in the fsf->dir.length) will be adjusted.  The backend will
+	 * hear about it on the next sync. */
 	ret = gtfs_fsf_read(pm->pm_file, kva, PGSIZE, offset);
 	poperror();
 	if (ret < PGSIZE)
@@ -630,7 +636,8 @@ static void __zero_fill(struct fs_file *f, off64_t begin, off64_t end)
 	void *zeros;
 
 	if (PGOFF(begin) || PGOFF(end))
-		error(EINVAL, "zero_fill had unaligned begin (%p) or end (%p)\n",
+		error(EINVAL,
+		      "zero_fill had unaligned begin (%p) or end (%p)\n",
 		      begin, end);
 	zeros = kpages_zalloc(PGSIZE, MEM_WAIT);
 	if (waserror()) {
@@ -734,8 +741,8 @@ static struct chan *gtfs_attach(char *arg)
 
 	frontend = devattach(devname(), 0);
 	if (waserror()) {
-		/* same as #mnt - don't cclose, since we don't want to devtab close, and
-		 * we know the ref == 1 here. */
+		/* same as #mnt - don't cclose, since we don't want to devtab
+		 * close, and we know the ref == 1 here. */
 		chanfree(frontend);
 		nexterror();
 	}
@@ -744,11 +751,12 @@ static struct chan *gtfs_attach(char *arg)
 	 * These come from attaches and successful, 'moving' walks. */
 	kref_init(&gtfs->users, gtfs_release, 1);
 	tfs = (struct tree_filesystem*)gtfs;
-	/* This gives us one ref on root, released during gtfs_release().  name is
-	 * set to ".", though that gets overwritten during coupling. */
+	/* This gives us one ref on root, released during gtfs_release().  name
+	 * is set to ".", though that gets overwritten during coupling. */
 	tfs_init(tfs);
 	if (waserror()) {
-		/* don't consume the backend ref on error, caller expects to have it */
+		/* don't consume the backend ref on error, caller expects to
+		 * have it */
 		tf_to_gtfs_priv(tfs->root)->be_walk = NULL;
 		/* ref from tfs_init.  this should free the TF. */
 		tf_kref_put(tfs->root);
@@ -793,13 +801,13 @@ static void pressure_dfs_cb(struct tree_file *tf)
 /* Under memory pressure, there are a bunch of things we can do. */
 static void gtfs_free_memory(struct gtfs *gtfs)
 {
-	/* This attempts to remove every file from the LRU.  It'll write back dirty
-	 * files, then if they haven't been used since we started, it'll delete the
-	 * frontend TF, which will delete the entire page cache entry.  The heavy
-	 * lifting is done by TF code. */
+	/* This attempts to remove every file from the LRU.  It'll write back
+	 * dirty files, then if they haven't been used since we started, it'll
+	 * delete the frontend TF, which will delete the entire page cache
+	 * entry.  The heavy lifting is done by TF code. */
 	tfs_lru_for_each(&gtfs->tfs, lru_prune_cb, -1);
-	/* This drops the negative TFs.  It's not a huge deal, since they are small,
-	 * but perhaps it'll help. */
+	/* This drops the negative TFs.  It's not a huge deal, since they are
+	 * small, but perhaps it'll help. */
 	tfs_lru_prune_neg(&gtfs->tfs);
 	/* This will attempt to free memory from all files in the frontend,
 	 * regardless of whether or not they are in use.  This might help if you

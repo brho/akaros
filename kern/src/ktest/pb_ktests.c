@@ -122,7 +122,7 @@ bool test_barrier(void)
 {
 	cprintf("Core 0 initializing barrier\n");
 	init_barrier(&test_cpu_array, num_cores);
-	cprintf("Core 0 asking all cores to print ids, barrier, rinse, repeat\n");
+	printk("Core 0 asking all cores to print ids, barrier, etc\n");
 	smp_call_function_all(test_barrier_handler, NULL, 0);
 
 	return true;
@@ -133,6 +133,7 @@ bool test_barrier(void)
 bool test_interrupts_irqsave(void)
 {
 	int8_t state = 0;
+
 	printd("Testing Nesting Enabling first, turning ints off:\n");
 	disable_irq();
 	printd("Interrupts are: %x\n", irq_is_enabled());
@@ -319,12 +320,14 @@ static void test_null_handler(struct hw_trapframe *tf, void *data)
 bool test_smp_call_functions(void)
 {
 	int i;
+
 	atomic_init(&a, 0);
 	atomic_init(&b, 0);
 	atomic_init(&c, 0);
-	handler_wrapper_t *waiter0 = 0, *waiter1 = 0, *waiter2 = 0, *waiter3 = 0,
-	                  *waiter4 = 0, *waiter5 = 0;
+	handler_wrapper_t *waiter0 = 0, *waiter1 = 0, *waiter2 = 0,
+			  *waiter3 = 0, *waiter4 = 0, *waiter5 = 0;
 	uint8_t me = core_id();
+
 	printk("\nCore %d: SMP Call Self (nowait):\n", me);
 	printk("---------------------\n");
 	smp_call_function_self(test_hello_world_handler, NULL, 0);
@@ -339,7 +342,8 @@ bool test_smp_call_functions(void)
 	printk("---------------------\n");
 	smp_call_function_all(test_hello_world_handler, NULL, &waiter0);
 	smp_call_wait(waiter0);
-	printk("\nCore %d: SMP Call All-Else Individually, in order (nowait):\n", me);
+	printk("\nCore %d: SMP Call All-Else Individually, in order (nowait):\n",
+	       me);
 	printk("---------------------\n");
 	for(i = 1; i < num_cores; i++)
 		smp_call_function_single(i, test_hello_world_handler, NULL, 0);
@@ -347,36 +351,49 @@ bool test_smp_call_functions(void)
 	printk("---------------------\n");
 	smp_call_function_self(test_hello_world_handler, NULL, &waiter0);
 	smp_call_wait(waiter0);
-	printk("\nCore %d: SMP Call All-Else Individually, in order (wait):\n", me);
+	printk("\nCore %d: SMP Call All-Else Individually, in order (wait):\n",
+	       me);
 	printk("---------------------\n");
 	for(i = 1; i < num_cores; i++)
 	{
-		smp_call_function_single(i, test_hello_world_handler, NULL, &waiter0);
+		smp_call_function_single(i, test_hello_world_handler, NULL,
+					 &waiter0);
 		smp_call_wait(waiter0);
 	}
 	printk("\nTesting to see if any IPI-functions are dropped when not waiting:\n");
-	printk("A: %d, B: %d, C: %d (should be 0,0,0)\n", atomic_read(&a), atomic_read(&b), atomic_read(&c));
+	printk("A: %d, B: %d, C: %d (should be 0,0,0)\n", atomic_read(&a),
+	       atomic_read(&b), atomic_read(&c));
 	smp_call_function_all(test_incrementer_handler, &a, 0);
 	smp_call_function_all(test_incrementer_handler, &b, 0);
 	smp_call_function_all(test_incrementer_handler, &c, 0);
 	// if i can clobber a previous IPI, the interleaving might do it
-	smp_call_function_single(1 % num_cores, test_incrementer_handler, &a, 0);
-	smp_call_function_single(2 % num_cores, test_incrementer_handler, &b, 0);
-	smp_call_function_single(3 % num_cores, test_incrementer_handler, &c, 0);
-	smp_call_function_single(4 % num_cores, test_incrementer_handler, &a, 0);
-	smp_call_function_single(5 % num_cores, test_incrementer_handler, &b, 0);
-	smp_call_function_single(6 % num_cores, test_incrementer_handler, &c, 0);
+	smp_call_function_single(1 % num_cores, test_incrementer_handler, &a,
+				 0);
+	smp_call_function_single(2 % num_cores, test_incrementer_handler, &b,
+				 0);
+	smp_call_function_single(3 % num_cores, test_incrementer_handler, &c,
+				 0);
+	smp_call_function_single(4 % num_cores, test_incrementer_handler, &a,
+				 0);
+	smp_call_function_single(5 % num_cores, test_incrementer_handler, &b,
+				 0);
+	smp_call_function_single(6 % num_cores, test_incrementer_handler, &c,
+				 0);
 	smp_call_function_all(test_incrementer_handler, &a, 0);
-	smp_call_function_single(3 % num_cores, test_incrementer_handler, &c, 0);
+	smp_call_function_single(3 % num_cores, test_incrementer_handler, &c,
+				 0);
 	smp_call_function_all(test_incrementer_handler, &b, 0);
-	smp_call_function_single(1 % num_cores, test_incrementer_handler, &a, 0);
+	smp_call_function_single(1 % num_cores, test_incrementer_handler, &a,
+				 0);
 	smp_call_function_all(test_incrementer_handler, &c, 0);
-	smp_call_function_single(2 % num_cores, test_incrementer_handler, &b, 0);
+	smp_call_function_single(2 % num_cores, test_incrementer_handler, &b,
+				 0);
 	// wait, so we're sure the others finish before printing.
 	// without this, we could (and did) get 19,18,19, since the B_inc
 	// handler didn't finish yet
 	smp_call_function_self(test_null_handler, NULL, &waiter0);
-	// need to grab all 5 handlers (max), since the code moves to the next free.
+	// need to grab all 5 handlers (max), since the code moves to the next
+	// free.
 	smp_call_function_self(test_null_handler, NULL, &waiter1);
 	smp_call_function_self(test_null_handler, NULL, &waiter2);
 	smp_call_function_self(test_null_handler, NULL, &waiter3);
@@ -386,7 +403,8 @@ bool test_smp_call_functions(void)
 	smp_call_wait(waiter2);
 	smp_call_wait(waiter3);
 	smp_call_wait(waiter4);
-	printk("A: %d, B: %d, C: %d (should be 19,19,19)\n", atomic_read(&a), atomic_read(&b), atomic_read(&c));
+	printk("A: %d, B: %d, C: %d (should be 19,19,19)\n", atomic_read(&a),
+	       atomic_read(&b), atomic_read(&c));
 	printk("Attempting to deadlock by smp_calling with an outstanding wait:\n");
 	smp_call_function_self(test_null_handler, NULL, &waiter0);
 	printk("Sent one\n");
@@ -441,7 +459,8 @@ bool test_lapic_status_bit(void)
 	udelay(5000000);
 	printk("IPIs received (should be %d): %d\n", a, NUM_IPI);
 	// KT_ASSERT_M("IPIs received should be 100000", (NUM_IPI == a));
-	// hopefully that handler never fires again.  leaving it registered for now.
+	// hopefully that handler never fires again.  leaving it registered for
+	// now.
 
 	return true;
 }
@@ -517,7 +536,8 @@ bool test_circ_buffer(void)
 
 	for (int i = 0; i < 5; i++) {
 		FOR_CIRC_BUFFER(i, 5, j)
-			printk("Starting with current = %d, each value = %d\n", i, j);
+			printk("Starting with current = %d, each value = %d\n",
+			       i, j);
 	}
 
 	return true;
@@ -587,7 +607,7 @@ bool test_hashtable(void)
 	KT_ASSERT_M("It should be possible to insert items to a hashtable",
 	            hashtable_insert(h, (void*)k, v));
 	v = NULL;
-	KT_ASSERT_M("It should be possible to find inserted stuff in a hashtable",
+	KT_ASSERT_M("should be possible to find inserted stuff in a hashtable",
 	            (v = hashtable_search(h, (void*)k)));
 
 	KT_ASSERT_M("The extracted element should be the same we inserted",
@@ -595,10 +615,10 @@ bool test_hashtable(void)
 
 	v = NULL;
 
-	KT_ASSERT_M("It should be possible to remove an existing element",
+	KT_ASSERT_M("should be possible to remove an existing element",
 	            (v = hashtable_remove(h, (void*)k)));
 
-	KT_ASSERT_M("An element should not remain in a hashtable after deletion",
+	KT_ASSERT_M("element should not remain in a hashtable after deletion",
 	            !(v = hashtable_search(h, (void*)k)));
 
 	/* Testing a bunch of items, insert, search, and removal */
@@ -697,10 +717,11 @@ bool test_circular_buffer(void)
 		size_t len = snprintf(buf, sizeof(buf), "%lu\n", i);
 
 		KT_ASSERT_M("Circular buffer write failed",
-					circular_buffer_write(&cb, buf, len) == len);
+			    circular_buffer_write(&cb, buf, len) == len);
 	}
 	cnum = off = 0;
-	while ((csize = circular_buffer_read(&cb, buf, sizeof(buf), off)) != 0) {
+	while ((csize = circular_buffer_read(&cb, buf, sizeof(buf), off)) != 0)
+	{
 		char *top = buf + csize;
 		char *ptr = buf;
 		char *pnl;
@@ -722,11 +743,12 @@ bool test_circular_buffer(void)
 		memset(buf, (int) i, sizeof(buf));
 
 		KT_ASSERT_M("Circular buffer write failed",
-					circular_buffer_write(&cb, buf,
-										  sizeof(buf)) == sizeof(buf));
+			    circular_buffer_write(&cb, buf, sizeof(buf)) ==
+			    sizeof(buf));
 	}
 	cnum = off = 0;
-	while ((csize = circular_buffer_read(&cb, buf, sizeof(buf), off)) != 0) {
+	while ((csize = circular_buffer_read(&cb, buf, sizeof(buf), off)) != 0)
+	{
 		size_t num = buf[0];
 
 		KT_ASSERT_M("Invalid record read size", csize == sizeof(buf));
@@ -743,7 +765,7 @@ bool test_circular_buffer(void)
 
 	mxsize = circular_buffer_max_write_size(&cb);
 	KT_ASSERT_M("Circular buffer max write failed",
-				circular_buffer_write(&cb, bigbuf, mxsize) == mxsize);
+		    circular_buffer_write(&cb, bigbuf, mxsize) == mxsize);
 
 	memset(bigbuf, 17, cbsize);
 	csize = circular_buffer_read(&cb, bigbuf, mxsize, 0);
@@ -867,13 +889,14 @@ bool test_ucq(void)
 
 		printk("Running the alarm handler!\n");
 		printk("NR msg per page: %d\n", NR_MSG_PER_PAGE);
-		/* might not be mmaped yet, if not, abort.  We used to user_mem_check,
-		 * but now we just touch it and PF. */
+		/* might not be mmaped yet, if not, abort.  We used to
+		 * user_mem_check, but now we just touch it and PF. */
 		char touch = *(char*)ucq;
 		asm volatile ("" : : "r"(touch));
 		/* load their address space */
 		old_proc = switch_to(p);
-		/* So it's mmaped, see if it is ready (note that this is dangerous) */
+		/* So it's mmaped, see if it is ready (note that this is
+		 * dangerous) */
 		if (!ucq->ucq_ready) {
 			printk("Not ready yet\n");
 			switch_back(p, old_proc);
@@ -887,8 +910,8 @@ bool test_ucq(void)
 		msg.ev_arg2 = 0xdeadbeef;
 		send_ucq_msg(ucq, p, &msg);
 		printk("nr_pages: %d\n", atomic_read(&ucq->nr_extra_pgs));
-		/* 2: Send a bunch.  In a VM, this causes one swap, and then a bunch of
-		 * mmaps. */
+		/* 2: Send a bunch.  In a VM, this causes one swap, and then a
+		 * bunch of mmaps. */
 		printk("[kernel] #2 \n");
 		for (int i = 0; i < 5000; i++) {
 			msg.ev_type = i;
@@ -904,7 +927,8 @@ bool test_ucq(void)
 		printk("nr_pages: %d\n", atomic_read(&ucq->nr_extra_pgs));
 		/* other things we could do:
 		 *  - concurrent producers / consumers...  ugh.
-		 *  - would require a kmsg to another core, instead of a local alarm
+		 *  - would require a kmsg to another core, instead of a local
+		 *  alarm
 		 */
 		/* done, switch back and free things */
 		switch_back(p, old_proc);
@@ -930,14 +954,15 @@ bool test_ucq(void)
 	            program);
 
 	struct proc *p = proc_create(program, NULL, NULL);
+
 	proc_wakeup(p);
-	/* instead of getting rid of the reference created in proc_create, we'll put
-	 * it in the awaiter */
+	/* instead of getting rid of the reference created in proc_create, we'll
+	 * put it in the awaiter */
 	waiter->data = p;
 	foc_decref(program);
-	/* Should never return from schedule (env_pop in there) also note you may
-	 * not get the process you created, in the event there are others floating
-	 * around that are runnable */
+	/* Should never return from schedule (env_pop in there) also note you
+	 * may not get the process you created, in the event there are others
+	 * floating around that are runnable */
 	run_scheduler();
 	smp_idle();
 
@@ -968,10 +993,11 @@ static void __test_up_sem(uint32_t srcid, long a0, long a1, long a2)
 bool test_kthreads(void)
 {
 	struct semaphore sem = SEMAPHORE_INITIALIZER(sem, 1);
+
 	printk("We're a kthread!  Stacktop is %p.  Testing suspend, etc...\n",
 	       get_stack_top());
-	/* So we have something that will wake us up.  Routine messages won't get
-	 * serviced in the kernel right away. */
+	/* So we have something that will wake us up.  Routine messages won't
+	 * get serviced in the kernel right away. */
 	send_kernel_message(core_id(), __test_up_sem, (long)&sem, 0, 0,
 	                    KMSG_ROUTINE);
 	/* Actually block (or try to) */
@@ -1183,7 +1209,8 @@ bool test_cv(void)
 	for (int i = 0; i < nr_msgs; i++) {
 		int cpu = (i % (num_cores - 1)) + 1;
 		if (atomic_read(&counter) % 5)
-			send_kernel_message(cpu, __test_cv_waiter, 0, 0, 0, KMSG_ROUTINE);
+			send_kernel_message(cpu, __test_cv_waiter, 0, 0, 0,
+					    KMSG_ROUTINE);
 		else
 			send_kernel_message(cpu, __test_cv_signal, 0, 0, 0, KMSG_ROUTINE);
 	}
@@ -1192,31 +1219,35 @@ bool test_cv(void)
 		cpu_relax();
 		cv_broadcast(cv);
 		udelay(1000000);
-		kthread_yield();	/* run whatever messages we sent to ourselves */
+		kthread_yield();/* run whatever messages we sent to ourselves */
 	}
 	KT_ASSERT(!cv->nr_waiters);
 	printk("test_cv: massive message storm complete\n");
 
-	/* Test 3: basic one signaller, one receiver.  we want to vary the amount of
-	 * time the sender and receiver delays, starting with (1ms, 0ms) and ending
-	 * with (0ms, 1ms).  At each extreme, such as with the sender waiting 1ms,
-	 * the receiver/waiter should hit the "check and wait" point well before the
-	 * sender/signaller hits the "change state and signal" point. */
+	/* Test 3: basic one signaller, one receiver.  we want to vary the
+	 * amount of time the sender and receiver delays, starting with (1ms,
+	 * 0ms) and ending with (0ms, 1ms).  At each extreme, such as with the
+	 * sender waiting 1ms, the receiver/waiter should hit the "check and
+	 * wait" point well before the sender/signaller hits the "change state
+	 * and signal" point. */
 	for (int i = 0; i < 1000; i++) {
-		for (int j = 0; j < 10; j++) {	/* some extra chances at each point */
+		/* some extra chances at each point */
+		for (int j = 0; j < 10; j++) {
 			state = FALSE;
-			atomic_init(&counter, 1);	/* signal that the client is done */
+			/* signal that the client is done */
+			atomic_init(&counter, 1);
 			/* client waits for i usec */
-			send_kernel_message(2, __test_cv_waiter_t3, i, 0, 0, KMSG_ROUTINE);
+			send_kernel_message(2, __test_cv_waiter_t3, i, 0, 0,
+					    KMSG_ROUTINE);
 			cmb();
 			udelay(1000 - i);	/* senders wait time: 1000..0 */
 			state = TRUE;
 			cv_signal(cv);
 			/* signal might have unblocked a kthread, let it run */
 			kthread_yield();
-			/* they might not have run at all yet (in which case they lost the
-			 * race and don't need the signal).  but we need to wait til they're
-			 * done */
+			/* they might not have run at all yet (in which case
+			 * they lost the race and don't need the signal).  but
+			 * we need to wait til they're done */
 			while (atomic_read(&counter))
 				cpu_relax();
 			KT_ASSERT(!cv->nr_waiters);
@@ -1244,8 +1275,8 @@ bool test_memset(void)
 			#define ASSRT_SIZE 64
 			char *assrt_msg = (char*) kmalloc(ASSRT_SIZE, 0);
 			snprintf(assrt_msg, ASSRT_SIZE,
-				     "Char %d is %c (%02x), should be %c (%02x)", i, *c, *c,
-				     x, x);
+				 "Char %d is %c (%02x), should be %c (%02x)", i,
+				 *c, *c, x, x);
 			KT_ASSERT_M(assrt_msg, (*c == x));
 			c++;
 		}
@@ -1285,17 +1316,17 @@ void noinline __longjmp_wrapper(struct jmpbuf *jb)
 }
 
 // TODO: Add assertions.
-bool test_setjmp()
+bool test_setjmp(void)
 {
 	struct jmpbuf jb;
 	printk("Starting: %s\n", __FUNCTION__);
 	if (setjmp(&jb)) {
 	  printk("After second setjmp return: %s\n", __FUNCTION__);
-    }
-    else {
-	  printk("After first setjmp return: %s\n", __FUNCTION__);
-      __longjmp_wrapper(&jb);
-    }
+	}
+	else {
+		printk("After first setjmp return: %s\n", __FUNCTION__);
+		__longjmp_wrapper(&jb);
+	}
 	printk("Exiting: %s\n", __FUNCTION__);
 
 	return true;
@@ -1326,10 +1357,13 @@ bool test_apipe(void)
 		for (int i = 0; i < MAX_BATCH + 1; i++) {
 			count_todo = i;
 			while (count_todo) {
-				ret = apipe_write(&test_pipe, &local_str, count_todo);
-				/* Shouldn't break, based on the loop counters */
+				ret = apipe_write(&test_pipe, &local_str,
+						  count_todo);
+				/* Shouldn't break, based on the loop counters
+				 */
 				if (!ret) {
-					printk("Writer breaking with %d left\n", count_todo);
+					printk("Writer breaking with %d left\n",
+					       count_todo);
 					break;
 				}
 				total += ret;
@@ -1349,9 +1383,11 @@ bool test_apipe(void)
 		for (int i = MAX_BATCH; i >= 0; i--) {
 			count_todo = i;
 			while (count_todo) {
-				ret = apipe_read(&test_pipe, &local_str, count_todo);
+				ret = apipe_read(&test_pipe, &local_str,
+						 count_todo);
 				if (!ret) {
-					printk("Reader breaking with %d left\n", count_todo);
+					printk("Reader breaking with %d left\n",
+					       count_todo);
 					break;
 				}
 				total += ret;
@@ -1391,8 +1427,8 @@ bool test_apipe(void)
 	send_kernel_message(1, __test_apipe_writer, 0, 0, 0, KMSG_ROUTINE);
 	__test_apipe_reader(0, 0, 0, 0);
 	/* We could be on core 1 now.  If we were called from core0, our caller
-	 * might expect us to return while being on core 0 (like if we were kfunc'd
-	 * from the monitor.  Be careful if you copy this code. */
+	 * might expect us to return while being on core 0 (like if we were
+	 * kfunc'd from the monitor.  Be careful if you copy this code. */
 
 	return true;
 }
@@ -1420,20 +1456,20 @@ bool test_rwlock(void)
 		int rand = read_tsc() & 0xff;
 		for (int i = 0; i < 10000; i++) {
 			switch ((rand * i) % 5) {
-				case 0:
-				case 1:
-					rlock(rwl);
+			case 0:
+			case 1:
+				rlock(rwl);
+				runlock(rwl);
+				break;
+			case 2:
+			case 3:
+				if (canrlock(rwl))
 					runlock(rwl);
-					break;
-				case 2:
-				case 3:
-					if (canrlock(rwl))
-						runlock(rwl);
-					break;
-				case 4:
-					wlock(rwl);
-					wunlock(rwl);
-					break;
+				break;
+			case 4:
+				wlock(rwl);
+				wunlock(rwl);
+				break;
 			}
 		}
 		/* signal to allow core 0 to finish */
@@ -1444,7 +1480,8 @@ bool test_rwlock(void)
 	atomic_init(&rwlock_counter, (num_cores - 1) * 4);
 	for (int i = 1; i < num_cores; i++)
 		for (int j = 0; j < 4; j++)
-			send_kernel_message(i, __test_rwlock, 0, 0, 0, KMSG_ROUTINE);
+			send_kernel_message(i, __test_rwlock, 0, 0, 0,
+					    KMSG_ROUTINE);
 	while (atomic_read(&rwlock_counter))
 		cpu_relax();
 	printk("rwlock test complete\n");
@@ -1500,7 +1537,8 @@ bool test_rv(void)
 	atomic_init(&counter, nr_msgs);
 	state = FALSE;
 	for (int i = 1; i < num_cores; i++)
-		send_kernel_message(i, __test_rv_sleeper, 0, 0, 0, KMSG_ROUTINE);
+		send_kernel_message(i, __test_rv_sleeper, 0, 0, 0,
+				    KMSG_ROUTINE);
 	udelay(1000000);
 	cmb();
 	state = TRUE;
@@ -1518,12 +1556,15 @@ bool test_rv(void)
 	atomic_init(&counter, nr_msgs);
 	for (int i = 0; i < nr_msgs; i++) {
 		int cpu = (i % (num_cores - 1)) + 1;
-		/* timeouts from 0ms ..5000ms (enough that they should wake via cond */
+
+		/* timeouts from 0ms ..5000ms (enough that they should wake via
+		 * cond */
 		if (atomic_read(&counter) % 5)
-			send_kernel_message(cpu, __test_rv_sleeper_timeout, i * 4000, 0, 0,
-			                    KMSG_ROUTINE);
+			send_kernel_message(cpu, __test_rv_sleeper_timeout, i *
+					    4000, 0, 0, KMSG_ROUTINE);
 		else
-			send_kernel_message(cpu, __test_rv_sleeper, 0, 0, 0, KMSG_ROUTINE);
+			send_kernel_message(cpu, __test_rv_sleeper, 0, 0, 0,
+					    KMSG_ROUTINE);
 	}
 	kthread_yield();	/* run whatever messages we sent to ourselves */
 	state = TRUE;
@@ -1531,7 +1572,7 @@ bool test_rv(void)
 		cpu_relax();
 		rendez_wakeup(rv);
 		udelay(1000000);
-		kthread_yield();	/* run whatever messages we sent to ourselves */
+		kthread_yield();/* run whatever messages we sent to ourselves */
 	}
 	KT_ASSERT(!rv->cv.nr_waiters);
 	printk("test_rv: lots of sleepers/timeouts complete\n");
@@ -1609,8 +1650,8 @@ bool test_kmalloc_incref(void)
 	KT_ASSERT(!__get_unaligned_orig_buf(b1));
 	b1tag = (struct kmalloc_tag*)(b1 - sizeof(struct kmalloc_tag));
 
-	/* realigned case.  alloc'd before b1's test, so we know we get different
-	 * buffers. */
+	/* realigned case.  alloc'd before b1's test, so we know we get
+	 * different buffers. */
 	b2 = kmalloc_align(55, 0, 64);
 	b2o = __get_unaligned_orig_buf(b2);
 	KT_ASSERT(b2o);
@@ -1648,8 +1689,8 @@ bool test_u16pool(void)
 			t[i] = p;
 		}
 		numalloc = i;
-		// free them at random. With luck, we don't get too many duplicate
-		// hits.
+		// free them at random. With luck, we don't get too many
+		// duplicate hits.
 		for (y = i = 0; i < numalloc; y++) {
 			/* could read genrand, but that could be offline */
 			int f = (uint16_t)read_tsc() % numalloc;
@@ -1764,38 +1805,36 @@ static bool uaccess_mapped(void *addr, char *buf, char *buf2)
 static bool uaccess_unmapped(void *addr, char *buf, char *buf2)
 {
 	KT_ASSERT_M("Copy to user (u8) to not mapped address should fail",
-				copy_to_user(addr, buf, 1) == -EFAULT);
+		    copy_to_user(addr, buf, 1) == -EFAULT);
 	KT_ASSERT_M("Copy to user (u16) to not mapped address should fail",
-				copy_to_user(addr, buf, 2) == -EFAULT);
+		    copy_to_user(addr, buf, 2) == -EFAULT);
 	KT_ASSERT_M("Copy to user (u32) to not mapped address should fail",
-				copy_to_user(addr, buf, 4) == -EFAULT);
+		    copy_to_user(addr, buf, 4) == -EFAULT);
 	KT_ASSERT_M("Copy to user (u64) to not mapped address should fail",
-				copy_to_user(addr, buf, 8) == -EFAULT);
+		    copy_to_user(addr, buf, 8) == -EFAULT);
 	KT_ASSERT_M("Copy to user (mem) to not mapped address should fail",
-				copy_to_user(addr, buf, sizeof(buf)) == -EFAULT);
+		    copy_to_user(addr, buf, sizeof(buf)) == -EFAULT);
 
 	KT_ASSERT_M("Copy from user (u8) to not mapped address should fail",
-				copy_from_user(buf, addr, 1) == -EFAULT);
+		    copy_from_user(buf, addr, 1) == -EFAULT);
 	KT_ASSERT_M("Copy from user (u16) to not mapped address should fail",
-				copy_from_user(buf, addr, 2) == -EFAULT);
+		    copy_from_user(buf, addr, 2) == -EFAULT);
 	KT_ASSERT_M("Copy from user (u32) to not mapped address should fail",
-				copy_from_user(buf, addr, 4) == -EFAULT);
+		    copy_from_user(buf, addr, 4) == -EFAULT);
 	KT_ASSERT_M("Copy from user (u64) to not mapped address should fail",
-				copy_from_user(buf, addr, 8) == -EFAULT);
+		    copy_from_user(buf, addr, 8) == -EFAULT);
 	KT_ASSERT_M("Copy from user (mem) to not mapped address should fail",
-				copy_from_user(buf, addr, sizeof(buf)) == -EFAULT);
+		    copy_from_user(buf, addr, sizeof(buf)) == -EFAULT);
 
-	KT_ASSERT_M(
-		"String copy to user to not mapped address should fail",
-		strcpy_to_user(NULL, addr, "Akaros") == -EFAULT);
-	KT_ASSERT_M(
-		"String copy from user to not mapped address should fail",
-		strcpy_from_user(NULL, buf, addr) == -EFAULT);
+	KT_ASSERT_M("String copy to user to not mapped address should fail",
+		    strcpy_to_user(NULL, addr, "Akaros") == -EFAULT);
+	KT_ASSERT_M("String copy from user to not mapped address should fail",
+		    strcpy_from_user(NULL, buf, addr) == -EFAULT);
 
 	KT_ASSERT_M("Copy from user with kernel side source pointer should fail",
-				copy_from_user(buf, buf2, sizeof(buf)) == -EFAULT);
+		    copy_from_user(buf, buf2, sizeof(buf)) == -EFAULT);
 	KT_ASSERT_M("Copy to user with kernel side source pointer should fail",
-				copy_to_user(buf, buf2, sizeof(buf)) == -EFAULT);
+		    copy_to_user(buf, buf2, sizeof(buf)) == -EFAULT);
 
 	return TRUE;
 }
@@ -1813,10 +1852,12 @@ bool test_uaccess(void)
 
 	err = proc_alloc(&tmp, 0, 0);
 	KT_ASSERT_M("Failed to alloc a temp proc", err == 0);
-	/* Tell everyone we're ready in case some ops don't work on PROC_CREATED */
+	/* Tell everyone we're ready in case some ops don't work on PROC_CREATED
+	 */
 	__proc_set_state(tmp, PROC_RUNNABLE_S);
 	switch_tmp = switch_to(tmp);
-	addr = mmap(tmp, 0, mmap_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, -1, 0);
+	addr = mmap(tmp, 0, mmap_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, -1,
+		    0);
 	if (addr == MAP_FAILED)
 		goto out;
 	passed = uaccess_mapped(addr, buf, buf2);
@@ -1875,17 +1916,17 @@ bool test_cmdline_parse(void)
 	const char *opt;
 	char param[128];
 
-	/* Note that the get_boot_option() API should be passed NULL the first time
-	 * it is called, in normal cases, and should be passed the value returned by
-	 * previous call to get_boot_option(), in case multiple options with same
-	 * name have to be fetched.
-	 */
+	/* Note that the get_boot_option() API should be passed NULL the first
+	 * time it is called, in normal cases, and should be passed the value
+	 * returned by previous call to get_boot_option(), in case multiple
+	 * options with same name have to be fetched.  */
 	opt = get_boot_option(fake_cmdline, "-root", param, sizeof(param));
 	KT_ASSERT_M("Unable to parse -root option", opt);
 	KT_ASSERT_M("Invalid -root option value", strcmp(param, "/foo") == 0);
 
 	opt = get_boot_option(fake_cmdline, "-root", NULL, 0);
-	KT_ASSERT_M("Unable to parse -root option when param not provided", opt);
+	KT_ASSERT_M("Unable to parse -root option when param not provided",
+		    opt);
 
 	opt = get_boot_option(fake_cmdline, "-simple", param, sizeof(param));
 	KT_ASSERT_M("Unable to parse -simple option", opt);
@@ -1897,11 +1938,13 @@ bool test_cmdline_parse(void)
 
 	opt = get_boot_option(fake_cmdline, "-quoted", param, sizeof(param));
 	KT_ASSERT_M("Unable to parse -quoted option", opt);
-	KT_ASSERT_M("Invalid -quoted option value", strcmp(param, "abc '") == 0);
+	KT_ASSERT_M("Invalid -quoted option value", strcmp(param, "abc '") ==
+		    0);
 
 	opt = get_boot_option(fake_cmdline, "-dup", param, sizeof(param));
 	KT_ASSERT_M("Unable to parse -dup option", opt);
-	KT_ASSERT_M("Invalid -dup option first value", strcmp(param, "311") == 0);
+	KT_ASSERT_M("Invalid -dup option first value", strcmp(param, "311") ==
+		    0);
 
 	opt = get_boot_option(opt, "-dup", param, sizeof(param));
 	KT_ASSERT_M("Unable to parse -dup option", opt);
@@ -1910,7 +1953,8 @@ bool test_cmdline_parse(void)
 
 	opt = get_boot_option(fake_cmdline, "-inner", param, sizeof(param));
 	KT_ASSERT_M("Unable to parse -inner option", opt);
-	KT_ASSERT_M("Invalid -inner option value", strcmp(param, "-outer") == 0);
+	KT_ASSERT_M("Invalid -inner option value", strcmp(param, "-outer") ==
+		    0);
 
 	opt = get_boot_option(opt, "-inner", param, sizeof(param));
 	KT_ASSERT_M("Should not be parsing -inner as value", !opt);
@@ -1955,8 +1999,9 @@ static bool test_percpu_zalloc(void)
 	KT_ASSERT(__pcpu_ptr_is_dyn(u64));
 	KT_ASSERT(__pcpu_ptr_is_dyn(u32));
 
-	/* The order here is a bit hokey too - the first alloc is usually 16 byte
-	 * aligned, so if we did a packed alloc, the u64 wouldn't be aligned. */
+	/* The order here is a bit hokey too - the first alloc is usually 16
+	 * byte aligned, so if we did a packed alloc, the u64 wouldn't be
+	 * aligned. */
 	KT_ASSERT(ALIGNED(u8, __alignof__(*u8)));
 	KT_ASSERT(ALIGNED(u64, __alignof__(*u64)));
 	KT_ASSERT(ALIGNED(u32, __alignof__(*u32)));
@@ -1968,8 +2013,8 @@ static bool test_percpu_zalloc(void)
 		_PERCPU_VAR(*u64, i) = i;
 	for_each_core(i)
 		KT_ASSERT(_PERCPU_VAR(*u64, i) == i);
-	/* If we free and realloc, we're likely to get the same one.  This is due
-	 * to the ARENA_BESTFIT policy with xalloc. */
+	/* If we free and realloc, we're likely to get the same one.  This is
+	 * due to the ARENA_BESTFIT policy with xalloc. */
 	old_u64 = u64;
 	percpu_free(u64);
 	u64 = percpu_zalloc(uint64_t, MEM_WAIT);
@@ -2003,8 +2048,8 @@ static bool test_percpu_increment(void)
 
 	atomic_set(&check_in, num_cores);
 	for_each_core(i)
-		send_kernel_message(i, __inc_foo, (long)foos, (long)&check_in, 0,
-		                    KMSG_IMMEDIATE);
+		send_kernel_message(i, __inc_foo, (long)foos, (long)&check_in,
+				    0, KMSG_IMMEDIATE);
 	while (atomic_read(&check_in))
 		cpu_relax();
 	for_each_core(i)

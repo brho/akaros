@@ -46,7 +46,8 @@ static struct ifaddrs *get_ether_addrs(struct ifaddrs *ifa)
 		addr_fd = open(path, O_RDONLY);
 		if (addr_fd < 0)
 			continue;
-		if (read(addr_fd, etheraddr, sizeof(etheraddr)) < sizeof(etheraddr)) {
+		if (read(addr_fd, etheraddr,
+			 sizeof(etheraddr)) < sizeof(etheraddr)) {
 			fprintf(stderr, "Read addr from %s: %r", d->d_name);
 			close(addr_fd);
 			continue;
@@ -64,8 +65,8 @@ static struct ifaddrs *get_ether_addrs(struct ifaddrs *ifa)
 		sa_ll = calloc(sizeof(struct sockaddr_ll), 1);
 		ifa->ifa_addr = (struct sockaddr*)sa_ll;
 		sa_ll->sll_family = AF_PACKET;
-		/* TODO: could set protocol and hatype, if we ever get the headers for
-		 * the options.  Probably not worth it. */
+		/* TODO: could set protocol and hatype, if we ever get the
+		 * headers for the options.  Probably not worth it. */
 		sa_ll->sll_ifindex = atoi(&ifa->ifa_name[SIZE_OF_ETHER]);
 		sa_ll->sll_halen = 6;
 		for (int i = 0; i < 6; i++)
@@ -124,8 +125,8 @@ static struct ifaddrs *get_inet_addrs(struct ifaddrs *ifa)
 	struct ipifc *ifc, *ifc_i;
 	struct iplifc *lifc_i;
 
-	/* This gives us a list of ipifcs (actual interfaces), each of which has a
-	 * list of lifcs (local interface, including the IP addr). */
+	/* This gives us a list of ipifcs (actual interfaces), each of which has
+	 * a list of lifcs (local interface, including the IP addr). */
 	ifc = readipifc(NULL, NULL, -1);
 	for (ifc_i = ifc; ifc_i; ifc_i = ifc_i->next) {
 		for (lifc_i = ifc_i->lifc; lifc_i; lifc_i = lifc_i->next)

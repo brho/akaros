@@ -54,7 +54,8 @@ void hexdump(FILE *f, void *v, int length)
 				fprintf(f," %02x", m[i + j]);
 			fprintf(f,"  ");
 			for (j = 0; j < 16; j++)
-				fprintf(f,"%c", isprint(m[i + j]) ? m[i + j] : '.');
+				fprintf(f, "%c",
+					isprint(m[i + j]) ? m[i + j] : '.');
 			fprintf(f,"\n");
 		} else if (all_zero == 2) {
 			fprintf(f,"...\n");

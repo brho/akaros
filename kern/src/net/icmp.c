@@ -69,7 +69,7 @@ typedef struct Icmp {
 	uint8_t data[1];
 } Icmp;
 
-enum {							/* Packet Types */
+enum {						/* Packet Types */
 	EchoReply = 0,
 	Unreachable = 3,
 	SrcQuench = 4,
@@ -88,7 +88,7 @@ enum {							/* Packet Types */
 };
 
 enum {
-	MinAdvise = 24,				/* minimum needed for us to advise another protocol */
+	MinAdvise = 24,	/* minimum needed for us to advise another protocol */
 };
 
 char *icmpnames[Maxtype + 1] = {
@@ -158,9 +158,8 @@ void icmpconnect(struct conv *c, char **argv, int argc)
 
 extern int icmpstate(struct conv *c, char *state, int n)
 {
-	return snprintf(state, n, "%s qin %d qout %d\n",
-					"Datagram",
-					c->rq ? qlen(c->rq) : 0, c->wq ? qlen(c->wq) : 0);
+	return snprintf(state, n, "%s qin %d qout %d\n", "Datagram",
+			c->rq ? qlen(c->rq) : 0, c->wq ? qlen(c->wq) : 0);
 }
 
 void icmpannounce(struct conv *c, char **argv, int argc)
@@ -205,8 +204,8 @@ static void icmpkick(void *x, struct block *bp)
 	ipriv->stats[OutMsgs]++;
 	netlog(c->p->f, Logicmp,
 	       "icmp output: Type %s (%d,%d), To %V, TTL %d, ID %d, SEQ %d\n",
-	       icmpnames[MIN(p->type, Maxtype)],
-	       p->type, p->code, p->dst, p->ttl, nhgets(p->icmpid), nhgets(p->seq));
+	       icmpnames[MIN(p->type, Maxtype)], p->type, p->code, p->dst,
+	       p->ttl, nhgets(p->icmpid), nhgets(p->seq));
 	ipoput4(c->p->f, bp, 0, c->ttl, c->tos, NULL);
 }
 
@@ -218,7 +217,8 @@ extern void icmpttlexceeded(struct Fs *f, uint8_t * ia, struct block *bp)
 	p = (Icmp *) bp->rp;
 
 	netlog(f, Logicmp, "sending icmpttlexceeded -> %V\n", p->src);
-	nbp = block_alloc(ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8, MEM_WAIT);
+	nbp = block_alloc(ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8,
+			  MEM_WAIT);
 	nbp->wp += ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8;
 	np = (Icmp *) nbp->rp;
 	np->vihl = IP_VER4;
@@ -231,7 +231,8 @@ extern void icmpttlexceeded(struct Fs *f, uint8_t * ia, struct block *bp)
 	hnputs(np->icmpid, 0);
 	hnputs(np->seq, 0);
 	memset(np->cksum, 0, sizeof(np->cksum));
-	hnputs(np->cksum, ptclcsum(nbp, ICMP_IPSIZE, blocklen(nbp) - ICMP_IPSIZE));
+	hnputs(np->cksum, ptclcsum(nbp, ICMP_IPSIZE,
+				   blocklen(nbp) - ICMP_IPSIZE));
 	ipoput4(f, nbp, 0, MAXTTL, DFLTTOS, NULL);
 
 }
@@ -259,7 +260,8 @@ static void icmpunreachable(struct Fs *f, struct block *bp, int code, int seq)
 	 * unreachable.  But we might not be UDP, due to how the code is built.
 	 * Check the UDP netlog if you see this. */
 	netlog(f, Logicmp, "sending icmpnoconv -> %V\n", p->src);
-	nbp = block_alloc(ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8, MEM_WAIT);
+	nbp = block_alloc(ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8,
+			  MEM_WAIT);
 	nbp->wp += ICMP_IPSIZE + ICMP_HDRSIZE + ICMP_IPSIZE + 8;
 	np = (Icmp *) nbp->rp;
 	np->vihl = IP_VER4;
@@ -272,7 +274,8 @@ static void icmpunreachable(struct Fs *f, struct block *bp, int code, int seq)
 	hnputs(np->icmpid, 0);
 	hnputs(np->seq, seq);
 	memset(np->cksum, 0, sizeof(np->cksum));
-	hnputs(np->cksum, ptclcsum(nbp, ICMP_IPSIZE, blocklen(nbp) - ICMP_IPSIZE));
+	hnputs(np->cksum, ptclcsum(nbp, ICMP_IPSIZE,
+				   blocklen(nbp) - ICMP_IPSIZE));
 	ipoput4(f, nbp, 0, MAXTTL, DFLTTOS, NULL);
 }
 
@@ -315,9 +318,10 @@ static struct block *mkechoreply(struct Proto *icmp, struct block *bp)
 	Icmp *q;
 	uint8_t ip[4];
 
-	/* we're repurposing bp to send it back out.  we need to remove any inbound
-	 * checksum flags (which were saying the HW did the checksum) and any other
-	 * metadata.  We might need to fill in some of the metadata too. */
+	/* we're repurposing bp to send it back out.  we need to remove any
+	 * inbound checksum flags (which were saying the HW did the checksum)
+	 * and any other metadata.  We might need to fill in some of the
+	 * metadata too. */
 	block_reset_metadata(bp);
 	q = (Icmp *) bp->rp;
 	q->vihl = IP_VER4;
@@ -361,14 +365,15 @@ static void icmpiput(struct Proto *icmp, struct Ipifc *unused, struct block *bp)
 	ipriv->stats[InMsgs]++;
 
 	p = (Icmp *) bp->rp;
-	/* The ID and SEQ are only for Echo Request and Reply, but close enough. */
+	/* The ID and SEQ are only for Echo Request and Reply, but close enough.
+	 */
 	netlog(icmp->f, Logicmp,
 	       "icmp input: Type %s (%d,%d), From %V, TTL %d, ID %d, SEQ %d\n",
-	       icmpnames[MIN(p->type, Maxtype)],
-	       p->type, p->code, p->src, p->ttl, nhgets(p->icmpid), nhgets(p->seq));
+	       icmpnames[MIN(p->type, Maxtype)], p->type, p->code, p->src,
+	       p->ttl, nhgets(p->icmpid), nhgets(p->seq));
 	n = blocklen(bp);
 	if (n < ICMP_IPSIZE + ICMP_HDRSIZE) {
-		/* pullupblock should fail if dlen < size.  b->len >= b->dlen. */
+		/* pullupblock should fail if dlen < size.  b->len >= b->dlen */
 		panic("We did a pullupblock and thought we had enough!");
 		ipriv->stats[InErrors]++;
 		ipriv->stats[HlenErrs]++;
@@ -392,18 +397,37 @@ static void icmpiput(struct Proto *icmp, struct Ipifc *unused, struct block *bp)
 		ipriv->in[p->type]++;
 
 	switch (p->type) {
-		case EchoRequest:
-			if (iplen < n)
-				bp = trimblock(bp, 0, iplen);
-			r = mkechoreply(icmp, bp);
-			ipriv->out[EchoReply]++;
-			ipoput4(icmp->f, r, 0, MAXTTL, DFLTTOS, NULL);
-			break;
-		case Unreachable:
-			if (p->code > 5)
-				msg = unreachcode[1];
-			else
-				msg = unreachcode[p->code];
+	case EchoRequest:
+		if (iplen < n)
+			bp = trimblock(bp, 0, iplen);
+		r = mkechoreply(icmp, bp);
+		ipriv->out[EchoReply]++;
+		ipoput4(icmp->f, r, 0, MAXTTL, DFLTTOS, NULL);
+		break;
+	case Unreachable:
+		if (p->code > 5)
+			msg = unreachcode[1];
+		else
+			msg = unreachcode[p->code];
+
+		bp->rp += ICMP_IPSIZE + ICMP_HDRSIZE;
+		if (blocklen(bp) < MinAdvise) {
+			ipriv->stats[LenErrs]++;
+			goto raise;
+		}
+		p = (Icmp *) bp->rp;
+		pr = Fsrcvpcolx(icmp->f, p->proto);
+		if (pr != NULL && pr->advise != NULL) {
+			(*pr->advise) (pr, bp, msg);
+			return;
+		}
+
+		bp->rp -= ICMP_IPSIZE + ICMP_HDRSIZE;
+		goticmpkt(icmp, bp);
+		break;
+	case TimeExceed:
+		if (p->code == 0) {
+			snprintf(m2, sizeof(m2), "ttl exceeded at %V", p->src);
 
 			bp->rp += ICMP_IPSIZE + ICMP_HDRSIZE;
 			if (blocklen(bp) < MinAdvise) {
@@ -413,36 +437,17 @@ static void icmpiput(struct Proto *icmp, struct Ipifc *unused, struct block *bp)
 			p = (Icmp *) bp->rp;
 			pr = Fsrcvpcolx(icmp->f, p->proto);
 			if (pr != NULL && pr->advise != NULL) {
-				(*pr->advise) (pr, bp, msg);
+				(*pr->advise) (pr, bp, m2);
 				return;
 			}
-
 			bp->rp -= ICMP_IPSIZE + ICMP_HDRSIZE;
-			goticmpkt(icmp, bp);
-			break;
-		case TimeExceed:
-			if (p->code == 0) {
-				snprintf(m2, sizeof(m2), "ttl exceeded at %V", p->src);
+		}
 
-				bp->rp += ICMP_IPSIZE + ICMP_HDRSIZE;
-				if (blocklen(bp) < MinAdvise) {
-					ipriv->stats[LenErrs]++;
-					goto raise;
-				}
-				p = (Icmp *) bp->rp;
-				pr = Fsrcvpcolx(icmp->f, p->proto);
-				if (pr != NULL && pr->advise != NULL) {
-					(*pr->advise) (pr, bp, m2);
-					return;
-				}
-				bp->rp -= ICMP_IPSIZE + ICMP_HDRSIZE;
-			}
-
-			goticmpkt(icmp, bp);
-			break;
-		default:
-			goticmpkt(icmp, bp);
-			break;
+		goticmpkt(icmp, bp);
+		break;
+	default:
+		goticmpkt(icmp, bp);
+		break;
 	}
 	return;
 
@@ -486,10 +491,11 @@ int icmpstats(struct Proto *icmp, char *buf, int len)
 		p = seprintf(p, e, "%s: %u\n", statnames[i], priv->stats[i]);
 	for (i = 0; i <= Maxtype; i++) {
 		if (icmpnames[i])
-			p = seprintf(p, e, "%s: %u %u\n", icmpnames[i], priv->in[i],
-						 priv->out[i]);
+			p = seprintf(p, e, "%s: %u %u\n", icmpnames[i],
+				     priv->in[i], priv->out[i]);
 		else
-			p = seprintf(p, e, "%d: %u %u\n", i, priv->in[i], priv->out[i]);
+			p = seprintf(p, e, "%d: %u %u\n", i, priv->in[i],
+				     priv->out[i]);
 	}
 	return p - buf;
 }

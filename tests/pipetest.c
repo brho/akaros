@@ -7,6 +7,7 @@
 void child_handler(int readfd, int writefd)
 {
 	char c;
+
 	read(readfd, &c, 1);
 	close(readfd);
 	printf("Child read from pipe0\n");
@@ -23,6 +24,7 @@ void parent_handler(int readfd, int writefd)
 		sched_yield();
 
 	char c;
+
 	printf("Parent writing to pipe0\n");
 	write(writefd, "", 1);
 	close(writefd);
@@ -36,6 +38,7 @@ int main(int argc, char **argv)
 {
 	int pipe0[2];
 	int pipe1[2];
+
 	pipe(pipe0);
 	pipe(pipe1);
 	pid_t child = fork();

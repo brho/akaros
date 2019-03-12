@@ -41,6 +41,7 @@ __execve (path, argv, envp)
   }
 
   int ret = ros_syscall(SYS_exec, path, strlen(path), sd->buf, sd->len, 0, 0);
+
   // if we got here, then exec better have failed...
   assert(ret == -1);
   free_serialized_data(sd);

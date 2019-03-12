@@ -13,10 +13,11 @@ void __attribute__((noreturn)) __kernel_vcore_entry(void)
 	#ifndef __x86_64__
 	set_tls_desc(vcpd_of(id)->vcore_tls_desc);
 	#endif
-	/* Every time the vcore comes up, it must set that it is in vcore context.
-	 * uthreads may share the same TLS as their vcore (when uthreads do not have
-	 * their own TLS), and if a uthread was preempted, __vcore_context == FALSE,
-	 * and that will continue to be true the next time the vcore pops up. */
+	/* Every time the vcore comes up, it must set that it is in vcore
+	 * context.  uthreads may share the same TLS as their vcore (when
+	 * uthreads do not have their own TLS), and if a uthread was preempted,
+	 * __vcore_context == FALSE, and that will continue to be true the next
+	 * time the vcore pops up. */
 	__vcore_context = TRUE;
 	vcore_entry();
 	fprintf(stderr, "vcore_entry() should never return!\n");

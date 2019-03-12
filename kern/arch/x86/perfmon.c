@@ -69,16 +69,17 @@ DEFINE_PERCPU_INIT(perfmon_counters_env_init);
 #define PROFILER_BT_DEPTH 16
 
 struct sample_snapshot {
-	struct user_context			ctx;
-	uintptr_t					pc_list[PROFILER_BT_DEPTH];
-	size_t						nr_pcs;
+	struct user_context		ctx;
+	uintptr_t			pc_list[PROFILER_BT_DEPTH];
+	size_t				nr_pcs;
 };
 static DEFINE_PERCPU(struct sample_snapshot, sample_snapshots);
 
 static void perfmon_counters_env_init(void)
 {
 	for (int i = 0; i < num_cores; i++) {
-		struct perfmon_cpu_context *cctx = _PERCPU_VARPTR(counters_env, i);
+		struct perfmon_cpu_context *cctx =
+			_PERCPU_VARPTR(counters_env, i);
 
 		spinlock_init_irqsave(&cctx->lock);
 	}
@@ -113,8 +114,8 @@ static void perfmon_disable_event(int idx)
 	uint64_t gctrl;
 
 	/* Events can be disabled in either location.  We could just clear the
-	 * global ctrl, but we use the contents of EVENTSEL to say if the counter is
-	 * available or not. */
+	 * global ctrl, but we use the contents of EVENTSEL to say if the
+	 * counter is available or not. */
 	write_msr(MSR_ARCH_PERFMON_EVENTSEL0 + idx, 0);
 	gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
 	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl & ~(1 << idx));
@@ -162,7 +163,8 @@ static void perfmon_enable_fix_event(int idx, uint64_t event,
 	fx = perfmon_apply_fixevent_mask(event, idx, fxctrl_value);
 	write_msr(MSR_CORE_PERF_FIXED_CTR_CTRL, fx);
 	gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
-	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl | ((uint64_t) 1 << (32 + idx)));
+	write_msr(MSR_CORE_PERF_GLOBAL_CTRL,
+		  gctrl | ((uint64_t) 1 << (32 + idx)));
 }
 
 static void perfmon_disable_fix_event(int idx, uint64_t fxctrl_value)
@@ -175,7 +177,8 @@ static void perfmon_disable_fix_event(int idx, uint64_t fxctrl_value)
 	write_msr(MSR_CORE_PERF_FIXED_CTR_CTRL,
 	          fxctrl_value & ~(FIXCNTR_MASK << (idx * FIXCNTR_NBITS)));
 	gctrl = read_msr(MSR_CORE_PERF_GLOBAL_CTRL);
-	write_msr(MSR_CORE_PERF_GLOBAL_CTRL, gctrl & ~((uint64_t) 1 << (32 + idx)));
+	write_msr(MSR_CORE_PERF_GLOBAL_CTRL,
+		  gctrl & ~((uint64_t) 1 << (32 + idx)));
 }
 
 static bool perfmon_fix_event_available(uint32_t idx, uint64_t fxctrl_value)
@@ -213,7 +216,8 @@ static void perfmon_convert_error(int err_code, int core_id)
 {
 	switch (err_code) {
 	case EBUSY:
-		set_error(err_code, "Fixed perf counter is busy on core %d", core_id);
+		set_error(err_code, "Fixed perf counter is busy on core %d",
+			  core_id);
 		break;
 	case ENOSPC:
 		set_error(err_code, "Perf counter idx out of range on core %d",
@@ -223,7 +227,8 @@ static void perfmon_convert_error(int err_code, int core_id)
 		set_error(err_code, "Perf counter not set on core %d", core_id);
 		break;
 	default:
-		set_error(err_code, "Unknown perf counter error on core %d", core_id);
+		set_error(err_code, "Unknown perf counter error on core %d",
+			  core_id);
 		break;
 	};
 }
@@ -245,20 +250,24 @@ static void perfmon_do_cores_alloc(void *opaque)
 		} else if (!perfmon_fix_event_available(i, fxctrl_value)) {
 			i = -EBUSY;
 		} else {
-			/* Keep a copy of pa->ev for later.  pa is read-only and shared. */
+			/* Keep a copy of pa->ev for later.  pa is read-only and
+			 * shared. */
 			cctx->fixed_counters[i] = pa->ev;
 			pev = &cctx->fixed_counters[i];
 			if (PMEV_GET_INTEN(pev->event))
-				perfmon_set_fixed_trigger(i, pev->trigger_count);
+				perfmon_set_fixed_trigger(i,
+							  pev->trigger_count);
 			else
 				write_msr(MSR_CORE_PERF_FIXED_CTR0 + i, 0);
-			write_msr(MSR_CORE_PERF_GLOBAL_OVF_CTRL, 1ULL << (32 + i));
+			write_msr(MSR_CORE_PERF_GLOBAL_OVF_CTRL,
+				  1ULL << (32 + i));
 			perfmon_enable_fix_event(i, pev->event, fxctrl_value);
 		}
 	} else {
 		for (i = 0; i < (int) cpu_caps.counters_x_proc; i++) {
 			if (cctx->counters[i].event == 0) {
-				/* kernel bug if the MSRs don't agree with our bookkeeping */
+				/* kernel bug if the MSRs don't agree with our
+				 * bookkeeping */
 				assert(perfmon_event_available(i));
 				break;
 			}
@@ -267,7 +276,8 @@ static void perfmon_do_cores_alloc(void *opaque)
 			cctx->counters[i] = pa->ev;
 			pev = &cctx->counters[i];
 			if (PMEV_GET_INTEN(pev->event))
-				perfmon_set_unfixed_trigger(i, pev->trigger_count);
+				perfmon_set_unfixed_trigger(i,
+							    pev->trigger_count);
 			else
 				write_msr(MSR_IA32_PERFCTR0 + i, 0);
 			write_msr(MSR_CORE_PERF_GLOBAL_OVF_CTRL, 1ULL << i);
@@ -347,9 +357,11 @@ static void perfmon_do_cores_status(void *opaque)
 
 	spin_lock_irqsave(&cctx->lock);
 	if (perfmon_is_fixed_event(&env->pa->ev))
-		env->pef->cores_values[coreno] = perfmon_read_fixed_counter(ccno);
+		env->pef->cores_values[coreno] =
+			perfmon_read_fixed_counter(ccno);
 	else
-		env->pef->cores_values[coreno] = perfmon_read_unfixed_counter(ccno);
+		env->pef->cores_values[coreno] =
+			perfmon_read_unfixed_counter(ccno);
 	spin_unlock_irqsave(&cctx->lock);
 }
 
@@ -388,7 +400,7 @@ static struct perfmon_alloc *perfmon_create_alloc(const struct perfmon_event *pe
 {
 	int i;
 	struct perfmon_alloc *pa = kzmalloc(sizeof(struct perfmon_alloc) +
-	                                        num_cores * sizeof(counter_t),
+	                                    num_cores * sizeof(counter_t),
 	                                    MEM_WAIT);
 
 	pa->ev = *pev;
@@ -401,7 +413,7 @@ static struct perfmon_alloc *perfmon_create_alloc(const struct perfmon_event *pe
 static struct perfmon_status *perfmon_status_alloc(void)
 {
 	struct perfmon_status *pef = kzmalloc(sizeof(struct perfmon_status) +
-	                                          num_cores * sizeof(uint64_t),
+	                                      num_cores * sizeof(uint64_t),
 	                                      MEM_WAIT);
 
 	return pef;
@@ -487,25 +499,28 @@ static void profiler_add_sample(uint64_t info)
 {
 	struct sample_snapshot *sample = PERCPU_VARPTR(sample_snapshots);
 
-	/* We shouldn't need to worry about another NMI that concurrently mucks with
-	 * the sample.  The PMU won't rearm the interrupt until we're done here.  In
-	 * the event that we do get another NMI from another source, we may get a
-	 * weird backtrace in the perf output. */
+	/* We shouldn't need to worry about another NMI that concurrently mucks
+	 * with the sample.  The PMU won't rearm the interrupt until we're done
+	 * here.  In the event that we do get another NMI from another source,
+	 * we may get a weird backtrace in the perf output. */
 	switch (sample->ctx.type) {
 	case ROS_HW_CTX:
 		if (in_kernel(&sample->ctx.tf.hw_tf)) {
-			profiler_push_kernel_backtrace(sample->pc_list, sample->nr_pcs,
-			                               info);
+			profiler_push_kernel_backtrace(sample->pc_list,
+						       sample->nr_pcs, info);
 		} else {
-			profiler_push_user_backtrace(sample->pc_list, sample->nr_pcs, info);
+			profiler_push_user_backtrace(sample->pc_list,
+						     sample->nr_pcs, info);
 		}
 		break;
 	case ROS_VM_CTX:
-		/* TODO: add VM support to perf.  For now, just treat it like a user
-		 * addr.  Note that the address is a guest-virtual address, not
-		 * guest-physical (which would be host virtual), and our VM_CTXs don't
-		 * make a distinction between user and kernel TFs (yet). */
-		profiler_push_user_backtrace(sample->pc_list, sample->nr_pcs, info);
+		/* TODO: add VM support to perf.  For now, just treat it like a
+		 * user addr.  Note that the address is a guest-virtual address,
+		 * not guest-physical (which would be host virtual), and our
+		 * VM_CTXs don't make a distinction between user and kernel TFs
+		 * (yet). */
+		profiler_push_user_backtrace(sample->pc_list, sample->nr_pcs,
+					     info);
 		break;
 	default:
 		warn("Bad perf sample type %d!", sample->ctx.type);
@@ -530,8 +545,10 @@ void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 		if (status & ((uint64_t) 1 << i)) {
 			if (cctx->counters[i].event) {
 				profiler_add_sample(
-				    perfmon_make_sample_event(cctx->counters + i));
-				perfmon_set_unfixed_trigger(i, cctx->counters[i].trigger_count);
+				    perfmon_make_sample_event(
+					cctx->counters + i));
+				perfmon_set_unfixed_trigger(i,
+					cctx->counters[i].trigger_count);
 			}
 		}
 	}
@@ -539,7 +556,8 @@ void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 		if (status & ((uint64_t) 1 << (32 + i))) {
 			if (cctx->fixed_counters[i].event) {
 				profiler_add_sample(
-				    perfmon_make_sample_event(cctx->fixed_counters + i));
+				    perfmon_make_sample_event(
+					cctx->fixed_counters + i));
 				perfmon_set_fixed_trigger(i,
 				        cctx->fixed_counters[i].trigger_count);
 			}
@@ -551,8 +569,8 @@ void perfmon_interrupt(struct hw_trapframe *hw_tf, void *data)
 
 	/* We need to re-arm the IRQ as the PFM IRQ gets masked on trigger.
 	 * Note that KVM and real HW seems to be doing two different things WRT
-	 * re-arming the IRQ. KVM re-arms does not mask the IRQ, while real HW does.
-	 */
+	 * re-arming the IRQ. KVM re-arms does not mask the IRQ, while real HW
+	 * does.  */
 	perfmon_arm_irq();
 }
 
@@ -592,9 +610,9 @@ int perfmon_open_event(const struct core_set *cset, struct perfmon_session *ps,
 	pa->ev.event &= 0xffffffff;
 	if (cpu_caps.perfmon_version < 3)
 		PMEV_SET_ANYTH(pa->ev.event, 0);
-	/* Ensure we're turning on the event.  The user could have forgotten to set
-	 * it.  Our tracking of whether or not a counter is in use depends on it
-	 * being enabled, or at least that some bit is set. */
+	/* Ensure we're turning on the event.  The user could have forgotten to
+	 * set it.  Our tracking of whether or not a counter is in use depends
+	 * on it being enabled, or at least that some bit is set. */
 	PMEV_SET_EN(pa->ev.event, 1);
 	smp_do_in_cores(cset, perfmon_do_cores_alloc, pa);
 
@@ -613,8 +631,8 @@ int perfmon_open_event(const struct core_set *cset, struct perfmon_session *ps,
 	 * until the perfmon_install_session_alloc() completes, and at that
 	 * time the smp_do_in_cores(perfmon_do_cores_alloc) will have run on
 	 * all cores.
-	 * The perfmon_alloc data structure will never be changed once published.
-	 */
+	 * The perfmon_alloc data structure will never be changed once
+	 * published. */
 	i = perfmon_install_session_alloc(ps, pa);
 	poperror();
 

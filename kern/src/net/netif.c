@@ -42,8 +42,8 @@ static int netown(struct netfile *, char *unused_char_p_t, int);
 static int openfile(struct ether *, int);
 static char *matchtoken(char *unused_char_p_t, char *);
 static char *netmulti(struct ether *, struct netfile *,
-					  uint8_t * unused_uint8_p_t, int);
-static int parseaddr(uint8_t * unused_uint8_p_t, char *unused_char_p_t, int);
+		      uint8_t *unused_uint8_p_t, int);
+static int parseaddr(uint8_t *unused_uint8_p_t, char *unused_char_p_t, int);
 
 /*
  *  set up a new network interface
@@ -64,9 +64,8 @@ void netifinit(struct ether *nif, char *name, int nfile, uint32_t limit)
 /*
  *  generate a 3 level directory
  */
-static int
-netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
-		 int unused_int, int i, struct dir *dp)
+static int netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
+		    int unused_int, int i, struct dir *dp)
 {
 	struct qid q;
 	struct ether *nif = (struct ether *)vp;
@@ -80,19 +79,19 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 	/* top level directory contains the name of the network */
 	if (c->qid.path == 0) {
 		switch (i) {
-			case DEVDOTDOT:
-				q.path = 0;
-				q.type = QTDIR;
-				devdir(c, q, ".", 0, eve.name, 0555, dp);
-				break;
-			case 0:
-				q.path = N2ndqid;
-				q.type = QTDIR;
-				strlcpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
-				devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
-				break;
-			default:
-				return -1;
+		case DEVDOTDOT:
+			q.path = 0;
+			q.type = QTDIR;
+			devdir(c, q, ".", 0, eve.name, 0555, dp);
+			break;
+		case 0:
+			q.path = N2ndqid;
+			q.type = QTDIR;
+			strlcpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
+			devdir(c, q, get_cur_genbuf(), 0, eve.name, 0555, dp);
+			break;
+		default:
+			return -1;
 		}
 		return 1;
 	}
@@ -100,33 +99,33 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 	/* second level contains clone plus all the conversations.
 	 *
 	 * This ancient comment is from plan9.  Inferno and nxm both had issues
-	 * here.  You couldn't ls /net/ether0/ when it didn't have any convs.  There
-	 * were also issues with nxm where you couldn't stat ether0/x/stats
-	 * properly.
+	 * here.  You couldn't ls /net/ether0/ when it didn't have any convs.
+	 * There were also issues with nxm where you couldn't stat
+	 * ether0/x/stats properly.
 	 *
-	 * The issue is that if we handle things like Nstatqid, then we will never
-	 * pass it down to the third level. And since we just set the path ==
-	 * Nstatqid, we won't have the NETID muxed in. If someone isn't trying to
-	 * generate a chan, but instead is looking it up (devwalk generates, devstat
-	 * already has the chan), then they are also looking for a devdir with path
-	 * containing ID << 5. So if you stat ether0/1/ifstats, devstat is looking
-	 * for path 41, but we return path 9 (41 = 32 + 9). (these numbers are
-	 * before we tracked NETID + 1).
+	 * The issue is that if we handle things like Nstatqid, then we will
+	 * never pass it down to the third level. And since we just set the path
+	 * == Nstatqid, we won't have the NETID muxed in. If someone isn't
+	 * trying to generate a chan, but instead is looking it up (devwalk
+	 * generates, devstat already has the chan), then they are also looking
+	 * for a devdir with path containing ID << 5. So if you stat
+	 * ether0/1/ifstats, devstat is looking for path 41, but we return path
+	 * 9 (41 = 32 + 9). (these numbers are before we tracked NETID + 1).
 	 *
-	 * We (akaros and plan9) had a big if here, that would catch things that do
-	 * not exist in the subdirs of a netif. Things like clone make sense here.
-	 * I guess addr too, though that seems to be added since the original
-	 * comment. You can see what the 3rd level was expecting to parse by looking
-	 * farther down in the code.
+	 * We (akaros and plan9) had a big if here, that would catch things that
+	 * do not exist in the subdirs of a netif. Things like clone make sense
+	 * here.  I guess addr too, though that seems to be added since the
+	 * original comment. You can see what the 3rd level was expecting to
+	 * parse by looking farther down in the code.
 	 *
 	 * The root of the problem was that the old code couldn't tell the
-	 * difference between no netid and netid 0. Now, we determine if we're at
-	 * the second level by the lack of a netid, instead of trying to enumerate
-	 * the qid types that the second level could have. The latter approach
-	 * allowed for something like ether0/1/stats, but we couldn't actually
-	 * devstat ether0/stats directly. It's worth noting that there is no
-	 * difference to the content of ether0/stats and ether0/x/stats (when you
-	 * read), but they have different chan qids.
+	 * difference between no netid and netid 0. Now, we determine if we're
+	 * at the second level by the lack of a netid, instead of trying to
+	 * enumerate the qid types that the second level could have. The latter
+	 * approach allowed for something like ether0/1/stats, but we couldn't
+	 * actually devstat ether0/stats directly. It's worth noting that there
+	 * is no difference to the content of ether0/stats and ether0/x/stats
+	 * (when you read), but they have different chan qids.
 	 *
 	 * Here's the old if block:
 	 t = NETTYPE(c->qid.path);
@@ -134,38 +133,39 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 	 */
 	if (NETID(c->qid.path) == -1) {
 		switch (i) {
-			case DEVDOTDOT:
-				q.type = QTDIR;
-				q.path = 0;
-				devdir(c, q, ".", 0, eve.name, DMDIR | 0555, dp);
-				break;
-			case 0:
-				q.path = Ncloneqid;
-				devdir(c, q, "clone", 0, eve.name, 0666, dp);
-				break;
-			case 1:
-				q.path = Naddrqid;
-				devdir(c, q, "addr", 0, eve.name, 0666, dp);
-				break;
-			case 2:
-				q.path = Nstatqid;
-				devdir(c, q, "stats", 0, eve.name, 0444, dp);
-				break;
-			case 3:
-				q.path = Nifstatqid;
-				devdir(c, q, "ifstats", 0, eve.name, 0444, dp);
-				break;
-			default:
-				i -= 4;
-				if (i >= nif->nfile)
-					return -1;
-				if (nif->f[i] == 0)
-					return 0;
-				q.type = QTDIR;
-				q.path = NETQID(i, N3rdqid);
-				snprintf(get_cur_genbuf(), GENBUF_SZ, "%d", i);
-				devdir(c, q, get_cur_genbuf(), 0, eve.name, DMDIR | 0555, dp);
-				break;
+		case DEVDOTDOT:
+			q.type = QTDIR;
+			q.path = 0;
+			devdir(c, q, ".", 0, eve.name, DMDIR | 0555, dp);
+			break;
+		case 0:
+			q.path = Ncloneqid;
+			devdir(c, q, "clone", 0, eve.name, 0666, dp);
+			break;
+		case 1:
+			q.path = Naddrqid;
+			devdir(c, q, "addr", 0, eve.name, 0666, dp);
+			break;
+		case 2:
+			q.path = Nstatqid;
+			devdir(c, q, "stats", 0, eve.name, 0444, dp);
+			break;
+		case 3:
+			q.path = Nifstatqid;
+			devdir(c, q, "ifstats", 0, eve.name, 0444, dp);
+			break;
+		default:
+			i -= 4;
+			if (i >= nif->nfile)
+				return -1;
+			if (nif->f[i] == 0)
+				return 0;
+			q.type = QTDIR;
+			q.path = NETQID(i, N3rdqid);
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "%d", i);
+			devdir(c, q, get_cur_genbuf(), 0, eve.name,
+			       DMDIR | 0555, dp);
+			break;
 		}
 		return 1;
 	}
@@ -182,34 +182,34 @@ netifgen(struct chan *c, char *unused_char_p_t, struct dirtab *vp,
 		perm = 0666;
 	}
 	switch (i) {
-		case DEVDOTDOT:
-			q.type = QTDIR;
-			q.path = N2ndqid;
-			strlcpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
-			devdir(c, q, get_cur_genbuf(), 0, eve.name, DMDIR | 0555, dp);
-			break;
-		case 0:
-			q.path = NETQID(NETID(c->qid.path), Ndataqid);
-			devdir(c, q, "data", 0, o, perm, dp);
-			break;
-		case 1:
-			q.path = NETQID(NETID(c->qid.path), Nctlqid);
-			devdir(c, q, "ctl", 0, o, perm, dp);
-			break;
-		case 2:
-			q.path = NETQID(NETID(c->qid.path), Nstatqid);
-			devdir(c, q, "stats", 0, eve.name, 0444, dp);
-			break;
-		case 3:
-			q.path = NETQID(NETID(c->qid.path), Ntypeqid);
-			devdir(c, q, "type", 0, eve.name, 0444, dp);
-			break;
-		case 4:
-			q.path = NETQID(NETID(c->qid.path), Nifstatqid);
-			devdir(c, q, "ifstats", 0, eve.name, 0444, dp);
-			break;
-		default:
-			return -1;
+	case DEVDOTDOT:
+		q.type = QTDIR;
+		q.path = N2ndqid;
+		strlcpy(get_cur_genbuf(), nif->name, GENBUF_SZ);
+		devdir(c, q, get_cur_genbuf(), 0, eve.name, DMDIR | 0555, dp);
+		break;
+	case 0:
+		q.path = NETQID(NETID(c->qid.path), Ndataqid);
+		devdir(c, q, "data", 0, o, perm, dp);
+		break;
+	case 1:
+		q.path = NETQID(NETID(c->qid.path), Nctlqid);
+		devdir(c, q, "ctl", 0, o, perm, dp);
+		break;
+	case 2:
+		q.path = NETQID(NETID(c->qid.path), Nstatqid);
+		devdir(c, q, "stats", 0, eve.name, 0444, dp);
+		break;
+	case 3:
+		q.path = NETQID(NETID(c->qid.path), Ntypeqid);
+		devdir(c, q, "type", 0, eve.name, 0444, dp);
+		break;
+	case 4:
+		q.path = NETQID(NETID(c->qid.path), Nifstatqid);
+		devdir(c, q, "ifstats", 0, eve.name, 0444, dp);
+		break;
+	default:
+		return -1;
 	}
 	return 1;
 }
@@ -231,26 +231,26 @@ struct chan *netifopen(struct ether *nif, struct chan *c, int omode)
 			error(EPERM, ERROR_FIXME);
 	} else {
 		switch (NETTYPE(c->qid.path)) {
-			case Ndataqid:
-			case Nctlqid:
-				id = NETID(c->qid.path);
-				openfile(nif, id);
-				break;
-			case Ncloneqid:
-				id = openfile(nif, -1);
-				c->qid.path = NETQID(id, Nctlqid);
-				break;
-			default:
-				if (omode & O_WRITE)
-					error(EINVAL, ERROR_FIXME);
+		case Ndataqid:
+		case Nctlqid:
+			id = NETID(c->qid.path);
+			openfile(nif, id);
+			break;
+		case Ncloneqid:
+			id = openfile(nif, -1);
+			c->qid.path = NETQID(id, Nctlqid);
+			break;
+		default:
+			if (omode & O_WRITE)
+				error(EINVAL, ERROR_FIXME);
 		}
 		switch (NETTYPE(c->qid.path)) {
-			case Ndataqid:
-			case Nctlqid:
-				f = nif->f[id];
-				if (netown(f, current->user.name, omode & 7) < 0)
-					error(EPERM, ERROR_FIXME);
-				break;
+		case Ndataqid:
+		case Nctlqid:
+			f = nif->f[id];
+			if (netown(f, current->user.name, omode & 7) < 0)
+				error(EPERM, ERROR_FIXME);
+			break;
 		}
 	}
 	c->mode = openmode(omode);
@@ -282,9 +282,8 @@ static int feature_appender(int features, char *p, int sofar)
 	return sofar;
 }
 
-long
-netifread(struct ether *nif, struct chan *c, void *a, long n,
-	  uint32_t offset)
+long netifread(struct ether *nif, struct chan *c, void *a, long n,
+	       uint32_t offset)
 {
 	int i, j;
 	struct netfile *f;
@@ -294,62 +293,67 @@ netifread(struct ether *nif, struct chan *c, void *a, long n,
 		return devdirread(c, a, n, (struct dirtab *)nif, 0, netifgen);
 
 	switch (NETTYPE(c->qid.path)) {
-		case Ndataqid:
-			f = nif->f[NETID(c->qid.path)];
-			return qread(f->in, a, n);
-		case Nctlqid:
-			return readnum(offset, a, n, NETID(c->qid.path), NUMSIZE);
-		case Nstatqid:
-			p = kzmalloc(READSTR, 0);
-			if (p == NULL)
-				return 0;
-			j = 0;
-			j += snprintf(p + j, READSTR - j, "driver: %s\n", nif->drv_name);
-			j += snprintf(p + j, READSTR - j, "in: %d\n", nif->inpackets);
-			j += snprintf(p + j, READSTR - j, "link: %d\n", nif->link);
-			j += snprintf(p + j, READSTR - j, "out: %d\n", nif->outpackets);
-			j += snprintf(p + j, READSTR - j, "crc errs: %d\n", nif->crcs);
-			j += snprintf(p + j, READSTR - j, "overflows: %d\n",
-						  nif->overflows);
-			j += snprintf(p + j, READSTR - j, "soft overflows: %d\n",
-						  nif->soverflows);
-			j += snprintf(p + j, READSTR - j, "framing errs: %d\n",
-						  nif->frames);
-			j += snprintf(p + j, READSTR - j, "buffer errs: %d\n", nif->buffs);
-			j += snprintf(p + j, READSTR - j, "output errs: %d\n", nif->oerrs);
-			j += snprintf(p + j, READSTR - j, "prom: %d\n", nif->prom);
-			j += snprintf(p + j, READSTR - j, "mbps: %d\n", nif->mbps);
-			j += snprintf(p + j, READSTR - j, "addr: ");
-			for (i = 0; i < nif->alen; i++)
-				j += snprintf(p + j, READSTR - j, "%02.2x", nif->addr[i]);
-			j += snprintf(p + j, READSTR - j, "\n");
-
-			j += snprintf(p + j, READSTR - j, "feat: ");
-			j = feature_appender(nif->feat, p, j);
-			j += snprintf(p + j, READSTR - j, "\n");
-
-			j += snprintf(p + j, READSTR - j, "hw_features: ");
-			j = feature_appender(nif->hw_features, p, j);
-			j += snprintf(p + j, READSTR - j, "\n");
-
-			n = readstr(offset, a, n, p);
-			kfree(p);
-			return n;
-		case Naddrqid:
-			p = kzmalloc(READSTR, 0);
-			if (p == NULL)
-				return 0;
-			j = 0;
-			for (i = 0; i < nif->alen; i++)
-				j += snprintf(p + j, READSTR - j, "%02.2x", nif->addr[i]);
-			n = readstr(offset, a, n, p);
-			kfree(p);
-			return n;
-		case Ntypeqid:
-			f = nif->f[NETID(c->qid.path)];
-			return readnum(offset, a, n, f->type, NUMSIZE);
-		case Nifstatqid:
+	case Ndataqid:
+		f = nif->f[NETID(c->qid.path)];
+		return qread(f->in, a, n);
+	case Nctlqid:
+		return readnum(offset, a, n, NETID(c->qid.path), NUMSIZE);
+	case Nstatqid:
+		p = kzmalloc(READSTR, 0);
+		if (p == NULL)
 			return 0;
+		j = 0;
+		j += snprintf(p + j, READSTR - j, "driver: %s\n",
+			      nif->drv_name);
+		j += snprintf(p + j, READSTR - j, "in: %d\n", nif->inpackets);
+		j += snprintf(p + j, READSTR - j, "link: %d\n", nif->link);
+		j += snprintf(p + j, READSTR - j, "out: %d\n", nif->outpackets);
+		j += snprintf(p + j, READSTR - j, "crc errs: %d\n", nif->crcs);
+		j += snprintf(p + j, READSTR - j, "overflows: %d\n",
+			      nif->overflows);
+		j += snprintf(p + j, READSTR - j, "soft overflows: %d\n",
+			      nif->soverflows);
+		j += snprintf(p + j, READSTR - j, "framing errs: %d\n",
+			      nif->frames);
+		j += snprintf(p + j, READSTR - j, "buffer errs: %d\n",
+			      nif->buffs);
+		j += snprintf(p + j, READSTR - j, "output errs: %d\n",
+			      nif->oerrs);
+		j += snprintf(p + j, READSTR - j, "prom: %d\n", nif->prom);
+		j += snprintf(p + j, READSTR - j, "mbps: %d\n", nif->mbps);
+		j += snprintf(p + j, READSTR - j, "addr: ");
+		for (i = 0; i < nif->alen; i++)
+			j += snprintf(p + j, READSTR - j, "%02.2x",
+				      nif->addr[i]);
+		j += snprintf(p + j, READSTR - j, "\n");
+
+		j += snprintf(p + j, READSTR - j, "feat: ");
+		j = feature_appender(nif->feat, p, j);
+		j += snprintf(p + j, READSTR - j, "\n");
+
+		j += snprintf(p + j, READSTR - j, "hw_features: ");
+		j = feature_appender(nif->hw_features, p, j);
+		j += snprintf(p + j, READSTR - j, "\n");
+
+		n = readstr(offset, a, n, p);
+		kfree(p);
+		return n;
+	case Naddrqid:
+		p = kzmalloc(READSTR, 0);
+		if (p == NULL)
+			return 0;
+		j = 0;
+		for (i = 0; i < nif->alen; i++)
+			j += snprintf(p + j, READSTR - j, "%02.2x",
+				      nif->addr[i]);
+		n = readstr(offset, a, n, p);
+		kfree(p);
+		return n;
+	case Ntypeqid:
+		f = nif->f[NETID(c->qid.path)];
+		return readnum(offset, a, n, f->type, NUMSIZE);
+	case Nifstatqid:
+		return 0;
 	}
 	error(EINVAL, ERROR_FIXME);
 	return -1;	/* not reached */
@@ -413,10 +417,10 @@ long netifwrite(struct ether *nif, struct chan *c, void *a, long n)
 	f = nif->f[NETID(c->qid.path)];
 	if ((p = matchtoken(buf, "connect")) != 0) {
 		/* We'd like to not use the NIC until it has come up fully -
-		 * auto-negotiation is done and packets will get sent out.  This is
-		 * about the best place to do it. */
+		 * auto-negotiation is done and packets will get sent out.  This
+		 * is about the best place to do it. */
 		netif_wait_for_carrier(nif);
-		type = strtol(p, 0, 0);	/* allows any base, though usually hex */
+		type = strtol(p, 0, 0);
 		if (typeinuse(nif, type))
 			error(EBUSY, ERROR_FIXME);
 		f->type = type;
@@ -424,9 +428,11 @@ long netifwrite(struct ether *nif, struct chan *c, void *a, long n)
 			nif->all++;
 	} else if (matchtoken(buf, "promiscuous")) {
 		if (f->prom == 0) {
-			/* Note that promisc has two meanings: put the NIC into promisc
-			 * mode, and record our outbound traffic.  See etheroq(). */
-			/* TODO: consider porting linux's interface for set_rx_mode. */
+			/* Note that promisc has two meanings: put the NIC into
+			 * promisc mode, and record our outbound traffic.  See
+			 * etheroq(). */
+			/* TODO: consider porting linux's interface for
+			 * set_rx_mode. */
 			if (nif->prom == 0 && nif->promiscuous != NULL)
 				nif->promiscuous(nif->arg, 1);
 			f->prom = 1;
@@ -435,7 +441,7 @@ long netifwrite(struct ether *nif, struct chan *c, void *a, long n)
 	} else if ((p = matchtoken(buf, "scanbs")) != 0) {
 		/* scan for base stations */
 		if (f->scan == 0) {
-			type = strtol(p, 0, 0);	/* allows any base, though usually hex */
+			type = strtol(p, 0, 0);
 			if (type < 5)
 				type = 5;
 			if (nif->scanbs != NULL)
@@ -566,12 +572,12 @@ static int netown(struct netfile *p, char *o, int omode)
 
 	spin_lock(&netlock);
 	if (*p->owner) {
-		if (strncmp(o, p->owner, KNAMELEN) == 0)	/* User */
+		if (strncmp(o, p->owner, KNAMELEN) == 0)
 			mode = p->mode;
-		else if (strncmp(o, eve.name, KNAMELEN) == 0)	/* Bootes is group */
+		else if (strncmp(o, eve.name, KNAMELEN) == 0)
 			mode = p->mode << 3;
 		else
-			mode = p->mode << 6;	/* Other */
+			mode = p->mode << 6;
 
 		rwx = omode_to_rwx(omode);
 		if ((rwx & mode) == rwx) {
@@ -620,7 +626,8 @@ static int openfile(struct ether *nif, int id)
 			f = kzmalloc(sizeof(struct netfile), 0);
 			if (f == 0)
 				exhausted("memory");
-			/* since we lock before netifinit (if we ever call that...) */
+			/* since we lock before netifinit (if we ever call
+			 * that...) */
 			qlock_init(&f->qlock);
 			f->in = qopen(nif->limit, Qmsg, 0, 0);
 			if (f->in == NULL) {
@@ -692,7 +699,7 @@ int activemulti(struct ether *nif, uint8_t * addr, int alen)
 	return 0;
 }
 
-static int parseaddr(uint8_t * to, char *from, int alen)
+static int parseaddr(uint8_t *to, char *from, int alen)
 {
 	char nip[4];
 	char *p;
@@ -717,8 +724,8 @@ static int parseaddr(uint8_t * to, char *from, int alen)
 /*
  *  keep track of multicast addresses
  */
-static char *netmulti(struct ether *nif, struct netfile *f, uint8_t * addr,
-					  int add)
+static char *netmulti(struct ether *nif, struct netfile *f, uint8_t *addr,
+		      int add)
 {
 	struct netaddr **l, *ap;
 	int i;
@@ -738,8 +745,8 @@ static char *netmulti(struct ether *nif, struct netfile *f, uint8_t * addr,
 
 	if (add) {
 		if (ap == 0) {
-			/* TODO: AFAIK, this never gets freed.  if we fix that, we can use a
-			 * kref too (instead of int ap->ref). */
+			/* TODO: AFAIK, this never gets freed.  if we fix that,
+			 * we can use a kref too (instead of int ap->ref). */
 			*l = ap = kzmalloc(sizeof(*ap), 0);
 			memmove(ap->addr, addr, nif->alen);
 			ap->next = 0;
@@ -808,7 +815,8 @@ ssize_t linux_ifstat(struct netif_stats *stats, void *va, size_t amt,
 	sofar += snprintf(p + sofar, READSTR - sofar, "\n");
 
 	sofar += snprintf(p + sofar, READSTR - sofar,
-	                  "rx length errors   : %lu\n", stats->rx_length_errors);
+			  "rx length errors   : %lu\n",
+			  stats->rx_length_errors);
 	sofar += snprintf(p + sofar, READSTR - sofar,
 	                  "rx over errors     : %lu\n", stats->rx_over_errors);
 	sofar += snprintf(p + sofar, READSTR - sofar,
@@ -818,19 +826,24 @@ ssize_t linux_ifstat(struct netif_stats *stats, void *va, size_t amt,
 	sofar += snprintf(p + sofar, READSTR - sofar,
 	                  "rx fifo errors     : %lu\n", stats->rx_fifo_errors);
 	sofar += snprintf(p + sofar, READSTR - sofar,
-	                  "rx missed errors   : %lu\n", stats->rx_missed_errors);
+			  "rx missed errors   : %lu\n",
+			  stats->rx_missed_errors);
 	sofar += snprintf(p + sofar, READSTR - sofar, "\n");
 
 	sofar += snprintf(p + sofar, READSTR - sofar,
-	                  "tx aborted errors  : %lu\n", stats->tx_aborted_errors);
+			  "tx aborted errors  : %lu\n",
+			  stats->tx_aborted_errors);
 	sofar += snprintf(p + sofar, READSTR - sofar,
-	                  "tx carrier errors  : %lu\n", stats->tx_carrier_errors);
+			  "tx carrier errors  : %lu\n",
+			  stats->tx_carrier_errors);
 	sofar += snprintf(p + sofar, READSTR - sofar,
 	                  "tx fifo errors     : %lu\n", stats->tx_fifo_errors);
 	sofar += snprintf(p + sofar, READSTR - sofar,
-	                  "tx heartbeat errors: %lu\n", stats->tx_heartbeat_errors);
+			  "tx heartbeat errors: %lu\n",
+			  stats->tx_heartbeat_errors);
 	sofar += snprintf(p + sofar, READSTR - sofar,
-	                  "tx window errors   : %lu\n", stats->tx_window_errors);
+			  "tx window errors   : %lu\n",
+			  stats->tx_window_errors);
 	sofar += snprintf(p + sofar, READSTR - sofar, "\n");
 
 	sofar += snprintf(p + sofar, READSTR - sofar,

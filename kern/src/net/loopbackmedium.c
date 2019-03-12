@@ -51,8 +51,8 @@ struct LB {
 
 static void loopbackread(void *a);
 
-static void
-loopbackbind(struct Ipifc *ifc, int unused_int, char **unused_char_pp_t)
+static void loopbackbind(struct Ipifc *ifc, int unused_int,
+			 char **unused_char_pp_t)
 {
 	LB *lb;
 
@@ -85,9 +85,8 @@ static void loopbackunbind(struct Ipifc *ifc)
 	kfree(lb);
 }
 
-static void
-loopbackbwrite(struct Ipifc *ifc, struct block *bp, int unused_int,
-			   uint8_t * unused_uint8_p_t)
+static void loopbackbwrite(struct Ipifc *ifc, struct block *bp, int unused_int,
+			   uint8_t *unused_uint8_p_t)
 {
 	LB *lb;
 

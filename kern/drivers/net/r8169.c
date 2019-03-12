@@ -752,14 +752,14 @@ struct rtl_poke_args {
 
 struct rtl8169_private {
 	/* 9ns compat */
-	struct pci_device			*pcidev;
-	struct ether				*edev;
+	struct pci_device		*pcidev;
+	struct ether			*edev;
 	TAILQ_ENTRY(rtl8169_private) link9ns;
-	const struct pci_device_id	*pci_id;			/* for navigating pci/pnp */
-	struct rendez				irq_task;			/* bottom half IRQ */
-	struct poke_tracker			poker;				/* tx concurrency */
-	bool						active;
-	bool						attached;
+	const struct pci_device_id	*pci_id; /* for navigating pci/pnp */
+	struct rendez			irq_task;	/* bottom half IRQ */
+	struct poke_tracker		poker;		/* tx concurrency */
+	bool				active;
+	bool				attached;
 
 	void __iomem *mmio_addr;	/* memory map physical address */
 	struct pci_device *pci_dev;
@@ -6998,9 +6998,10 @@ static int rtl8169_xmit_frags(struct rtl8169_private *tp, struct block *bp,
 		txd->addr = cpu_to_le64(mapping);
 
 		tp->tx_skb[entry].len = len;
-		/* Tracking how many frags we're sending.  The expectation from the
-		 * Linux code is that cur_frag is 0-indexed during the loop, and
-		 * incremented at the end.  This only seems to matter for err_out. */
+		/* Tracking how many frags we're sending.  The expectation from
+		 * the Linux code is that cur_frag is 0-indexed during the loop,
+		 * and incremented at the end.  This only seems to matter for
+		 * err_out. */
 		cur_frag++;
 	}
 
@@ -7031,8 +7032,8 @@ static void r8169_csum_workaround(struct rtl8169_private *tp,
 				  struct block *bp)
 {
 	if (bp->mss) {
-		/* Need to break the large packet up into smaller segments.  Would need
-		 * support from higher in the stack. */
+		/* Need to break the large packet up into smaller segments.
+		 * Would need support from higher in the stack. */
 		panic("Not implemented");
 #if 0 // AKAROS_PORT
 		netdev_features_t features = tp->dev->feat;
@@ -7053,8 +7054,8 @@ static void r8169_csum_workaround(struct rtl8169_private *tp,
 		dev_consume_skb_any(skb);
 #endif
 	} else if (bp->flag & BLOCK_TRANS_TX_CSUM) {
-		/* Yes, finalize checks the bp->flag too, but we wanted to know if we
-		 * should even try, and o/w drop. */
+		/* Yes, finalize checks the bp->flag too, but we wanted to know
+		 * if we should even try, and o/w drop. */
 		ptclcsum_finalize(bp, 0);
 		rtl8169_start_xmit(bp, tp->dev);
 	} else {
@@ -7163,11 +7164,11 @@ static bool rtl8169_tso_csum_v2(struct rtl8169_private *tp,
 	} else if (bp->flag & BLOCK_TRANS_TX_CSUM) {
 		uint8_t ip_protocol;
 
-		/* Linux would conditionally pad it the packet if the hardware can't do
-		 * it (which is my interpretation of seeing eth_skb_pad / ETH_ZLEN
-		 * padding/checks.  On Akaros, we'll tell the ethernet layer to do it
-		 * for the bad models (grep NETF_PADMIN), and leave the checks in here
-		 * for sanity. */
+		/* Linux would conditionally pad it the packet if the hardware
+		 * can't do it (which is my interpretation of seeing eth_skb_pad
+		 * / ETH_ZLEN padding/checks.  On Akaros, we'll tell the
+		 * ethernet layer to do it for the bad models (grep
+		 * NETF_PADMIN), and leave the checks in here for sanity. */
 		assert(!rtl_test_hw_pad_bug(tp, bp));
 
 		if (transport_offset > TCPHO_MAX) {
@@ -7193,7 +7194,8 @@ static bool rtl8169_tso_csum_v2(struct rtl8169_private *tp,
 			break;
 		}
 
-		/* Note Akaros could check the specific BLOCK_TRANS_TX_CSUM flag */
+		/* Note Akaros could check the specific BLOCK_TRANS_TX_CSUM flag
+		 */
 		if (ip_protocol == IPPROTO_TCP)
 			opts[1] |= TD1_TCP_CS;
 		else if (ip_protocol == IPPROTO_UDP)
@@ -7221,10 +7223,11 @@ static netdev_tx_t rtl8169_start_xmit(struct block *bp, struct ether *dev)
 	uint32_t opts[2];
 	int frags;
 
-	/* TODO: This isn't quite nr_frags, since there could be holes.  Should fix
-	 * the block extra data to track valid segments. */
+	/* TODO: This isn't quite nr_frags, since there could be holes.  Should
+	 * fix the block extra data to track valid segments. */
 	if (unlikely(!TX_FRAGS_READY_FOR(tp, bp->nr_extra_bufs))) {
-		netif_err(tp, drv, dev, "BUG! Tx Ring full when queue awake!\n");
+		netif_err(tp, drv, dev,
+			  "BUG! Tx Ring full when queue awake!\n");
 		goto err_stop_0;
 	}
 
@@ -7240,8 +7243,8 @@ static netdev_tx_t rtl8169_start_xmit(struct block *bp, struct ether *dev)
 	}
 
 	len = BHLEN(bp);
-	/* I think we always have some sort of header in BHLEN.  If not, change the
-	 * rest of this to handle it. */
+	/* I think we always have some sort of header in BHLEN.  If not, change
+	 * the rest of this to handle it. */
 	assert(len);
 	mapping = dma_map_single(d, bp->rp, len, DMA_TO_DEVICE);
 	if (unlikely(dma_mapping_error(d, mapping))) {
@@ -7283,7 +7286,8 @@ static netdev_tx_t rtl8169_start_xmit(struct block *bp, struct ether *dev)
 
 	bus_wmb();
 
-	/* Linux calls netif_stop_queue if (!TX_FRAGS_READY_FOR(tp, MAX_SKB_FRAGS))
+	/* Linux calls netif_stop_queue if (!TX_FRAGS_READY_FOR(tp,
+	 * MAX_SKB_FRAGS))
 	 *
 	 * We do our backpressure in __rtl_xmit_poke. */
 
@@ -7406,10 +7410,10 @@ static void rtl_tx(struct ether *dev, struct rtl8169_private *tp)
 			RTL_W8(TxPoll, NPQ);
 		}
 
-		/* I'm not sure if this needs to happen after the TxPoll hack.  The
-		 * netif is woken first on linux, but there might be a napi ordering,
-		 * where the expectation is that the TxPoll hack happens before the
-		 * netif stop (and potentially start) */
+		/* I'm not sure if this needs to happen after the TxPoll hack.
+		 * The netif is woken first on linux, but there might be a napi
+		 * ordering, where the expectation is that the TxPoll hack
+		 * happens before the netif stop (and potentially start) */
 		struct rtl_poke_args args[1];
 
 		args->edev = dev;
@@ -7427,8 +7431,8 @@ static inline void rtl8169_rx_csum(struct block *bp, uint32_t opts1)
 {
 	uint32_t status = opts1 & RxProtoMask;
 
-	/* Linux marked CHECKSUM_UNNECESSARY here.  We might need to do something
-	 * with Bipck still. */
+	/* Linux marked CHECKSUM_UNNECESSARY here.  We might need to do
+	 * something with Bipck still. */
 	if (((status == RxProtoTCP) && !(opts1 & TCPFail)) ||
 	    ((status == RxProtoUDP) && !(opts1 & UDPFail)))
 		bp->flag |= Btcpck | Budpck;
@@ -7571,8 +7575,8 @@ static void rtl8169_interrupt(struct hw_trapframe *hw_tf, void *dev_instance)
 		if (status) {
 			handled = 1;
 			rtl_irq_disable(tp);
-			/* It's not clear if there's only one IRQ at a time (SMP) or not.
-			 * Safest way is to use a ktask. */
+			/* It's not clear if there's only one IRQ at a time
+			 * (SMP) or not.  Safest way is to use a ktask. */
 			rendez_wakeup(&tp->irq_task);
 		}
 	}
@@ -7593,7 +7597,8 @@ static void rtl_slow_event_work(struct rtl8169_private *tp)
 		switch (tp->mac_version) {
 		/* Work around for rx fifo overflow */
 		case RTL_GIGA_MAC_VER_11:
-			/* This might not work, given how our workqueue shims go */
+			/* This might not work, given how our workqueue shims go
+			 */
 			panic("Not implemented");
 			netif_stop_queue(dev);
 			/* XXX - Hack alert. See rtl_task(). */
@@ -7673,8 +7678,10 @@ static void rtl8169_irq_ktask(void *arg)
 		status = rtl_get_events(tp);
 		rtl_ack_events(tp, status & ~tp->event_slow);
 
-		if (status & RTL_EVENT_NAPI_RX)
-			rtl_rx(dev, tp, UINT32_MAX);	/* careful of budget's type */
+		if (status & RTL_EVENT_NAPI_RX) {
+			/* careful of budget's type */
+			rtl_rx(dev, tp, UINT32_MAX);
+		}
 
 		if (status & RTL_EVENT_NAPI_TX)
 			rtl_tx(dev, tp);
@@ -7784,13 +7791,15 @@ static int rtl_open(struct ether *dev)
 	 * Rx and Tx descriptors needs 256 bytes alignment.
 	 * dma_alloc_coherent provides more.
 	 */
-	tp->TxDescArray = dma_zalloc_coherent(&pdev->device, R8169_TX_RING_BYTES,
-					     &tp->TxPhyAddr, MEM_WAIT);
+	tp->TxDescArray = dma_zalloc_coherent(&pdev->device,
+					      R8169_TX_RING_BYTES,
+					      &tp->TxPhyAddr, MEM_WAIT);
 	if (!tp->TxDescArray)
 		goto err_pm_runtime_put;
 
-	tp->RxDescArray = dma_zalloc_coherent(&pdev->device, R8169_RX_RING_BYTES,
-					     &tp->RxPhyAddr, MEM_WAIT);
+	tp->RxDescArray = dma_zalloc_coherent(&pdev->device,
+					      R8169_RX_RING_BYTES,
+					      &tp->RxPhyAddr, MEM_WAIT);
 	if (!tp->RxDescArray)
 		goto err_free_tx_0;
 
@@ -8519,9 +8528,9 @@ static int rtl_init_one(struct ether *dev, struct pci_device *pdev,
 	 * properly for all devices */
 	dev->feat |= NETIF_F_RXCSUM |
 		NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX;
-	/* AKAROS: We don't have a way (currently) to turn on certain features at
-	 * runtime.  Linux's NIC didn't want SG, CSUM, and TSO by default, but we'll
-	 * turn it on until we find a NIC with a problem. */
+	/* AKAROS: We don't have a way (currently) to turn on certain features
+	 * at runtime.  Linux's NIC didn't want SG, CSUM, and TSO by default,
+	 * but we'll turn it on until we find a NIC with a problem. */
 	dev->feat |= NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
 
 	/* AKAROS: Some versions don't pad to the mintu. */
@@ -8683,13 +8692,13 @@ static void __rtl_xmit_poke(void *args)
 		bp = qget(edev->oq);
 		if (!bp)
 			break;
-		/* TODO: If this is a problem, we can peak at the first block and wait
-		 * til we have enough room.  Though we are still capped by the max TX
-		 * possible, and it might not be worth doing (leaving the NIC idle and
-		 * blasting packets.
+		/* TODO: If this is a problem, we can peak at the first block
+		 * and wait til we have enough room.  Though we are still capped
+		 * by the max TX possible, and it might not be worth doing
+		 * (leaving the NIC idle and blasting packets.
 		 *
-		 * We probably need qclone to respect MAX_SKB_FRAGS or some other
-		 * system-wide constant. */
+		 * We probably need qclone to respect MAX_SKB_FRAGS or some
+		 * other system-wide constant. */
 		if (bp->nr_extra_bufs > MAX_SKB_FRAGS)
 			bp = linearizeblock(bp);
 		rtl8169_start_xmit(bp, edev);
@@ -8744,9 +8753,10 @@ static void rtl8169_shutdown(struct ether *ether)
 {
 	struct rtl8169_private *tp = netdev_priv(ether);
 
-	/* 9ns doesn't even call into devether shutdown - not sure what the hell is
-	 * going on there.  Completely untested, and I don't know if the order of
-	 * shutdown / remove_one is right, or if other things need to be done. */
+	/* 9ns doesn't even call into devether shutdown - not sure what the hell
+	 * is going on there.  Completely untested, and I don't know if the
+	 * order of shutdown / remove_one is right, or if other things need to
+	 * be done. */
 	warn("Untested NIC shutdown!");
 	rtl_shutdown(tp->pcidev);
 	rtl_remove_one(tp->pcidev);
@@ -8772,13 +8782,15 @@ static void rtl8169_pci(void)
 	struct rtl8169_private *ctlr;
 
 	STAILQ_FOREACH(pcidev, &pci_devices, all_dev) {
-		/* This checks that pcidev is a Network Controller for Ethernet */
+		/* This checks that pcidev is a Network Controller for Ethernet
+		 */
 		if (pcidev->class != 0x02 || pcidev->subclass != 0x00)
 			continue;
 		pci_id = srch_linux_pci_tbl(rtl8169_pci_tbl, pcidev);
 		if (!pci_id)
 			continue;
-		/* If we have a module init method, call it here via run_once() */
+		/* If we have a module init method, call it here via run_once()
+		 */
 		printk("rtl8169 driver found 0x%04x:%04x at %02x:%02x.%x\n",
 			   pcidev->ven_id, pcidev->dev_id,
 			   pcidev->bus, pcidev->dev, pcidev->func);
@@ -8826,14 +8838,15 @@ static int rtl8169_pnp(struct ether *edev)
 	pcidev = ctlr->pcidev;
 	strlcpy(edev->drv_name, "r8169", KNAMELEN);
 
-	/* Unlike bnx2x, we need to do the device init early so we can extract info
-	 * like the MAC addr. */
+	/* Unlike bnx2x, we need to do the device init early so we can extract
+	 * info like the MAC addr. */
 	rc = rtl_init_one(edev, pcidev, ctlr->pci_id);
 	if (rc) {
 		printk("Failed to init r8169 0x%04x:%04x at %02x:%02x.%x\n",
 			   pcidev->ven_id, pcidev->dev_id,
 			   pcidev->bus, pcidev->dev, pcidev->func);
-		/* We could clear 'active', but if it failed once, it'll fail again. */
+		/* We could clear 'active', but if it failed once, it'll fail
+		 * again. */
 		return -1;
 	}
 

@@ -26,7 +26,7 @@
 
 /* Helpers */
 static void run_process_and_wait(int argc, char *argv[],
-								 const struct core_set *cores);
+				 const struct core_set *cores);
 
 /* For communicating with perf_create_context() */
 static struct perf_context_config perf_cfg = {
@@ -40,24 +40,24 @@ static struct perf_context *pctx;
 extern char **environ;	/* POSIX envp */
 
 struct perf_opts {
-	FILE						*outfile;
-	const char					*events;
-	char						**cmd_argv;
-	int							cmd_argc;
-	struct core_set				cores;
-	bool						got_cores;
-	bool						verbose;
-	bool						sampling;
-	bool						stat_bignum;
-	bool						record_quiet;
-	unsigned long				record_period;
+	FILE			*outfile;
+	const char		*events;
+	char			**cmd_argv;
+	int			cmd_argc;
+	struct core_set		cores;
+	bool			got_cores;
+	bool			verbose;
+	bool			sampling;
+	bool			stat_bignum;
+	bool			record_quiet;
+	unsigned long		record_period;
 };
 static struct perf_opts opts;
 
 struct perf_cmd {
-	char						*name;
-	char						*desc;
-	char						*opts;
+	char			*name;
+	char			*desc;
+	char			*opts;
 	int (*func)(struct perf_cmd *, int, char **);
 };
 
@@ -108,11 +108,12 @@ static int perf_help(struct perf_cmd *cmd, int argc, char *argv[])
 	for (int i = 0; i < COUNT_OF(perf_cmds); i++) {
 		if (!strcmp(perf_cmds[i].name, argv[1])) {
 			if (perf_cmds[i].opts) {
-				fprintf(stdout, "perf %s %s\n", perf_cmds[i].name,
-				        perf_cmds[i].opts);
+				fprintf(stdout, "perf %s %s\n",
+					perf_cmds[i].name, perf_cmds[i].opts);
 				fprintf(stdout, "\t%s\n", perf_cmds[i].desc);
 			} else {
-				/* For argp subcommands, call their help directly. */
+				/* For argp subcommands, call their help
+				 * directly. */
 				sub_argv[0] = xstrdup(perf_cmds[i].name);
 				sub_argv[1] = xstrdup("--help");
 				perf_cmds[i].func(&perf_cmds[i], 2, sub_argv);
@@ -151,9 +152,9 @@ static int perf_pmu_caps(struct perf_cmd *cmd, int argc, char *argv[])
 			"PERF.counters_x_proc     = %u\n"
 			"PERF.bits_x_fix_counter  = %u\n"
 			"PERF.fix_counters_x_proc = %u\n",
-			pai->perfmon_version, pai->proc_arch_events, pai->bits_x_counter,
-			pai->counters_x_proc, pai->bits_x_fix_counter,
-			pai->fix_counters_x_proc);
+			pai->perfmon_version, pai->proc_arch_events,
+			pai->bits_x_counter, pai->counters_x_proc,
+			pai->bits_x_fix_counter, pai->fix_counters_x_proc);
 	return 0;
 }
 
@@ -197,7 +198,8 @@ static error_t parse_collect_opt(int key, char *arg, struct argp_state *state)
 		break;
 	case ARGP_KEY_ARG:
 		p_opts->cmd_argc = state->argc - state->next + 1;
-		p_opts->cmd_argv = xmalloc(sizeof(char*) * (p_opts->cmd_argc + 1));
+		p_opts->cmd_argv = xmalloc(sizeof(char*) *
+					   (p_opts->cmd_argc + 1));
 		p_opts->cmd_argv[0] = arg;
 		memcpy(&p_opts->cmd_argv[1], &state->argv[state->next],
 		       sizeof(char*) * (p_opts->cmd_argc - 1));
@@ -228,7 +230,7 @@ static void collect_argp(struct perf_cmd *cmd, int argc, char *argv[],
 	const char *fmt = "perf %s";
 	size_t cmd_sz = strlen(cmd->name) + strlen(fmt) + 1;
 
-	/* Rewrite the command name from foo to perf foo for the --help output */
+	/* Rewrite the command name from foo to perf foo for the --help output*/
 	cmd_name = xmalloc(cmd_sz);
 	snprintf(cmd_name, cmd_sz, fmt, cmd->name);
 	cmd_name[cmd_sz - 1] = '\0';
@@ -246,7 +248,7 @@ static void submit_events(struct perf_opts *opts)
 	dup_evts = xstrdup(opts->events);
 	for (tok = strtok_r(dup_evts, ",", &tok_save);
 	     tok;
-		 tok = strtok_r(NULL, ",", &tok_save)) {
+	     tok = strtok_r(NULL, ",", &tok_save)) {
 
 		sel = perf_parse_event(tok);
 		PMEV_SET_INTEN(sel->ev.event, opts->sampling);
@@ -285,14 +287,16 @@ static error_t parse_record_opt(int key, char *arg, struct argp_state *state)
 	switch (key) {
 	case 'c':
 		if (p_opts->record_period)
-			argp_error(state, "Period set.  Only use at most one of -c -F");
+			argp_error(state,
+				"Period set.  Only use at most one of -c -F");
 		p_opts->record_period = atol(arg);
 		break;
 	case 'F':
 		if (p_opts->record_period)
-			argp_error(state, "Period set.  Only use at most one of -c -F");
-		/* TODO: when we properly support freq, multiple events will have the
-		 * same freq but different, dynamic, periods. */
+			argp_error(state,
+				"Period set.  Only use at most one of -c -F");
+		/* TODO: when we properly support freq, multiple events will
+		 * have the same freq but different, dynamic, periods. */
 		p_opts->record_period = freq_to_period(atol(arg));
 		break;
 	case 'g':
@@ -326,8 +330,9 @@ static int perf_record(struct perf_cmd *cmd, int argc, char *argv[])
 	collect_argp(cmd, argc, argv, children, &opts);
 	opts.sampling = TRUE;
 
-	/* Once a perf event is submitted, it'll start counting and firing the IRQ.
-	 * However, we can control whether or not the samples are collected. */
+	/* Once a perf event is submitted, it'll start counting and firing the
+	 * IRQ.  However, we can control whether or not the samples are
+	 * collected. */
 	submit_events(&opts);
 	perf_start_sampling(pctx);
 	run_process_and_wait(opts.cmd_argc, opts.cmd_argv,
@@ -335,8 +340,8 @@ static int perf_record(struct perf_cmd *cmd, int argc, char *argv[])
 	perf_stop_sampling(pctx);
 	if (opts.verbose)
 		perf_context_show_events(pctx, stdout);
-	/* The events are still counting and firing IRQs.  Let's be nice and turn
-	 * them off to minimize our impact. */
+	/* The events are still counting and firing IRQs.  Let's be nice and
+	 * turn them off to minimize our impact. */
 	perf_stop_events(pctx);
 	/* Generate the Linux perf file format with the traces which have been
 	 * created during this operation. */
@@ -367,7 +372,7 @@ static error_t parse_stat_opt(int key, char *arg, struct argp_state *state)
 	case ARGP_KEY_END:
 		if (!p_opts->events)
 			p_opts->events = "cache-misses,cache-references,"
-			                 "branch-misses,branches,instructions,cycles";
+				"branch-misses,branches,instructions,cycles";
 		if (!p_opts->outfile)
 			p_opts->outfile = stdout;
 		break;
@@ -378,8 +383,8 @@ static error_t parse_stat_opt(int key, char *arg, struct argp_state *state)
 }
 
 struct stat_val {
-	char						*name;
-	uint64_t					count;
+	char			*name;
+	uint64_t		count;
 };
 
 /* Helper, given a name, fetches its value as a float. */
@@ -398,8 +403,8 @@ static float get_seconds(struct stat_val *all_vals, size_t nr_vals)
 {
 	float sec = get_count_for("nsec", all_vals, nr_vals) / 1000000000;
 
-	/* We should never have a time of 0, but in case something went wrong, don't
-	 * hand back 0 (divide by 0 errors). */
+	/* We should never have a time of 0, but in case something went wrong,
+	 * don't hand back 0 (divide by 0 errors). */
 	return sec != 0.0 ? sec : 1.0;
 }
 
@@ -431,20 +436,23 @@ static void stat_print_val(FILE *out, struct stat_val *val,
 	/* Everyone gets the same front part of the printout */
 	fprintf(out, "%18llu      %-25s #", val->count, val->name);
 
-	/* Based on the particular event and what other events we know, we may print
-	 * something different to the summary bit after the #. */
+	/* Based on the particular event and what other events we know, we may
+	 * print something different to the summary bit after the #. */
 	if (!strcmp(val->name, "instructions")) {
 		float cycles = get_count_for("cycles", all_vals, nr_vals);
 
 		if (cycles != 0.0)
-			fprintf(out, "%9.3f insns per cycle\n", val->count / cycles);
+			fprintf(out, "%9.3f insns per cycle\n",
+				val->count / cycles);
 		else
 			print_default_rate(out, val, all_vals, nr_vals);
 	} else if (!strcmp(val->name, "cache-misses")) {
-		float cache_ref = get_count_for("cache-references", all_vals, nr_vals);
+		float cache_ref = get_count_for("cache-references", all_vals,
+						nr_vals);
 
 		if (cache_ref != 0.0)
-			fprintf(out, "%8.2f%% of all refs\n", val->count * 100 / cache_ref);
+			fprintf(out, "%8.2f%% of all refs\n",
+				val->count * 100 / cache_ref);
 		else
 			print_default_rate(out, val, all_vals, nr_vals);
 	} else if (!strcmp(val->name, "branch-misses")) {
@@ -506,10 +514,10 @@ static int perf_stat(struct perf_cmd *cmd, int argc, char *argv[])
 	opts.sampling = FALSE;
 	out = opts.outfile;
 
-	/* As soon as we submit one event, that event is being tracked, meaning that
-	 * the setup/teardown of perf events is also tracked.  Each event (including
-	 * the clock measurement) will roughly account for either the start or stop
-	 * of every other event. */
+	/* As soon as we submit one event, that event is being tracked, meaning
+	 * that the setup/teardown of perf events is also tracked.  Each event
+	 * (including the clock measurement) will roughly account for either the
+	 * start or stop of every other event. */
 	clock_gettime(CLOCK_REALTIME, &start);
 	submit_events(&opts);
 	run_process_and_wait(opts.cmd_argc, opts.cmd_argv,
@@ -522,7 +530,8 @@ static int perf_stat(struct perf_cmd *cmd, int argc, char *argv[])
 	fprintf(out, "\nPerformance counter stats for '%s':\n\n", cmd_string);
 	free(cmd_string);
 	for (int i = 0; i < pctx->event_count; i++)
-		stat_print_val(out, &stat_vals[i], stat_vals, pctx->event_count + 1);
+		stat_print_val(out, &stat_vals[i], stat_vals,
+			       pctx->event_count + 1);
 	fprintf(out, "\n%8llu.%09llu seconds time elapsed\n\n", diff.tv_sec,
 	        diff.tv_nsec);
 	fclose(out);
@@ -531,7 +540,7 @@ static int perf_stat(struct perf_cmd *cmd, int argc, char *argv[])
 }
 
 static void run_process_and_wait(int argc, char *argv[],
-								 const struct core_set *cores)
+				 const struct core_set *cores)
 {
 	int pid, status;
 
@@ -578,7 +587,8 @@ static void global_usage(void)
 	fprintf(stderr, "  Usage: perf COMMAND [ARGS]\n");
 	fprintf(stderr, "\n  Available commands:\n\n");
 	for (int i = 0; i < COUNT_OF(perf_cmds); i++)
-		fprintf(stderr, "  \t%s: %s\n", perf_cmds[i].name, perf_cmds[i].desc);
+		fprintf(stderr, "  \t%s: %s\n", perf_cmds[i].name,
+			perf_cmds[i].desc);
 	exit(-1);
 }
 
@@ -588,7 +598,8 @@ int main(int argc, char *argv[])
 
 	save_cmdline(argc, argv);
 
-	/* Common inits.  Some functions don't need these, but it doesn't hurt. */
+	/* Common inits.  Some functions don't need these, but it doesn't hurt.
+	 */
 	perf_initialize();
 	pctx = perf_create_context(&perf_cfg);
 	cctx = perfconv_create_context(pctx);
@@ -597,7 +608,8 @@ int main(int argc, char *argv[])
 		global_usage();
 	for (i = 0; i < COUNT_OF(perf_cmds); i++) {
 		if (!strcmp(perf_cmds[i].name, argv[1])) {
-			ret = perf_cmds[i].func(&perf_cmds[i], argc - 1, argv + 1);
+			ret = perf_cmds[i].func(&perf_cmds[i], argc - 1,
+						argv + 1);
 			break;
 		}
 	}

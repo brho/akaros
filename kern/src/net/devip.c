@@ -46,7 +46,7 @@ static char *devname(void)
 }
 
 enum {
-	Qtopdir = 1,				/* top level directory */
+	Qtopdir = 1,	/* top level directory */
 	Qtopbase,
 	Qarp = Qtopbase,
 	Qndb,
@@ -110,8 +110,8 @@ static struct conv *chan2conv(struct chan *chan)
 }
 
 static inline int founddevdir(struct chan *c, struct qid q, char *n,
-							  int64_t length, char *user, long perm,
-							  struct dir *db)
+			      int64_t length, char *user, long perm,
+			      struct dir *db)
 {
 	devdir(c, q, n, length, user, perm, db);
 	return 1;
@@ -120,6 +120,7 @@ static inline int founddevdir(struct chan *c, struct qid q, char *n,
 static int topdirgen(struct chan *c, struct dir *dp)
 {
 	struct qid q;
+
 	mkqid(&q, QID(0, 0, Qtopdir), 0, QTDIR);
 	snprintf(get_cur_genbuf(), GENBUF_SZ, "#%s%lu", devname(), c->dev);
 	return founddevdir(c, q, get_cur_genbuf(), 0, network, 0555, dp);
@@ -135,20 +136,21 @@ static int qdata_stat_perm(struct conv *cv)
 	perm = cv->perm;
 	/* If there is ever a listener, then it's readable.  Ideally, we'd only
 	 * report this on the Qlisten file (which we also do).  The socket crap
-	 * should never use a listening socket for data, so there shouldn't be any
-	 * confusion when a Qdata shows up as readable. */
+	 * should never use a listening socket for data, so there shouldn't be
+	 * any confusion when a Qdata shows up as readable. */
 	perm |= cv->incall ? DMREADABLE : 0;
 	/* For connectable convs, they need to be both connected and qio
-	 * readable/writable.  The way to think about this is that the convs are not
-	 * truly writable/readable until they are connected.  Conveniently, this
-	 * means that when select polls Qdata for non-blocking connect(), a
+	 * readable/writable.  The way to think about this is that the convs are
+	 * not truly writable/readable until they are connected.  Conveniently,
+	 * this means that when select polls Qdata for non-blocking connect(), a
 	 * connected conversation pops up as writable (the qio is writable too).
 	 *
-	 * Note that a conversation can be 'Connected' even if it failed to connect.
-	 * At least that's what the 9ns TCP code does.  It's more like "the protocol
-	 * did what it needed and the connectctlmsg call (or its non-blocking
-	 * equivalent) is done".  For instance, TCP has a few reasons to call
-	 * Fsconnected, such as when we send the SYN and get a RST. */
+	 * Note that a conversation can be 'Connected' even if it failed to
+	 * connect.  At least that's what the 9ns TCP code does.  It's more like
+	 * "the protocol did what it needed and the connectctlmsg call (or its
+	 * non-blocking equivalent) is done".  For instance, TCP has a few
+	 * reasons to call Fsconnected, such as when we send the SYN and get a
+	 * RST. */
 	if (!cv->p->connect || connected(cv)) {
 		perm |= qreadable(cv->rq) ? DMREADABLE : 0;
 		perm |= qwritable(cv->wq) ? DMWRITABLE : 0;
@@ -169,40 +171,39 @@ static int ip3gen(struct chan *c, int i, struct dir *dp)
 	mkqid(&q, QID(PROTO(c->qid), CONV(c->qid), i), 0, QTFILE);
 
 	switch (i) {
-		default:
+	default:
+		return -1;
+	case Qctl:
+		return founddevdir(c, q, "ctl", 0, cv->owner, cv->perm, dp);
+	case Qdata:
+		perm = qdata_stat_perm(cv);
+		return founddevdir(c, q, "data", qlen(cv->rq), cv->owner, perm,
+				   dp);
+	case Qerr:
+		perm = cv->perm;
+		perm |= qreadable(cv->eq) ? DMREADABLE : 0;
+		return founddevdir(c, q, "err", qlen(cv->eq), cv->owner, perm,
+				   dp);
+	case Qlisten:
+		perm = cv->perm;
+		perm |= cv->incall ? DMREADABLE : 0;
+		return founddevdir(c, q, "listen", 0, cv->owner, perm, dp);
+	case Qlocal:
+		p = "local";
+		break;
+	case Qremote:
+		p = "remote";
+		break;
+	case Qsnoop:
+		if (strcmp(cv->p->name, "ipifc") != 0)
 			return -1;
-		case Qctl:
-			return founddevdir(c, q, "ctl", 0,
-					           cv->owner, cv->perm, dp);
-		case Qdata:
-			perm = qdata_stat_perm(cv);
-			return founddevdir(c, q, "data", qlen(cv->rq),
-							   cv->owner, perm, dp);
-		case Qerr:
-			perm = cv->perm;
-			perm |= qreadable(cv->eq) ? DMREADABLE : 0;
-			return founddevdir(c, q, "err", qlen(cv->eq),
-							   cv->owner, perm, dp);
-		case Qlisten:
-			perm = cv->perm;
-			perm |= cv->incall ? DMREADABLE : 0;
-			return founddevdir(c, q, "listen", 0, cv->owner, perm, dp);
-		case Qlocal:
-			p = "local";
-			break;
-		case Qremote:
-			p = "remote";
-			break;
-		case Qsnoop:
-			if (strcmp(cv->p->name, "ipifc") != 0)
-				return -1;
-			perm = 0400;
-			perm |= qreadable(cv->sq) ? DMREADABLE : 0;
-			return founddevdir(c, q, "snoop", qlen(cv->sq),
-							   cv->owner, perm, dp);
-		case Qstatus:
-			p = "status";
-			break;
+		perm = 0400;
+		perm |= qreadable(cv->sq) ? DMREADABLE : 0;
+		return founddevdir(c, q, "snoop", qlen(cv->sq), cv->owner, perm,
+				   dp);
+	case Qstatus:
+		p = "status";
+		break;
 	}
 	return founddevdir(c, q, p, 0, cv->owner, 0444, dp);
 }
@@ -210,12 +211,13 @@ static int ip3gen(struct chan *c, int i, struct dir *dp)
 static int ip2gen(struct chan *c, int i, struct dir *dp)
 {
 	struct qid q;
+
 	mkqid(&q, QID(PROTO(c->qid), 0, i), 0, QTFILE);
 	switch (i) {
-		case Qclone:
-			return founddevdir(c, q, "clone", 0, network, 0666, dp);
-		case Qstats:
-			return founddevdir(c, q, "stats", 0, network, 0444, dp);
+	case Qclone:
+		return founddevdir(c, q, "clone", 0, network, 0666, dp);
+	case Qstats:
+		return founddevdir(c, q, "stats", 0, network, 0444, dp);
 	}
 	return -1;
 }
@@ -234,29 +236,29 @@ static int ip1gen(struct chan *c, int i, struct dir *dp)
 	prot = 0666;
 	mkqid(&q, QID(0, 0, i), 0, QTFILE);
 	switch (i) {
-		default:
-			return -1;
-		case Qarp:
-			p = "arp";
-			break;
-		case Qndb:
-			p = "ndb";
-			len = strlen(f->ndb);
-			q.vers = f->ndbvers;
-			break;
-		case Qiproute:
-			p = "iproute";
-			break;
-		case Qipselftab:
-			p = "ipselftab";
-			prot = 0444;
-			break;
-		case Qiprouter:
-			p = "iprouter";
-			break;
-		case Qlog:
-			p = "log";
-			break;
+	default:
+		return -1;
+	case Qarp:
+		p = "arp";
+		break;
+	case Qndb:
+		p = "ndb";
+		len = strlen(f->ndb);
+		q.vers = f->ndbvers;
+		break;
+	case Qiproute:
+		p = "iproute";
+		break;
+	case Qipselftab:
+		p = "ipselftab";
+		prot = 0444;
+		break;
+	case Qiprouter:
+		p = "iprouter";
+		break;
+	case Qlog:
+		p = "log";
+		break;
 	}
 	devdir(c, q, p, len, network, prot, dp);
 	if (i == Qndb && f->ndbmtime > kerndate)
@@ -264,9 +266,8 @@ static int ip1gen(struct chan *c, int i, struct dir *dp)
 	return 1;
 }
 
-static int
-ipgen(struct chan *c, char *unused_char_p_t, struct dirtab *d, int unused_int,
-	  int s, struct dir *dp)
+static int ipgen(struct chan *c, char *unused_char_p_t, struct dirtab *d,
+		 int unused_int, int s, struct dir *dp)
 {
 	struct qid q;
 	struct conv *cv;
@@ -275,56 +276,58 @@ ipgen(struct chan *c, char *unused_char_p_t, struct dirtab *d, int unused_int,
 	f = ipfs[c->dev];
 
 	switch (TYPE(c->qid)) {
-		case Qtopdir:
-			if (s == DEVDOTDOT)
-				return topdirgen(c, dp);
-			if (s < f->np) {
-				if (f->p[s]->connect == NULL)
-					return 0;	/* protocol with no user interface */
-				mkqid(&q, QID(s, 0, Qprotodir), 0, QTDIR);
-				return founddevdir(c, q, f->p[s]->name, 0, network, 0555, dp);
-			}
-			s -= f->np;
-			return ip1gen(c, s + Qtopbase, dp);
-		case Qarp:
-		case Qndb:
-		case Qlog:
-		case Qiproute:
-		case Qiprouter:
-		case Qipselftab:
-			return ip1gen(c, TYPE(c->qid), dp);
-		case Qprotodir:
-			if (s == DEVDOTDOT)
-				return topdirgen(c, dp);
-			else if (s < f->p[PROTO(c->qid)]->ac) {
-				cv = f->p[PROTO(c->qid)]->conv[s];
-				snprintf(get_cur_genbuf(), GENBUF_SZ, "%d", s);
-				mkqid(&q, QID(PROTO(c->qid), s, Qconvdir), 0, QTDIR);
-				return
-					founddevdir(c, q, get_cur_genbuf(), 0, cv->owner, 0555, dp);
-			}
-			s -= f->p[PROTO(c->qid)]->ac;
-			return ip2gen(c, s + Qprotobase, dp);
-		case Qclone:
-		case Qstats:
-			return ip2gen(c, TYPE(c->qid), dp);
-		case Qconvdir:
-			if (s == DEVDOTDOT) {
-				s = PROTO(c->qid);
-				mkqid(&q, QID(s, 0, Qprotodir), 0, QTDIR);
-				devdir(c, q, f->p[s]->name, 0, network, 0555, dp);
-				return 1;
-			}
-			return ip3gen(c, s + Qconvbase, dp);
-		case Qctl:
-		case Qdata:
-		case Qerr:
-		case Qlisten:
-		case Qlocal:
-		case Qremote:
-		case Qstatus:
-		case Qsnoop:
-			return ip3gen(c, TYPE(c->qid), dp);
+	case Qtopdir:
+		if (s == DEVDOTDOT)
+			return topdirgen(c, dp);
+		if (s < f->np) {
+			/* protocol with no user interface */
+			if (f->p[s]->connect == NULL)
+				return 0;
+			mkqid(&q, QID(s, 0, Qprotodir), 0, QTDIR);
+			return founddevdir(c, q, f->p[s]->name, 0, network,
+					   0555, dp);
+		}
+		s -= f->np;
+		return ip1gen(c, s + Qtopbase, dp);
+	case Qarp:
+	case Qndb:
+	case Qlog:
+	case Qiproute:
+	case Qiprouter:
+	case Qipselftab:
+		return ip1gen(c, TYPE(c->qid), dp);
+	case Qprotodir:
+		if (s == DEVDOTDOT)
+			return topdirgen(c, dp);
+		else if (s < f->p[PROTO(c->qid)]->ac) {
+			cv = f->p[PROTO(c->qid)]->conv[s];
+			snprintf(get_cur_genbuf(), GENBUF_SZ, "%d", s);
+			mkqid(&q, QID(PROTO(c->qid), s, Qconvdir), 0, QTDIR);
+			return founddevdir(c, q, get_cur_genbuf(), 0, cv->owner,
+					   0555, dp);
+		}
+		s -= f->p[PROTO(c->qid)]->ac;
+		return ip2gen(c, s + Qprotobase, dp);
+	case Qclone:
+	case Qstats:
+		return ip2gen(c, TYPE(c->qid), dp);
+	case Qconvdir:
+		if (s == DEVDOTDOT) {
+			s = PROTO(c->qid);
+			mkqid(&q, QID(s, 0, Qprotodir), 0, QTDIR);
+			devdir(c, q, f->p[s]->name, 0, network, 0555, dp);
+			return 1;
+		}
+		return ip3gen(c, s + Qconvbase, dp);
+	case Qctl:
+	case Qdata:
+	case Qerr:
+	case Qlisten:
+	case Qlocal:
+	case Qremote:
+	case Qstatus:
+	case Qsnoop:
+		return ip3gen(c, TYPE(c->qid), dp);
 	}
 	return -1;
 }
@@ -450,162 +453,166 @@ static struct chan *ipopen(struct chan *c, int omode)
 	f = ipfs[c->dev];
 
 	switch (TYPE(c->qid)) {
-		default:
-			break;
-		case Qndb:
-			if (omode & (O_WRITE | O_TRUNC) && !iseve())
-				error(EPERM, ERROR_FIXME);
-			if ((omode & (O_WRITE | O_TRUNC)) == (O_WRITE | O_TRUNC))
-				f->ndb[0] = 0;
-			break;
-		case Qlog:
-			netlogopen(f);
-			break;
-		case Qiprouter:
-			iprouteropen(f);
-			break;
-		case Qiproute:
-			c->synth_buf = kpages_zalloc(IPROUTE_LEN, MEM_WAIT);
-			routeread(f, c->synth_buf, 0, IPROUTE_LEN);
-			break;
-		case Qtopdir:
-		case Qprotodir:
-		case Qconvdir:
-		case Qstatus:
-		case Qremote:
-		case Qlocal:
-		case Qstats:
-		case Qipselftab:
-			if (omode & O_WRITE)
-				error(EPERM, ERROR_FIXME);
-			break;
-		case Qsnoop:
-			if (omode & O_WRITE)
-				error(EPERM, ERROR_FIXME);
-			/* might be racy.  note the lack of a proto lock, unlike Qdata */
-			p = f->p[PROTO(c->qid)];
-			cv = p->conv[CONV(c->qid)];
-			if (strcmp(ATTACHER(c), cv->owner) != 0 && !iseve())
-				error(EPERM, ERROR_FIXME);
-			atomic_inc(&cv->snoopers);
-			break;
-		case Qclone:
-			p = f->p[PROTO(c->qid)];
-			qlock(&p->qlock);
-			if (waserror()) {
-				qunlock(&p->qlock);
-				nexterror();
-			}
-			cv = Fsprotoclone(p, ATTACHER(c));
+	default:
+		break;
+	case Qndb:
+		if (omode & (O_WRITE | O_TRUNC) && !iseve())
+			error(EPERM, ERROR_FIXME);
+		if ((omode & (O_WRITE | O_TRUNC)) == (O_WRITE | O_TRUNC))
+			f->ndb[0] = 0;
+		break;
+	case Qlog:
+		netlogopen(f);
+		break;
+	case Qiprouter:
+		iprouteropen(f);
+		break;
+	case Qiproute:
+		c->synth_buf = kpages_zalloc(IPROUTE_LEN, MEM_WAIT);
+		routeread(f, c->synth_buf, 0, IPROUTE_LEN);
+		break;
+	case Qtopdir:
+	case Qprotodir:
+	case Qconvdir:
+	case Qstatus:
+	case Qremote:
+	case Qlocal:
+	case Qstats:
+	case Qipselftab:
+		if (omode & O_WRITE)
+			error(EPERM, ERROR_FIXME);
+		break;
+	case Qsnoop:
+		if (omode & O_WRITE)
+			error(EPERM, ERROR_FIXME);
+		/* might be racy. note the lack of a proto lock, unlike Qdata */
+		p = f->p[PROTO(c->qid)];
+		cv = p->conv[CONV(c->qid)];
+		if (strcmp(ATTACHER(c), cv->owner) != 0 && !iseve())
+			error(EPERM, ERROR_FIXME);
+		atomic_inc(&cv->snoopers);
+		break;
+	case Qclone:
+		p = f->p[PROTO(c->qid)];
+		qlock(&p->qlock);
+		if (waserror()) {
 			qunlock(&p->qlock);
-			poperror();
-			if (cv == NULL) {
-				error(ENODEV, "Null conversation from Fsprotoclone");
-				break;
-			}
-			mkqid(&c->qid, QID(p->x, cv->x, Qctl), 0, QTFILE);
+			nexterror();
+		}
+		cv = Fsprotoclone(p, ATTACHER(c));
+		qunlock(&p->qlock);
+		poperror();
+		if (cv == NULL) {
+			error(ENODEV, "Null conversation from Fsprotoclone");
 			break;
-		case Qdata:
-		case Qctl:
-		case Qerr:
-			p = f->p[PROTO(c->qid)];
-			qlock(&p->qlock);
-			cv = p->conv[CONV(c->qid)];
-			qlock(&cv->qlock);
-			if (waserror()) {
-				qunlock(&cv->qlock);
-				qunlock(&p->qlock);
-				nexterror();
-			}
-			if ((perm & (cv->perm >> 6)) != perm) {
-				if (strcmp(ATTACHER(c), cv->owner) != 0)
-					error(EPERM, ERROR_FIXME);
-				if ((perm & cv->perm) != perm)
-					error(EPERM, ERROR_FIXME);
-
-			}
-			cv->inuse++;
-			if (cv->inuse == 1) {
-				kstrdup(&cv->owner, ATTACHER(c));
-				cv->perm = 0660;
-			}
+		}
+		mkqid(&c->qid, QID(p->x, cv->x, Qctl), 0, QTFILE);
+		break;
+	case Qdata:
+	case Qctl:
+	case Qerr:
+		p = f->p[PROTO(c->qid)];
+		qlock(&p->qlock);
+		cv = p->conv[CONV(c->qid)];
+		qlock(&cv->qlock);
+		if (waserror()) {
 			qunlock(&cv->qlock);
 			qunlock(&p->qlock);
-			poperror();
-			break;
-		case Qlisten:
-			cv = f->p[PROTO(c->qid)]->conv[CONV(c->qid)];
-			/* No permissions or Announce checks required.  We'll see if that's
-			 * a good idea or not. (the perm check would do nothing, as is,
-			 * since an O_PATH perm is 0).
-			 *
-			 * But we probably want to incref to keep the conversation around
-			 * until this FD/chan is closed.  #ip is a little weird in that
-			 * objects never really go away (high water mark for convs, you can
-			 * always find them in the ns).  I think it is possible to
-			 * namec/ipgen a chan, then have that conv close, then have that
-			 * chan be opened.  You can probably do this with a data file. */
-			if (omode & O_PATH) {
-				qlock(&cv->qlock);
-				cv->inuse++;
-				qunlock(&cv->qlock);
-				break;
-			}
-			if ((perm & (cv->perm >> 6)) != perm) {
-				if (strcmp(ATTACHER(c), cv->owner) != 0)
-					error(EPERM, ERROR_FIXME);
-				if ((perm & cv->perm) != perm)
-					error(EPERM, ERROR_FIXME);
+			nexterror();
+		}
+		if ((perm & (cv->perm >> 6)) != perm) {
+			if (strcmp(ATTACHER(c), cv->owner) != 0)
+				error(EPERM, ERROR_FIXME);
+			if ((perm & cv->perm) != perm)
+				error(EPERM, ERROR_FIXME);
 
-			}
-
-			if (cv->state != Announced)
-				error(EFAIL, "not announced");
-
-			if (waserror()) {
-				closeconv(cv);
-				nexterror();
-			}
+		}
+		cv->inuse++;
+		if (cv->inuse == 1) {
+			kstrdup(&cv->owner, ATTACHER(c));
+			cv->perm = 0660;
+		}
+		qunlock(&cv->qlock);
+		qunlock(&p->qlock);
+		poperror();
+		break;
+	case Qlisten:
+		cv = f->p[PROTO(c->qid)]->conv[CONV(c->qid)];
+		/* No permissions or Announce checks required.  We'll see if
+		 * that's a good idea or not. (the perm check would do nothing,
+		 * as is, since an O_PATH perm is 0).
+		 *
+		 * But we probably want to incref to keep the conversation
+		 * around until this FD/chan is closed.  #ip is a little weird
+		 * in that objects never really go away (high water mark for
+		 * convs, you can always find them in the ns).  I think it is
+		 * possible to namec/ipgen a chan, then have that conv close,
+		 * then have that chan be opened.  You can probably do this with
+		 * a data file. */
+		if (omode & O_PATH) {
 			qlock(&cv->qlock);
 			cv->inuse++;
 			qunlock(&cv->qlock);
+			break;
+		}
+		if ((perm & (cv->perm >> 6)) != perm) {
+			if (strcmp(ATTACHER(c), cv->owner) != 0)
+				error(EPERM, ERROR_FIXME);
+			if ((perm & cv->perm) != perm)
+				error(EPERM, ERROR_FIXME);
 
-			nc = NULL;
-			while (nc == NULL) {
-				/* give up if we got a hangup */
-				if (qisclosed(cv->rq))
-					error(EFAIL, "listen hungup");
+		}
 
-				qlock(&cv->listenq);
-				if (waserror()) {
-					qunlock(&cv->listenq);
-					nexterror();
-				}
-				/* we can peek at incall without grabbing the cv qlock.  if
-				 * anything is there, it'll remain there until we dequeue it.
-				 * no one else can, since we hold the listenq lock */
-				if ((c->flag & O_NONBLOCK) && !cv->incall)
-					error(EAGAIN, "listen queue empty");
-				/* wait for a connect */
-				rendez_sleep(&cv->listenr, should_wake, cv);
+		if (cv->state != Announced)
+			error(EFAIL, "not announced");
 
-				/* if there is a concurrent hangup, they will hold the qlock
-				 * until the hangup is complete, including closing the cv->rq */
-				qlock(&cv->qlock);
-				nc = cv->incall;
-				if (nc != NULL) {
-					cv->incall = nc->next;
-					mkqid(&c->qid, QID(PROTO(c->qid), nc->x, Qctl), 0, QTFILE);
-					kstrdup(&cv->owner, ATTACHER(c));
-				}
-				qunlock(&cv->qlock);
-
-				qunlock(&cv->listenq);
-				poperror();
-			}
+		if (waserror()) {
 			closeconv(cv);
+			nexterror();
+		}
+		qlock(&cv->qlock);
+		cv->inuse++;
+		qunlock(&cv->qlock);
+
+		nc = NULL;
+		while (nc == NULL) {
+			/* give up if we got a hangup */
+			if (qisclosed(cv->rq))
+				error(EFAIL, "listen hungup");
+
+			qlock(&cv->listenq);
+			if (waserror()) {
+				qunlock(&cv->listenq);
+				nexterror();
+			}
+			/* we can peek at incall without grabbing the cv qlock.
+			 * if anything is there, it'll remain there until we
+			 * dequeue it.  no one else can, since we hold the
+			 * listenq lock */
+			if ((c->flag & O_NONBLOCK) && !cv->incall)
+				error(EAGAIN, "listen queue empty");
+			/* wait for a connect */
+			rendez_sleep(&cv->listenr, should_wake, cv);
+
+			/* if there is a concurrent hangup, they will hold the
+			 * qlock until the hangup is complete, including closing
+			 * the cv->rq */
+			qlock(&cv->qlock);
+			nc = cv->incall;
+			if (nc != NULL) {
+				cv->incall = nc->next;
+				mkqid(&c->qid, QID(PROTO(c->qid), nc->x, Qctl),
+				      0, QTFILE);
+				kstrdup(&cv->owner, ATTACHER(c));
+			}
+			qunlock(&cv->qlock);
+
+			qunlock(&cv->listenq);
 			poperror();
-			break;
+		}
+		closeconv(cv);
+		poperror();
+		break;
 	}
 	c->mode = openmode(omode);
 	c->flag |= COPEN;
@@ -623,12 +630,12 @@ static size_t ipwstat(struct chan *c, uint8_t *dp, size_t n)
 
 	f = ipfs[c->dev];
 	switch (TYPE(c->qid)) {
-		default:
-			error(EPERM, ERROR_FIXME);
-			break;
-		case Qctl:
-		case Qdata:
-			break;
+	default:
+		error(EPERM, ERROR_FIXME);
+		break;
+	case Qctl:
+	case Qdata:
+		break;
 	}
 
 	d = kzmalloc(sizeof(*d) + n, 0);
@@ -663,44 +670,45 @@ static char *ipchaninfo(struct chan *ch, char *ret, size_t ret_l)
 	f = ipfs[ch->dev];
 
 	switch (TYPE(ch->qid)) {
-		default:
-			ret = "Unknown type";
-			break;
-		case Qdata:
-			proto = f->p[PROTO(ch->qid)];
-			conv = proto->conv[CONV(ch->qid)];
-			snprintf(ret, ret_l,
-			         "Qdata, %s, proto %s, conv idx %d, rq len %d, wq len %d, total read %llu",
-			         SLIST_EMPTY(&conv->data_taps) ? "untapped" : "tapped",
-			         proto->name, conv->x, qlen(conv->rq), qlen(conv->wq),
-					 q_bytes_read(conv->rq));
-			break;
-		case Qarp:
-			ret = "Qarp";
-			break;
-		case Qiproute:
-			ret = "Qiproute";
-			break;
-		case Qlisten:
-			proto = f->p[PROTO(ch->qid)];
-			conv = proto->conv[CONV(ch->qid)];
-			snprintf(ret, ret_l,
-			         "Qlisten, %s proto %s, conv idx %d, has %sincalls",
-			         SLIST_EMPTY(&conv->listen_taps) ? "untapped" : "tapped",
-			         proto->name, conv->x, conv->incall ? "" : "no ");
-			break;
-		case Qlog:
-			ret = "Qlog";
-			break;
-		case Qndb:
-			ret = "Qndb";
-			break;
-		case Qctl:
-			proto = f->p[PROTO(ch->qid)];
-			conv = proto->conv[CONV(ch->qid)];
-			snprintf(ret, ret_l, "Qctl, proto %s, conv idx %d", proto->name,
-					 conv->x);
-			break;
+	default:
+		ret = "Unknown type";
+		break;
+	case Qdata:
+		proto = f->p[PROTO(ch->qid)];
+		conv = proto->conv[CONV(ch->qid)];
+		snprintf(ret, ret_l,
+		         "Qdata, %s, proto %s, conv idx %d, rq len %d, wq len %d, total read %llu",
+		         SLIST_EMPTY(&conv->data_taps) ? "untapped" : "tapped",
+		         proto->name, conv->x, qlen(conv->rq), qlen(conv->wq),
+				 q_bytes_read(conv->rq));
+		break;
+	case Qarp:
+		ret = "Qarp";
+		break;
+	case Qiproute:
+		ret = "Qiproute";
+		break;
+	case Qlisten:
+		proto = f->p[PROTO(ch->qid)];
+		conv = proto->conv[CONV(ch->qid)];
+		snprintf(ret, ret_l,
+		         "Qlisten, %s proto %s, conv idx %d, has %sincalls",
+		         SLIST_EMPTY(&conv->listen_taps) ? "untapped"
+			 				 : "tapped",
+		         proto->name, conv->x, conv->incall ? "" : "no ");
+		break;
+	case Qlog:
+		ret = "Qlog";
+		break;
+	case Qndb:
+		ret = "Qndb";
+		break;
+	case Qctl:
+		proto = f->p[PROTO(ch->qid)];
+		conv = proto->conv[CONV(ch->qid)];
+		snprintf(ret, ret_l, "Qctl, proto %s, conv idx %d", proto->name,
+				 conv->x);
+		break;
 	}
 	return ret;
 }
@@ -750,33 +758,33 @@ static void ipclose(struct chan *c)
 
 	f = ipfs[c->dev];
 	switch (TYPE(c->qid)) {
-		default:
-			break;
-		case Qlog:
-			if (c->flag & COPEN)
-				netlogclose(f);
-			break;
-		case Qiprouter:
-			if (c->flag & COPEN)
-				iprouterclose(f);
-			break;
-		case Qdata:
-		case Qctl:
-		case Qerr:
-		case Qlisten:
-			if (c->flag & COPEN)
-				closeconv(f->p[PROTO(c->qid)]->conv[CONV(c->qid)]);
-			break;
-		case Qsnoop:
-			if (c->flag & COPEN)
-				atomic_dec(&f->p[PROTO(c->qid)]->conv[CONV(c->qid)]->snoopers);
-			break;
-		case Qiproute:
-			if (c->flag & COPEN) {
-				kpages_free(c->synth_buf, IPROUTE_LEN);
-				c->synth_buf = NULL;
-			}
-			break;
+	default:
+		break;
+	case Qlog:
+		if (c->flag & COPEN)
+			netlogclose(f);
+		break;
+	case Qiprouter:
+		if (c->flag & COPEN)
+			iprouterclose(f);
+		break;
+	case Qdata:
+	case Qctl:
+	case Qerr:
+	case Qlisten:
+		if (c->flag & COPEN)
+			closeconv(f->p[PROTO(c->qid)]->conv[CONV(c->qid)]);
+		break;
+	case Qsnoop:
+		if (c->flag & COPEN)
+			atomic_dec(&f->p[PROTO(c->qid)]->conv[CONV(c->qid)]->snoopers);
+		break;
+	case Qiproute:
+		if (c->flag & COPEN) {
+			kpages_free(c->synth_buf, IPROUTE_LEN);
+			c->synth_buf = NULL;
+		}
+		break;
 	}
 	kfree(((struct IPaux *)c->aux)->owner);
 	kfree(c->aux);
@@ -799,88 +807,89 @@ static size_t ipread(struct chan *ch, void *a, size_t n, off64_t off)
 
 	p = a;
 	switch (TYPE(ch->qid)) {
-		default:
-			error(EPERM, ERROR_FIXME);
-		case Qtopdir:
-		case Qprotodir:
-		case Qconvdir:
-			return devdirread(ch, a, n, 0, 0, ipgen);
-		case Qarp:
-			return arpread(f->arp, a, offset, n);
-		case Qndb:
-			return readstr(offset, a, n, f->ndb);
-		case Qiproute:
-			return readmem(offset, a, n, ch->synth_buf, IPROUTE_LEN);
-		case Qiprouter:
-			return iprouterread(f, a, n);
-		case Qipselftab:
-			return ipselftabread(f, a, offset, n);
-		case Qlog:
-			return netlogread(f, a, offset, n);
-		case Qctl:
-			snprintf(get_cur_genbuf(), GENBUF_SZ, "%lu", CONV(ch->qid));
-			return readstr(offset, p, n, get_cur_genbuf());
-		case Qremote:
-			buf = kzmalloc(Statelen, 0);
-			x = f->p[PROTO(ch->qid)];
-			c = x->conv[CONV(ch->qid)];
-			if (x->remote == NULL) {
-				snprintf(buf, Statelen, "%I!%d\n", c->raddr, c->rport);
-			} else {
-				(*x->remote) (c, buf, Statelen - 2);
-			}
-			rv = readstr(offset, p, n, buf);
-			kfree(buf);
-			return rv;
-		case Qlocal:
-			buf = kzmalloc(Statelen, 0);
-			x = f->p[PROTO(ch->qid)];
-			c = x->conv[CONV(ch->qid)];
-			if (x->local == NULL) {
-				snprintf(buf, Statelen, "%I!%d\n", c->laddr, c->lport);
-			} else {
-				(*x->local) (c, buf, Statelen - 2);
-			}
-			rv = readstr(offset, p, n, buf);
-			kfree(buf);
-			return rv;
-		case Qstatus:
-			/* this all is a bit screwed up since the size of some state's
-			 * buffers will change from one invocation to another.  a reader
-			 * will come in and read the entire buffer.  then it will come again
-			 * and read from the next offset, expecting EOF.  if the buffer
-			 * changed sizes, it'll reprint the end of the buffer slightly. */
-			buf = kzmalloc(Statelen, 0);
-			x = f->p[PROTO(ch->qid)];
-			c = x->conv[CONV(ch->qid)];
-			if (c->state == Bypass)
-				snprintf(buf, Statelen, "Bypassed\n");
-			else
-				(*x->state)(c, buf, Statelen - 2);
-			rv = readstr(offset, p, n, buf);
-			kfree(buf);
-			return rv;
-		case Qdata:
-			c = f->p[PROTO(ch->qid)]->conv[CONV(ch->qid)];
-			if (ch->flag & O_NONBLOCK)
-				return qread_nonblock(c->rq, a, n);
-			else
-				return qread(c->rq, a, n);
-		case Qerr:
-			c = f->p[PROTO(ch->qid)]->conv[CONV(ch->qid)];
-			return qread(c->eq, a, n);
-		case Qsnoop:
-			c = f->p[PROTO(ch->qid)]->conv[CONV(ch->qid)];
-			return qread(c->sq, a, n);
-		case Qstats:
-			x = f->p[PROTO(ch->qid)];
-			if (x->stats == NULL)
-				error(EFAIL, "stats not implemented");
-			buf = kzmalloc(Statelen, 0);
-			(*x->stats) (x, buf, Statelen);
-			rv = readstr(offset, p, n, buf);
-			kfree(buf);
-			return rv;
+	default:
+		error(EPERM, ERROR_FIXME);
+	case Qtopdir:
+	case Qprotodir:
+	case Qconvdir:
+		return devdirread(ch, a, n, 0, 0, ipgen);
+	case Qarp:
+		return arpread(f->arp, a, offset, n);
+	case Qndb:
+		return readstr(offset, a, n, f->ndb);
+	case Qiproute:
+		return readmem(offset, a, n, ch->synth_buf, IPROUTE_LEN);
+	case Qiprouter:
+		return iprouterread(f, a, n);
+	case Qipselftab:
+		return ipselftabread(f, a, offset, n);
+	case Qlog:
+		return netlogread(f, a, offset, n);
+	case Qctl:
+		snprintf(get_cur_genbuf(), GENBUF_SZ, "%lu", CONV(ch->qid));
+		return readstr(offset, p, n, get_cur_genbuf());
+	case Qremote:
+		buf = kzmalloc(Statelen, 0);
+		x = f->p[PROTO(ch->qid)];
+		c = x->conv[CONV(ch->qid)];
+		if (x->remote == NULL) {
+			snprintf(buf, Statelen, "%I!%d\n", c->raddr, c->rport);
+		} else {
+			(*x->remote) (c, buf, Statelen - 2);
+		}
+		rv = readstr(offset, p, n, buf);
+		kfree(buf);
+		return rv;
+	case Qlocal:
+		buf = kzmalloc(Statelen, 0);
+		x = f->p[PROTO(ch->qid)];
+		c = x->conv[CONV(ch->qid)];
+		if (x->local == NULL) {
+			snprintf(buf, Statelen, "%I!%d\n", c->laddr, c->lport);
+		} else {
+			(*x->local) (c, buf, Statelen - 2);
+		}
+		rv = readstr(offset, p, n, buf);
+		kfree(buf);
+		return rv;
+	case Qstatus:
+		/* this all is a bit screwed up since the size of some state's
+		 * buffers will change from one invocation to another.  a reader
+		 * will come in and read the entire buffer.  then it will come
+		 * again and read from the next offset, expecting EOF.  if the
+		 * buffer changed sizes, it'll reprint the end of the buffer
+		 * slightly. */
+		buf = kzmalloc(Statelen, 0);
+		x = f->p[PROTO(ch->qid)];
+		c = x->conv[CONV(ch->qid)];
+		if (c->state == Bypass)
+			snprintf(buf, Statelen, "Bypassed\n");
+		else
+			(*x->state)(c, buf, Statelen - 2);
+		rv = readstr(offset, p, n, buf);
+		kfree(buf);
+		return rv;
+	case Qdata:
+		c = f->p[PROTO(ch->qid)]->conv[CONV(ch->qid)];
+		if (ch->flag & O_NONBLOCK)
+			return qread_nonblock(c->rq, a, n);
+		else
+			return qread(c->rq, a, n);
+	case Qerr:
+		c = f->p[PROTO(ch->qid)]->conv[CONV(ch->qid)];
+		return qread(c->eq, a, n);
+	case Qsnoop:
+		c = f->p[PROTO(ch->qid)]->conv[CONV(ch->qid)];
+		return qread(c->sq, a, n);
+	case Qstats:
+		x = f->p[PROTO(ch->qid)];
+		if (x->stats == NULL)
+			error(EFAIL, "stats not implemented");
+		buf = kzmalloc(Statelen, 0);
+		(*x->stats) (x, buf, Statelen);
+		rv = readstr(offset, p, n, buf);
+		kfree(buf);
+		return rv;
 	}
 }
 
@@ -889,14 +898,14 @@ static struct block *ipbread(struct chan *ch, size_t n, off64_t offset)
 	struct conv *c;
 
 	switch (TYPE(ch->qid)) {
-		case Qdata:
-			c = chan2conv(ch);
-			if (ch->flag & O_NONBLOCK)
-				return qbread_nonblock(c->rq, n);
-			else
-				return qbread(c->rq, n);
-		default:
-			return devbread(ch, n, offset);
+	case Qdata:
+		c = chan2conv(ch);
+		if (ch->flag & O_NONBLOCK)
+			return qbread_nonblock(c->rq, n);
+		else
+			return qbread(c->rq, n);
+	default:
+		return devbread(ch, n, offset);
 	}
 }
 
@@ -959,10 +968,10 @@ static void setlport(struct conv *c)
 		/*
 		 * Fsproto initialises p->nextport to 0 and the restricted
 		 * ports (p->nextrport) to 600.
-		 * Restricted ports must lie between 600 and 1024.
-		 * For the initial condition or if the unrestricted port number
-		 * has wrapped round, select a random port between 5000 and 1<<15
-		 * to start at.
+		 * Restricted ports must lie between 600 and 1024.  For the
+		 * initial condition or if the unrestricted port number has
+		 * wrapped round, select a random port between 5000 and 1<<15 to
+		 * start at.
 		 */
 		if (c->restricted) {
 			if (*pp >= 1024)
@@ -1064,17 +1073,17 @@ static void setraddrport(struct conv *c, char *str)
 void Fsstdconnect(struct conv *c, char *argv[], int argc)
 {
 	switch (argc) {
-		default:
-			error(EINVAL, "bad args to %s", __func__);
-		case 2:
-			setraddrport(c, argv[1]);
-			setladdr(c);
-			setlport(c);
-			break;
-		case 3:
-			setraddrport(c, argv[1]);
-			setladdrport(c, argv[2], 0);
-			break;
+	default:
+		error(EINVAL, "bad args to %s", __func__);
+	case 2:
+		setraddrport(c, argv[1]);
+		setladdr(c);
+		setlport(c);
+		break;
+	case 3:
+		setraddrport(c, argv[1]);
+		setladdrport(c, argv[2], 0);
+		break;
 	}
 
 	/* TODO: why is an IPnoaddr (in v6 format, equivalent to v6Unspecified),
@@ -1111,20 +1120,20 @@ static void connectctlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb,
 	c->cerr[0] = '\0';
 	if (x->connect == NULL)
 		error(EFAIL, "connect not supported");
-	/* It's up to the proto connect method to not block the kthread.  This is
-	 * currently the case for e.g. TCP. */
+	/* It's up to the proto connect method to not block the kthread.  This
+	 * is currently the case for e.g. TCP. */
 	x->connect(c, cb->f, cb->nf);
-	/* This is notionally right before the rendez_sleep: either we block or we
-	 * kick back to userspace.  We do this before the unlock to avoid races with
-	 * c->state (rendez's internal lock deals with its race with the waker) and
-	 * to avoid the excessive unlock and relock.
+	/* This is notionally right before the rendez_sleep: either we block or
+	 * we kick back to userspace.  We do this before the unlock to avoid
+	 * races with c->state (rendez's internal lock deals with its race with
+	 * the waker) and to avoid the excessive unlock and relock.
 	 *
 	 * Also, it's important that we don't do anything important for the
-	 * functionality of the conv after the rendez sleep.  The non-blocking style
-	 * won't call back into the kernel - it just wants the event.  I considered
-	 * allowing multiple connect calls, where we just return if it was already
-	 * connected, but that would break UDP, which allows multiple different
-	 * connect calls. */
+	 * functionality of the conv after the rendez sleep.  The non-blocking
+	 * style won't call back into the kernel - it just wants the event.  I
+	 * considered allowing multiple connect calls, where we just return if
+	 * it was already connected, but that would break UDP, which allows
+	 * multiple different connect calls. */
 	if ((chan->flag & O_NONBLOCK) && !connected(c))
 		error(EINPROGRESS, "connection not ready yet");
 	qunlock(&c->qlock);
@@ -1148,11 +1157,11 @@ void Fsstdannounce(struct conv *c, char *argv[], int argc)
 	memset(c->raddr, 0, sizeof(c->raddr));
 	c->rport = 0;
 	switch (argc) {
-		default:
-			error(EINVAL, "bad args to announce");
-		case 2:
-			setladdrport(c, argv[1], 1);
-			break;
+	default:
+		error(EINVAL, "bad args to announce");
+	case 2:
+		setladdrport(c, argv[1], 1);
+		break;
 	}
 }
 
@@ -1196,11 +1205,11 @@ static void announcectlmsg(struct Proto *x, struct conv *c, struct cmdbuf *cb)
 void Fsstdbind(struct conv *c, char *argv[], int argc)
 {
 	switch (argc) {
-		default:
-			error(EINVAL, "bad args to bind");
-		case 2:
-			setladdrport(c, argv[1], 0);
-			break;
+	default:
+		error(EINVAL, "bad args to bind");
+	case 2:
+		setladdrport(c, argv[1], 0);
+		break;
 	}
 }
 
@@ -1257,13 +1266,15 @@ static void proto_bypass_kick(void *arg, struct block *bp)
 	case IP_VER4:
 		bp = pullupblock(bp, IPV4HDR_LEN);
 		if (!bp)
-			error(EINVAL, "Proto bypass unable to pullup v4 header");
+			error(EINVAL,
+			      "Proto bypass unable to pullup v4 header");
 		ipoput4(f, bp, FALSE, MAXTTL, DFLTTOS, NULL);
 		break;
 	case IP_VER6:
 		bp = pullupblock(bp, IPV6HDR_LEN);
 		if (!bp)
-			error(EINVAL, "Proto bypass unable to pullup v6 header");
+			error(EINVAL,
+			      "Proto bypass unable to pullup v6 header");
 		ipoput6(f, bp, FALSE, MAXTTL, DFLTTOS, NULL);
 		break;
 	default:
@@ -1334,9 +1345,9 @@ static void bypassctlmsg(struct Proto *x, struct conv *cv, struct cmdbuf *cb)
 {
 	if (!x->bypass)
 		error(EFAIL, "Protocol %s does not support bypass", x->name);
-	/* The protocol needs to set the port (usually by calling Fsstdbypass) and
-	 * then do whatever it needs to make sure it can find the conv again during
-	 * receive (usually by adding to a hash table). */
+	/* The protocol needs to set the port (usually by calling Fsstdbypass)
+	 * and then do whatever it needs to make sure it can find the conv again
+	 * during receive (usually by adding to a hash table). */
 	x->bypass(cv, cb->f, cb->nf);
 	setup_proto_qio_bypass(cv);
 	cv->state = Bypass;
@@ -1414,87 +1425,90 @@ static size_t ipwrite(struct chan *ch, void *v, size_t n, off64_t off)
 	f = ipfs[ch->dev];
 
 	switch (TYPE(ch->qid)) {
-		default:
-			error(EPERM, ERROR_FIXME);
-		case Qdata:
-			x = f->p[PROTO(ch->qid)];
-			c = x->conv[CONV(ch->qid)];
-			/* connection-less protocols (UDP) can write without manually
-			 * binding. */
-			if (c->lport == 0)
-				autobind(c);
-			if (ch->flag & O_NONBLOCK)
-				qwrite_nonblock(c->wq, a, n);
-			else
-				qwrite(c->wq, a, n);
-			break;
-		case Qarp:
-			return arpwrite(f, a, n);
-		case Qiproute:
-			return routewrite(f, ch, a, n);
-		case Qlog:
-			netlogctl(f, a, n);
-			return n;
-		case Qndb:
-			return ndbwrite(f, a, off, n);
-		case Qctl:
-			x = f->p[PROTO(ch->qid)];
-			c = x->conv[CONV(ch->qid)];
-			cb = parsecmd(a, n);
+	default:
+		error(EPERM, ERROR_FIXME);
+	case Qdata:
+		x = f->p[PROTO(ch->qid)];
+		c = x->conv[CONV(ch->qid)];
+		/* connection-less protocols (UDP) can write without manually
+		 * binding. */
+		if (c->lport == 0)
+			autobind(c);
+		if (ch->flag & O_NONBLOCK)
+			qwrite_nonblock(c->wq, a, n);
+		else
+			qwrite(c->wq, a, n);
+		break;
+	case Qarp:
+		return arpwrite(f, a, n);
+	case Qiproute:
+		return routewrite(f, ch, a, n);
+	case Qlog:
+		netlogctl(f, a, n);
+		return n;
+	case Qndb:
+		return ndbwrite(f, a, off, n);
+	case Qctl:
+		x = f->p[PROTO(ch->qid)];
+		c = x->conv[CONV(ch->qid)];
+		cb = parsecmd(a, n);
 
-			qlock(&c->qlock);
-			if (waserror()) {
-				qunlock(&c->qlock);
-				kfree(cb);
-				nexterror();
-			}
-			if (cb->nf < 1)
-				error(EFAIL, "short control request");
-			if (strcmp(cb->f[0], "connect") == 0)
-				connectctlmsg(x, c, cb, ch);
-			else if (strcmp(cb->f[0], "announce") == 0)
-				announcectlmsg(x, c, cb);
-			else if (strcmp(cb->f[0], "bind") == 0)
-				bindctlmsg(x, c, cb);
-			else if (strcmp(cb->f[0], "bypass") == 0)
-				bypassctlmsg(x, c, cb);
-			else if (strcmp(cb->f[0], "shutdown") == 0)
-				shutdownctlmsg(c, cb);
-			else if (strcmp(cb->f[0], "ttl") == 0)
-				ttlctlmsg(c, cb);
-			else if (strcmp(cb->f[0], "tos") == 0)
-				tosctlmsg(c, cb);
-			else if (strcmp(cb->f[0], "ignoreadvice") == 0)
-				c->ignoreadvice = 1;
-			else if (strcmp(cb->f[0], "addmulti") == 0) {
-				if (cb->nf < 2)
-					error(EFAIL, "addmulti needs interface address");
-				if (cb->nf == 2) {
-					if (!ipismulticast(c->raddr))
-						error(EFAIL, "addmulti for a non multicast address");
-					parseip(ia, cb->f[1]);
-					ipifcaddmulti(c, c->raddr, ia);
-				} else {
-					parseip(ma, cb->f[2]);
-					if (!ipismulticast(ma))
-						error(EFAIL, "addmulti for a non multicast address");
-					parseip(ia, cb->f[1]);
-					ipifcaddmulti(c, ma, ia);
-				}
-			} else if (strcmp(cb->f[0], "remmulti") == 0) {
-				if (cb->nf < 2)
-					error(EFAIL, "remmulti needs interface address");
-				if (!ipismulticast(c->raddr))
-					error(EFAIL, "remmulti for a non multicast address");
-				parseip(ia, cb->f[1]);
-				ipifcremmulti(c, c->raddr, ia);
-			} else if (x->ctl != NULL) {
-				x->ctl(c, cb->f, cb->nf);
-			} else
-				error(EFAIL, "unknown control request");
+		qlock(&c->qlock);
+		if (waserror()) {
 			qunlock(&c->qlock);
 			kfree(cb);
-			poperror();
+			nexterror();
+		}
+		if (cb->nf < 1)
+			error(EFAIL, "short control request");
+		if (strcmp(cb->f[0], "connect") == 0)
+			connectctlmsg(x, c, cb, ch);
+		else if (strcmp(cb->f[0], "announce") == 0)
+			announcectlmsg(x, c, cb);
+		else if (strcmp(cb->f[0], "bind") == 0)
+			bindctlmsg(x, c, cb);
+		else if (strcmp(cb->f[0], "bypass") == 0)
+			bypassctlmsg(x, c, cb);
+		else if (strcmp(cb->f[0], "shutdown") == 0)
+			shutdownctlmsg(c, cb);
+		else if (strcmp(cb->f[0], "ttl") == 0)
+			ttlctlmsg(c, cb);
+		else if (strcmp(cb->f[0], "tos") == 0)
+			tosctlmsg(c, cb);
+		else if (strcmp(cb->f[0], "ignoreadvice") == 0)
+			c->ignoreadvice = 1;
+		else if (strcmp(cb->f[0], "addmulti") == 0) {
+			if (cb->nf < 2)
+				error(EFAIL,
+				      "addmulti needs interface address");
+			if (cb->nf == 2) {
+				if (!ipismulticast(c->raddr))
+					error(EFAIL, "addmulti for a non multicast address");
+				parseip(ia, cb->f[1]);
+				ipifcaddmulti(c, c->raddr, ia);
+			} else {
+				parseip(ma, cb->f[2]);
+				if (!ipismulticast(ma))
+					error(EFAIL, "addmulti for a non multicast address");
+				parseip(ia, cb->f[1]);
+				ipifcaddmulti(c, ma, ia);
+			}
+		} else if (strcmp(cb->f[0], "remmulti") == 0) {
+			if (cb->nf < 2)
+				error(EFAIL,
+				      "remmulti needs interface address");
+			if (!ipismulticast(c->raddr))
+				error(EFAIL,
+				      "remmulti for a non multicast address");
+			parseip(ia, cb->f[1]);
+			ipifcremmulti(c, c->raddr, ia);
+		} else if (x->ctl != NULL) {
+			x->ctl(c, cb->f, cb->nf);
+		} else
+			error(EFAIL, "unknown control request");
+		qunlock(&c->qlock);
+		kfree(cb);
+		poperror();
 	}
 	return n;
 }
@@ -1505,18 +1519,18 @@ static size_t ipbwrite(struct chan *ch, struct block *bp, off64_t offset)
 	size_t n;
 
 	switch (TYPE(ch->qid)) {
-		case Qdata:
-			c = chan2conv(ch);
-			if (bp->next)
-				bp = concatblock(bp);
-			n = BLEN(bp);
-			if (ch->flag & O_NONBLOCK)
-				qbwrite_nonblock(c->wq, bp);
-			else
-				qbwrite(c->wq, bp);
-			return n;
-		default:
-			return devbwrite(ch, bp, offset);
+	case Qdata:
+		c = chan2conv(ch);
+		if (bp->next)
+			bp = concatblock(bp);
+		n = BLEN(bp);
+		if (ch->flag & O_NONBLOCK)
+			qbwrite_nonblock(c->wq, bp);
+		else
+			qbwrite(c->wq, bp);
+		return n;
+	default:
+		return devbwrite(ch, bp, offset);
 	}
 }
 
@@ -1527,17 +1541,17 @@ static void fire_data_taps(struct conv *conv, int filter)
 	/* At this point, we have an event we want to send to our taps (if any).
 	 * The lock protects list integrity and the existence of the tap.
 	 *
-	 * Previously, I thought of using the conv qlock.  That actually breaks, due
-	 * to weird usages of the qlock (someone holds it for a long time, blocking
-	 * the inbound wakeup from etherread4).
+	 * Previously, I thought of using the conv qlock.  That actually breaks,
+	 * due to weird usages of the qlock (someone holds it for a long time,
+	 * blocking the inbound wakeup from etherread4).
 	 *
 	 * I opted for a spinlock for a couple reasons:
-	 * - fire_tap should not block.  ideally it'll be fast too (it's mostly a
-	 * send_event).
+	 * - fire_tap should not block.  ideally it'll be fast too (it's mostly
+	 *   a send_event).
 	 * - our callers might not want to block.  A lot of network wakeups will
 	 * come network processes (etherread4) or otherwise unrelated to this
-	 * particular conversation.  I'd rather do something like fire off a KMSG
-	 * than block those.
+	 * particular conversation.  I'd rather do something like fire off a
+	 * KMSG than block those.
 	 * - if fire_tap takes a while, holding the lock only slows down other
 	 * events on this *same* conversation, or other tap registration.  not a
 	 * huge deal. */
@@ -1553,9 +1567,9 @@ static void ip_wake_cb(struct queue *q, void *data, int filter)
 
 	/* For these two, we want to ignore events on the opposite end of the
 	 * queues.  For instance, we want to know when the WQ is writable.  Our
-	 * writes will actually make it readable - we don't want to trigger a tap
-	 * for that.  However, qio doesn't know how/why we are using a queue, or
-	 * even who the ends are (hence the callbacks) */
+	 * writes will actually make it readable - we don't want to trigger a
+	 * tap for that.  However, qio doesn't know how/why we are using a
+	 * queue, or even who the ends are (hence the callbacks) */
 	if ((filter & FDTAP_FILT_READABLE) && (q == conv->wq))
 		return;
 	if ((filter & FDTAP_FILT_WRITABLE) && (q == conv->rq))
@@ -1568,75 +1582,77 @@ int iptapfd(struct chan *chan, struct fd_tap *tap, int cmd)
 	struct conv *conv = chan2conv(chan);
 	int ret;
 
-	#define DEVIP_LEGAL_DATA_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_WRITABLE | \
-	                               FDTAP_FILT_HANGUP | FDTAP_FILT_PRIORITY |   \
-	                               FDTAP_FILT_ERROR)
-	#define DEVIP_LEGAL_LISTEN_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_HANGUP)
+#define DEVIP_LEGAL_DATA_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_WRITABLE |     \
+                               FDTAP_FILT_HANGUP | FDTAP_FILT_PRIORITY |       \
+                               FDTAP_FILT_ERROR)
+#define DEVIP_LEGAL_LISTEN_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_HANGUP)
 
 	switch (TYPE(chan->qid)) {
-		case Qdata:
-			if (tap->filter & ~DEVIP_LEGAL_DATA_TAPS) {
-				set_errno(ENOSYS);
-				set_errstr("Unsupported #%s data tap %p, must be %p", devname(),
-				           tap->filter, DEVIP_LEGAL_DATA_TAPS);
-				return -1;
+	case Qdata:
+		if (tap->filter & ~DEVIP_LEGAL_DATA_TAPS) {
+			set_errno(ENOSYS);
+			set_errstr("Unsupported #%s data tap %p, must be %p",
+				   devname(), tap->filter,
+				   DEVIP_LEGAL_DATA_TAPS);
+			return -1;
+		}
+		spin_lock(&conv->tap_lock);
+		switch (cmd) {
+		case (FDTAP_CMD_ADD):
+			if (SLIST_EMPTY(&conv->data_taps)) {
+				qio_set_wake_cb(conv->rq, ip_wake_cb, conv);
+				qio_set_wake_cb(conv->wq, ip_wake_cb, conv);
 			}
-			spin_lock(&conv->tap_lock);
-			switch (cmd) {
-				case (FDTAP_CMD_ADD):
-					if (SLIST_EMPTY(&conv->data_taps)) {
-						qio_set_wake_cb(conv->rq, ip_wake_cb, conv);
-						qio_set_wake_cb(conv->wq, ip_wake_cb, conv);
-					}
-					SLIST_INSERT_HEAD(&conv->data_taps, tap, link);
-					ret = 0;
-					break;
-				case (FDTAP_CMD_REM):
-					SLIST_REMOVE(&conv->data_taps, tap, fd_tap, link);
-					if (SLIST_EMPTY(&conv->data_taps)) {
-						qio_set_wake_cb(conv->rq, 0, conv);
-						qio_set_wake_cb(conv->wq, 0, conv);
-					}
-					ret = 0;
-					break;
-				default:
-					set_errno(ENOSYS);
-					set_errstr("Unsupported #%s data tap command %p",
-					           devname(), cmd);
-					ret = -1;
+			SLIST_INSERT_HEAD(&conv->data_taps, tap, link);
+			ret = 0;
+			break;
+		case (FDTAP_CMD_REM):
+			SLIST_REMOVE(&conv->data_taps, tap, fd_tap, link);
+			if (SLIST_EMPTY(&conv->data_taps)) {
+				qio_set_wake_cb(conv->rq, 0, conv);
+				qio_set_wake_cb(conv->wq, 0, conv);
 			}
-			spin_unlock(&conv->tap_lock);
-			return ret;
-		case Qlisten:
-			if (tap->filter & ~DEVIP_LEGAL_LISTEN_TAPS) {
-				set_errno(ENOSYS);
-				set_errstr("Unsupported #%s listen tap %p, must be %p",
-				           devname(), tap->filter, DEVIP_LEGAL_LISTEN_TAPS);
-				return -1;
-			}
-			spin_lock(&conv->tap_lock);
-			switch (cmd) {
-				case (FDTAP_CMD_ADD):
-					SLIST_INSERT_HEAD(&conv->listen_taps, tap, link);
-					ret = 0;
-					break;
-				case (FDTAP_CMD_REM):
-					SLIST_REMOVE(&conv->listen_taps, tap, fd_tap, link);
-					ret = 0;
-					break;
-				default:
-					set_errno(ENOSYS);
-					set_errstr("Unsupported #%s listen tap command %p",
-					           devname(), cmd);
-					ret = -1;
-			}
-			spin_unlock(&conv->tap_lock);
-			return ret;
+			ret = 0;
+			break;
 		default:
 			set_errno(ENOSYS);
-			set_errstr("Can't tap #%s file type %d", devname(),
-			           TYPE(chan->qid));
+			set_errstr("Unsupported #%s data tap command %p",
+			           devname(), cmd);
+			ret = -1;
+		}
+		spin_unlock(&conv->tap_lock);
+		return ret;
+	case Qlisten:
+		if (tap->filter & ~DEVIP_LEGAL_LISTEN_TAPS) {
+			set_errno(ENOSYS);
+			set_errstr("Unsupported #%s listen tap %p, must be %p",
+				   devname(), tap->filter,
+				   DEVIP_LEGAL_LISTEN_TAPS);
 			return -1;
+		}
+		spin_lock(&conv->tap_lock);
+		switch (cmd) {
+		case (FDTAP_CMD_ADD):
+			SLIST_INSERT_HEAD(&conv->listen_taps, tap, link);
+			ret = 0;
+			break;
+		case (FDTAP_CMD_REM):
+			SLIST_REMOVE(&conv->listen_taps, tap, fd_tap, link);
+			ret = 0;
+			break;
+		default:
+			set_errno(ENOSYS);
+			set_errstr("Unsupported #%s listen tap command %p",
+			           devname(), cmd);
+			ret = -1;
+		}
+		spin_unlock(&conv->tap_lock);
+		return ret;
+	default:
+		set_errno(ENOSYS);
+		set_errstr("Can't tap #%s file type %d", devname(),
+		           TYPE(chan->qid));
+		return -1;
 	}
 }
 
@@ -1735,7 +1751,8 @@ retry:
 			qlock_init(&c->listenq);
 			rendez_init(&c->cr);
 			rendez_init(&c->listenr);
-			SLIST_INIT(&c->data_taps);	/* already = 0; set to be futureproof */
+			/* already = 0; set to be futureproof */
+			SLIST_INIT(&c->data_taps);
 			SLIST_INIT(&c->listen_taps);
 			spinlock_init(&c->tap_lock);
 			qlock(&c->qlock);
@@ -1762,7 +1779,8 @@ retry:
 			 *  make sure both processes and protocol
 			 *  are done with this Conv
 			 */
-			if (c->inuse == 0 && (p->inuse == NULL || (*p->inuse) (c) == 0))
+			if (c->inuse == 0 && (p->inuse == NULL ||
+					      (*p->inuse)(c) == 0))
 				break;
 
 			qunlock(&c->qlock);
@@ -1843,8 +1861,8 @@ static void fire_listener_taps(struct conv *conv)
 /*
  *  called with protocol locked
  */
-struct conv *Fsnewcall(struct conv *c, uint8_t * raddr, uint16_t rport,
-					   uint8_t * laddr, uint16_t lport, uint8_t version)
+struct conv *Fsnewcall(struct conv *c, uint8_t *raddr, uint16_t rport,
+		       uint8_t *laddr, uint16_t lport, uint8_t version)
 {
 	struct conv *nc;
 	struct conv **l;

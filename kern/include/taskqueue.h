@@ -22,8 +22,8 @@
 typedef void (*task_fn_t)(void *context, int pending);
 struct taskqueue {};
 struct task {
-	task_fn_t					ta_func;		/*	task handler */
-	void						*ta_context;	/*	argument for handler */
+	task_fn_t			ta_func;	/* task handler */
+	void				*ta_context;	/* arg for handler */
 };
 
 #define taskqueue_drain(x, y)
@@ -36,7 +36,7 @@ int taskqueue_enqueue(struct taskqueue *queue, struct task *task);
 /* We're already fast, no need for another function! */
 #define taskqueue_enqueue_fast taskqueue_enqueue
 #define TASK_INIT(str, dummy, func, arg)                                       \
-	(str)->ta_func = func;                                                     \
+	(str)->ta_func = func;                                                 \
 	(str)->ta_context = (void*)arg;
 
 struct workqueue_struct {
@@ -51,7 +51,7 @@ struct work_struct {
 /* Delayed work is embedded in other structs.  Handlers will expect to get a
  * work_struct pointer. */
 struct delayed_work {
-	struct work_struct 			work;
+	struct work_struct 		work;
 	/* TODO: support for the actual alarm / timer */
 };
 

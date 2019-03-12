@@ -361,7 +361,8 @@ void timer_alarm_handler(struct alarm_waiter *waiter)
 void init_timer_alarms(void)
 {
 	for (uint64_t i = 0; i < vm->nr_gpcs; i++) {
-		struct alarm_waiter *timer_alarm = malloc(sizeof(struct alarm_waiter));
+		struct alarm_waiter *timer_alarm =
+			malloc(sizeof(struct alarm_waiter));
 		struct guest_thread *gth = gpcid_to_gth(vm, i);
 
 		/* TODO: consider a struct to bundle a bunch of things, not just
@@ -463,7 +464,8 @@ int main(int argc, char **argv)
 		case 'g':	/* greedy */
 			parlib_never_yield = TRUE;
 			if (is_scp) {
-				fprintf(stderr, "Can't be both greedy and an SCP\n");
+				fprintf(stderr,
+					"Can't be both greedy and an SCP\n");
 				exit(1);
 			}
 			is_greedy = TRUE;
@@ -471,7 +473,8 @@ int main(int argc, char **argv)
 		case 's':	/* scp */
 			parlib_wants_to_be_mcp = FALSE;
 			if (is_greedy) {
-				fprintf(stderr, "Can't be both greedy and an SCP\n");
+				fprintf(stderr,
+					"Can't be both greedy and an SCP\n");
 				exit(1);
 			}
 			is_scp = TRUE;
@@ -485,7 +488,8 @@ int main(int argc, char **argv)
 		case 'k':	/* specify file to get cmdline args from */
 			cmdline_fd = open(optarg, O_RDONLY);
 			if (cmdline_fd < 0) {
-				fprintf(stderr, "failed to open file: %s\n", optarg);
+				fprintf(stderr, "failed to open file: %s\n",
+					optarg);
 				exit(1);
 			}
 			if (stat(optarg, &stat_result) == -1) {
@@ -519,7 +523,8 @@ int main(int argc, char **argv)
 			// Sadly, the getopt_long struct does
 			// not have a pointer to help text.
 			for (int i = 0;
-			     i < sizeof(long_options)/sizeof(long_options[0]) - 1;
+			     i <
+			     sizeof(long_options) / sizeof(long_options[0]) - 1;
 			     i++) {
 				struct option *l = &long_options[i];
 
@@ -531,12 +536,14 @@ int main(int argc, char **argv)
 	}
 
 	if (strlen(cmdline_default) == 0) {
-		fprintf(stderr, "WARNING: No command line parameter file specified.\n");
+		fprintf(stderr,
+			"WARNING: No command line parameter file specified.\n");
 	}
 	argc -= optind;
 	argv += optind;
 	if (argc < 1) {
-		fprintf(stderr, "Usage: %s vmimage [-n (no vmcall printf)]\n", argv[0]);
+		fprintf(stderr, "Usage: %s vmimage [-n (no vmcall printf)]\n",
+			argv[0]);
 		exit(1);
 	}
 
@@ -572,7 +579,8 @@ int main(int argc, char **argv)
 
 	if (initrd) {
 		initrd_start = ROUNDUP(kernel_max_address, PGSIZE);
-		fprintf(stderr, "kernel_max_address is %#p; Load initrd @ %#p\n",
+		fprintf(stderr,
+			"kernel_max_address is %#p; Load initrd @ %#p\n",
 		        kernel_max_address, initrd_start);
 		initrd_size = setup_initrd(initrd, (void *)initrd_start,
 		                           memend - initrd_start + 1);
@@ -593,8 +601,8 @@ int main(int argc, char **argv)
 	 * unbacked EPT page: accesses to this page will cause a page fault that
 	 * traps to the host, which will examine the fault, see it was for the
 	 * known MMIO address, and fulfill the MMIO read or write on the guest's
-	 * behalf accordingly. We place the virtio space at 512 GB higher than the
-	 * guest physical memory to avoid a full page table walk. */
+	 * behalf accordingly. We place the virtio space at 512 GB higher than
+	 * the guest physical memory to avoid a full page table walk. */
 	uintptr_t virtio_mmio_base_addr_hint;
 	uintptr_t virtio_mmio_base_addr;
 
@@ -603,7 +611,8 @@ int main(int argc, char **argv)
 	             bp->e820_map[bp->e820_entries - 1].size),
 	             PML4_PTE_REACH);
 
-	/* mmap with prot_none so we don't accidentally mmap something else here.
+	/* mmap with prot_none so we don't accidentally mmap something else
+	 * here.
 	 * We give space for 512 devices right now.
 	 * TODO(ganshun): Make it dynamic based on number of virtio devices. */
 	virtio_mmio_base_addr =
@@ -611,7 +620,8 @@ int main(int argc, char **argv)
 	                     PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 
 	if (!virtio_mmio_base_addr || virtio_mmio_base_addr >= BRK_START) {
-		/* Either we were unable to mmap at all or we mapped it too high. */
+		/* Either we were unable to mmap at all or we mapped it too
+		 * high. */
 		panic("Unable to mmap protect space for virtio devices, got 0x%016x",
 		      virtio_mmio_base_addr);
 	}
@@ -656,9 +666,8 @@ int main(int argc, char **argv)
 
 		/* Append all the virtio mmio base addresses. */
 
-		/* Since the lower number irqs are no longer being used, the irqs
-		 * can now be assigned starting from 0.
-		 */
+		/* Since the lower number irqs are no longer being used, the
+		 * irqs can now be assigned starting from 0.  */
 		vm->virtio_mmio_devices[i]->irq = i;
 		len = snprintf(cmdlinep, cmdlinesz,
 		               "\n virtio_mmio.device=1K@0x%llx:%lld",
@@ -677,7 +686,8 @@ int main(int argc, char **argv)
 	               "\n maxcpus=%lld\n possible_cpus=%lld", vm->nr_gpcs,
 	               vm->nr_gpcs);
 	if (len >= cmdlinesz) {
-		fprintf(stderr, "Too many arguments to the linux command line.");
+		fprintf(stderr,
+			"Too many arguments to the linux command line.");
 		exit(1);
 	}
 	cmdlinesz -= len;

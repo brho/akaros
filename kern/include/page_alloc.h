@@ -39,16 +39,16 @@ typedef BSD_LIST_ENTRY(page) page_list_entry_t;
  * an issue, we can dynamically allocate some of these things when we're a
  * buffer page (in a page mapping) */
 struct page {
-	BSD_LIST_ENTRY(page)		pg_link;	/* membership in various lists */
-	atomic_t					pg_flags;
-	struct page_map				*pg_mapping; /* for debugging... */
-	unsigned long				pg_index;
-	void						**pg_tree_slot;
-	void						*pg_private;	/* type depends on page usage */
-	struct semaphore 			pg_sem;		/* for blocking on IO */
-	uint64_t				gpa;		/* physical address in guest */
+	BSD_LIST_ENTRY(page)		pg_link;
+	atomic_t			pg_flags;
+	struct page_map			*pg_mapping;	/* for debugging... */
+	unsigned long			pg_index;
+	void				**pg_tree_slot;
+	void				*pg_private;
+	struct semaphore 		pg_sem;	
+	uint64_t			gpa;	/* physical address in guest */
 
-	bool						pg_is_free;	/* TODO: will remove */
+	bool				pg_is_free;	/* TODO: will remove */
 };
 
 /******** Externally visible global variables ************/

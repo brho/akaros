@@ -86,15 +86,15 @@ struct block *block_alloc(size_t size, int mem_flags)
 	 b->lim = ((uint8_t*)b) + msize(b);
 	 * See use of n in commented code below
 	 */
-	b->lim =
-		((uint8_t *) b) + sizeof(struct block) + size + Hdrspc + (BLOCKALIGN -
-																  1);
+	b->lim = ((uint8_t *) b) + sizeof(struct block) + size + Hdrspc +
+		(BLOCKALIGN - 1);
 	b->rp = b->base;
 	/* TODO: support this */
-	/* n is supposed to be Hdrspc + rear padding + extra reserved memory, but
-	 * since we don't currently support checking how much memory was actually
-	 * reserved, this is always Hdrspc + rear padding. After rounding that down
-	 * to BLOCKALIGN, it's always Hdrpsc since the padding is < BLOCKALIGN.
+	/* n is supposed to be Hdrspc + rear padding + extra reserved memory,
+	 * but since we don't currently support checking how much memory was
+	 * actually reserved, this is always Hdrspc + rear padding. After
+	 * rounding that down to BLOCKALIGN, it's always Hdrpsc since the
+	 * padding is < BLOCKALIGN.
 	 n = b->lim - b->base - size;
 	 b->rp += n & ~(BLOCKALIGN - 1);
 	 */
@@ -200,8 +200,8 @@ void free_block_extra(struct block *b)
 {
 	struct extra_bdata *ebd;
 
-	/* assuming our release method is kfree, which will change when we support
-	 * user buffers */
+	/* assuming our release method is kfree, which will change when we
+	 * support user buffers */
 	for (int i = 0; i < b->nr_extra_bufs; i++) {
 		ebd = &b->extra_data[i];
 		if (ebd->base)
@@ -210,7 +210,7 @@ void free_block_extra(struct block *b)
 	b->extra_len = 0;
 	b->nr_extra_bufs = 0;
 	kfree(b->extra_data);	/* harmless if it is 0 */
-	b->extra_data = 0;		/* in case the block is reused by a free override */
+	b->extra_data = 0; /* in case the block is reused by a free override */
 }
 
 /* Frees a block, returning its size (len, not alloc) */
@@ -291,8 +291,8 @@ void checkb(struct block *b, char *msg)
 			      msg, i, ebd->off, ebd->len);
 		if (ebd->base) {
 			if (!kmalloc_refcnt((void*)ebd->base))
-				panic("checkb %s: buf %d, base %p has no refcnt!\n", msg, i,
-				      ebd->base);
+				panic("checkb %s: buf %d, base %p has no refcnt!\n",
+				      msg, i, ebd->base);
 			extra_len += ebd->len;
 		}
 	}

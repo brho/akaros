@@ -44,88 +44,88 @@
 #include <net/ip.h>
 #include <arch/io.h>
 
-enum {							/* registers */
-	Idr0 = 0x0000,				/* MAC address */
-	Mar0 = 0x0008,	/* Multicast address */
-	Tsd0 = 0x0010,	/* Transmit Status Descriptor0 */
-	Tsad0 = 0x0020,	/* Transmit Start Address Descriptor0 */
+enum {				/* registers */
+	Idr0 = 0x0000,		/* MAC address */
+	Mar0 = 0x0008,		/* Multicast address */
+	Tsd0 = 0x0010,		/* Transmit Status Descriptor0 */
+	Tsad0 = 0x0020,		/* Transmit Start Address Descriptor0 */
 	Rbstart = 0x0030,	/* Receive Buffer Start Address */
-	Erbcr = 0x0034,	/* Early Receive Byte Count */
-	Ersr = 0x0036,	/* Early Receive Status */
-	Cr = 0x0037,	/* Command Register */
-	Capr = 0x0038,	/* Current Address of Packet Read */
-	Cbr = 0x003A,	/* Current Buffer Address */
-	Imr = 0x003C,	/* Interrupt Mask */
-	Isr = 0x003E,	/* Interrupt Status */
-	Tcr = 0x0040,	/* Transmit Configuration */
-	Rcr = 0x0044,	/* Receive Configuration */
-	Tctr = 0x0048,	/* Timer Count */
-	Mpc = 0x004C,	/* Missed Packet Counter */
+	Erbcr = 0x0034,		/* Early Receive Byte Count */
+	Ersr = 0x0036,		/* Early Receive Status */
+	Cr = 0x0037,		/* Command Register */
+	Capr = 0x0038,		/* Current Address of Packet Read */
+	Cbr = 0x003A,		/* Current Buffer Address */
+	Imr = 0x003C,		/* Interrupt Mask */
+	Isr = 0x003E,		/* Interrupt Status */
+	Tcr = 0x0040,		/* Transmit Configuration */
+	Rcr = 0x0044,		/* Receive Configuration */
+	Tctr = 0x0048,		/* Timer Count */
+	Mpc = 0x004C,		/* Missed Packet Counter */
 	Cr9346 = 0x0050,	/* 9346 Command Register */
 	Config0 = 0x0051,	/* Configuration Register 0 */
 	Config1 = 0x0052,	/* Configuration Register 1 */
 	TimerInt = 0x0054,	/* Timer Interrupt */
-	Msr = 0x0058,	/* Media Status */
+	Msr = 0x0058,		/* Media Status */
 	Config3 = 0x0059,	/* Configuration Register 3 */
 	Config4 = 0x005A,	/* Configuration Register 4 */
 	Mulint = 0x005C,	/* Multiple Interrupt Select */
-	RerID = 0x005E,	/* PCI Revision ID */
-	Tsad = 0x0060,	/* Transmit Status of all Descriptors */
+	RerID = 0x005E,		/* PCI Revision ID */
+	Tsad = 0x0060,		/* Transmit Status of all Descriptors */
 
-	Bmcr = 0x0062,	/* Basic Mode Control */
-	Bmsr = 0x0064,	/* Basic Mode Status */
-	Anar = 0x0066,	/* Auto-Negotiation Advertisment */
+	Bmcr = 0x0062,		/* Basic Mode Control */
+	Bmsr = 0x0064,		/* Basic Mode Status */
+	Anar = 0x0066,		/* Auto-Negotiation Advertisment */
 	Anlpar = 0x0068,	/* Auto-Negotiation Link Partner */
-	Aner = 0x006A,	/* Auto-Negotiation Expansion */
-	Dis = 0x006C,	/* Disconnect Counter */
-	Fcsc = 0x006E,	/* False Carrier Sense Counter */
+	Aner = 0x006A,		/* Auto-Negotiation Expansion */
+	Dis = 0x006C,		/* Disconnect Counter */
+	Fcsc = 0x006E,		/* False Carrier Sense Counter */
 	Nwaytr = 0x0070,	/* N-way Test */
-	Rec = 0x0072,	/* RX_ER Counter */
-	Cscr = 0x0074,	/* CS Configuration */
+	Rec = 0x0072,		/* RX_ER Counter */
+	Cscr = 0x0074,		/* CS Configuration */
 	Phy1parm = 0x0078,	/* PHY Parameter 1 */
 	Twparm = 0x007C,	/* Twister Parameter */
 	Phy2parm = 0x0080,	/* PHY Parameter 2 */
 };
 
-enum {							/* Cr */
-	Bufe = 0x01,				/* Rx Buffer Empty */
-	Te = 0x04,	/* Transmitter Enable */
-	Re = 0x08,	/* Receiver Enable */
-	Rst = 0x10,	/* Software Reset */
+enum {				/* Cr */
+	Bufe = 0x01,		/* Rx Buffer Empty */
+	Te = 0x04,		/* Transmitter Enable */
+	Re = 0x08,		/* Receiver Enable */
+	Rst = 0x10,		/* Software Reset */
 };
 
-enum {							/* Imr/Isr */
-	Rok = 0x0001,				/* Receive OK */
-	Rer = 0x0002,	/* Receive Error */
-	Tok = 0x0004,	/* Transmit OK */
-	Ter = 0x0008,	/* Transmit Error */
-	Rxovw = 0x0010,	/* Receive Buffer Overflow */
-	PunLc = 0x0020,	/* Packet Underrun or Link Change */
-	Fovw = 0x0040,	/* Receive FIFO Overflow */
-	Clc = 0x2000,	/* Cable Length Change */
+enum {				/* Imr/Isr */
+	Rok = 0x0001,		/* Receive OK */
+	Rer = 0x0002,		/* Receive Error */
+	Tok = 0x0004,		/* Transmit OK */
+	Ter = 0x0008,		/* Transmit Error */
+	Rxovw = 0x0010,		/* Receive Buffer Overflow */
+	PunLc = 0x0020,		/* Packet Underrun or Link Change */
+	Fovw = 0x0040,		/* Receive FIFO Overflow */
+	Clc = 0x2000,		/* Cable Length Change */
 	Timerbit = 0x4000,	/* Timer */
-	Serr = 0x8000,	/* System Error */
+	Serr = 0x8000,		/* System Error */
 };
 
-enum {							/* Tcr */
-	Clrabt = 0x00000001,		/* Clear Abort */
-	TxrrSHIFT = 4,	/* Transmit Retry Count */
+enum {				/* Tcr */
+	Clrabt = 0x00000001,	/* Clear Abort */
+	TxrrSHIFT = 4,		/* Transmit Retry Count */
 	TxrrMASK = 0x000000F0,
 	MtxdmaSHIFT = 8,	/* Max. DMA Burst Size */
 	MtxdmaMASK = 0x00000700,
 	Mtxdma2048 = 0x00000700,
 	Acrc = 0x00010000,	/* Append CRC (not) */
-	LbkSHIFT = 17,	/* Loopback Test */
+	LbkSHIFT = 17,		/* Loopback Test */
 	LbkMASK = 0x00060000,
 	Rtl8139ArevG = 0x00800000,	/* RTL8139A Rev. G ID */
-	IfgSHIFT = 24,	/* Interframe Gap */
+	IfgSHIFT = 24,		/* Interframe Gap */
 	IfgMASK = 0x03000000,
 	HwveridSHIFT = 26,	/* Hardware Version ID */
 	HwveridMASK = 0x7C000000,
 };
 
-enum {							/* Rcr */
-	Aap = 0x00000001,			/* Accept All Packets */
+enum {				/* Rcr */
+	Aap = 0x00000001,	/* Accept All Packets */
 	Apm = 0x00000002,	/* Accept Physical Match */
 	Am = 0x00000004,	/* Accept Multicast */
 	Ab = 0x00000008,	/* Accept Broadcast */
@@ -153,45 +153,45 @@ enum {							/* Rcr */
 	Erxthnone = 0x00000000,
 };
 
-enum {							/* Received Packet Status */
-	Rcok = 0x0001,				/* Receive Completed OK */
-	Fae = 0x0002,	/* Frame Alignment Error */
-	Crc = 0x0004,	/* CRC Error */
-	Long = 0x0008,	/* Long Packet */
-	Runt = 0x0010,	/* Runt Packet Received */
-	Ise = 0x0020,	/* Invalid Symbol Error */
-	Bar = 0x2000,	/* Broadcast Address Received */
-	Pam = 0x4000,	/* Physical Address Matched */
-	Mar = 0x8000,	/* Multicast Address Received */
+enum {				/* Received Packet Status */
+	Rcok = 0x0001,		/* Receive Completed OK */
+	Fae = 0x0002,		/* Frame Alignment Error */
+	Crc = 0x0004,		/* CRC Error */
+	Long = 0x0008,		/* Long Packet */
+	Runt = 0x0010,		/* Runt Packet Received */
+	Ise = 0x0020,		/* Invalid Symbol Error */
+	Bar = 0x2000,		/* Broadcast Address Received */
+	Pam = 0x4000,		/* Physical Address Matched */
+	Mar = 0x8000,		/* Multicast Address Received */
 };
 
-enum {							/* Media Status Register */
-	Rxpf = 0x01,				/* Pause Flag */
-	Txpf = 0x02,	/* Pause Flag */
-	Linkb = 0x04,	/* Inverse of Link Status */
-	Speed10 = 0x08,	/* 10Mbps */
+enum {				/* Media Status Register */
+	Rxpf = 0x01,		/* Pause Flag */
+	Txpf = 0x02,		/* Pause Flag */
+	Linkb = 0x04,		/* Inverse of Link Status */
+	Speed10 = 0x08,		/* 10Mbps */
 	Auxstatus = 0x10,	/* Aux. Power Present Status */
-	Rxfce = 0x40,	/* Receive Flow Control Enable */
-	Txfce = 0x80,	/* Transmit Flow Control Enable */
+	Rxfce = 0x40,		/* Receive Flow Control Enable */
+	Txfce = 0x80,		/* Transmit Flow Control Enable */
 };
 
 typedef struct Td Td;
-struct Td {						/* Soft Transmit Descriptor */
+struct Td {			/* Soft Transmit Descriptor */
 	int tsd;
 	int tsad;
 	uint8_t *data;
 	struct block *bp;
 };
 
-enum {							/* Tsd0 */
-	SizeSHIFT = 0,				/* Descriptor Size */
+enum {				/* Tsd0 */
+	SizeSHIFT = 0,		/* Descriptor Size */
 	SizeMASK = 0x00001FFF,
 	Own = 0x00002000,
 	Tun = 0x00004000,	/* Transmit FIFO Underrun */
 	Tcok = 0x00008000,	/* Transmit COmpleted OK */
 	EtxthSHIFT = 16,	/* Early Tx Threshold */
 	EtxthMASK = 0x001F0000,
-	NccSHIFT = 24,	/* Number of Collisions Count */
+	NccSHIFT = 24,		/* Number of Collisions Count */
 	NccMASK = 0x0F000000,
 	Cdh = 0x10000000,	/* CD Heartbeat */
 	Owc = 0x20000000,	/* Out of Window Collision */
@@ -200,8 +200,8 @@ enum {							/* Tsd0 */
 };
 
 enum {
-	Rblen = Rblen64K,			/* Receive Buffer Length */
-	Ntd = 4,	/* Number of Transmit Descriptors */
+	Rblen = Rblen64K,	/* Receive Buffer Length */
+	Ntd = 4,		/* Number of Transmit Descriptors */
 };
 #define 	Tdbsz		ROUNDUP(sizeof(struct etherpkt), 4)
 
@@ -212,27 +212,27 @@ typedef struct ctlr {
 	int active;
 	int id;
 
-	qlock_t alock;				/* attach */
-	spinlock_t ilock;			/* init */
-	void *alloc;				/* base of per-ctlr allocated data */
+	qlock_t alock;		/* attach */
+	spinlock_t ilock;	/* init */
+	void *alloc;		/* base of per-ctlr allocated data */
 
-	int rcr;					/* receive configuration register */
-	uint8_t *rbstart;			/* receive buffer */
-	int rblen;					/* receive buffer length */
-	int ierrs;					/* receive errors */
+	int rcr;		/* receive configuration register */
+	uint8_t *rbstart;	/* receive buffer */
+	int rblen;		/* receive buffer length */
+	int ierrs;		/* receive errors */
 
-	spinlock_t tlock;			/* transmit */
+	spinlock_t tlock;	/* transmit */
 	Td td[Ntd];
-	int ntd;					/* descriptors active */
-	int tdh;					/* host index into td */
-	int tdi;					/* interface index into td */
-	int etxth;					/* early transmit threshold */
-	int taligned;				/* packet required no alignment */
-	int tunaligned;				/* packet required alignment */
+	int ntd;		/* descriptors active */
+	int tdh;		/* host index into td */
+	int tdi;		/* interface index into td */
+	int etxth;		/* early transmit threshold */
+	int taligned;		/* packet required no alignment */
+	int tunaligned;		/* packet required alignment */
 
-	int dis;					/* disconnect counter */
-	int fcsc;					/* false carrier sense counter */
-	int rec;					/* RX_ER counter */
+	int dis;		/* disconnect counter */
+	int fcsc;		/* false carrier sense counter */
+	int rec;		/* RX_ER counter */
 } ctlr;
 
 static struct ctlr *ctlrhead;
@@ -306,9 +306,11 @@ static long rtl8139ifstat(struct ether *edev, void *a, long n, uint32_t offset)
 	l += snprintf(p + l, READSTR - l, "Bmcr 0x%4.4x\n", csr16r(ctlr, Bmcr));
 	l += snprintf(p + l, READSTR - l, "Bmsr 0x%4.4x\n", csr16r(ctlr, Bmsr));
 	l += snprintf(p + l, READSTR - l, "Anar 0x%4.4x\n", csr16r(ctlr, Anar));
-	l += snprintf(p + l, READSTR - l, "Anlpar 0x%4.4x\n", csr16r(ctlr, Anlpar));
+	l += snprintf(p + l, READSTR - l, "Anlpar 0x%4.4x\n",
+		      csr16r(ctlr, Anlpar));
 	l += snprintf(p + l, READSTR - l, "Aner 0x%4.4x\n", csr16r(ctlr, Aner));
-	l += snprintf(p + l, READSTR - l, "Nwaytr 0x%4.4x\n", csr16r(ctlr, Nwaytr));
+	l += snprintf(p + l, READSTR - l, "Nwaytr 0x%4.4x\n",
+		      csr16r(ctlr, Nwaytr));
 	snprintf(p + l, READSTR - l, "Cscr 0x%4.4x\n", csr16r(ctlr, Cscr));
 	n = readstr(offset, a, n, p);
 	kfree(p);
@@ -364,8 +366,8 @@ static void rtl8139init(struct ether *edev)
 	/*
 	 * MAC Address.
 	 */
-	r = (edev->ea[3] << 24) | (edev->ea[2] << 16) | (edev->ea[1] << 8) | edev->
-		ea[0];
+	r = (edev->ea[3] << 24) | (edev->ea[2] << 16) | (edev->ea[1] << 8)
+	    | edev-> ea[0];
 	csr32w(ctlr, Idr0, r);
 	r = (edev->ea[5] << 8) | edev->ea[4];
 	csr32w(ctlr, Idr0 + 4, r);
@@ -400,7 +402,7 @@ static void rtl8139init(struct ether *edev)
 	 */
 	csr32w(ctlr, TimerInt, 0);
 	csr16w(ctlr, Imr,
-		   Serr | Timerbit | Fovw | PunLc | Rxovw | Ter | Tok | Rer | Rok);
+	       Serr | Timerbit | Fovw | PunLc | Rxovw | Ter | Tok | Rer | Rok);
 	csr32w(ctlr, Mpc, 0);
 
 	/*
@@ -423,8 +425,8 @@ static void rtl8139attach(struct ether *edev)
 	qlock(&ctlr->alock);
 	if (ctlr->alloc == NULL) {
 		ctlr->rblen = 1 << ((Rblen >> RblenSHIFT) + 13);
-		ctlr->alloc = kzmalloc(ctlr->rblen + 16 + Ntd * Tdbsz + ARCH_CL_SIZE,
-							   MEM_WAIT);
+		ctlr->alloc = kzmalloc(ctlr->rblen + 16 + Ntd * Tdbsz
+				       + ARCH_CL_SIZE, MEM_WAIT);
 		rtl8139init(edev);
 	}
 	qunlock(&ctlr->alock);
@@ -588,7 +590,9 @@ static void rtl8139interrupt(struct hw_trapframe *tf, void *arg)
 
 				if (!(tsd & Tcok)) {
 					if (tsd & Tun) {
-						if (ctlr->etxth < (ETHERMAXTU + ETHERHDRSIZE) / 32)
+						if (ctlr->etxth < (ETHERMAXTU +
+								   ETHERHDRSIZE)
+						    / 32)
 							ctlr->etxth++;
 					}
 					edev->oerrs++;
@@ -616,7 +620,8 @@ static void rtl8139interrupt(struct hw_trapframe *tf, void *arg)
 				if (!(msr & Speed10) && edev->mbps != 100) {
 					edev->mbps = 100;
 					qsetlimit(edev->oq, 256 * 1024);
-				} else if ((msr & Speed10) && edev->mbps != 10) {
+				} else if ((msr & Speed10) && edev->mbps != 10)
+				{
 					edev->mbps = 10;
 					qsetlimit(edev->oq, 65 * 1024);
 				}
@@ -663,8 +668,8 @@ static struct ctlr *rtl8139match(struct ether *edev, int id)
 			continue;
 
 #if 0
-		/* trying to alloc PIO ports (.size of them?).  for now, we just assume
-		 * they are free */
+		/* trying to alloc PIO ports (.size of them?).  for now, we just
+		 * assume they are free */
 		if (ioalloc(port, pcidev->mem[0].size, 0, "rtl8139") < 0) {
 			printd("rtl8139: port 0x%x in use\n", port);
 			continue;
@@ -693,7 +698,7 @@ static struct {
 	{
 	"dfe-538tx", (0x1300 << 16) | 0x1186,},	/* D-Link DFE-538TX */
 	{
-	"dfe-560txd", (0x1340 << 16) | 0x1186,},	/* D-Link DFE-560TXD */
+	"dfe-560txd", (0x1340 << 16) | 0x1186,},/* D-Link DFE-560TXD */
 	{
 NULL},};
 
@@ -749,7 +754,8 @@ static int rtl8139pnp(struct ether *edev)
 		ctlr = rtl8139match(edev, id);
 	else
 		for (i = 0; rtl8139pci[i].name; i++) {
-			if ((ctlr = rtl8139match(edev, rtl8139pci[i].id)) != NULL)
+			if ((ctlr = rtl8139match(edev, rtl8139pci[i].id)) !=
+			    NULL)
 				break;
 		}
 	if (ctlr == NULL)

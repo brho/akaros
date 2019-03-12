@@ -46,8 +46,8 @@ static int gotSegmentationFault(int (*test)(void))
 	if (sigsetjmp(env, 1) == 0) {
 		int status;
 
-		signal(PAGE_PROTECTION_VIOLATED_SIGNAL, segmentationFaultHandler);
-		status = (*test)();
+		signal(PAGE_PROTECTION_VIOLATED_SIGNAL,
+		       segmentationFaultHandler); status = (*test)();
 		signal(PAGE_PROTECTION_VIOLATED_SIGNAL, SIG_DFL);
 		return status;
 	} else

@@ -57,7 +57,8 @@ static inline unsigned long kpte_print(kpte_t *kpte)
 static inline void kpte_write(kpte_t *kpte, physaddr_t pa, int settings)
 {
 	assert(!PGOFF(pa));
-	/* The arch-bits like PTE_D, PTE_PS, etc are all in the native KPT format */
+	/* The arch-bits like PTE_D, PTE_PS, etc are all in the native KPT
+	 * format */
 	*kpte = build_kpte(pa, settings);
 }
 

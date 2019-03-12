@@ -30,6 +30,7 @@ static __thread void (*__vcore_reentry_func)(void) = NULL;
 void __attribute__((noreturn)) __vcore_entry(void)
 {
 	extern void uthread_vcore_entry(void);
+
 	uthread_vcore_entry();
 	fprintf(stderr, "vcore_entry() should never return!\n");
 	abort();
@@ -41,8 +42,9 @@ void vcore_entry(void) __attribute__((weak, alias ("__vcore_entry")));
 static void free_transition_tls(int id)
 {
 	if (get_vcpd_tls_desc(id)) {
-		/* Note we briefly have no TLS desc in VCPD.  This is fine so long as
-		 * that vcore doesn't get started fresh before we put in a new desc */
+		/* Note we briefly have no TLS desc in VCPD.  This is fine so
+		 * long as that vcore doesn't get started fresh before we put in
+		 * a new desc */
 		free_tls(get_vcpd_tls_desc(id));
 		set_vcpd_tls_desc(id, NULL);
 	}
@@ -50,24 +52,28 @@ static void free_transition_tls(int id)
 
 static int allocate_transition_tls(int id)
 {
-	/* Libc function to initialize TLS-based locale info for ctype functions. */
+	/* Libc function to initialize TLS-based locale info for ctype
+	 * functions. */
 	extern void __ctype_init(void);
 
-	/* We want to free and then reallocate the tls rather than simply 
-	 * reinitializing it because its size may have changed.  TODO: not sure if
-	 * this is right.  0-ing is one thing, but freeing and reallocating can be
-	 * expensive, esp if syscalls are involved.  Check out glibc's
+	/* We want to free and then reallocate the tls rather than simply
+	 * reinitializing it because its size may have changed.  TODO: not sure
+	 * if this is right.  0-ing is one thing, but freeing and reallocating
+	 * can be expensive, esp if syscalls are involved.  Check out glibc's
 	 * allocatestack.c for what might work. */
 	free_transition_tls(id);
 
 	void *tcb = allocate_tls();
+
 	if (!tcb) {
 		errno = ENOMEM;
 		return -1;
 	}
 
-	/* Setup some intitial TLS data for the newly allocated transition tls. */
+	/* Setup some intitial TLS data for the newly allocated transition tls.
+	 */
 	void *temp_tcb = get_tls_desc();
+
 	set_tls_desc(tcb);
 	begin_safe_access_tls_vars();
 	__vcoreid = id;
@@ -89,14 +95,16 @@ static void free_vcore_stack(int id)
 static int allocate_vcore_stack(int id)
 {
 	struct preempt_data *vcpd = vcpd_of(id);
+
 	if (vcpd->vcore_stack)
 		return 0; // reuse old stack
 
 	void* stackbot = mmap(0, TRANSITION_STACK_SIZE,
 	                      PROT_READ | PROT_WRITE | PROT_EXEC,
-	                      MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+			      MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1,
+			      0);
 
-	if(stackbot == MAP_FAILED)
+	if (stackbot == MAP_FAILED)
 		return -1; // errno set by mmap
 
 	vcpd->vcore_stack = (uintptr_t)stackbot + TRANSITION_STACK_SIZE;
@@ -165,9 +173,9 @@ static void prep_remaining_vcores(void)
 static void vcore_libc_init(void)
 {
 	register_printf_specifier('r', printf_errstr, printf_errstr_info);
-	/* TODO: register for other kevents/signals and whatnot (can probably reuse
-	 * the simple ev_q).  Could also do this via explicit functions from the
-	 * program. */
+	/* TODO: register for other kevents/signals and whatnot (can probably
+	 * reuse the simple ev_q).  Could also do this via explicit functions
+	 * from the program. */
 }
 
 /* We need to separate the guts of vcore_lib_ctor() into a separate function,
@@ -179,13 +187,13 @@ static void vcore_libc_init(void)
 void vcore_lib_init(void)
 {
 	/* Note this is racy, but okay.  The first time through, we are _S.
-	 * Also, this is the "lowest" level constructor for now, so we don't need
-	 * to call any other init functions after our run_once() call. This may
-	 * change in the future. */
+	 * Also, this is the "lowest" level constructor for now, so we don't
+	 * need to call any other init functions after our run_once() call. This
+	 * may change in the future. */
 	parlib_init_once_racy(return);
-	/* Need to alloc vcore0's transition stuff here (technically, just the TLS)
-	 * so that schedulers can use vcore0's transition TLS before it comes up in
-	 * vcore_entry() */
+	/* Need to alloc vcore0's transition stuff here (technically, just the
+	 * TLS) so that schedulers can use vcore0's transition TLS before it
+	 * comes up in vcore_entry() */
 	prep_vcore_0();
 	assert(!in_vcore_context());
 	vcore_libc_init();
@@ -200,22 +208,21 @@ static void __attribute__((constructor)) vcore_lib_ctor(void)
 
 /* Helper functions used to reenter at the top of a vcore's stack for an
  * arbitrary function */
-static void __attribute__((noinline, noreturn)) 
-__vcore_reenter()
+static void __attribute__((noinline, noreturn)) __vcore_reenter()
 {
-  __vcore_reentry_func();
-  assert(0);
+	__vcore_reentry_func();
+	assert(0);
 }
 
 void vcore_reenter(void (*entry_func)(void))
 {
-  assert(in_vcore_context());
-  struct preempt_data *vcpd = vcpd_of(vcore_id());
-
-  __vcore_reentry_func = entry_func;
-  set_stack_pointer((void*)vcpd->vcore_stack);
-  cmb();
-  __vcore_reenter();
+	assert(in_vcore_context());
+	struct preempt_data *vcpd = vcpd_of(vcore_id());
+	
+	__vcore_reentry_func = entry_func;
+	set_stack_pointer((void*)vcpd->vcore_stack);
+	cmb();
+	__vcore_reenter();
 }
 
 /* Helper, picks some sane defaults and changes the process into an MCP */
@@ -238,8 +245,9 @@ static void __vc_req_poke(void *nr_vc_wanted)
 {
 	long nr_vcores_wanted = *(long*)nr_vc_wanted;
 
-	/* We init'd up to max_vcores() VCs during init.  This assumes the kernel
-	 * doesn't magically change that value (which it should not do). */
+	/* We init'd up to max_vcores() VCs during init.  This assumes the
+	 * kernel doesn't magically change that value (which it should not do).
+	 * */
 	nr_vcores_wanted = MIN(nr_vcores_wanted, max_vcores());
 	if (nr_vcores_wanted > __procdata.res_req[RES_CORES].amt_wanted)
 		__procdata.res_req[RES_CORES].amt_wanted = nr_vcores_wanted;
@@ -269,8 +277,8 @@ void vcore_request_total(long nr_vcores_wanted)
 	if (nr_vcores_wanted == __procdata.res_req[RES_CORES].amt_wanted)
 		return;
 
-	/* We race to "post our work" here.  Whoever handles the poke will get the
-	 * latest value written here. */
+	/* We race to "post our work" here.  Whoever handles the poke will get
+	 * the latest value written here. */
 	nr_vc_wanted = nr_vcores_wanted;
 	poke(&vc_req_poke, &nr_vc_wanted);
 }
@@ -307,39 +315,41 @@ void vcore_yield(bool preempt_pending)
 		return;
 	__sync_fetch_and_and(&vcpd->flags, ~VC_CAN_RCV_MSG);
 	/* no wrmb() necessary, handle_events() has an mb() if it is checking */
-	/* Clears notif pending and tries to handle events.  This is an optimization
-	 * to avoid the yield syscall if we have an event pending.  If there is one,
-	 * we want to unwind and return to the 2LS loop, where we may not want to
-	 * yield anymore.
-	 * Note that the kernel only cares about CAN_RCV_MSG for the desired vcore;
-	 * when spamming, it relies on membership of lists within the kernel.  Look
-	 * at spam_list_member() for more info (k/s/event.c). */
+	/* Clears notif pending and tries to handle events.  This is an
+	 * optimization to avoid the yield syscall if we have an event pending.
+	 * If there is one, we want to unwind and return to the 2LS loop, where
+	 * we may not want to yield anymore.
+	 *
+	 * Note that the kernel only cares about CAN_RCV_MSG for the desired
+	 * vcore; when spamming, it relies on membership of lists within the
+	 * kernel.  Look at spam_list_member() for more info (k/s/event.c). */
 	if (handle_events(vcoreid)) {
 		__sync_fetch_and_or(&vcpd->flags, VC_CAN_RCV_MSG);
 		return;
 	}
-	/* If we are yielding since we don't want the core, tell the kernel we want
-	 * one less vcore (vc_yield assumes a dumb 2LS).
+	/* If we are yielding since we don't want the core, tell the kernel we
+	 * want one less vcore (vc_yield assumes a dumb 2LS).
 	 *
 	 * If yield fails (slight race), we may end up having more vcores than
 	 * amt_wanted for a while, and might lose one later on (after a
 	 * preempt/timeslicing) - the 2LS will have to notice eventually if it
-	 * actually needs more vcores (which it already needs to do).  amt_wanted
-	 * could even be 0.
+	 * actually needs more vcores (which it already needs to do).
+	 * amt_wanted could even be 0.
 	 *
 	 * In general, any time userspace decrements or sets to 0, it could get
-	 * preempted, so the kernel will still give us at least one, until the last
-	 * vcore properly yields without missing a message (and becomes a WAITING
-	 * proc, which the ksched will not give cores to).
+	 * preempted, so the kernel will still give us at least one, until the
+	 * last vcore properly yields without missing a message (and becomes a
+	 * WAITING proc, which the ksched will not give cores to).
 	 *
-	 * I think it's possible for userspace to do this (lock, read amt_wanted,
-	 * check all message queues for all vcores, subtract amt_wanted (not set to
-	 * 0), unlock) so long as every event handler +1s the amt wanted, but that's
-	 * a huge pain, and we already have event handling code making sure a
-	 * process can't sleep (transition to WAITING) if a message arrives (can't
-	 * yield if notif_pending, can't go WAITING without yielding, and the event
-	 * posting the notif_pending will find the online VC or be delayed by
-	 * spinlock til the proc is WAITING). */
+	 * I think it's possible for userspace to do this (lock, read
+	 * amt_wanted, check all message queues for all vcores, subtract
+	 * amt_wanted (not set to 0), unlock) so long as every event handler +1s
+	 * the amt wanted, but that's a huge pain, and we already have event
+	 * handling code making sure a process can't sleep (transition to
+	 * WAITING) if a message arrives (can't yield if notif_pending, can't go
+	 * WAITING without yielding, and the event posting the notif_pending
+	 * will find the online VC or be delayed by spinlock til the proc is
+	 * WAITING). */
 	if (!preempt_pending) {
 		do {
 			old_nr = __procdata.res_req[RES_CORES].amt_wanted;
@@ -349,8 +359,8 @@ void vcore_yield(bool preempt_pending)
 		             &__procdata.res_req[RES_CORES].amt_wanted,
 		             old_nr, old_nr - 1));
 	}
-	/* We can probably yield.  This may pop back up if notif_pending became set
-	 * by the kernel after we cleared it and we lost the race. */
+	/* We can probably yield.  This may pop back up if notif_pending became
+	 * set by the kernel after we cleared it and we lost the race. */
 	sys_yield(preempt_pending);
 	__sync_fetch_and_or(&vcpd->flags, VC_CAN_RCV_MSG);
 }
@@ -363,9 +373,9 @@ void enable_notifs(uint32_t vcoreid)
 {
 	__enable_notifs(vcoreid);
 	wrmb();	/* need to read after the write that enabled notifs */
-	/* Note we could get migrated before executing this.  If that happens, our
-	 * vcore had gone into vcore context (which is what we wanted), and this
-	 * self_notify to our old vcore is spurious and harmless. */
+	/* Note we could get migrated before executing this.  If that happens,
+	 * our vcore had gone into vcore context (which is what we wanted), and
+	 * this self_notify to our old vcore is spurious and harmless. */
 	if (vcpd_of(vcoreid)->notif_pending)
 		sys_self_notify(vcoreid, EV_NONE, 0, TRUE);
 }
@@ -392,24 +402,25 @@ void disable_notifs(uint32_t vcoreid)
 void vcore_idle(void)
 {
 	uint32_t vcoreid = vcore_id();
-	/* Once we enable notifs, the calling context will be treated like a uthread
-	 * (saved into the uth slot).  We don't want to ever run it again, so we
-	 * need to make sure there's no cur_uth. */
+
+	/* Once we enable notifs, the calling context will be treated like a
+	 * uthread (saved into the uth slot).  We don't want to ever run it
+	 * again, so we need to make sure there's no cur_uth. */
 	assert(!current_uthread);
 	/* This clears notif_pending (check, signal, check again pattern). */
 	if (handle_events(vcoreid))
 		return;
-	/* This enables notifs, but also checks notif pending.  At this point, any
-	 * new notifs will restart the vcore from the top. */
+	/* This enables notifs, but also checks notif pending.  At this point,
+	 * any new notifs will restart the vcore from the top. */
 	enable_notifs(vcoreid);
-	/* From now, til we get into the kernel, any notifs will permanently destroy
-	 * this context and start the VC from the top.
+	/* From now, til we get into the kernel, any notifs will permanently
+	 * destroy this context and start the VC from the top.
 	 *
 	 * Once we're in the kernel, any messages (__notify, __preempt), will be
 	 * RKMs.  halt will need to check for those atomically.  Checking for
-	 * notif_pending in the kernel (sleep only if not set) is not enough, since
-	 * not all reasons for the kernel to stay awak set notif_pending (e.g.,
-	 * __preempts and __death).
+	 * notif_pending in the kernel (sleep only if not set) is not enough,
+	 * since not all reasons for the kernel to stay awak set notif_pending
+	 * (e.g., __preempts and __death).
 	 *
 	 * At this point, we're out of VC ctx, so anyone who sets notif_pending
 	 * should also send an IPI / __notify */
@@ -423,13 +434,16 @@ void vcore_idle(void)
 static void __ensure_vcore_runs(uint32_t vcoreid)
 {
 	if (vcore_is_preempted(vcoreid)) {
-		printd("[vcore]: VC %d changing to VC %d\n", vcore_id(), vcoreid);
-		/* Note that at this moment, the vcore could still be mapped (we're
-		 * racing with __preempt.  If that happens, we'll just fail the
-		 * sys_change_vcore(), and next time __ensure runs we'll get it. */
-		/* We want to recover them from preemption.  Since we know they have
-		 * notifs disabled, they will need to be directly restarted, so we can
-		 * skip the other logic and cut straight to the sys_change_vcore() */
+		printd("[vcore]: VC %d changing to VC %d\n", vcore_id(),
+		       vcoreid);
+		/* Note that at this moment, the vcore could still be mapped
+		 * (we're racing with __preempt.  If that happens, we'll just
+		 * fail the sys_change_vcore(), and next time __ensure runs
+		 * we'll get it. */
+		/* We want to recover them from preemption.  Since we know they
+		 * have notifs disabled, they will need to be directly
+		 * restarted, so we can skip the other logic and cut straight to
+		 * the sys_change_vcore() */
 		sys_change_vcore(vcoreid, FALSE);
 	}
 }
@@ -505,7 +519,8 @@ bool check_vcoreid(const char *str, uint32_t vcoreid)
 {
 	uint32_t kvcoreid = get_vcoreid();
 	if (vcoreid != kvcoreid) {
-		printf("%s: VC %d thought it was VC %d\n", str, kvcoreid, vcoreid);
+		printf("%s: VC %d thought it was VC %d\n", str, kvcoreid,
+		       vcoreid);
 		return FALSE;
 	}
 	return TRUE;
@@ -517,7 +532,8 @@ void __attribute__((noreturn)) vcore_yield_or_restart(void)
 	struct preempt_data *vcpd = vcpd_of(vcore_id());
 
 	vcore_yield(FALSE);
-	/* If vcore_yield returns, we have an event.  Just restart vcore context. */
+	/* If vcore_yield returns, we have an event.  Just restart vcore
+	 * context. */
 	set_stack_pointer((void*)vcpd->vcore_stack);
 	vcore_entry();
 }

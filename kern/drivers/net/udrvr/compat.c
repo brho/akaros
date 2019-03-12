@@ -41,7 +41,8 @@ unsigned long pgprot_writecombine(int vmprot)
  * vmap_pmem_nocache(). This routine is expected to be invoked as part of mmap()
  * handler.
  */
-int map_upage_at_addr(struct proc *p, physaddr_t paddr, uintptr_t addr, int pteprot, int dolock)
+int map_upage_at_addr(struct proc *p, physaddr_t paddr, uintptr_t addr,
+		      int pteprot, int dolock)
 {
 	pte_t		pte;
 	int		rv = -1;
@@ -89,7 +90,7 @@ void put_page(struct page *pagep)
 }
 
 int get_user_page(struct proc *p, unsigned long uvastart, int write, int force,
-    struct page **plist)
+		  struct page **plist)
 {
 	pte_t		pte;
 	int		ret = -1;
@@ -133,8 +134,9 @@ int get_user_page(struct proc *p, unsigned long uvastart, int write, int force,
 		goto err1;
 	}
 
-	/* TODO (GUP): change the interface such that devices provide the memory and
-	 * the user mmaps it, instead of trying to pin arbitrary user memory. */
+	/* TODO (GUP): change the interface such that devices provide the memory
+	 * and the user mmaps it, instead of trying to pin arbitrary user
+	 * memory. */
 	warn_once("Extremely unsafe, unpinned memory mapped!  If your process dies, you might scribble on RAM!");
 
 	plist[0] = pp;
@@ -197,7 +199,7 @@ done:
 
 /* Callers must pass in null terminated strings */
 static ssize_t sysfs_read(char __user *buf, size_t ucount, loff_t *pos,
-    char *src)
+			  char *src)
 {
 	int		slen = strlen(src) + 1;	/* + 1 for terminating null */
 	unsigned long	off = *pos, nb = slen - off;
@@ -213,7 +215,7 @@ static ssize_t sysfs_read(char __user *buf, size_t ucount, loff_t *pos,
 }
 
 static ssize_t ib_api_ver_read(struct file *filp, char __user *buf,
-    size_t count, loff_t *pos)
+			       size_t count, loff_t *pos)
 {
 	char		src[4] = { 0, 0, 0, 0};
 
@@ -230,8 +232,8 @@ static const struct file_operations ib_api_ver = {
 };
 #endif
 
-static ssize_t mlx4_mgm_read(struct file *filp, char __user *buf,
-    size_t count, loff_t *pos)
+static ssize_t mlx4_mgm_read(struct file *filp, char __user *buf, size_t count,
+			     loff_t *pos)
 {
 #if CONFIG_MLX4_DEFAULT_MGM_LOG_ENTRY_SIZE == -1
 	char		src[4] = { '-', '1', 0, 0 };
@@ -271,8 +273,8 @@ static void stradd(char *dest, int val, int num)
 	}
 }
 
-static ssize_t cpu_read(struct file *filp, char __user *buf,
-    size_t count, loff_t *pos)
+static ssize_t cpu_read(struct file *filp, char __user *buf, size_t count,
+			loff_t *pos)
 {
 	char cpu_info_str[128];
 	long freq = __proc_global_info.tsc_freq, idx;
@@ -333,8 +335,8 @@ void sysfs_init(void)
 #endif
 }
 
-static ssize_t dver_read(struct file *filp, char __user *buf,
-    size_t count, loff_t *pos)
+static ssize_t dver_read(struct file *filp, char __user *buf, size_t count,
+			 loff_t *pos)
 {
 	struct ib_uverbs_device *uvp;
 	char		src[4] = { 0, 0, 0, 0};
@@ -345,8 +347,8 @@ static ssize_t dver_read(struct file *filp, char __user *buf,
 	return sysfs_read(buf, count, pos, src);
 }
 
-static ssize_t dname_read(struct file *filp, char __user *buf,
-    size_t count, loff_t *pos)
+static ssize_t dname_read(struct file *filp, char __user *buf, size_t count,
+			  loff_t *pos)
 {
 	struct ib_uverbs_device *uvp;
 
@@ -354,32 +356,32 @@ static ssize_t dname_read(struct file *filp, char __user *buf,
 	return sysfs_read(buf, count, pos, uvp->ib_dev->name);
 }
 
-static ssize_t ntype_read(struct file *filp, char __user *buf,
-    size_t count, loff_t *pos)
+static ssize_t ntype_read(struct file *filp, char __user *buf, size_t count,
+			  loff_t *pos)
 {
 	char	src[] = "1";
 
 	return sysfs_read(buf, count, pos, src);
 }
 
-static ssize_t ddev_read(struct file *filp, char __user *buf,
-    size_t count, loff_t *pos)
+static ssize_t ddev_read(struct file *filp, char __user *buf, size_t count,
+			 loff_t *pos)
 {
 	char	src[] = "0x1003";
 
 	return sysfs_read(buf, count, pos, src);
 }
 
-static ssize_t dven_read(struct file *filp, char __user *buf,
-    size_t count, loff_t *pos)
+static ssize_t dven_read(struct file *filp, char __user *buf, size_t count,
+			 loff_t *pos)
 {
 	char	src[] = "0x15b3";
 
 	return sysfs_read(buf, count, pos, src);
 }
 
-static ssize_t vsd_read(struct file *filp, char __user *buf,
-    size_t count, loff_t *pos)
+static ssize_t vsd_read(struct file *filp, char __user *buf, size_t count,
+			loff_t *pos)
 {
 	char	*src = "puma20_A1-10.2.3.0";
 
@@ -425,7 +427,7 @@ static const struct file_operations vsd_fops = {
 #endif
 
 void sysfs_create(int devnum, const struct file_operations *verb_fops,
-    void *ptr)
+		  void *ptr)
 {
 #if 1 // AKAROS_PORT
 	warn("mlx4: udrvr stuff requires various files, implement for 9ns!");
@@ -520,7 +522,7 @@ struct ib_uverbs_ex_cmd_hdr_compat {
 };
 
 static ssize_t compat_ex(struct ib_uverbs_file *file, size_t count,
-    const char __user *buf)
+			 const char __user *buf)
 {
 	struct ib_uverbs_cmd_hdr hdr;
 	struct ib_uverbs_ex_cmd_hdr_compat ex_hdr;
@@ -610,7 +612,7 @@ next:
 }
 
 static ssize_t compat(struct ib_uverbs_file *file, size_t count,
-    const char __user *buf)
+		      const char __user *buf)
 {
 	unsigned long			tmpbuf[17];
 	struct ib_uverbs_cmd_hdr	*p = (struct ib_uverbs_cmd_hdr *)tmpbuf;
@@ -654,7 +656,7 @@ static ssize_t compat(struct ib_uverbs_file *file, size_t count,
  * 8B hca_core_clock
  */
 static ssize_t compat_query(struct ib_uverbs_file *file, size_t count,
-    const char __user *buf)
+			    const char __user *buf)
 {
 	unsigned long			tmpbuf[17], tval = 0;
 	struct ib_uverbs_cmd_hdr	*p = (struct ib_uverbs_cmd_hdr *)tmpbuf;

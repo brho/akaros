@@ -89,6 +89,7 @@ const char *x86_trapname(int trapno)
 void set_stack_top(uintptr_t stacktop)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
 	/* No need to reload the task register, this takes effect immediately */
 	x86_set_stacktop_tss(pcpui->tss, stacktop);
 	/* Also need to make sure sysenters come in correctly */
@@ -113,6 +114,7 @@ void send_nmi(uint32_t os_coreid)
 {
 	/* NMI / IPI for x86 are limited to 8 bits */
 	uint8_t hw_core = (uint8_t)get_hw_coreid(os_coreid);
+
 	__send_nmi(hw_core);
 }
 
@@ -138,7 +140,8 @@ void idt_init(void)
 	 * handler with a fake interrupt number (500) that is out of bounds of
 	 * the idt[] */
 	for (i = 0; i < trap_tbl_size - 1; i++)
-		SETGATE(idt[trap_tbl[i].trapnumber], 0, GD_KT, trap_tbl[i].trapaddr, 0);
+		SETGATE(idt[trap_tbl[i].trapnumber], 0, GD_KT,
+			trap_tbl[i].trapaddr, 0);
 	/* Sanity check */
 	assert((uintptr_t)ISR_syscall ==
 	       ((uintptr_t)idt[T_SYSCALL].gd_off_63_32 << 32 |
@@ -163,8 +166,8 @@ void idt_init(void)
 	/* We will set this properly once we have a kstack from the slab. */
 	set_stack_top(0xdeadbeef);
 
-	/* Initialize the TSS field of the gdt.  The size of the TSS desc differs
-	 * between 64 and 32 bit, hence the pointer acrobatics */
+	/* Initialize the TSS field of the gdt.  The size of the TSS desc
+	 * differs between 64 and 32 bit, hence the pointer acrobatics */
 	syssegdesc_t *ts_slot = (syssegdesc_t*)&gdt[GD_TSS >> 3];
 	*ts_slot = (syssegdesc_t)SEG_SYS_SMALL(STS_T32A, (uintptr_t)&ts,
 	                                       sizeof(taskstate_t), 0);
@@ -189,8 +192,8 @@ void idt_init(void)
 	num_cores_mpacpi = MAX_NUM_CORES - ncleft;
 	printk("MP and ACPI found %d cores\n", num_cores_mpacpi);
 	if (num_cores != num_cores_mpacpi)
-		warn("Topology (%d) and MP/ACPI (%d) differ on num_cores!", num_cores,
-		     num_cores_mpacpi);
+		warn("Topology (%d) and MP/ACPI (%d) differ on num_cores!",
+		     num_cores, num_cores_mpacpi);
 
 	apiconline();
 	ioapiconline();
@@ -202,7 +205,8 @@ void idt_init(void)
 	             MKBUS(BusLAPIC, 0, 0, 0));
 	register_irq(IdtLAPIC_PCINT, perfmon_interrupt, NULL,
 	             MKBUS(BusLAPIC, 0, 0, 0));
-	register_irq(I_KERNEL_MSG, handle_kmsg_ipi, NULL, MKBUS(BusIPI, 0, 0, 0));
+	register_irq(I_KERNEL_MSG, handle_kmsg_ipi, NULL,
+		     MKBUS(BusIPI, 0, 0, 0));
 }
 
 static void print_fperr(struct hw_trapframe *hw_tf)
@@ -215,8 +219,8 @@ static void print_fperr(struct hw_trapframe *hw_tf)
 	asm volatile ("stmxcsr %0" : "=m"(mxcsr));
 	print_lock();
 	print_trapframe(hw_tf);
-	printk("Core %d: FP ERR, CW: 0x%04x, SW: 0x%04x, MXCSR 0x%08x\n", core_id(),
-	       fpcw, fpsw, mxcsr);
+	printk("Core %d: FP ERR, CW: 0x%04x, SW: 0x%04x, MXCSR 0x%08x\n",
+	       core_id(), fpcw, fpsw, mxcsr);
 	printk("Core %d: The following faults are unmasked:\n", core_id());
 	if (fpsw & ~fpcw & FP_EXCP_IE) {
 		printk("\tInvalid Operation: ");
@@ -273,30 +277,31 @@ static bool __handler_kernel_page_fault(struct hw_trapframe *hw_tf,
 	}
 	/* In general, if there's no cur_proc, a KPF is a bug. */
 	if (!pcpui->cur_proc) {
-		/* This only runs from test_uaccess(), where it is expected to fail. */
+		/* This only runs from test_uaccess(), where it is expected to
+		 * fail. */
 		if (try_handle_exception_fixup(hw_tf))
 			return TRUE;
 		panic_hwtf(hw_tf, "Proc-less Page Fault in the Kernel at %p!",
 		           fault_va);
 	}
-	/* TODO - handle kernel page faults.  This is dangerous, since we might be
-	 * holding locks in the kernel and could deadlock when we HPF.  For now, I'm
-	 * just disabling the lock checker, since it'll flip out when it sees there
-	 * is a kernel trap.  Will need to think about this a bit, esp when we
-	 * properly handle bad addrs and whatnot. */
+	/* TODO - handle kernel page faults.  This is dangerous, since we might
+	 * be holding locks in the kernel and could deadlock when we HPF.  For
+	 * now, I'm just disabling the lock checker, since it'll flip out when
+	 * it sees there is a kernel trap.  Will need to think about this a bit,
+	 * esp when we properly handle bad addrs and whatnot. */
 	pcpui->__lock_checking_enabled--;
-	/* It is a bug for the kernel to access user memory while holding locks that
-	 * are used by handle_page_fault.  At a minimum, this includes p->vmr_lock
-	 * and memory allocation locks.
+	/* It is a bug for the kernel to access user memory while holding locks
+	 * that are used by handle_page_fault.  At a minimum, this includes
+	 * p->vmr_lock and memory allocation locks.
 	 *
-	 * In an effort to reduce the number of locks (both now and in the future),
-	 * the kernel will not attempt to handle faults on file-back VMRs.  We
-	 * probably can turn that on in the future, but I'd rather keep things safe
-	 * for now.  (We'll probably need to change this when we stop
-	 * MAP_POPULATE | MAP_LOCKED entire binaries).
+	 * In an effort to reduce the number of locks (both now and in the
+	 * future), the kernel will not attempt to handle faults on file-back
+	 * VMRs.  We probably can turn that on in the future, but I'd rather
+	 * keep things safe for now.  (We'll probably need to change this when
+	 * we stop MAP_POPULATE | MAP_LOCKED entire binaries).
 	 *
-	 * Note that we do not enable IRQs here, unlike in the user case.  Again,
-	 * this is to limit the locks we could be grabbing. */
+	 * Note that we do not enable IRQs here, unlike in the user case.
+	 * Again, this is to limit the locks we could be grabbing. */
 	err = handle_page_fault_nofile(pcpui->cur_proc, fault_va, prot);
 	pcpui->__lock_checking_enabled++;
 	if (err) {
@@ -309,11 +314,12 @@ static bool __handler_kernel_page_fault(struct hw_trapframe *hw_tf,
 		       *(uintptr_t*)(hw_tf->tf_rsp +  8),
 		       *(uintptr_t*)(hw_tf->tf_rsp + 16),
 		       *(uintptr_t*)(hw_tf->tf_rsp + 24));
-		panic_hwtf(hw_tf, "Proc-ful Page Fault in the Kernel at %p!", fault_va);
-		/* if we want to do something like kill a process or other code, be
-		 * aware we are in a sort of irq-like context, meaning the main
-		 * kernel code we 'interrupted' could be holding locks - even
-		 * irqsave locks. */
+		panic_hwtf(hw_tf, "Proc-ful Page Fault in the Kernel at %p!",
+			   fault_va);
+		/* if we want to do something like kill a process or other code,
+		 * be aware we are in a sort of irq-like context, meaning the
+		 * main kernel code we 'interrupted' could be holding locks -
+		 * even irqsave locks. */
 	}
 	return TRUE;
 }
@@ -334,15 +340,16 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 static void do_nmi_work(struct hw_trapframe *hw_tf)
 {
 	assert(!irq_is_enabled());
-	/* It's mostly harmless to snapshot the TF, and we can send a spurious PCINT
-	 * interrupt.  perfmon.c just uses the interrupt to tell it to check its
-	 * counters for overflow.  Note that the PCINT interrupt is just a regular
-	 * IRQ.  The backtrace was recorded during the NMI and emitted during IRQ.
+	/* It's mostly harmless to snapshot the TF, and we can send a spurious
+	 * PCINT interrupt.  perfmon.c just uses the interrupt to tell it to
+	 * check its counters for overflow.  Note that the PCINT interrupt is
+	 * just a regular IRQ.  The backtrace was recorded during the NMI and
+	 * emitted during IRQ.
 	 *
 	 * That being said, it's OK if the monitor triggers debugging NMIs while
 	 * perf is running.  If perf triggers an NMI when the monitor wants to
-	 * print, the monitor will debug *that* NMI, and not the one that gets sent
-	 * moments later.  That's fine. */
+	 * print, the monitor will debug *that* NMI, and not the one that gets
+	 * sent moments later.  That's fine. */
 	emit_monitor_backtrace(ROS_HW_CTX, hw_tf);
 	perfmon_snapshot_hwtf(hw_tf);
 	send_self_ipi(IdtLAPIC_PCINT);
@@ -397,35 +404,40 @@ __nmi_bottom_half(struct hw_trapframe *hw_tf)
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 
 	while (1) {
-		/* Signal that we're doing work.  A concurrent NMI will set this to
-		 * NMI_HANDLE_ANOTHER if we should continue, which we'll catch later. */
+		/* Signal that we're doing work.  A concurrent NMI will set this
+		 * to NMI_HANDLE_ANOTHER if we should continue, which we'll
+		 * catch later. */
 		pcpui->nmi_status = NMI_IN_PROGRESS;
 		do_nmi_work(hw_tf);
-		/* We need to check nmi_status to see if it is NMI_HANDLE_ANOTHER (if
-		 * so, run again), write NMI_NORMAL_OPN, leave this stack, and return to
-		 * the original context.  We need to do that in such a manner that an
-		 * NMI can come in at any time.  There are two concerns.
+		/* We need to check nmi_status to see if it is
+		 * NMI_HANDLE_ANOTHER (if so, run again), write NMI_NORMAL_OPN,
+		 * leave this stack, and return to the original context.  We
+		 * need to do that in such a manner that an NMI can come in at
+		 * any time.  There are two concerns.
 		 *
-		 * First, we need to not "miss the signal" telling us to re-run the NMI
-		 * handler.  To do that, we'll do the actual checking in asm.  Being in
-		 * the asm code block is a signal to the real NMI handler that we need
-		 * to abort and do_nmi_work() again.
+		 * First, we need to not "miss the signal" telling us to re-run
+		 * the NMI handler.  To do that, we'll do the actual checking in
+		 * asm.  Being in the asm code block is a signal to the real NMI
+		 * handler that we need to abort and do_nmi_work() again.
 		 *
-		 * Second, we need to atomically leave the stack and return.  By being
-		 * in asm, the NMI handler knows to just hack our PC to make us return,
-		 * instead of starting up a fresh __nmi_bottom_half().
+		 * Second, we need to atomically leave the stack and return.  By
+		 * being in asm, the NMI handler knows to just hack our PC to
+		 * make us return, instead of starting up a fresh
+		 * __nmi_bottom_half().
 		 *
-		 * The NMI handler works together with the following function such that
-		 * if that race occurs while we're in the function, it'll fail and
-		 * return.  Then we'll just do_nmi_work() and try again. */
+		 * The NMI handler works together with the following function
+		 * such that if that race occurs while we're in the function,
+		 * it'll fail and return.  Then we'll just do_nmi_work() and try
+		 * again. */
 		extern void nmi_try_to_pop(struct hw_trapframe *tf, int *status,
 		                           int old_val, int new_val);
 
 		nmi_try_to_pop(hw_tf, &pcpui->nmi_status, NMI_IN_PROGRESS,
 		               NMI_NORMAL_OPN);
-		/* Either we returned on our own, since we lost a race with nmi_status
-		 * and didn't write (status = ANOTHER), or we won the race, but an NMI
-		 * handler set the status to ANOTHER and restarted us. */
+		/* Either we returned on our own, since we lost a race with
+		 * nmi_status and didn't write (status = ANOTHER), or we won the
+		 * race, but an NMI handler set the status to ANOTHER and
+		 * restarted us. */
 		assert(pcpui->nmi_status != NMI_NORMAL_OPN);
 	}
 }
@@ -469,65 +481,67 @@ void handle_nmi(struct hw_trapframe *hw_tf)
 	uintptr_t worker_stacktop;
 
 	/* At this point, we're an NMI and other NMIs are blocked.  Only once we
-	 * hop to the bottom half could that be no longer true.  NMI with NMIs fully
-	 * blocked will run without interruption.  For that reason, we don't have to
-	 * be careful about any memory accesses or compiler tricks. */
+	 * hop to the bottom half could that be no longer true.  NMI with NMIs
+	 * fully blocked will run without interruption.  For that reason, we
+	 * don't have to be careful about any memory accesses or compiler
+	 * tricks. */
 	if (pcpui->nmi_status == NMI_HANDLE_ANOTHER)
 		return;
 	if (pcpui->nmi_status == NMI_IN_PROGRESS) {
 		/* Force the handler to run again.  We don't need to worry about
-		 * concurrent access here.  We're running, they are not.  We cannot
-		 * 'PAUSE' since NMIs are fully blocked.
+		 * concurrent access here.  We're running, they are not.  We
+		 * cannot 'PAUSE' since NMIs are fully blocked.
 		 *
-		 * The asm routine, for its part, does a compare-and-swap, so if we
-		 * happened to interrupt it before it wrote NMI_NORMAL_OPN, it'll
-		 * notice, abort, and not write the status. */
+		 * The asm routine, for its part, does a compare-and-swap, so if
+		 * we happened to interrupt it before it wrote NMI_NORMAL_OPN,
+		 * it'll notice, abort, and not write the status. */
 		pcpui->nmi_status = NMI_HANDLE_ANOTHER;
 		return;
 	}
 	assert(pcpui->nmi_status == NMI_NORMAL_OPN);
 	pcpui->nmi_status = NMI_HANDLE_ANOTHER;
-	/* We could be interrupting an NMI that is trying to pop back to a normal
-	 * context.  We can tell by looking at its PC.  If it is within the popping
-	 * routine, then we interrupted it at this bad time.  We'll hack the TF such
-	 * that it will return instead of succeeding. */
+	/* We could be interrupting an NMI that is trying to pop back to a
+	 * normal context.  We can tell by looking at its PC.  If it is within
+	 * the popping routine, then we interrupted it at this bad time.  We'll
+	 * hack the TF such that it will return instead of succeeding. */
 	if (nmi_check_and_hack_tf(hw_tf))
 		return;
-	/* OK, so we didn't interrupt an NMI that was trying to return.  So we need
-	 * to run the bottom half.  We're going to jump stacks, but we also need to
-	 * copy the hw_tf.  The existing one will be clobbered by any interrupting
-	 * NMIs.
+	/* OK, so we didn't interrupt an NMI that was trying to return.  So we
+	 * need to run the bottom half.  We're going to jump stacks, but we also
+	 * need to copy the hw_tf.  The existing one will be clobbered by any
+	 * interrupting NMIs.
 	 *
-	 * We also need to save some space on the top of that stack for a pointer to
-	 * pcpui and a scratch register, which nmi_try_to_pop() will use.  The
-	 * target stack will look like this:
+	 * We also need to save some space on the top of that stack for a
+	 * pointer to pcpui and a scratch register, which nmi_try_to_pop() will
+	 * use.  The target stack will look like this:
 	 *
-	 *               +--------------------------+ Page boundary (e.g. 0x6000)
-	 *               |   scratch space (rsp)    |
-	 *               |       pcpui pointer      |
-	 *               |      tf_ss + padding     | HW_TF end
-	 *               |          tf_rsp          |
-	 *               |            .             |
-	 *               |            .             |
-	 * RSP ->        |         tf_gsbase        | HW_TF start, hw_tf_copy
-	 *               +--------------------------+
-	 *               |            .             |
-	 *               |            .             |
-	 *               |            .             |
-	 *               +--------------------------+ Page boundary (e.g. 0x5000)
+	 *           +--------------------------+ Page boundary (e.g. 0x6000)
+	 *           |   scratch space (rsp)    |
+	 *           |       pcpui pointer      |
+	 *           |      tf_ss + padding     | HW_TF end
+	 *           |          tf_rsp          |
+	 *           |            .             |
+	 *           |            .             |
+	 * RSP ->    |         tf_gsbase        | HW_TF start, hw_tf_copy
+	 *           +--------------------------+
+	 *           |            .             |
+	 *           |            .             |
+	 *           |            .             |
+	 *           +--------------------------+ Page boundary (e.g. 0x5000)
 	 *
-	 * __nmi_bottom_half() just picks up using the stack below tf_gsbase.  It'll
-	 * push as needed, growing down.  Basically we're just using the space
-	 * 'above' the stack as storage. */
+	 * __nmi_bottom_half() just picks up using the stack below tf_gsbase.
+	 * It'll push as needed, growing down.  Basically we're just using the
+	 * space 'above' the stack as storage. */
 	worker_stacktop = pcpui->nmi_worker_stacktop - 2 * sizeof(uintptr_t);
 	*(uintptr_t*)worker_stacktop = (uintptr_t)pcpui;
 	worker_stacktop = worker_stacktop - sizeof(struct hw_trapframe);
 	hw_tf_copy = (struct hw_trapframe*)worker_stacktop;
 	*hw_tf_copy = *hw_tf;
-	/* Once we head to the bottom half, consider ourselves interruptible (though
-	 * it's not until the first time we do_nmi_work()).  We'll never come back
-	 * to this stack.  Doing this in asm so we can easily pass an argument.  We
-	 * don't need to call (vs jmp), but it helps keep the stack aligned. */
+	/* Once we head to the bottom half, consider ourselves interruptible
+	 * (though it's not until the first time we do_nmi_work()).  We'll never
+	 * come back to this stack.  Doing this in asm so we can easily pass an
+	 * argument.  We don't need to call (vs jmp), but it helps keep the
+	 * stack aligned. */
 	asm volatile("mov $0x0, %%rbp;"
 	             "mov %0, %%rsp;"
 	             "call __nmi_bottom_half;"
@@ -551,63 +565,67 @@ static void trap_dispatch(struct hw_trapframe *hw_tf)
 
 	// Handle processor exceptions.
 	switch(hw_tf->tf_trapno) {
-		case T_BRKPT:
-			if (!in_kernel(hw_tf))
-				backtrace_user_ctx(current, current_ctx);
-			else
-				monitor(hw_tf);
+	case T_BRKPT:
+		if (!in_kernel(hw_tf))
+			backtrace_user_ctx(current, current_ctx);
+		else
+			monitor(hw_tf);
+		handled = TRUE;
+		break;
+	case T_ILLOP:
+	{
+		/* TODO: this can PF if there is a concurrent unmap/PM removal.
+		 * */
+		uintptr_t ip = get_hwtf_pc(hw_tf);
+
+		pcpui = &per_cpu_info[core_id()];
+		pcpui->__lock_checking_enabled--; /* for print debugging */
+		/* We will muck with the actual TF.  If we're dealing with
+		 * userspace, we need to make sure we edit the actual TF that
+		 * will get restarted (pcpui), and not the TF on the kstack
+		 * (which aren't the same).  See set_current_ctx() for more
+		 * info. */
+		if (!in_kernel(hw_tf))
+			hw_tf = &pcpui->cur_ctx->tf.hw_tf;
+		printd("bad opcode, eip: %p, next 3 bytes: %x %x %x\n", ip,
+		       *(uint8_t*)(ip + 0),
+		       *(uint8_t*)(ip + 1),
+		       *(uint8_t*)(ip + 2));
+		/* rdtscp: 0f 01 f9 */
+		if (*(uint8_t*)(ip + 0) == 0x0f,
+		    *(uint8_t*)(ip + 1) == 0x01,
+		    *(uint8_t*)(ip + 2) == 0xf9) {
+			x86_fake_rdtscp(hw_tf);
 			handled = TRUE;
-			break;
-		case T_ILLOP:
-		{
-			/* TODO: this can PF if there is a concurrent unmap/PM removal. */
-			uintptr_t ip = get_hwtf_pc(hw_tf);
-			pcpui = &per_cpu_info[core_id()];
-			pcpui->__lock_checking_enabled--;		/* for print debugging */
-			/* We will muck with the actual TF.  If we're dealing with
-			 * userspace, we need to make sure we edit the actual TF that will
-			 * get restarted (pcpui), and not the TF on the kstack (which aren't
-			 * the same).  See set_current_ctx() for more info. */
-			if (!in_kernel(hw_tf))
-				hw_tf = &pcpui->cur_ctx->tf.hw_tf;
-			printd("bad opcode, eip: %p, next 3 bytes: %x %x %x\n", ip,
-			       *(uint8_t*)(ip + 0),
-			       *(uint8_t*)(ip + 1),
-			       *(uint8_t*)(ip + 2));
-			/* rdtscp: 0f 01 f9 */
-			if (*(uint8_t*)(ip + 0) == 0x0f,
-			    *(uint8_t*)(ip + 1) == 0x01,
-			    *(uint8_t*)(ip + 2) == 0xf9) {
-				x86_fake_rdtscp(hw_tf);
-				handled = TRUE;
-			}
-			pcpui->__lock_checking_enabled++;		/* for print debugging */
-			break;
 		}
-		case T_PGFLT:
-			handled = __handle_page_fault(hw_tf, &aux);
-			break;
-		case T_GPFLT:
-		case T_FPERR:
-			handled = try_handle_exception_fixup(hw_tf);
-			break;
-		case T_SYSCALL:
-			enable_irq();
-			// check for userspace, for now
-			assert(hw_tf->tf_cs != GD_KT);
-			/* Set up and run the async calls */
-			/* TODO: this is using the wrong reg1 for traps for 32 bit */
-			prep_syscalls(current,
-			              (struct syscall*)x86_get_systrap_arg0(hw_tf),
-						  (unsigned int)x86_get_systrap_arg1(hw_tf));
-			disable_irq();
-			handled = TRUE;
-			break;
+		pcpui->__lock_checking_enabled++; /* for print debugging */
+		break;
+	}
+	case T_PGFLT:
+		handled = __handle_page_fault(hw_tf, &aux);
+		break;
+	case T_GPFLT:
+	case T_FPERR:
+		handled = try_handle_exception_fixup(hw_tf);
+		break;
+	case T_SYSCALL:
+		enable_irq();
+		// check for userspace, for now
+		assert(hw_tf->tf_cs != GD_KT);
+		/* Set up and run the async calls */
+		/* TODO: this is using the wrong reg1 for traps for 32 bit */
+		prep_syscalls(current,
+			      (struct syscall*)x86_get_systrap_arg0(hw_tf),
+			      (unsigned int)x86_get_systrap_arg1(hw_tf));
+		disable_irq();
+		handled = TRUE;
+		break;
 	}
 
 	if (!handled) {
 		if (in_kernel(hw_tf))
-			panic_hwtf(hw_tf, "Damn Damn!  Unhandled trap in the kernel!");
+			panic_hwtf(hw_tf,
+				   "Damn Damn!  Unhandled trap in the kernel!");
 		reflect_unhandled_trap(hw_tf->tf_trapno, hw_tf->tf_err, aux);
 	}
 }
@@ -654,6 +672,7 @@ static void set_current_ctx_vm(struct per_cpu_info *pcpui,
 void trap(struct hw_trapframe *hw_tf)
 {
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
+
 	/* Copy out the TF for now */
 	if (!in_kernel(hw_tf)) {
 		set_current_ctx_hw(pcpui, hw_tf);
@@ -667,9 +686,9 @@ void trap(struct hw_trapframe *hw_tf)
 	if ((hw_tf->tf_cs & ~3) != GD_UT && (hw_tf->tf_cs & ~3) != GD_KT)
 		panic_hwtf(hw_tf, "Trapframe with invalid CS!");
 	trap_dispatch(hw_tf);
-	/* Return to the current process, which should be runnable.  If we're the
-	 * kernel, we should just return naturally.  Note that current and tf need
-	 * to still be okay (might not be after blocking) */
+	/* Return to the current process, which should be runnable.  If we're
+	 * the kernel, we should just return naturally.  Note that current and
+	 * tf need to still be okay (might not be after blocking) */
 	if (in_kernel(hw_tf)) {
 		dec_ktrap_depth(pcpui);
 		return;
@@ -703,8 +722,8 @@ static void irq_dispatch(struct hw_trapframe *hw_tf)
 	if (!irq_h) {
 		warn_once("Received IRQ %d, had no handler registered!",
 		          hw_tf->tf_trapno);
-		/* If we don't have an IRQ handler, we don't know how to EOI.  Odds are,
-		 * it's a LAPIC IRQ, such as I_TESTING */
+		/* If we don't have an IRQ handler, we don't know how to EOI.
+		 * Odds are, it's a LAPIC IRQ, such as I_TESTING */
 		if (!lapic_check_spurious(hw_tf->tf_trapno))
 			lapic_send_eoi(hw_tf->tf_trapno);
 		goto out_no_eoi;
@@ -722,7 +741,8 @@ static void irq_dispatch(struct hw_trapframe *hw_tf)
 	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
 	if ((I_SMP_CALL0 <= hw_tf->tf_trapno) &&
 	    (hw_tf->tf_trapno <= I_SMP_CALL_LAST))
-		down_checklist(handler_wrappers[hw_tf->tf_trapno & 0x0f].cpu_list);
+		down_checklist(handler_wrappers[hw_tf->tf_trapno & 0x0f]
+			       .cpu_list);
 	disable_irq();
 	/* Keep in sync with ipi_is_pending */
 	irq_handlers[hw_tf->tf_trapno]->eoi(hw_tf->tf_trapno);
@@ -750,9 +770,9 @@ void handle_irq(struct hw_trapframe *hw_tf)
 	if (!in_kernel(hw_tf))
 		set_current_ctx_hw(pcpui, hw_tf);
 	irq_dispatch(hw_tf);
-	/* Return to the current process, which should be runnable.  If we're the
-	 * kernel, we should just return naturally.  Note that current and tf need
-	 * to still be okay (might not be after blocking) */
+	/* Return to the current process, which should be runnable.  If we're
+	 * the kernel, we should just return naturally.  Note that current and
+	 * tf need to still be okay (might not be after blocking) */
 	if (in_kernel(hw_tf))
 		return;
 	proc_restartcore();
@@ -764,6 +784,7 @@ int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 {
 	struct irq_handler *irq_h;
 	int vector;
+
 	irq_h = kzmalloc(sizeof(struct irq_handler), 0);
 	assert(irq_h);
 	irq_h->dev_irq = irq;
@@ -810,7 +831,8 @@ static int route_irq_h(struct irq_handler *irq_h, int os_coreid)
 	}
 	hw_coreid = get_hw_coreid(os_coreid);
 	if (hw_coreid == -1) {
-		printk("[kernel] os_coreid %d not a valid hw core!\n", os_coreid);
+		printk("[kernel] os_coreid %d not a valid hw core!\n",
+		       os_coreid);
 		return -1;
 	}
 	irq_h->route_irq(irq_h, irq_h->apic_vector, hw_coreid);
@@ -824,6 +846,7 @@ int route_irqs(int apic_vec, int os_coreid)
 {
 	struct irq_handler *irq_h;
 	int ret = -1;
+
 	if (!vector_is_irq(apic_vec)) {
 		printk("[kernel] vector %d is not an IRQ vector!\n", apic_vec);
 		return -1;
@@ -845,12 +868,12 @@ void sysenter_callwrapper(struct syscall *sysc, unsigned long count,
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	set_current_ctx_sw(pcpui, sw_tf);
 	__set_cpu_state(pcpui, CPU_STATE_KERNEL);
-	/* Once we've set_current_ctx, we can enable interrupts.  This used to be
-	 * mandatory (we had immediate KMSGs that would muck with cur_ctx).  Now it
-	 * should only help for sanity/debugging. */
+	/* Once we've set_current_ctx, we can enable interrupts.  This used to
+	 * be mandatory (we had immediate KMSGs that would muck with cur_ctx).
+	 * Now it should only help for sanity/debugging. */
 	enable_irq();
-	/* Set up and run the async calls.  This may block, and we could migrate to
-	 * another core.  If you use pcpui again, you need to reread it. */
+	/* Set up and run the async calls.  This may block, and we could migrate
+	 * to another core.  If you use pcpui again, you need to reread it. */
 	prep_syscalls(current, sysc, count);
 	disable_irq();
 	proc_restartcore();
@@ -860,6 +883,7 @@ void sysenter_callwrapper(struct syscall *sysc, unsigned long count,
 void send_ipi(uint32_t os_coreid, uint8_t vector)
 {
 	int hw_coreid = get_hw_coreid(os_coreid);
+
 	if (hw_coreid == -1) {
 		panic("Unmapped OS coreid (OS %d)!\n", os_coreid);
 		return;
@@ -882,62 +906,63 @@ static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 
 	cpuid(tf->tf_rax, tf->tf_rcx, &eax, &ebx, &ecx, &edx);
 	switch (tf->tf_rax) {
-		/* TODO: If we can move this to userspace, vmrunkernel can make GPCS on
-		 * the fly. */
-		case 0x01:
-			/* Set the hypervisor bit to let the guest know it is virtualized */
-			ecx |= 1 << 31;
-			/* Unset the monitor capability bit so that the guest does not try
-			 * to use monitor/mwait. */
-			ecx &= ~(1 << 3);
-			/* Unset the vmx capability bit so that the guest does not try
-			 * to turn it on. */
-			ecx &= ~(1 << 5);
-			/* Unset the perf capability bit so that the guest does not try
-			 * to turn it on. */
-			ecx &= ~(1 << 15);
+	/* TODO: If we can move this to userspace, vmrunkernel can make GPCS on
+	 * the fly. */
+	case 0x01:
+		/* Set the hypervisor bit to let the guest know it is
+		 * virtualized */
+		ecx |= 1 << 31;
+		/* Unset the monitor capability bit so that the guest does not
+		 * try to use monitor/mwait. */
+		ecx &= ~(1 << 3);
+		/* Unset the vmx capability bit so that the guest does not try
+		 * to turn it on. */
+		ecx &= ~(1 << 5);
+		/* Unset the perf capability bit so that the guest does not try
+		 * to turn it on. */
+		ecx &= ~(1 << 15);
 
-			/* Set the guest pcore id into the apic ID field in CPUID. */
-			ebx &= 0x0000ffff;
-			ebx |= (current->vmm.nr_guest_pcores & 0xff) << 16;
-			ebx |= (tf->tf_guest_pcoreid & 0xff) << 24;
-			break;
-		case 0x0A:
-			eax = 0;
-			ebx = 0;
-			ecx = 0;
-			edx = 0;
-			break;
-		/* Signal the use of KVM. */
-		case 0x40000000:
-			sigptr = (const uint32_t *)kvm_sig;
-			eax = 0;
-			ebx = sigptr[0];
-			ecx = sigptr[1];
-			edx = sigptr[2];
-			break;
-		/* Hypervisor Features. */
-		case 0x40000003:
-			/* Unset the monitor capability bit so that the guest does not try
-			 * to use monitor/mwait. */
-			edx &= ~(1 << 0);
-			break;
-		/* Signal the use of AKAROS. */
-		case 0x40000100:
-			sigptr = (const uint32_t *)akaros_sig;
-			eax = 0;
-			ebx = sigptr[0];
-			ecx = sigptr[1];
-			edx = sigptr[2];
-			break;
-		/* Hypervisor Features. */
-		case 0x40000103:
-			/* Unset the monitor capability bit so that the guest does not try
-			 * to use monitor/mwait. */
-			edx &= ~(1 << 0);
-			break;
-		default:
-			break;
+		/* Set the guest pcore id into the apic ID field in CPUID. */
+		ebx &= 0x0000ffff;
+		ebx |= (current->vmm.nr_guest_pcores & 0xff) << 16;
+		ebx |= (tf->tf_guest_pcoreid & 0xff) << 24;
+		break;
+	case 0x0A:
+		eax = 0;
+		ebx = 0;
+		ecx = 0;
+		edx = 0;
+		break;
+	/* Signal the use of KVM. */
+	case 0x40000000:
+		sigptr = (const uint32_t *)kvm_sig;
+		eax = 0;
+		ebx = sigptr[0];
+		ecx = sigptr[1];
+		edx = sigptr[2];
+		break;
+	/* Hypervisor Features. */
+	case 0x40000003:
+		/* Unset the monitor capability bit so that the guest does not
+		 * try to use monitor/mwait. */
+		edx &= ~(1 << 0);
+		break;
+	/* Signal the use of AKAROS. */
+	case 0x40000100:
+		sigptr = (const uint32_t *)akaros_sig;
+		eax = 0;
+		ebx = sigptr[0];
+		ecx = sigptr[1];
+		edx = sigptr[2];
+		break;
+	/* Hypervisor Features. */
+	case 0x40000103:
+		/* Unset the monitor capability bit so that the guest does not
+		 * try to use monitor/mwait. */
+		edx &= ~(1 << 0);
+		break;
+	default:
+		break;
 	}
 	tf->tf_rax = eax;
 	tf->tf_rbx = ebx;
@@ -967,15 +992,17 @@ static bool handle_vmexit_ept_fault(struct vm_trapframe *tf)
 }
 
 /* Regarding NMI blocking,
- * 		"An NMI causes subsequent NMIs to be blocked, but only after the VM exit
- * 		completes." (SDM)
+ * 	"An NMI causes subsequent NMIs to be blocked, but only after the VM exit
+ * 	completes." (SDM)
  *
  * Like handle_nmi(), this function and anything it calls directly cannot fault,
  * or else we lose our NMI protections. */
 static bool handle_vmexit_nmi(struct vm_trapframe *tf)
 {
-	/* Sanity checks, make sure we really got an NMI.  Feel free to remove. */
-	assert((tf->tf_intrinfo2 & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI_INTR);
+	/* Sanity checks, make sure we really got an NMI.  Feel free to remove.
+	 */
+	assert((tf->tf_intrinfo2 & INTR_INFO_INTR_TYPE_MASK)
+	       == INTR_TYPE_NMI_INTR);
 	assert((tf->tf_intrinfo2 & INTR_INFO_VECTOR_MASK) == T_NMI);
 	assert(!irq_is_enabled());
 
@@ -989,9 +1016,8 @@ bool handle_vmexit_msr(struct vm_trapframe *tf)
 {
 	bool ret;
 
-	ret = vmm_emulate_msr(tf,
-	                      (tf->tf_exit_reason == EXIT_REASON_MSR_READ
-						   ? VMM_MSR_EMU_READ : VMM_MSR_EMU_WRITE));
+	ret = vmm_emulate_msr(tf, (tf->tf_exit_reason == EXIT_REASON_MSR_READ
+				   ? VMM_MSR_EMU_READ : VMM_MSR_EMU_WRITE));
 	if (ret)
 		tf->tf_rip += 2;
 	return ret;
@@ -1002,9 +1028,10 @@ bool handle_vmexit_extirq(struct vm_trapframe *tf)
 	struct hw_trapframe hw_tf;
 	uint32_t trap_nr;
 
-	/* For now, we just handle external IRQs.  I think guest traps should go to
-	 * the guest, based on our vmctls */
-	assert((tf->tf_intrinfo2 & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_EXT_INTR);
+	/* For now, we just handle external IRQs.  I think guest traps should go
+	 * to the guest, based on our vmctls */
+	assert((tf->tf_intrinfo2 & INTR_INFO_INTR_TYPE_MASK)
+	       == INTR_TYPE_EXT_INTR);
 	/* The POKE_HANDLER doesn't run for an ExtINT that triggers a vmexit */
 	trap_nr = tf->tf_intrinfo2 & INTR_INFO_VECTOR_MASK;
 	if (trap_nr == I_POKE_CORE) {
@@ -1012,8 +1039,8 @@ bool handle_vmexit_extirq(struct vm_trapframe *tf)
 		return TRUE;
 	}
 	/* TODO: Our IRQ handlers all expect TFs.  Let's fake one.  A bunch of
-	 * handlers (e.g. backtrace/perf) will probably be unhappy about a user TF
-	 * that is really a VM, so this all needs work. */
+	 * handlers (e.g. backtrace/perf) will probably be unhappy about a user
+	 * TF that is really a VM, so this all needs work. */
 	hw_tf.tf_gsbase = 0;
 	hw_tf.tf_fsbase = 0;
 	hw_tf.tf_rax = tf->tf_rax;
@@ -1052,8 +1079,8 @@ static bool handle_vmexit_xsetbv(struct vm_trapframe *tf)
 	// If the VM tries to set xcr0 to a superset
 	// of Akaros's default value, kill the VM.
 
-	// Bit in vm_rfbm and x86_default_xcr0:        Ok. Requested and allowed.
-	// Bit in vm_rfbm but not x86_default_xcr0:    Bad! Requested, not allowed.
+	// Bit in vm_rfbm and x86_default_xcr0: Ok. Requested and allowed.
+	// Bit in vm_rfbm but not x86_default_xcr0: Bad! Requested, not allowed.
 	// Bit not in vm_rfbm but in x86_default_xcr0: Ok. Not requested.
 
 	// vm_rfbm & (~x86_default_xcr0) is nonzero if any bits
@@ -1081,13 +1108,14 @@ static void vmexit_dispatch(struct vm_trapframe *tf)
 
 	/* Do not block in any of these functions.
 	 *
-	 * If we block, we'll probably need to finalize the context.  If we do, then
-	 * there's a chance the guest pcore can start somewhere else, and then we
-	 * can't get the GPC loaded again.  Plus, they could be running a GPC with
-	 * an unresolved vmexit.  It's just mess.
+	 * If we block, we'll probably need to finalize the context.  If we do,
+	 * then there's a chance the guest pcore can start somewhere else, and
+	 * then we can't get the GPC loaded again.  Plus, they could be running
+	 * a GPC with an unresolved vmexit.  It's just mess.
 	 *
-	 * If we want to enable IRQs, we can do so on a case-by-case basis.  Don't
-	 * do it for external IRQs - the irq_dispatch code will handle it. */
+	 * If we want to enable IRQs, we can do so on a case-by-case basis.
+	 * Don't do it for external IRQs - the irq_dispatch code will handle it.
+	 * */
 	switch (tf->tf_exit_reason) {
 	case EXIT_REASON_VMCALL:
 		if (current->vmm.flags & VMM_CTL_FL_KERN_PRINTC &&
@@ -1117,14 +1145,15 @@ static void vmexit_dispatch(struct vm_trapframe *tf)
 		handled = handle_vmexit_xsetbv(tf);
 		break;
 	default:
-		printd("Unhandled vmexit: reason 0x%x, exit qualification 0x%x\n",
+		printd("Unhandled vmexit: reason 0x%x, exit qual 0x%x\n",
 		       tf->tf_exit_reason, tf->tf_exit_qual);
 	}
 	if (!handled) {
 		tf->tf_flags |= VMCTX_FL_HAS_FAULT;
 		if (reflect_current_context()) {
-			/* VM contexts shouldn't be in vcore context, so this should be
-			 * pretty rare (unlike SCPs or VC ctx page faults). */
+			/* VM contexts shouldn't be in vcore context, so this
+			 * should be pretty rare (unlike SCPs or VC ctx page
+			 * faults). */
 			printk("[kernel] Unable to reflect VM Exit\n");
 			print_vmtrapframe(tf);
 			proc_destroy(current);
@@ -1155,9 +1184,9 @@ void handle_vmexit(struct vm_trapframe *tf)
 	__set_cpu_state(pcpui, CPU_STATE_KERNEL);
 	tf = &pcpui->cur_ctx->tf.vm_tf;
 	vmexit_dispatch(tf);
-	/* We're either restarting a partial VM ctx (vmcs was launched, loaded on
-	 * the core, etc) or a SW vc ctx for the reflected trap.  Or the proc is
-	 * dying and we'll handle a __death KMSG shortly. */
+	/* We're either restarting a partial VM ctx (vmcs was launched, loaded
+	 * on the core, etc) or a SW vc ctx for the reflected trap.  Or the proc
+	 * is dying and we'll handle a __death KMSG shortly. */
 	proc_restartcore();
 }
 

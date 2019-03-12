@@ -61,25 +61,23 @@ static uint32_t ioapic_read(struct guest_thread *vm_thread, int ix,
 	switch (reg) {
 	case 0:
 		return ioapic[ix].id;
-		break;
 	case 1:
 		return 0x170011;
-		break;
 	case 2:
 		return ioapic[ix].arbid;
-		break;
 	default:
 		if (reg >= 0 && reg < (IOAPIC_NUM_PINS*2 + 0x10)) {
 			//bx_io_redirect_entry_t *entry = ioredtbl + index;
-			//data = (ioregsel&1) ? entry->get_hi_part() : entry->get_lo_part();
+			//data = (ioregsel&1) ? entry->get_hi_part()
+			//                    : entry->get_lo_part();
 			ret = ioapic[ix].value[reg];
-			DPRINTF("IOAPIC_READ %x: %x return %08x\n", ix, reg, ret);
+			DPRINTF("IOAPIC_READ %x: %x return %08x\n", ix, reg,
+				ret);
 			return ret;
 		} else {
 			DPRINTF("IOAPIC READ: %x BAD INDEX 0x%x\n", ix, reg);
 		}
 		return ret;
-		break;
 	}
 	return 0;
 }
@@ -102,9 +100,9 @@ static void ioapic_write(struct guest_thread *vm_thread, int ix,
 		if (vm->virtio_mmio_devices[i] == NULL)
 			continue;
 
-		/* The first IRQ register starts at 0x10, and there are two 32-bit
-		 * registers for each IRQ. The first 8 bits of the value assigned to
-		 * 'reg' is the interrupt vector. */
+		/* The first IRQ register starts at 0x10, and there are two
+		 * 32-bit registers for each IRQ. The first 8 bits of the value
+		 * assigned to 'reg' is the interrupt vector. */
 		irqreg = (vm->virtio_mmio_devices[i]->irq) * 2 + 0x10;
 		if (reg == irqreg && (value & 0xff) != 0) {
 			vm->virtio_mmio_devices[i]->vec = value & 0xff;
@@ -133,7 +131,8 @@ static void ioapic_write(struct guest_thread *vm_thread, int ix,
 	default:
 		if (reg >= 0 && reg < (IOAPIC_NUM_PINS*2 + 0x10)) {
 			ioapic[ix].value[reg] = value;
-			DPRINTF("IOAPIC %x: set %08x to %016x\n", ix, reg, value);
+			DPRINTF("IOAPIC %x: set %08x to %016x\n", ix, reg,
+				value);
 		} else {
 			DPRINTF("IOAPIC WRITE: %x BAD INDEX 0x%x\n", ix, reg);
 		}
@@ -149,10 +148,12 @@ int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
 	int ix = 0;
 	uint32_t offset = gpa & 0xfffff;
 	/* basic sanity tests. */
-	DPRINTF("%s: %p 0x%x %p %s\n", __func__, (void *)gpa, destreg, regp, store ? "write" : "read");
+	DPRINTF("%s: %p 0x%x %p %s\n", __func__, (void *)gpa, destreg, regp,
+		store ? "write" : "read");
 
 	if ((offset != 0) && (offset != 0x10)) {
-		DPRINTF("Bad register offset: 0x%x and has to be 0x0 or 0x10\n", offset);
+		DPRINTF("Bad register offset: 0x%x and has to be 0x0 or 0x10\n",
+			offset);
 		return -1;
 	}
 

@@ -49,7 +49,7 @@ static void nullunbind(struct Ipifc *unused_ipifc)
 }
 
 static void nullbwrite(struct Ipifc *unused_ipifc, struct block *b,
-					   int unused_int, uint8_t * unused_uint8_p_t)
+		       int unused_int, uint8_t *unused_uint8_p_t)
 {
 	error(EFAIL, "nullbwrite");
 }

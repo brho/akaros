@@ -89,9 +89,9 @@ void *net_receiveq_fn(void *_vq)
 				"  See virtio-v1.0-cs04 s5.3.6.1 Device Operation");
 		}
 
-		/* The virtio_net header comes first.  We'll assume they didn't break
-		 * the header across IOVs, but earlier versions of Linux did break out
-		 * the payload into the second IOV. */
+		/* The virtio_net header comes first.  We'll assume they didn't
+		 * break the header across IOVs, but earlier versions of Linux
+		 * did break out the payload into the second IOV. */
 		net_header = iov[0].iov_base;
 		assert(iov[0].iov_len >= VIRTIO_HEADER_SIZE);
 		iov_strip_bytes(iov, ilen, VIRTIO_HEADER_SIZE);
@@ -103,8 +103,8 @@ void *net_receiveq_fn(void *_vq)
 				"Encountered an error trying to read input from the ethernet device.");
 		}
 
-		/* See virtio spec virtio-v1.0-cs04 s5.1.6.3.2 Device Requirements:
-		 * Setting Up Receive Buffers
+		/* See virtio spec virtio-v1.0-cs04 s5.1.6.3.2 Device
+		 * Requirements: Setting Up Receive Buffers
 		 *
 		 * VIRTIO_NET_F_MRG_RXBUF is not currently negotiated.
 		 * num_buffers will always be 1 if VIRTIO_NET_F_MRG_RXBUF is not
@@ -139,7 +139,7 @@ void *net_transmitq_fn(void *_vq)
 	if (!dev->poke_guest) {
 		free(iov);
 		VIRTIO_DEV_ERRX(vq->vqdev,
-		                "The 'poke_guest' function pointer was not set.");
+			"The 'poke_guest' function pointer was not set.");
 	}
 
 	for (;;) {

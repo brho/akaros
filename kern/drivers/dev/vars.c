@@ -14,8 +14,8 @@
  *     d (decimal)
  *     u (unsigned)
  *     o (octal)
- *     c (char)				does not need a size
- *     s (string)			does not need a size
+ *     c (char)		does not need a size
+ *     s (string)	does not need a size
  * size is:
  *     b (8 bits)
  *     h (16 bits)
@@ -105,7 +105,7 @@ static struct chan *vars_attach(char *spec)
 }
 
 static struct walkqid *vars_walk(struct chan *c, struct chan *nc, char **name,
-								 unsigned int nname)
+				 unsigned int nname)
 {
 	ERRSTACK(1);
 	struct walkqid *ret;
@@ -227,10 +227,11 @@ static void vars_create(struct chan *c, char *name, int omode, uint32_t perm,
 	qlock(&vars_lock);
 	new_slot = find_free_var();
 	if (!new_slot) {
-		vars_dir = kreallocarray(vars_dir, nr_vars * 2, sizeof(struct dirtab),
-		                         MEM_WAIT);
+		vars_dir = kreallocarray(vars_dir, nr_vars * 2,
+					 sizeof(struct dirtab), MEM_WAIT);
 		if (!vars_dir)
-			error(ENOMEM, "krealloc_array failed, nr_vars was %p", nr_vars);
+			error(ENOMEM, "krealloc_array failed, nr_vars was %p",
+			      nr_vars);
 		memset(vars_dir + nr_vars, 0, nr_vars * sizeof(struct dirtab));
 		for (size_t i = nr_vars; i < nr_vars * 2; i++)
 			vars_dir[i].qid.vers = -1;
@@ -318,7 +319,8 @@ static size_t vars_read(struct chan *c, void *ubuf, size_t n, off64_t offset)
 	 * double-check for the user-provided vars. */
 	fmt = strchr(c->name->s, '!');
 	if (!fmt)
-		error(EINVAL, "var %s has no ! in its format string", c->name->s);
+		error(EINVAL, "var %s has no ! in its format string",
+		      c->name->s);
 	fmt++;
 	data_fmt = *fmt;
 	if (!data_fmt)
@@ -348,34 +350,43 @@ static size_t vars_read(struct chan *c, void *ubuf, size_t n, off64_t offset)
 		switch (data_size) {
 		case 'b':
 			if (is_signed)
-				size = snprintf(tmp, size, fmt_int, *(int8_t*)c->qid.path);
+				size = snprintf(tmp, size, fmt_int,
+						*(int8_t*)c->qid.path);
 			else
-				size = snprintf(tmp, size, fmt_int, *(uint8_t*)c->qid.path);
+				size = snprintf(tmp, size, fmt_int,
+						*(uint8_t*)c->qid.path);
 			break;
 		case 'h':
 			if (is_signed)
-				size = snprintf(tmp, size, fmt_int, *(int16_t*)c->qid.path);
+				size = snprintf(tmp, size, fmt_int,
+						*(int16_t*)c->qid.path);
 			else
-				size = snprintf(tmp, size, fmt_int, *(uint16_t*)c->qid.path);
+				size = snprintf(tmp, size, fmt_int,
+						*(uint16_t*)c->qid.path);
 			break;
 		case 'w':
 			if (is_signed)
-				size = snprintf(tmp, size, fmt_int, *(int32_t*)c->qid.path);
+				size = snprintf(tmp, size, fmt_int,
+						*(int32_t*)c->qid.path);
 			else
-				size = snprintf(tmp, size, fmt_int, *(uint32_t*)c->qid.path);
+				size = snprintf(tmp, size, fmt_int,
+						*(uint32_t*)c->qid.path);
 			break;
 		case 'g':
 			if (is_signed)
-				size = snprintf(tmp, size, fmt_int, *(int64_t*)c->qid.path);
+				size = snprintf(tmp, size, fmt_int,
+						*(int64_t*)c->qid.path);
 			else
-				size = snprintf(tmp, size, fmt_int, *(uint64_t*)c->qid.path);
+				size = snprintf(tmp, size, fmt_int,
+						*(uint64_t*)c->qid.path);
 			break;
 		default:
 			error(EINVAL, "Bad #%s size %c", devname(), data_size);
 		}
 		break;
 	default:
-		error(EINVAL, "Unknown #%s data_format %c", devname(), data_fmt);
+		error(EINVAL, "Unknown #%s data_format %c", devname(),
+		      data_fmt);
 	}
 	fmt++;
 	if (*fmt)
@@ -403,7 +414,7 @@ static void vars_remove(struct chan *c)
 	struct dirtab *dir;
 	char *dir_name;
 
-	/* chan's name may have multiple elements in the path; get the last one. */
+	/* chan may have multiple elements in the path; get the last one. */
 	dir_name = strrchr(c->name->s, '/');
 	dir_name = dir_name ? dir_name + 1 : c->name->s;
 

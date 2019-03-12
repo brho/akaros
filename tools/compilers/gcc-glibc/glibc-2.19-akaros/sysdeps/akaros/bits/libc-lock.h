@@ -127,11 +127,12 @@ static inline void *__rtld_lock_who_am_i(void)
 {
 	if (atomic_read(&vcpd_of(0)->flags) & VC_SCP_NOVCCTX)
 		return (void*)0xf00baa;
-	/* We can't use TLS related to parlib (in_vcore_context() / vcore_id() will
-	 * crash.  current_uthread won't link.).  We *can* find our thread
+	/* We can't use TLS related to parlib (in_vcore_context() / vcore_id()
+	 * will crash.  current_uthread won't link.).  We *can* find our thread
 	 * descriptor, which disambiguates any callers (including between vcore
-	 * context (which probably shouldn't be in here) and uthreads, so long as
-	 * uthreads have TLS - which they must if they are making glibc calls. */
+	 * context (which probably shouldn't be in here) and uthreads, so long
+	 * as uthreads have TLS - which they must if they are making glibc
+	 * calls. */
 	return THREAD_SELF;
 }
 

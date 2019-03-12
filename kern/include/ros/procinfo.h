@@ -25,20 +25,23 @@
 struct vcore;
 struct vcore {
 #ifdef ROS_KERNEL
-	TAILQ_ENTRY(vcore)	list;
+	TAILQ_ENTRY(vcore)		list;
 #else /* userspace */
 	void				*dummy_ptr1;
 	void				*dummy_ptr2;
 #endif /* ROS_KERNEL */
 	uint32_t			pcoreid;
 	bool				valid;
-	uint32_t			nr_preempts_sent;	/* these two differ when a preempt*/
-	uint32_t			nr_preempts_done;	/* is in flight. */
+	/* these two differ when a preempt is in flight. */
+	uint32_t			nr_preempts_sent;
+	uint32_t			nr_preempts_done;
 	uint64_t			preempt_pending;
-	/* A process can see cumulative runtime as of the last resume, and can also
-	 * calculate runtime in this interval, by adding (ns - resume) + total. */
-	uint64_t			resume_ticks;		/* TSC at resume time */
-	uint64_t			total_ticks;		/* ticks up to last offlining */
+	/* A process can see cumulative runtime as of the last resume, and can
+	 * also calculate runtime in this interval, by adding (ns - resume) +
+	 * total. */
+	uint64_t			resume_ticks;	/* TSC at resume time */
+	/* ticks up to last offlining */
+	uint64_t			total_ticks;
 };
 
 struct pcore {
@@ -53,13 +56,13 @@ typedef struct procinfo {
 	uint64_t tsc_freq;
 	uint64_t timing_overhead;
 	uintptr_t program_end;
-	/* glibc relies on stuff above this point.  if you change it, you need to
-	 * rebuild glibc. */
+	/* glibc relies on stuff above this point.  if you change it, you need
+	 * to rebuild glibc. */
 	bool is_mcp;			/* is in multi mode */
-	unsigned long 		res_grant[MAX_NUM_RESOURCES];
-	struct vcore		vcoremap[MAX_NUM_CORES];
+	unsigned long 			res_grant[MAX_NUM_RESOURCES];
+	struct vcore			vcoremap[MAX_NUM_CORES];
 	uint32_t			num_vcores;
-	struct pcore		pcoremap[MAX_NUM_CORES];
+	struct pcore			pcoremap[MAX_NUM_CORES];
 	seq_ctr_t			coremap_seqctr;
 } procinfo_t;
 #define PROCINFO_NUM_PAGES  ((sizeof(procinfo_t)-1)/PGSIZE + 1)
@@ -95,18 +98,20 @@ extern struct proc_global_info __proc_global_info;
 static inline uint32_t __get_vcoreid_from_procinfo(void)
 {
 	/* The assumption is that any IPIs/KMSGs would knock userspace into the
-	 * kernel before it could read the closing of the seqctr.  Put another way,
-	 * there is a 'memory barrier' between the IPI write and the seqctr write.
-	 * I think this is true. */
+	 * kernel before it could read the closing of the seqctr.  Put another
+	 * way, there is a 'memory barrier' between the IPI write and the seqctr
+	 * write.  I think this is true. */
 	uint32_t kpcoreid, kvcoreid;
 	extern long __ros_syscall_noerrno(unsigned int _num, long _a0, long _a1,
-	                                  long _a2, long _a3, long _a4, long _a5);
+	                                  long _a2, long _a3, long _a4,
+					  long _a5);
 
 	seq_ctr_t old_seq;
 	do {
 		cmb();
 		old_seq = __procinfo.coremap_seqctr;
-		kpcoreid = __ros_syscall_noerrno(SYS_getpcoreid, 0, 0, 0, 0, 0, 0);
+		kpcoreid = __ros_syscall_noerrno(SYS_getpcoreid, 0, 0, 0, 0, 0,
+						 0);
 		if (!__procinfo.pcoremap[kpcoreid].valid)
 			continue;
 		kvcoreid = __procinfo.pcoremap[kpcoreid].vcoreid;

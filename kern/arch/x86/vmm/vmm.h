@@ -6,6 +6,7 @@
 static inline int cpu_has_vmx(void)
 {
 	unsigned long ecx = cpuid_ecx(1);
+
 	return ecx & (1<<5); /* CPUID.1:ECX.VMX[bit 5] -> VT */
 }
 

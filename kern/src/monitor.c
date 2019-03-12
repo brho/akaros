@@ -99,18 +99,22 @@ int mon_kerninfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	extern char _start[], etext[], end[];
 
-	cprintf("Special kernel symbols:\n");
-	cprintf("  _start %016x (virt)  %016x (phys)\n", _start, (uintptr_t)(_start - KERNBASE));
-	cprintf("  etext  %016x (virt)  %016x (phys)\n", etext, (uintptr_t)(etext - KERNBASE));
-	cprintf("  end    %016x (virt)  %016x (phys)\n", end, (uintptr_t)(end - KERNBASE));
-	cprintf("Kernel executable memory footprint: %dKB\n",
-		(uint32_t)(end-_start+1023)/1024);
+	printk("Special kernel symbols:\n");
+	printk("  _start %016x (virt)  %016x (phys)\n", _start,
+	       (uintptr_t)(_start - KERNBASE));
+	printk("  etext  %016x (virt)  %016x (phys)\n", etext,
+	       (uintptr_t)(etext - KERNBASE));
+	printk("  end    %016x (virt)  %016x (phys)\n", end,
+	       (uintptr_t)(end - KERNBASE));
+	printk("Kernel executable memory footprint: %dKB\n",
+	       (uint32_t)(end-_start + 1023)/1024);
 	return 0;
 }
 
 static int __backtrace(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	uintptr_t pc, fp;
+
 	if (argc == 1) {
 		backtrace();
 		return 0;
@@ -122,7 +126,8 @@ static int __backtrace(int argc, char **argv, struct hw_trapframe *hw_tf)
 	pc = strtol(argv[1], 0, 16);
 	fp = strtol(argv[2], 0, 16);
 	print_lock();
-	printk("Backtrace from instruction %p, with frame pointer %p\n", pc, fp);
+	printk("Backtrace from instruction %p, with frame pointer %p\n", pc,
+	       fp);
 	backtrace_frame(pc, fp);
 	print_unlock();
 	return 0;
@@ -152,7 +157,7 @@ static int __showmapping(int argc, char **argv, struct hw_trapframe *hw_tf)
 	pid_t pid;
 
 	if (argc < 3) {
-		printk("Shows virtual -> physical mappings for a virt addr range.\n");
+		printk("Shows virt -> phys mappings for a virt addr range.\n");
 		printk("Usage: showmapping PID START_ADDR [END_ADDR]\n");
 		printk("    PID == 0 for the boot pgdir\n");
 		return 1;
@@ -253,8 +258,8 @@ int mon_manager(int argc, char** argv, struct hw_trapframe *hw_tf)
 int mon_nanwan(int argc, char **argv, struct hw_trapframe *hw_tf)
 {
 	/* Borrowed with love from http://www.geocities.com/SoHo/7373/zoo.htm
-	 * (http://www.ascii-art.com/).  Slightly modified to make it 25 lines tall.
-	 */
+	 * (http://www.ascii-art.com/).  Slightly modified to make it 25 lines
+	 * tall. */
 	print_lock();
 	printk("\n");
 	printk("             .-.  .-.\n");
@@ -304,12 +309,13 @@ int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("No such program!\n");
 		return 1;
 	}
-	char **p_argv = kmalloc(sizeof(char*) * argc, 0);	/* bin_run's argc */
+	char **p_argv = kmalloc(sizeof(char*) * argc, 0); /* bin_run's argc */
 	for (int i = 0; i < argc - 1; i++)
 		p_argv[i] = argv[i + 1];
 	p_argv[argc - 1] = 0;
-	/* super ugly: we need to stash current, so that proc_create doesn't pick up
-	 * on random processes running here and assuming they are the parent */
+	/* super ugly: we need to stash current, so that proc_create doesn't
+	 * pick up on random processes running here and assuming they are the
+	 * parent */
 	struct proc *old_cur = current;
 	current = 0;
 	struct proc *p = proc_create(program, p_argv, NULL);
@@ -318,8 +324,9 @@ int mon_bin_run(int argc, char **argv, struct hw_trapframe *hw_tf)
 	proc_wakeup(p);
 	proc_decref(p); /* let go of the reference created in proc_create() */
 	foc_decref(program);
-	/* Make a scheduling decision.  You might not get the process you created,
-	 * in the event there are others floating around that are runnable */
+	/* Make a scheduling decision.  You might not get the process you
+	 * created, in the event there are others floating around that are
+	 * runnable */
 	run_scheduler();
 	/* want to idle, so we un the process we just selected.  this is a bit
 	 * hackish, but so is the monitor. */
@@ -433,8 +440,8 @@ int mon_kfunc(int argc, char **argv, struct hw_trapframe *hw_tf)
 		printk("Function not found.\n");
 		return 1;
 	}
-	/* Not elegant, but whatever.  maybe there's a better syntax, or we can do
-	 * it with asm magic. */
+	/* Not elegant, but whatever.  maybe there's a better syntax, or we can
+	 * do it with asm magic. */
 	switch (argc) {
 	case 2: /* have to fake one arg */
 		ret = func((void*)0);
@@ -540,22 +547,24 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 		}
 		begin = start_timing();
 #ifdef CONFIG_APPSERVER
-		printk("Warning: this will be inaccurate due to the appserver.\n");
-		end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores - 1;
+		printk("Warning: inaccurate due to the appserver.\n");
+		end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores
+			     - 1;
 #endif /* CONFIG_APPSERVER */
 		proc_destroy(p);
 		proc_decref(p);
 #ifdef CONFIG_APPSERVER
-		/* Won't be that accurate, since it's not actually going through the
-		 * __proc_free() path. */
+		/* Won't be that accurate, since it's not actually going through
+		 * the __proc_free() path. */
 		spin_on(kref_refcnt(&p->p_kref) != end_refcnt);
 #else
-		/* this is a little ghetto. it's not fully free yet, but we are also
-		 * slowing it down by messing with it, esp with the busy waiting on a
-		 * hyperthreaded core. */
+		/* this is a little ghetto. it's not fully free yet, but we are
+		 * also slowing it down by messing with it, esp with the busy
+		 * waiting on a hyperthreaded core. */
 		spin_on(p->env_cr3);
 #endif /* CONFIG_APPSERVER */
-		/* No noticeable difference using stop_timing instead of read_tsc() */
+		/* No noticeable difference using stop_timing instead of
+		 * read_tsc() */
 		diff = stop_timing(begin);
 	} else if (!strcmp(argv[1], "preempt")) {
 		if (argc < 3) {
@@ -567,19 +576,25 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 			printk("No such proc\n");
 			return 1;
 		}
-		if (argc == 4) { /* single core being preempted, warned but no delay */
+		if (argc == 4) {
+			/* single core being preempted, warned but no delay */
 			uint32_t pcoreid = strtol(argv[3], 0, 0);
+
 			begin = start_timing();
 			if (proc_preempt_core(p, pcoreid, 1000000)) {
 				__sched_put_idle_core(p, pcoreid);
-				/* done when unmapped (right before abandoning) */
+				/* done when unmapped (right before abandoning)
+				 * */
 				spin_on(p->procinfo->pcoremap[pcoreid].valid);
 			} else {
-				printk("Core %d was not mapped to proc\n", pcoreid);
+				printk("Core %d was not mapped to proc\n",
+				       pcoreid);
 			}
 			diff = stop_timing(begin);
-		} else { /* preempt all cores, warned but no delay */
-			end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores;
+		} else {
+			/* preempt all cores, warned but no delay */
+			end_refcnt = kref_refcnt(&p->p_kref)
+				     - p->procinfo->num_vcores;
 			begin = start_timing();
 			proc_preempt_all(p, 1000000);
 			/* a little ghetto, implies no one is using p */
@@ -593,15 +608,20 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 			return 1;
 		}
 		struct proc *p = pid2proc(strtol(argv[2], 0, 0));
+
 		if (!p) {
 			printk("No such proc\n");
 			return 1;
 		}
-		printk("Careful: if this hangs, then the process isn't responding.\n");
-		if (argc == 4) { /* single core being preempted-warned */
+		printk("if this hangs, then the process isn't responding.\n");
+		if (argc == 4) {
+			/* single core being preempted-warned */
 			uint32_t pcoreid = strtol(argv[3], 0, 0);
+
 			spin_lock(&p->proc_lock);
-			uint32_t vcoreid = p->procinfo->pcoremap[pcoreid].vcoreid;
+			uint32_t vcoreid =
+				p->procinfo->pcoremap[pcoreid].vcoreid;
+
 			if (!p->procinfo->pcoremap[pcoreid].valid) {
 				printk("Pick a mapped pcore\n");
 				spin_unlock(&p->proc_lock);
@@ -613,14 +633,15 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 			/* done when unmapped (right before abandoning) */
 			spin_on(p->procinfo->pcoremap[pcoreid].valid);
 			diff = stop_timing(begin);
-		} else { /* preempt-warn all cores */
-			printk("Warning, this won't work if they can't yield their "
-			       "last vcore, will stop at 1!\n");
+		} else {
+			/* preempt-warn all cores */
+			printk("this won't work if they can't yield their last vcore, will stop at 1!\n");
 			spin_lock(&p->proc_lock);
 			begin = start_timing();
 			__proc_preempt_warnall(p, 1000000);
 			spin_unlock(&p->proc_lock);
-			/* target cores do the unmapping / changing of the num_vcores */
+			/* target cores do the unmapping / changing of the
+			 * num_vcores */
 			spin_on(p->procinfo->num_vcores > 1);
 			diff = stop_timing(begin);
 		}
@@ -635,8 +656,10 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 			printk("No such proc\n");
 			return 1;
 		}
-		if (argc == 4) { /* single core preempted, no warning or waiting */
+		if (argc == 4) {
+			/* single core preempted, no warning or waiting */
 			uint32_t pcoreid = strtol(argv[3], 0, 0);
+
 			spin_lock(&p->proc_lock);
 			if (!p->procinfo->pcoremap[pcoreid].valid) {
 				printk("Pick a mapped pcore\n");
@@ -648,16 +671,20 @@ int mon_measure(int argc, char **argv, struct hw_trapframe *hw_tf)
 			if (!p->procinfo->num_vcores)
 				__proc_set_state(p, PROC_RUNNABLE_M);
 			spin_unlock(&p->proc_lock);
-			/* ghetto, since the ksched should be calling all of this */
+			/* ghetto, since the ksched should be calling all of
+			 * this */
 			__sched_put_idle_core(p, pcoreid);
 			/* done when unmapped (right before abandoning) */
 			spin_on(p->procinfo->pcoremap[pcoreid].valid);
 			diff = stop_timing(begin);
-		} else { /* preempt all cores, no warning or waiting */
+		} else {
+			/* preempt all cores, no warning or waiting */
 			spin_lock(&p->proc_lock);
 			uint32_t pc_arr[p->procinfo->num_vcores];
 			uint32_t num_revoked;
-			end_refcnt = kref_refcnt(&p->p_kref) - p->procinfo->num_vcores;
+
+			end_refcnt = kref_refcnt(&p->p_kref)
+				     - p->procinfo->num_vcores;
 			begin = start_timing();
 			num_revoked = __proc_preempt_all(p, pc_arr);
 			__proc_set_state(p, PROC_RUNNABLE_M);
@@ -708,8 +735,8 @@ void emit_monitor_backtrace(int type, void *tf)
 {
 	if (!PERCPU_VAR(mon_nmi_trace))
 		return;
-	/* To prevent a spew of output during a lot of perf NMIs, we'll turn off the
-	 * monitor output as soon as any NMI hits our core. */
+	/* To prevent a spew of output during a lot of perf NMIs, we'll turn off
+	 * the monitor output as soon as any NMI hits our core. */
 	PERCPU_VAR(mon_nmi_trace) = FALSE;
 	print_lock();
 	if (type == ROS_HW_CTX)
@@ -772,11 +799,13 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 		udelay(1000000);
 	} else if (!strcmp(argv[1], "pcpui")) {
 		int pcpui_type, pcpui_coreid;
+
 		if (argc >= 3)
 			pcpui_type = strtol(argv[2], 0, 0);
 		else
 			pcpui_type = 0;
-		printk("\nRunning PCPUI Trace Ring handlers for type %d\n", pcpui_type);
+		printk("\nRunning PCPUI Trace Ring handlers for type %d\n",
+		       pcpui_type);
 		if (argc >= 4) {
 			pcpui_coreid = strtol(argv[3], 0, 0);
 			pcpui_tr_foreach(pcpui_coreid, pcpui_type);
@@ -788,7 +817,7 @@ int mon_trace(int argc, char **argv, struct hw_trapframe *hw_tf)
 			printk("\nResetting all PCPUI Trace Rings\n");
 			pcpui_tr_reset_all();
 		} else {
-			printk("\nResetting and clearing all PCPUI Trace Rings\n");
+			printk("\nResetting/clearing all PCPUI Trace Rings\n");
 			pcpui_tr_reset_and_clear_all();
 		}
 	} else if (!strcmp(argv[1], "verbose")) {
@@ -858,7 +887,8 @@ static int runcmd(char *real_buf, struct hw_trapframe *hw_tf) {
 	// Parse the command buffer into whitespace-separated arguments
 	argc = 0;
 	argv[argc] = 0;
-	/* Discard initial 'm ', which is a common mistake when using 'm' a lot */
+	/* Discard initial 'm ', which is a common mistake when using 'm' a lot
+	 */
 	if ((buf[0] == 'm') && (buf[1] == ' '))
 		buf += 2;
 	while (1) {
@@ -900,9 +930,11 @@ void monitor(struct hw_trapframe *hw_tf)
 
 	/* they are always disabled, since we have this irqsave lock */
 	if (irq_is_enabled())
-		printk("Entering Nanwan's Dungeon on Core %d (Ints on):\n", coreid);
+		printk("Entering Nanwan's Dungeon on Core %d (Ints on):\n",
+		       coreid);
 	else
-		printk("Entering Nanwan's Dungeon on Core %d (Ints off):\n", coreid);
+		printk("Entering Nanwan's Dungeon on Core %d (Ints off):\n",
+		       coreid);
 	printk("Type 'help' for a list of commands.\n");
 
 	if (hw_tf != NULL)
@@ -910,9 +942,11 @@ void monitor(struct hw_trapframe *hw_tf)
 
 	while (1) {
 		/* on occasion, the kernel monitor can migrate (like if you run
-		 * something that blocks / syncs and wakes up on another core) */
+		 * something that blocks / syncs and wakes up on another core)
+		 */
 		cmb();
-		cnt = readline(buf, MON_CMD_LENGTH, "ROS(Core %d)> ", core_id_early());
+		cnt = readline(buf, MON_CMD_LENGTH, "ROS(Core %d)> ",
+			       core_id_early());
 		if (cnt > 0) {
 			buf[cnt] = 0;
 			if (runcmd(buf, hw_tf) < 0)
@@ -948,6 +982,7 @@ static void show_msr(struct hw_trapframe *unused, void *v)
 	int core = core_id();
 	uint64_t val;
 	uint32_t msr = *(uint32_t *)v;
+
 	val = read_msr(msr);
 	printk("%d: %08x: %016llx\n", core, msr, val);
 }
@@ -963,6 +998,7 @@ static void set_msr(struct hw_trapframe *unused, void *v)
 	struct set *s = v;
 	uint32_t msr = s->msr;
 	uint64_t val = s->val;
+
 	write_msr(msr, val);
 	val = read_msr(msr);
 	printk("%d: %08x: %016llx\n", core, msr, val);
@@ -976,6 +1012,7 @@ int mon_msr(int argc, char **argv, struct hw_trapframe *hw_tf)
 #else
 	uint64_t val;
 	uint32_t msr;
+
 	if (argc < 2 || argc > 3) {
 		printk("Usage: msr register [value]\n");
 		return 1;
@@ -1006,7 +1043,7 @@ int mon_db(int argc, char **argv, struct hw_trapframe *hw_tf)
 	if (argc < 2) {
 		printk("Usage: db OPTION\n");
 		printk("\tblk [PID]: print all blocked kthreads\n");
-		printk("\taddr PID 0xADDR: for PID lookup ADDR's file/vmr info\n");
+		printk("\taddr PID 0xADDR: lookup ADDR's file/vmr info\n");
 		printk("\trv WAITER: backtrace rendez alarm waiter\n");
 		return 1;
 	}
@@ -1025,7 +1062,8 @@ int mon_db(int argc, char **argv, struct hw_trapframe *hw_tf)
 			printk("Usage: db rv 0xWAITER\n");
 			return 1;
 		}
-		rendez_debug_waiter((struct alarm_waiter*)strtoul(argv[2], 0, 16));
+		rendez_debug_waiter((struct alarm_waiter*)strtoul(argv[2], 0,
+								  16));
 	} else {
 		printk("Bad option\n");
 		return 1;
@@ -1069,8 +1107,8 @@ int mon_kpfret(int argc, char **argv, struct hw_trapframe *hw_tf)
 			printk("Usage: kpfret HW_TF\n");
 			return 1;
 		}
-		/* the hw_tf passed in is the one we got from monitor, which is 0 from
-		 * panics. */
+		/* the hw_tf passed in is the one we got from monitor, which is
+		 * 0 from panics. */
 		hw_tf = (struct hw_trapframe*)strtol(argv[1], 0, 16);
 	}
 
@@ -1159,9 +1197,10 @@ int mon_coreinfo(int argc, char **argv, struct hw_trapframe *hw_tf)
 	       pcpui->owning_vcoreid != 0xdeadbeef ? pcpui->owning_vcoreid : 0);
 	kth = pcpui->cur_kthread;
 	if (kth) {
-		/* kth->proc is only used when the kthread is sleeping.  when it's
-		 * running, we care about cur_proc.  if we're here, proc should be 0
-		 * unless the kth is concurrently sleeping (we called this remotely) */
+		/* kth->proc is only used when the kthread is sleeping.  when
+		 * it's running, we care about cur_proc.  if we're here, proc
+		 * should be 0 unless the kth is concurrently sleeping (we
+		 * called this remotely) */
 		printk("\tkthread %p (%s), sysc %p (%d)\n", kth, kth->name,
 		       kth->sysc, kth->sysc ? kth->sysc->num : -1);
 	} else {

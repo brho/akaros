@@ -23,8 +23,8 @@
  * spaces.  We just happen to have a slight 'hole' in addressable physical
  * memory.  We can move the PBASE, but we're limited to 32 bit (physical)
  * addresses. */
-#define LAPIC_PBASE					0xfee00000	/* default *physical* address */
-#define LAPIC_LVT_MASK					0x00010000
+#define LAPIC_PBASE		0xfee00000	/* default *physical* address */
+#define LAPIC_LVT_MASK		0x00010000
 
 /* Quick note on the divisor.  The LAPIC timer ticks once per divisor-bus ticks
  * (system bus or APIC bus, depending on the model).  Ex: A divisor of 128 means
@@ -39,15 +39,15 @@
 #define LAPIC_TIMER_DIVISOR_BITS	0x8	/* Div = 32 */
 
 // IPI Interrupt Command Register
-#define LAPIC_IPI_ICR_LOWER				0x30
-#define LAPIC_IPI_ICR_UPPER				0x31
+#define LAPIC_IPI_ICR_LOWER	0x30
+#define LAPIC_IPI_ICR_UPPER	0x31
 /* Interrupts being serviced (in-service) and pending (interrupt request reg).
  * Note these registers are not normal bitmaps, but instead are 8 separate
  * 32-bit registers, spaced/aligned on 16 byte boundaries in the LAPIC address
  * space. */
-#define LAPIC_ISR					0x10
-#define LAPIC_IRR					0x20
-#define LAPIC_DFR					0x0e
+#define LAPIC_ISR		0x10
+#define LAPIC_IRR		0x20
+#define LAPIC_DFR		0x0e
 
 struct irq_handler;	/* include loops */
 
@@ -129,7 +129,6 @@ static inline void lapic_disable_timer(void)
 static inline void lapic_disable(void)
 {
 	apicrput(MSR_LAPIC_SPURIOUS, apicrget(MSR_LAPIC_SPURIOUS) & 0xffffefff);
-	//write_msr(IA32_APIC_BASE, read_msr(IA32_APIC_BASE) & ~MSR_APIC_ENABLE);
 }
 
 static inline void lapic_enable(void)
@@ -203,15 +202,15 @@ static inline void __send_nmi(uint8_t hw_coreid)
  */
 
 struct ioapic {
-	spinlock_t lock;			/* IOAPIC: register access */
-	uintptr_t addr;				/* IOAPIC: register base */
-	uintptr_t paddr;			/* register base */
-	int nrdt;					/* IOAPIC: size of RDT */
-	int ibase;					/* global interrupt base */
+	spinlock_t lock;	/* IOAPIC: register access */
+	uintptr_t addr;		/* IOAPIC: register base */
+	uintptr_t paddr;	/* register base */
+	int nrdt;		/* IOAPIC: size of RDT */
+	int ibase;		/* global interrupt base */
 };
 
 struct lapic {
-	int machno;					/* similar to os_coreid, unused */
+	int machno;		/* similar to os_coreid, unused */
 
 	uint32_t lvt[8];
 	int nlvt;
@@ -244,7 +243,7 @@ enum {
  * [16] Interrupt Mask
  */
 enum {
-	MTf = 0x00000000,			/* Fixed */
+	MTf = 0x00000000,	/* Fixed */
 	MTlp = 0x00000100,	/* Lowest Priority */
 	MTsmi = 0x00000200,	/* SMI */
 	MTrr = 0x00000300,	/* Remote Read */

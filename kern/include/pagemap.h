@@ -22,13 +22,13 @@ struct page_map_operations;
  * currently in memory.  It is a map, per object, from index to physical page
  * frame. */
 struct page_map {
-	qlock_t						pm_qlock;		/* for the radix tree nr_pgs */
-	struct fs_file				*pm_file;
-	struct radix_tree			pm_tree;		/* tracks present pages */
-	unsigned long				pm_num_pages;	/* how many pages are present */
+	qlock_t				pm_qlock;/* for the radix tree nr_pgs */
+	struct fs_file			*pm_file;
+	struct radix_tree		pm_tree;	/* tracks present pgs */
+	unsigned long			pm_num_pages;	/* num present */
 	struct page_map_operations	*pm_op;
-	spinlock_t					pm_lock;		/* for the VMR list */
-	struct vmr_tailq			pm_vmrs;
+	spinlock_t			pm_lock;	/* for the VMR list */
+	struct vmr_tailq		pm_vmrs;
 };
 
 /* Operations performed on a page_map.  These are usually FS specific, which

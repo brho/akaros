@@ -68,9 +68,9 @@ static inline struct profiler_cpu_context *profiler_get_cpu_ctx(int cpu)
 
 static inline char *vb_encode_uint64(char *data, uint64_t n)
 {
-	/* Classical variable bytes encoding. Encodes 7 bits at a time, using bit
-	 * number 7 in the byte, as indicator of end of sequence (when zero).
-	 */
+	/* Classical variable bytes encoding. Encodes 7 bits at a time, using
+	 * bit number 7 in the byte, as indicator of end of sequence (when
+	 * zero). */
 	for (; n >= 0x80; n >>= 7)
 		*data++ = (char) (n | 0x80);
 	*data++ = (char) n;
@@ -81,8 +81,9 @@ static inline char *vb_encode_uint64(char *data, uint64_t n)
 static struct block *profiler_buffer_write(struct profiler_cpu_context *cpu_buf,
                                            struct block *b)
 {
-	/* qpass will drop b if the queue is over its limit.  we're willing to lose
-	 * traces, but we won't lose 'control' events, such as MMAP and PID. */
+	/* qpass will drop b if the queue is over its limit.  we're willing to
+	 * lose traces, but we won't lose 'control' events, such as MMAP and
+	 * PID. */
 	if (b) {
 		if (qpass(profiler_queue, b) < 0)
 			cpu_buf->dropped_data_cnt++;
@@ -259,7 +260,8 @@ static void profiler_emit_current_system_status(void)
 	{
 		struct proc *p = (struct proc *) opaque;
 
-		profiler_notify_mmap(p, vmr->vm_base, vmr->vm_end - vmr->vm_base,
+		profiler_notify_mmap(p, vmr->vm_base,
+				     vmr->vm_end - vmr->vm_base,
 		                     vmr->vm_prot, vmr->vm_flags, vmr->__vm_foc,
 		                     vmr->vm_foff);
 	}
@@ -297,14 +299,14 @@ static void alloc_cpu_buffers(void)
 {
 	ERRSTACK(1);
 
-	/* It is very important that we enqueue and dequeue entire records at once.
-	 * If we leave partial records, the entire stream will be corrupt.  Our
-	 * reader does its best to make sure it has room for complete records
-	 * (checks qlen()).
+	/* It is very important that we enqueue and dequeue entire records at
+	 * once.  If we leave partial records, the entire stream will be
+	 * corrupt.  Our reader does its best to make sure it has room for
+	 * complete records (checks qlen()).
 	 *
 	 * If we ever get corrupt streams, try making this a Qmsg.  Though it
-	 * doesn't help every situation - we have issues with writes greater than
-	 * Maxatomic regardless. */
+	 * doesn't help every situation - we have issues with writes greater
+	 * than Maxatomic regardless. */
 	profiler_queue = qopen(profiler_queue_limit, 0, NULL, NULL);
 	if (!profiler_queue)
 		error(ENOMEM, ERROR_FIXME);
@@ -499,10 +501,12 @@ void profiler_push_kernel_backtrace(uintptr_t *pc_list, size_t nr_pcs,
                                     uint64_t info)
 {
 	if (kref_get_not_zero(&profiler_kref, 1)) {
-		struct profiler_cpu_context *cpu_buf = profiler_get_cpu_ctx(core_id());
+		struct profiler_cpu_context *cpu_buf =
+			profiler_get_cpu_ctx(core_id());
 
 		if (profiler_percpu_ctx && cpu_buf->tracing)
-			profiler_push_kernel_trace64(cpu_buf, pc_list, nr_pcs, info);
+			profiler_push_kernel_trace64(cpu_buf, pc_list, nr_pcs,
+						     info);
 		kref_put(&profiler_kref);
 	}
 }
@@ -512,10 +516,12 @@ void profiler_push_user_backtrace(uintptr_t *pc_list, size_t nr_pcs,
 {
 	if (kref_get_not_zero(&profiler_kref, 1)) {
 		struct proc *p = current;
-		struct profiler_cpu_context *cpu_buf = profiler_get_cpu_ctx(core_id());
+		struct profiler_cpu_context *cpu_buf =
+			profiler_get_cpu_ctx(core_id());
 
 		if (profiler_percpu_ctx && cpu_buf->tracing)
-			profiler_push_user_trace64(cpu_buf, p, pc_list, nr_pcs, info);
+			profiler_push_user_trace64(cpu_buf, p, pc_list, nr_pcs,
+						   info);
 		kref_put(&profiler_kref);
 	}
 }
@@ -536,10 +542,12 @@ void profiler_notify_mmap(struct proc *p, uintptr_t addr, size_t size, int prot,
 	if (kref_get_not_zero(&profiler_kref, 1)) {
 		if (foc && (prot & PROT_EXEC) && profiler_percpu_ctx) {
 			char path_buf[PROFILER_MAX_PRG_PATH];
-			char *path = foc_abs_path(foc, path_buf, sizeof(path_buf));
+			char *path = foc_abs_path(foc, path_buf,
+						  sizeof(path_buf));
 
 			if (likely(path))
-				profiler_push_pid_mmap(p, addr, size, offset, path);
+				profiler_push_pid_mmap(p, addr, size, offset,
+						       path);
 		}
 		kref_put(&profiler_kref);
 	}

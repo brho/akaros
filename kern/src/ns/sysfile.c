@@ -43,10 +43,14 @@
  * like it's the size of a common-case stat. */
 enum {
 	DIRSIZE = STAT_FIX_LEN_AK + 32 * STAT_NR_STRINGS_AK,
-	DIRREADLIM = 2048,	/* should handle the largest reasonable directory entry */
-	DIRREADSIZE=8192,	/* Just read a lot. Memory is cheap, lots of bandwidth,
-				 * and RPCs are very expensive. At the same time,
-				 * let's not yet exceed a common MSIZE. */
+
+	/* should handle the largest reasonable directory entry */
+	DIRREADLIM = 2048,
+
+	/* Just read a lot. Memory is cheap, lots of bandwidth, and RPCs are
+	 * very expensive. At the same time, let's not yet exceed a common
+	 * MSIZE. */
+	DIRREADSIZE = 8192,
 };
 
 int newfd(struct chan *c, int low_fd, int oflags, bool must_use_low)
@@ -66,8 +70,8 @@ struct chan *fdtochan(struct fd_table *fdt, int fd, int mode, int chkmnt,
 
 	c = lookup_fd(fdt, fd, iref);
 	if (!c) {
-		/* We lost the info about why there was a problem (we used to track file
-		 * group closed too, can add that in later). */
+		/* We lost the info about why there was a problem (we used to
+		 * track file group closed too, can add that in later). */
 		error(EBADF, ERROR_FIXME);
 	}
 	if (chkmnt && (c->flag & CMSG)) {
@@ -118,13 +122,14 @@ int openmode(uint32_t omode)
 /* GIANT WARNING: if this ever throws, ipopen (and probably many others) will
  * screw up refcnts of Qctl, err, data, etc */
 #if 0
-	/* this is the old plan9 style.  i think they want to turn exec into read,
-	 * and strip off anything higher, and just return the RD/WR style bits.  not
-	 * stuff like ORCLOSE.  the lack of OEXCL might be a bug on their part (it's
-	 * the only one of their non-RW-related flags that isn't masked out).
+	/* this is the old plan9 style.  i think they want to turn exec into
+	 * read, and strip off anything higher, and just return the RD/WR style
+	 * bits.  not stuff like ORCLOSE.  the lack of OEXCL might be a bug on
+	 * their part (it's the only one of their non-RW-related flags that
+	 * isn't masked out).
 	 *
-	 * Note that we no longer convert OEXEC/O_EXEC to O_READ, and instead return
-	 * just the O_ACCMODE bits. */
+	 * Note that we no longer convert OEXEC/O_EXEC to O_READ, and instead
+	 * return just the O_ACCMODE bits. */
 	if (o >= (OTRUNC | OCEXEC | ORCLOSE | OEXEC))
 		error(EINVAL, ERROR_FIXME);
 	o &= ~(OTRUNC | OCEXEC | ORCLOSE);
@@ -134,8 +139,8 @@ int openmode(uint32_t omode)
 		return OREAD;
 	return o;
 #endif
-	/* no error checking (we have a shitload of flags anyway), and we return the
-	 * basic access modes (RD/WR/ETC) */
+	/* no error checking (we have a shitload of flags anyway), and we return
+	 * the basic access modes (RD/WR/ETC) */
 	return omode & O_ACCMODE;
 }
 
@@ -181,12 +186,12 @@ int sysfchdir(struct proc *target, int fd)
 	poperror();
 
 	/* This is a little hokey.  Ideally, we'd only allow O_PATH fds to be
-	 * fchdir'd.  Linux/POSIX lets you do arbitrary FDs.  Luckily, we stored the
-	 * name when we walked (__namec_from), so we should be able to recreate the
-	 * chan.  Using namec() with channame() is a more heavy-weight cclone(), but
-	 * also might have issues if the chan has since been removed or the
-	 * namespace is otherwise different from when the original fd/chan was first
-	 * created. */
+	 * fchdir'd.  Linux/POSIX lets you do arbitrary FDs.  Luckily, we stored
+	 * the name when we walked (__namec_from), so we should be able to
+	 * recreate the chan.  Using namec() with channame() is a more
+	 * heavy-weight cclone(), but also might have issues if the chan has
+	 * since been removed or the namespace is otherwise different from when
+	 * the original fd/chan was first created. */
 	if (c->flag & O_PATH) {
 		set_dot(target, c);
 		return 0;
@@ -293,8 +298,8 @@ int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
 		error(EPERM, ERROR_FIXME);
 	}
 	ret = insert_obj_fdt(&to_proc->open_files, c, to_fd, 0, TRUE);
-	/* drop the ref from fdtochan.  if insert succeeded, there is one other ref
-	 * stored in the FDT */
+	/* drop the ref from fdtochan.  if insert succeeded, there is one other
+	 * ref stored in the FDT */
 	cclose(c);
 	if (ret < 0)
 		error(EFAIL, "Can't insert FD %d into FDG", to_fd);
@@ -591,10 +596,10 @@ int sysopenat(int fromfd, char *path, int vfs_flags)
 	if ((path[0] == '/') || (fromfd == AT_FDCWD)) {
 		c = namec(path, Aopen, vfs_flags, 0, NULL);
 	} else {
-		/* We don't cclose from.  namec_from will convert it to the new chan
-		 * during the walk process (c).  It'll probably close from internally,
-		 * and give us something new for c.  On error, namec_from will cclose
-		 * from. */
+		/* We don't cclose from.  namec_from will convert it to the new
+		 * chan during the walk process (c).  It'll probably close from
+		 * internally, and give us something new for c.  On error,
+		 * namec_from will cclose from. */
 		from = fdtochan(&current->open_files, fromfd, -1, FALSE, TRUE);
 		if (!(from->flag & O_PATH))
 			error(EINVAL, "Cannot openat from a non-O_PATH FD");
@@ -635,8 +640,9 @@ long unionread(struct chan *c, void *va, long n)
 	while (mount != NULL) {
 		/* Error causes component of union to be skipped */
 		if (mount->to) {
-			/* normally we want to discard the error, but for our ghetto kdirent
-			 * hack, we need to repeat unionread if we saw a ENODATA */
+			/* normally we want to discard the error, but for our
+			 * ghetto kdirent hack, we need to repeat unionread if
+			 * we saw a ENODATA */
 			if (waserror()) {
 				if (get_errno() == ENODATA) {
 					runlock(&m->lock);
@@ -647,11 +653,13 @@ long unionread(struct chan *c, void *va, long n)
 			} else {
 				if (c->umc == NULL) {
 					c->umc = cclone(mount->to);
-					c->umc = devtab[c->umc->type].open(c->umc,
-									   O_READ);
+					c->umc =
+					    devtab[c->umc->type].open(c->umc,
+								      O_READ);
 				}
 
-				nr = devtab[c->umc->type].read(c->umc, va, n, c->umc->offset);
+				nr = devtab[c->umc->type].read(c->umc, va, n,
+							       c->umc->offset);
 				if (nr < 0)
 					nr = 0;	/* dev.c can return -1 */
 				c->umc->offset += nr;
@@ -733,7 +741,8 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 		}
 		/* debugging */
 		if (waserror()) {
-			printk("Well, sysread of a dir sucks.%s \n", current_errstr());
+			printk("Well, sysread of a dir sucks.%s \n",
+			       current_errstr());
 			nexterror();
 		}
 		va = c->buf + c->bufused;
@@ -745,7 +754,7 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 		n = unionread(c, va, n);
 	else {
 		if (offp == NULL) {
-			spin_lock(&c->lock);	/* lock for int64_t assignment */
+			spin_lock(&c->lock); /* lock for int64_t assignment */
 			off = c->offset;
 			spin_unlock(&c->lock);
 		} else
@@ -871,17 +880,17 @@ int sysrename(char *from_path, char *to_path)
 		return -1;
 	}
 	renamee = namec(from_path, Aremove, 0, 0, NULL);
-	/* We might need to support wstat for 'short' rename (intra-directory, with
-	 * no slashes).  Til then, we can just go with EXDEV. */
+	/* We might need to support wstat for 'short' rename (intra-directory,
+	 * with no slashes).  Til then, we can just go with EXDEV. */
 	if (!devtab[renamee->type].rename)
 		error(EXDEV, "device does not support rename");
 	parent_chan = namec(to_path, Arename, 0, 0, (char*)renamee);
-	/* When we're done, renamee still points to the file, but it's in the new
-	 * location.  Its cname is still the old location, similar to remove.  If
-	 * anyone cares, we can change it.  parent_chan still points to the parent -
-	 * it didn't get moved like create does.  Though it does have the name of
-	 * the new location.  If we want, we can hand that to renamee.  It's a moot
-	 * point, since they are both getting closed. */
+	/* When we're done, renamee still points to the file, but it's in the
+	 * new location.  Its cname is still the old location, similar to
+	 * remove.  If anyone cares, we can change it.  parent_chan still points
+	 * to the parent - it didn't get moved like create does.  Though it does
+	 * have the name of the new location.  If we want, we can hand that to
+	 * renamee.  It's a moot point, since they are both getting closed. */
 	cclose(renamee);
 	cclose(parent_chan);
 	poperror();
@@ -905,49 +914,49 @@ int64_t sysseek(int fd, int64_t off, int whence)
 		nexterror();
 	}
 	switch (whence) {
-		case 0:
-			if (c->qid.type & QTDIR) {
-				if (off != 0)
-					error(EISDIR, ERROR_FIXME);
-				unionrewind(c);
-			} else if (off < 0)
-				error(EINVAL, ERROR_FIXME);
-			spin_lock(&c->lock);	/* lock for int64_t assignment */
-			c->offset = off;
-			spin_unlock(&c->lock);
-			break;
-
-		case 1:
-			if (c->qid.type & QTDIR)
+	case 0:
+		if (c->qid.type & QTDIR) {
+			if (off != 0)
 				error(EISDIR, ERROR_FIXME);
-			spin_lock(&c->lock);	/* lock for read/write update */
-			off += c->offset;
-			if (off < 0) {
-				spin_unlock(&c->lock);
-				error(EINVAL, ERROR_FIXME);
-			}
-			c->offset = off;
-			spin_unlock(&c->lock);
-			break;
-
-		case 2:
-			if (c->qid.type & QTDIR)
-				error(EISDIR, ERROR_FIXME);
-			dir = chandirstat(c);
-			if (dir == NULL)
-				error(EFAIL, "internal error: stat error in seek");
-			off += dir->length;
-			kfree(dir);
-			if (off < 0)
-				error(EINVAL, ERROR_FIXME);
-			spin_lock(&c->lock);	/* lock for read/write update */
-			c->offset = off;
-			spin_unlock(&c->lock);
-			break;
-
-		default:
+			unionrewind(c);
+		} else if (off < 0)
 			error(EINVAL, ERROR_FIXME);
-			break;
+		spin_lock(&c->lock);	/* lock for int64_t assignment */
+		c->offset = off;
+		spin_unlock(&c->lock);
+		break;
+
+	case 1:
+		if (c->qid.type & QTDIR)
+			error(EISDIR, ERROR_FIXME);
+		spin_lock(&c->lock);	/* lock for read/write update */
+		off += c->offset;
+		if (off < 0) {
+			spin_unlock(&c->lock);
+			error(EINVAL, ERROR_FIXME);
+		}
+		c->offset = off;
+		spin_unlock(&c->lock);
+		break;
+
+	case 2:
+		if (c->qid.type & QTDIR)
+			error(EISDIR, ERROR_FIXME);
+		dir = chandirstat(c);
+		if (dir == NULL)
+			error(EFAIL, "internal error: stat error in seek");
+		off += dir->length;
+		kfree(dir);
+		if (off < 0)
+			error(EINVAL, ERROR_FIXME);
+		spin_lock(&c->lock);	/* lock for read/write update */
+		c->offset = off;
+		spin_unlock(&c->lock);
+		break;
+
+	default:
+		error(EINVAL, ERROR_FIXME);
+		break;
 	}
 	poperror();
 	c->dri = 0;
@@ -1012,6 +1021,7 @@ int sysfstatakaros(int fd, struct kstat *ks)
 
 	int n = 4096;
 	uint8_t *buf;
+
 	buf = kmalloc(n, MEM_WAIT);
 	n = sysfstat(fd, buf, n);
 	if (n > 0) {
@@ -1061,6 +1071,7 @@ int sysstatakaros(char *path, struct kstat *ks, int flags)
 
 	int n = 4096;
 	uint8_t *buf;
+
 	buf = kmalloc(n, MEM_WAIT);
 	n = __stat(path, buf, n, flags);
 	if (n > 0) {
@@ -1095,13 +1106,14 @@ static long rwrite(int fd, void *va, long n, int64_t * offp)
 		error(EINVAL, ERROR_FIXME);
 
 	if (offp == NULL) {
-		/* append changes the offset to the end, and even if we fail later, this
-		 * change will persist */
+		/* append changes the offset to the end, and even if we fail
+		 * later, this change will persist */
 		if (c->flag & O_APPEND) {
 			dir = chandirstat(c);
 			if (!dir)
-				error(EFAIL, "internal error: stat error in append write");
-			spin_lock(&c->lock);	/* legacy lock for int64 assignment */
+				error(EFAIL, "stat error in append write");
+			/* legacy lock for int64 assignment */
+			spin_lock(&c->lock);
 			c->offset = dir->length;
 			spin_unlock(&c->lock);
 			kfree(dir);
@@ -1197,7 +1209,8 @@ struct dir *chandirstat(struct chan *c)
 			kfree(d);
 			return NULL;
 		}
-		nd = GBIT16((uint8_t *) buf) + BIT16SZ;	/* size needed to store whole stat buffer including count */
+		/* size needed to store whole stat buffer including count */
+		nd = GBIT16((uint8_t *) buf) + BIT16SZ;
 		if (nd <= n) {
 			convM2D(buf, n, d, (char *)&d[1]);
 			return d;
@@ -1307,7 +1320,8 @@ static long dirpackage(uint8_t * buf, long ts, struct kdirent **d)
 	}
 
 	/*
-	 * first find number of all stats, check they look like stats, & size all associated strings
+	 * first find number of all stats, check they look like stats, & size
+	 * all associated strings
 	 */
 	ss = 0;
 	n = 0;
@@ -1330,7 +1344,8 @@ static long dirpackage(uint8_t * buf, long ts, struct kdirent **d)
 	for (i = 0; i < ts; i += m) {
 		m = BIT16SZ + GBIT16((uint8_t *) & buf[i]);
 		/* Note 's' is ignored by convM2kdirent */
-		if (nn >= n || /*convM2D */ convM2kdirent(&buf[i], m, *d + nn, s) != m) {
+		if (nn >= n || /*convM2D */ convM2kdirent(&buf[i], m, *d + nn,
+							  s) != m) {
 			kfree(*d);
 			*d = NULL;
 			error(EFAIL, "bad directory entry");
@@ -1400,7 +1415,8 @@ void print_chaninfo(struct chan *c)
 		   c->name ? c->name->s : "no cname",
 		   kref_refcnt(&c->ref),
 		   has_dev ? devtab[c->type].name : "no dev",
-		   has_chaninfo ? devtab[c->type].chaninfo(c, buf, sizeof(buf)) : "");
+		   has_chaninfo ? devtab[c->type].chaninfo(c, buf, sizeof(buf))
+		                : "");
 	if (!has_chaninfo)
 		printk("qid.path: %p\n", c->qid.path);
 	printk("\n");
@@ -1422,8 +1438,8 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 		return -1;
 	}
 	if (!parent) {
-		/* We are probably spawned by the kernel directly, and have no parent to
-		 * inherit from. */
+		/* We are probably spawned by the kernel directly, and have no
+		 * parent to inherit from. */
 		new_proc->pgrp = newpgrp();
 		new_proc->slash = namec("#kfs", Atodir, 0, 0, NULL);
 		if (!new_proc->slash)
@@ -1438,7 +1454,8 @@ int plan9setup(struct proc *new_proc, struct proc *parent, int flags)
 	/* Shared semantics */
 	kref_get(&parent->pgrp->ref, 1);
 	new_proc->pgrp = parent->pgrp;
-	/* copy semantics on / and . (doesn't make a lot of sense in akaros o/w) */
+	/* copy semantics on / and . (doesn't make a lot of sense in akaros
+	 * o/w). */
 	/* / should never disappear while we hold a ref to parent */
 	chan_incref(parent->slash);
 	new_proc->slash = parent->slash;
@@ -1545,7 +1562,8 @@ int fd_chan_ctl(int fd, int cmd, unsigned long arg1, unsigned long arg2,
 	}
 
 	if (!devtab[c->type].chan_ctl)
-		error(EINVAL, "%s has no chan_ctl, can't %d", chan_dev_name(c), cmd);
+		error(EINVAL, "%s has no chan_ctl, can't %d", chan_dev_name(c),
+		      cmd);
 
 	/* Some commands require 9ns support in addition to the device ctl. */
 	switch (cmd) {
@@ -1586,7 +1604,8 @@ void *kread_whole_file(struct file_or_chan *file)
 	contents = kmalloc(size, MEM_WAIT);
 	cpy_amt = kread_file(file, contents, size);
 	if (cpy_amt < 0) {
-		printk("Error %d reading file %s\n", get_errno(), foc_to_name(file));
+		printk("Error %d reading file %s\n", get_errno(),
+		       foc_to_name(file));
 		kfree(contents);
 		return 0;
 	}
@@ -1617,8 +1636,8 @@ void *lookup_fd(struct fd_table *fdt, int fd, bool incref)
 	}
 	if (fd < fdt->max_fdset) {
 		if (GET_BITMASK_BIT(fdt->open_fds->fds_bits, fd)) {
-			/* while max_files and max_fdset might not line up, we should never
-			 * have a valid fdset higher than files */
+			/* while max_files and max_fdset might not line up, we
+			 * should never have a valid fdset higher than files */
 			assert(fd < fdt->max_files);
 			retval = fdt->fd[fd].fd_chan;
 			if (incref)
@@ -1635,16 +1654,18 @@ static int grow_fd_set(struct fd_table *open_files)
 	int n;
 	struct file_desc *nfd, *ofd;
 
-	/* Only update open_fds once. If currently pointing to open_fds_init, then
-	 * update it to point to a newly allocated fd_set with space for
+	/* Only update open_fds once. If currently pointing to open_fds_init,
+	 * then update it to point to a newly allocated fd_set with space for
 	 * NR_FILE_DESC_MAX */
-	if (open_files->open_fds == (struct fd_set*)&open_files->open_fds_init) {
+	if (open_files->open_fds == (struct fd_set*)&open_files->open_fds_init)
+	{
 		open_files->open_fds = kzmalloc(sizeof(struct fd_set), 0);
 		memmove(open_files->open_fds, &open_files->open_fds_init,
 		        sizeof(struct small_fd_set));
 	}
 
-	/* Grow the open_files->fd array in increments of NR_OPEN_FILES_DEFAULT */
+	/* Grow the open_files->fd array in increments of NR_OPEN_FILES_DEFAULT
+	 */
 	n = open_files->max_files + NR_OPEN_FILES_DEFAULT;
 	if (n > NR_FILE_DESC_MAX)
 		return -EMFILE;
@@ -1661,7 +1682,7 @@ static int grow_fd_set(struct fd_table *open_files)
 	open_files->max_files = n;
 	open_files->max_fdset = n;
 
-	/* Only free the old one if it wasn't pointing to open_files->fd_array */
+	/* Only free the old one if it wasn't pointing to open_files->fd_array*/
 	if (ofd != open_files->fd_array)
 		kfree(ofd);
 	return 0;
@@ -1672,16 +1693,19 @@ static void free_fd_set(struct fd_table *open_files)
 {
 	void *free_me;
 
-	if (open_files->open_fds != (struct fd_set*)&open_files->open_fds_init) {
+	if (open_files->open_fds != (struct fd_set*)&open_files->open_fds_init)
+	{
 		assert(open_files->fd != open_files->fd_array);
-		/* need to reset the pointers to the internal addrs, in case we take a
-		 * look while debugging.  0 them out, since they have old data.  our
-		 * current versions should all be closed. */
-		memset(&open_files->open_fds_init, 0, sizeof(struct small_fd_set));
+		/* need to reset the pointers to the internal addrs, in case we
+		 * take a look while debugging.  0 them out, since they have old
+		 * data.  our current versions should all be closed. */
+		memset(&open_files->open_fds_init, 0,
+		       sizeof(struct small_fd_set));
 		memset(&open_files->fd_array, 0, sizeof(open_files->fd_array));
 
 		free_me = open_files->open_fds;
-		open_files->open_fds = (struct fd_set*)&open_files->open_fds_init;
+		open_files->open_fds =
+			(struct fd_set*)&open_files->open_fds_init;
 		kfree(free_me);
 
 		free_me = open_files->fd;
@@ -1702,8 +1726,8 @@ bool close_fd(struct fd_table *fdt, int fd)
 	spin_lock(&fdt->lock);
 	if (fd < fdt->max_fdset) {
 		if (GET_BITMASK_BIT(fdt->open_fds->fds_bits, fd)) {
-			/* while max_files and max_fdset might not line up, we should never
-			 * have a valid fdset higher than files */
+			/* while max_files and max_fdset might not line up, we
+			 * should never have a valid fdset higher than files */
 			assert(fd < fdt->max_files);
 			chan = fdt->fd[fd].fd_chan;
 			tap = fdt->fd[fd].fd_tap;
@@ -1733,23 +1757,25 @@ static int __get_fd(struct fd_table *open_files, int low_fd, bool must_use_low)
 		return -EINVAL;
 	if (open_files->closed)
 		return -EINVAL;	/* won't matter, they are dying */
-	if (must_use_low && GET_BITMASK_BIT(open_files->open_fds->fds_bits, low_fd))
+	if (must_use_low
+	    && GET_BITMASK_BIT(open_files->open_fds->fds_bits, low_fd))
 		return -ENFILE;
 	if (low_fd > open_files->hint_min_fd)
 		update_hint = FALSE;
 	else
 		low_fd = open_files->hint_min_fd;
-	/* Loop until we have a valid slot (we grow the fd_array at the bottom of
-	 * the loop if we haven't found a slot in the current array */
+	/* Loop until we have a valid slot (we grow the fd_array at the bottom
+	 * of the loop if we haven't found a slot in the current array */
 	while (slot == -1) {
 		for (low_fd; low_fd < open_files->max_fdset; low_fd++) {
-			if (GET_BITMASK_BIT(open_files->open_fds->fds_bits, low_fd))
+			if (GET_BITMASK_BIT(open_files->open_fds->fds_bits,
+					    low_fd))
 				continue;
 			slot = low_fd;
 			SET_BITMASK_BIT(open_files->open_fds->fds_bits, slot);
 			assert(slot < open_files->max_files &&
 			       open_files->fd[slot].fd_chan == 0);
-			/* We know slot >= hint, since we started with the hint */
+			/* We know slot >= hint, since we started with hint */
 			if (update_hint)
 				open_files->hint_min_fd = slot + 1;
 			break;
@@ -1813,8 +1839,8 @@ void close_fdt(struct fd_table *fdt, bool cloexec)
 	}
 	for (int i = 0; i < fdt->max_fdset; i++) {
 		if (GET_BITMASK_BIT(fdt->open_fds->fds_bits, i)) {
-			/* while max_files and max_fdset might not line up, we should never
-			 * have a valid fdset higher than files */
+			/* while max_files and max_fdset might not line up, we
+			 * should never have a valid fdset higher than files */
 			assert(i < fdt->max_files);
 			if (cloexec && !(fdt->fd[i].fd_flags & FD_CLOEXEC))
 				continue;
@@ -1833,9 +1859,9 @@ void close_fdt(struct fd_table *fdt, bool cloexec)
 		fdt->closed = TRUE;
 	}
 	spin_unlock(&fdt->lock);
-	/* We go through some hoops to close/decref outside the lock.  Nice for not
-	 * holding the lock for a while; critical in case the decref/cclose sleeps
-	 * (it can) */
+	/* We go through some hoops to close/decref outside the lock.  Nice for
+	 * not holding the lock for a while; critical in case the decref/cclose
+	 * sleeps (it can) */
 	for (int i = 0; i < idx; i++) {
 		cclose(to_close[i].fd_chan);
 		if (to_close[i].fd_tap)
@@ -1873,8 +1899,8 @@ void clone_fdt(struct fd_table *src, struct fd_table *dst)
 	}
 	for (int i = 0; i < src->max_fdset; i++) {
 		if (GET_BITMASK_BIT(src->open_fds->fds_bits, i)) {
-			/* while max_files and max_fdset might not line up, we should never
-			 * have a valid fdset higher than files */
+			/* while max_files and max_fdset might not line up, we
+			 * should never have a valid fdset higher than files */
 			assert(i < src->max_files);
 			chan = src->fd[i].fd_chan;
 			assert(i < dst->max_files && dst->fd[i].fd_chan == 0);
@@ -1899,7 +1925,8 @@ int fd_get_fd_flags(struct fd_table *fdt, int fd)
 		spin_unlock(&fdt->lock);
 		return -1;
 	}
-	if ((fd < fdt->max_fdset) && GET_BITMASK_BIT(fdt->open_fds->fds_bits, fd))
+	if ((fd < fdt->max_fdset)
+	    && GET_BITMASK_BIT(fdt->open_fds->fds_bits, fd))
 		ret = fdt->fd[fd].fd_flags;
 	spin_unlock(&fdt->lock);
 	if (ret == -1)
@@ -1918,7 +1945,8 @@ int fd_set_fd_flags(struct fd_table *fdt, int fd, int new_fl)
 		spin_unlock(&fdt->lock);
 		return -1;
 	}
-	if ((fd < fdt->max_fdset) && GET_BITMASK_BIT(fdt->open_fds->fds_bits, fd))
+	if ((fd < fdt->max_fdset)
+	    && GET_BITMASK_BIT(fdt->open_fds->fds_bits, fd))
 		fdt->fd[fd].fd_flags = new_fl;
 	spin_unlock(&fdt->lock);
 	if (ret == -1)

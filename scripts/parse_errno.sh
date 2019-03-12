@@ -6,7 +6,7 @@
 #  #define	ENOENT		2	/* No such file or directory */
 #  #define	ESRCH		3	/* No such process */
 #  #define	EINTR		4	/* Interrupted system call */
-#  #define	EIO			5	/* I/O error */
+#  #define	EIO		5	/* I/O error */
 #
 # And output them as:
 #

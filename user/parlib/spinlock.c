@@ -68,7 +68,7 @@ void __spin_pdr_unlock(struct spin_pdr_lock *pdr_lock)
 {
 	/* could make an arch-dependent 'release barrier' out of these */
 	wmb();	/* Need to prevent the compiler from reordering older stores. */
-	rwmb();	/* And no old reads passing either.   x86 makes both mbs a cmb() */
+	rwmb();	/* No old reads passing either.   x86 makes both mbs a cmb() */
 	pdr_lock->lock = SPINPDR_UNLOCKED;
 }
 

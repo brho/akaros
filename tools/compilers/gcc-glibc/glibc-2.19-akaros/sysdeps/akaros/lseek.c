@@ -11,6 +11,7 @@ off_t __libc_lseek (int fd, off_t offset, int whence)
 	off_t hi = 0;
 	off_t lo = 0;
 	off_t ret;
+
 	if (fd < 0) {
 		__set_errno (EBADF);
 		return -1;
@@ -24,8 +25,8 @@ off_t __libc_lseek (int fd, off_t offset, int whence)
 			__set_errno (EINVAL);
 			return -1;
 	}
-	/* get the high and low part, regardless of whether offset was already 64
-	 * bits or not (casting to avoid warnings) */
+	/* get the high and low part, regardless of whether offset was already
+	 * 64 bits or not (casting to avoid warnings) */
 	hi = (loff_t)offset >> 32;
 	lo = offset & 0xffffffff;
 	ret = ros_syscall(SYS_llseek, fd, hi, lo, &retoff, whence, 0);

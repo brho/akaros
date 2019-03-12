@@ -9,13 +9,13 @@
 
 // Dynamic Host Configuration Protocol / BOOTP
 enum {
-	OfferTimeout = 60,		// when an offer times out
-	MaxLease = 60 * 60,		// longest lease for dynamic binding
-	MinLease = 15 * 60,		// shortest lease for dynamic binding
+	OfferTimeout = 60,	// when an offer times out
+	MaxLease = 60 * 60,	// longest lease for dynamic binding
+	MinLease = 15 * 60,	// shortest lease for dynamic binding
 	StaticLease = 30 * 60,	// lease for static binding
 
-	IPUDPHDRSIZE = 28,		// size of an IP plus UDP header
-	MINSUPPORTED = 576,		// biggest IP message the client must support
+	IPUDPHDRSIZE = 28,	// size of an IP plus UDP header
+	MINSUPPORTED = 576,	// biggest IP message the client must support
 
 	// lengths of some bootp fields
 	Maxhwlen = 16,
@@ -153,20 +153,20 @@ struct bootp {
 	// Udphdr (included because of structure alignment on the alpha)
 	uint8_t udphdr[Udphdrsize];
 
-	uint8_t op;						// opcode
-	uint8_t htype;					// hardware type
-	uint8_t hlen;					// hardware address len
-	uint8_t hops;					// hops
-	uint8_t xid[4];					// a random number
-	uint8_t secs[2];				// elapsed since client started booting
+	uint8_t op;			// opcode
+	uint8_t htype;			// hardware type
+	uint8_t hlen;			// hardware address len
+	uint8_t hops;			// hops
+	uint8_t xid[4];			// a random number
+	uint8_t secs[2];		// elapsed since client started booting
 	uint8_t flags[2];
-	uint8_t ciaddr[IPv4addrlen];	// client IP address (client tells server)
-	uint8_t yiaddr[IPv4addrlen];	// client IP address (server tells client)
+	uint8_t ciaddr[IPv4addrlen]; // client IP address (client tells server)
+	uint8_t yiaddr[IPv4addrlen]; // client IP address (server tells client)
 	uint8_t siaddr[IPv4addrlen];	// server IP address
 	uint8_t giaddr[IPv4addrlen];	// gateway IP address
-	uint8_t chaddr[Maxhwlen];		// client hardware address
-	char sname[64];					// server host name (optional)
-	char file[Maxfilelen];			// boot file name
+	uint8_t chaddr[Maxhwlen];	// client hardware address
+	char sname[64];			// server host name (optional)
+	char file[Maxfilelen];		// boot file name
 	uint8_t optmagic[4];
 	uint8_t optdata[Maxoptlen];
 };

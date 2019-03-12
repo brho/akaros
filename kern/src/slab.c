@@ -106,7 +106,7 @@ static void kmc_track(struct kmem_cache *kc)
 	qlock(&arenas_and_slabs_lock);
 	TAILQ_FOREACH(kc_i, &all_kmem_caches, all_kmc_link) {
 		if (!strcmp(kc->name, kc_i->name))
-			warn("New KMC %s created, but one with that name exists!",
+			warn("Creatgin KMC %s, but one with that name exists!",
 			     kc->name);
 	}
 	TAILQ_INSERT_TAIL(&all_kmem_caches, kc, all_kmc_link);
@@ -179,21 +179,21 @@ static void lock_depot(struct kmem_depot *depot)
 	/* The lock is contended.  When we finally get the lock, we'll up the
 	 * contention count and see if we've had too many contentions over time.
 	 *
-	 * The idea is that if there are bursts of contention worse than X contended
-	 * acquisitions in Y nsec, then we'll grow the magazines.  This might not be
-	 * that great of an approach - every thread gets one count, regardless of
-	 * how long they take.
+	 * The idea is that if there are bursts of contention worse than X
+	 * contended acquisitions in Y nsec, then we'll grow the magazines.
+	 * This might not be that great of an approach - every thread gets one
+	 * count, regardless of how long they take.
 	 *
-	 * We read the time before locking so that we don't artificially grow the
-	 * window too much.  Say the lock is heavily contended and we take a long
-	 * time to get it.  Perhaps X threads try to lock it immediately, but it
-	 * takes over Y seconds for the Xth thread to actually get the lock.  We
-	 * might then think the burst wasn't big enough. */
+	 * We read the time before locking so that we don't artificially grow
+	 * the window too much.  Say the lock is heavily contended and we take a
+	 * long time to get it.  Perhaps X threads try to lock it immediately,
+	 * but it takes over Y seconds for the Xth thread to actually get the
+	 * lock.  We might then think the burst wasn't big enough. */
 	time = nsec();
 	spin_lock_irqsave(&depot->lock);
-	/* If there are no not-empty mags, we're probably fighting for the lock not
-	 * because the magazines aren't big enough, but because there aren't enough
-	 * mags in the system yet. */
+	/* If there are no not-empty mags, we're probably fighting for the lock
+	 * not because the magazines aren't big enough, but because there aren't
+	 * enough mags in the system yet. */
 	if (!depot->nr_not_empty)
 		return;
 	if (time - depot->busy_start > resize_timeout_ns) {
@@ -204,8 +204,8 @@ static void lock_depot(struct kmem_depot *depot)
 	if (depot->busy_count > resize_threshold) {
 		depot->busy_count = 0;
 		depot->magsize = MIN(KMC_MAG_MAX_SZ, depot->magsize + 1);
-		/* That's all we do - the pccs will eventually notice and up their
-		 * magazine sizes. */
+		/* That's all we do - the pccs will eventually notice and up
+		 * their magazine sizes. */
 	}
 }
 
@@ -277,8 +277,10 @@ static struct kmem_pcpu_cache *build_pcpu_caches(void)
 	for (int i = 0; i < kmc_nr_pcpu_caches(); i++) {
 		pcc[i].irq_state = 0;
 		pcc[i].magsize = KMC_MAG_MIN_SZ;
-		pcc[i].loaded = __kmem_alloc_from_slab(kmem_magazine_cache, MEM_WAIT);
-		pcc[i].prev = __kmem_alloc_from_slab(kmem_magazine_cache, MEM_WAIT);
+		pcc[i].loaded = __kmem_alloc_from_slab(kmem_magazine_cache,
+						       MEM_WAIT);
+		pcc[i].prev = __kmem_alloc_from_slab(kmem_magazine_cache,
+						     MEM_WAIT);
 		pcc[i].nr_allocs_ever = 0;
 	}
 	return pcc;
@@ -304,7 +306,8 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 		panic("Cache %s object alignment is actually MIN(PGSIZE, align (%p))",
 		      name, align);
 	kc->flags = flags;
-	/* We might want some sort of per-call site NUMA-awareness in the future. */
+	/* We might want some sort of per-call site NUMA-awareness in the
+	 * future. */
 	kc->source = source ? source : kpages_arena;
 	TAILQ_INIT(&kc->full_slab_list);
 	TAILQ_INIT(&kc->partial_slab_list);
@@ -318,16 +321,17 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	hash_init_hh(&kc->hh);
 	for (int i = 0; i < kc->hh.nr_hash_lists; i++)
 		BSD_LIST_INIT(&kc->static_hash[i]);
-	/* No touch must use bufctls, even for small objects, so that it does not
-	 * use the object as memory.  Note that if we have an arbitrary source,
-	 * small objects, and we're 'pro-touch', the small allocation path will
-	 * assume we're importing from a PGSIZE-aligned source arena. */
+	/* No touch must use bufctls, even for small objects, so that it does
+	 * not use the object as memory.  Note that if we have an arbitrary
+	 * source, small objects, and we're 'pro-touch', the small allocation
+	 * path will assume we're importing from a PGSIZE-aligned source arena.
+	 */
 	if ((obj_size > SLAB_LARGE_CUTOFF) || (flags & KMC_NOTOUCH))
 		kc->flags |= __KMC_USE_BUFCTL;
 	depot_init(&kc->depot);
 	kmem_trace_ht_init(&kc->trace_ht);
-	/* We do this last, since this will all into the magazine cache - which we
-	 * could be creating on this call! */
+	/* We do this last, since this will all into the magazine cache - which
+	 * we could be creating on this call! */
 	kc->pcpu_caches = build_pcpu_caches();
 	add_importing_slab(kc->source, kc);
 	kmc_track(kc);
@@ -343,8 +347,8 @@ static int __mag_ctor(void *obj, void *priv, int flags)
 
 void kmem_cache_init(void)
 {
-	/* magazine must be first - all caches, including mags, will do a slab alloc
-	 * from the mag cache. */
+	/* magazine must be first - all caches, including mags, will do a slab
+	 * alloc from the mag cache. */
 	static_assert(sizeof(struct kmem_magazine) <= SLAB_LARGE_CUTOFF);
 	__kmem_cache_create(kmem_magazine_cache, "kmem_magazine",
 	                    sizeof(struct kmem_magazine),
@@ -378,8 +382,8 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
 {
 	struct kmem_cache *kc = kmem_cache_alloc(kmem_cache_cache, 0);
 
-	__kmem_cache_create(kc, name, obj_size, align, flags, source, ctor, dtor,
-	                    priv);
+	__kmem_cache_create(kc, name, obj_size, align, flags, source, ctor,
+			    dtor, priv);
 	return kc;
 }
 
@@ -427,10 +431,11 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 		void *buf_start = (void*)SIZE_MAX;
 
 		BSD_LIST_FOREACH_SAFE(i, &a_slab->bufctl_freelist, link, temp) {
-			// Track the lowest buffer address, which is the start of the buffer
+			// Track the lowest buffer address, which is the start
+			// of the buffer
 			buf_start = MIN(buf_start, i->buf_addr);
-			/* This is a little dangerous, but we can skip removing, since we
-			 * init the freelist when we reuse the slab. */
+			/* This is a little dangerous, but we can skip removing,
+			 * since we init the freelist when we reuse the slab. */
 			kmem_cache_free(kmem_bufctl_cache, i);
 		}
 		arena_free(cp->source, buf_start, cp->import_amt);
@@ -451,9 +456,9 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 	spin_lock_irqsave(&cp->cache_lock);
 	assert(TAILQ_EMPTY(&cp->full_slab_list));
 	assert(TAILQ_EMPTY(&cp->partial_slab_list));
-	/* Clean out the empty list.  We can't use a regular FOREACH here, since the
-	 * link element is stored in the slab struct, which is stored on the page
-	 * that we are freeing. */
+	/* Clean out the empty list.  We can't use a regular FOREACH here, since
+	 * the link element is stored in the slab struct, which is stored on the
+	 * page that we are freeing. */
 	a_slab = TAILQ_FIRST(&cp->empty_slab_list);
 	while (a_slab) {
 		next = TAILQ_NEXT(a_slab, link);
@@ -480,7 +485,8 @@ static void __try_hash_resize(struct kmem_cache *cp)
 	/* TODO: we only need to pull from base if our arena is a base or we are
 	 * inside a kpages arena (keep in mind there could be more than one of
 	 * those, depending on how we do NUMA allocs).  This might help with
-	 * fragmentation.  To know this, we'll need the caller to pass us a flag. */
+	 * fragmentation.  To know this, we'll need the caller to pass us a
+	 * flag. */
 	new_tbl = base_zalloc(NULL, new_tbl_sz, ARENA_INSTANTFIT | MEM_ATOMIC);
 	if (!new_tbl)
 		return;
@@ -492,8 +498,10 @@ static void __try_hash_resize(struct kmem_cache *cp)
 	for (int i = 0; i < old_tbl_nr_lists; i++) {
 		while ((bc_i = BSD_LIST_FIRST(&old_tbl[i]))) {
 			BSD_LIST_REMOVE(bc_i, link);
-			hash_idx = hash_ptr(bc_i->buf_addr, cp->hh.nr_hash_bits);
-			BSD_LIST_INSERT_HEAD(&cp->alloc_hash[hash_idx], bc_i, link);
+			hash_idx = hash_ptr(bc_i->buf_addr,
+					    cp->hh.nr_hash_bits);
+			BSD_LIST_INSERT_HEAD(&cp->alloc_hash[hash_idx], bc_i,
+					     link);
 		}
 	}
 	hash_reset_load_limit(&cp->hh);
@@ -534,10 +542,11 @@ static struct kmem_bufctl *__yank_bufctl(struct kmem_cache *cp, void *buf)
 static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags)
 {
 	void *retval = NULL;
+
 	spin_lock_irqsave(&cp->cache_lock);
 	// look at partial list
 	struct kmem_slab *a_slab = TAILQ_FIRST(&cp->partial_slab_list);
-	// 	if none, go to empty list and get an empty and make it partial
+	//  if none, go to empty list and get an empty and make it partial
 	if (!a_slab) {
 		// TODO: think about non-sleeping flags
 		if (TAILQ_EMPTY(&cp->empty_slab_list) &&
@@ -556,12 +565,13 @@ static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags)
 	// have a partial now (a_slab), get an item, return item
 	if (!__use_bufctls(cp)) {
 		retval = a_slab->free_small_obj;
-		/* the next free_small_obj address is stored at the beginning of the
-		 * current free_small_obj. */
+		/* the next free_small_obj address is stored at the beginning of
+		 * the current free_small_obj. */
 		a_slab->free_small_obj = *(uintptr_t**)(a_slab->free_small_obj);
 	} else {
 		// rip the first bufctl out of the partial slab's buf list
-		struct kmem_bufctl *a_bufctl = BSD_LIST_FIRST(&a_slab->bufctl_freelist);
+		struct kmem_bufctl *a_bufctl =
+			BSD_LIST_FIRST(&a_slab->bufctl_freelist);
 
 		BSD_LIST_REMOVE(a_bufctl, link);
 		__track_alloc(cp, a_bufctl);
@@ -638,8 +648,9 @@ static void __kmem_free_to_slab(struct kmem_cache *cp, void *buf)
 		// find its slab
 		a_slab = (struct kmem_slab*)(ROUNDDOWN((uintptr_t)buf, PGSIZE) +
 		                             PGSIZE - sizeof(struct kmem_slab));
-		/* write location of next free small obj to the space at the beginning
-		 * of the buffer, then list buf as the next free small obj */
+		/* write location of next free small obj to the space at the
+		 * beginning of the buffer, then list buf as the next free small
+		 * obj */
 		*(uintptr_t**)buf = a_slab->free_small_obj;
 		a_slab->free_small_obj = buf;
 	} else {
@@ -678,16 +689,16 @@ try_free:
 		unlock_pcu_cache(pcc);
 		return;
 	}
-	/* The paper checks 'is empty' here.  But we actually just care if it has
-	 * room left, not that prev is completely empty.  This could be the case due
-	 * to magazine resize. */
+	/* The paper checks 'is empty' here.  But we actually just care if it
+	 * has room left, not that prev is completely empty.  This could be the
+	 * case due to magazine resize. */
 	if (pcc->prev->nr_rounds < pcc->magsize) {
 		__swap_mags(pcc);
 		goto try_free;
 	}
 	lock_depot(depot);
-	/* Here's where the resize magic happens.  We'll start using it for the next
-	 * magazine. */
+	/* Here's where the resize magic happens.  We'll start using it for the
+	 * next magazine. */
 	pcc->magsize = depot->magsize;
 	mag = SLIST_FIRST(&depot->empty);
 	if (mag) {
@@ -702,11 +713,11 @@ try_free:
 	unlock_depot(depot);
 	/* Need to unlock, in case we end up calling back into ourselves. */
 	unlock_pcu_cache(pcc);
-	/* don't want to wait on a free.  if this fails, we can still just give it
-	 * to the slab layer. */
+	/* don't want to wait on a free.  if this fails, we can still just give
+	 * it to the slab layer. */
 	mag = kmem_cache_alloc(kmem_magazine_cache, MEM_ATOMIC);
 	if (mag) {
-		assert(mag->nr_rounds == 0);	/* paranoia, can probably remove */
+		assert(mag->nr_rounds == 0);
 		lock_depot(depot);
 		SLIST_INSERT_HEAD(&depot->empty, mag, link);
 		depot->nr_empty++;
@@ -735,9 +746,10 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 	if (!__use_bufctls(cp)) {
 		void *a_page;
 
-		/* Careful, this assumes our source is a PGSIZE-aligned allocator.  We
-		 * could use xalloc to enforce the alignment, but that'll bypass the
-		 * qcaches, which we don't want.  Caller beware. */
+		/* Careful, this assumes our source is a PGSIZE-aligned
+		 * allocator.  We could use xalloc to enforce the alignment, but
+		 * that'll bypass the qcaches, which we don't want.  Caller
+		 * beware. */
 		a_page = arena_alloc(cp->source, PGSIZE, MEM_ATOMIC);
 		if (!a_page)
 			return FALSE;
@@ -749,9 +761,11 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		                        cp->obj_size;
 		// TODO: consider staggering this IAW section 4.3
 		a_slab->free_small_obj = a_page;
-		/* Walk and create the free list, which is circular.  Each item stores
-		 * the location of the next one at the beginning of the block. */
+		/* Walk and create the free list, which is circular.  Each item
+		 * stores the location of the next one at the beginning of the
+		 * block. */
 		void *buf = a_slab->free_small_obj;
+
 		for (int i = 0; i < a_slab->num_total_obj - 1; i++) {
 			*(uintptr_t**)buf = buf + cp->obj_size;
 			buf += cp->obj_size;
@@ -774,7 +788,8 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		/* for each buffer, set up a bufctl and point to the buffer */
 		for (int i = 0; i < a_slab->num_total_obj; i++) {
 			a_bufctl = kmem_cache_alloc(kmem_bufctl_cache, 0);
-			BSD_LIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
+			BSD_LIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl,
+					     link);
 			a_bufctl->buf_addr = buf;
 			a_bufctl->my_slab = a_slab;
 			buf += cp->obj_size;

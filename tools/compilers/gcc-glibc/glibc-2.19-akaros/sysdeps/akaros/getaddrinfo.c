@@ -24,7 +24,8 @@ static int serv_get_portprotocol(const char *serv, unsigned long *port_ret,
 {
 	char *strtoul_end = 0;
 	unsigned long port = 0;	/* uninitialized, up to the main caller */
-	int protocol = 0;		/* any protocol, will assume TCP and UDP later */
+	int protocol = 0;	/* any protocol, will assume TCP/UDP later */
+
 	if (serv) {
 		if (serv[0] == '\0')
 			return EAI_NONAME;
@@ -34,9 +35,10 @@ static int serv_get_portprotocol(const char *serv, unsigned long *port_ret,
 			if (hints->ai_flags & AI_NUMERICSERV)
 				return EAI_NONAME;
 			/* CS lookup */
-			/* TODO: get a port, maybe a protocol.  If we have a restriction on
-			 * the protocol from hints, check that here.  Probably need to
-			 * rework this a bit if we have multiple protocols. */
+			/* TODO: get a port, maybe a protocol.  If we have a
+			 * restriction on the protocol from hints, check that
+			 * here.  Probably need to rework this a bit if we have
+			 * multiple protocols. */
 			return EAI_NONAME;
 		}
 	}
@@ -108,14 +110,14 @@ static int node_fill_addrinfo(const char *node, struct addrinfo *ai,
 static int proto_to_socktype(int protocol)
 {
 	switch (protocol) {
-		case IPPROTO_IP:
-		case IPPROTO_TCP:
-			return SOCK_STREAM;
-		case IPPROTO_ICMP:
-		case IPPROTO_UDP:
-			return SOCK_DGRAM;
-		case IPPROTO_RAW:
-			return SOCK_RAW;
+	case IPPROTO_IP:
+	case IPPROTO_TCP:
+		return SOCK_STREAM;
+	case IPPROTO_ICMP:
+	case IPPROTO_UDP:
+		return SOCK_DGRAM;
+	case IPPROTO_RAW:
+		return SOCK_RAW;
 	}
 	return -1;
 }
@@ -123,12 +125,12 @@ static int proto_to_socktype(int protocol)
 static int socktype_to_proto(int socktype)
 {
 	switch (socktype) {
-		case SOCK_STREAM:
-			return IPPROTO_TCP;
-		case SOCK_DGRAM:
-			return IPPROTO_UDP;
-		case SOCK_RAW:
-			return IPPROTO_RAW;
+	case SOCK_STREAM:
+		return IPPROTO_TCP;
+	case SOCK_DGRAM:
+		return IPPROTO_UDP;
+	case SOCK_RAW:
+		return IPPROTO_RAW;
 	}
 	return -1;
 }
@@ -164,10 +166,11 @@ int getaddrinfo(const char *node, const char *serv,
 	ai->ai_addr = malloc(sizeof(struct sockaddr_storage));
 	memset(ai->ai_addr, 0, sizeof(struct sockaddr_storage));
 
-	/* Only supporting TCP and UDP for now.  If protocol is 0, later we'll make
-	 * addrinfos for both (TODO).  Likewise, we only support DGRAM or STREAM for
-	 * socktype. */
-	if ((ret = serv_get_portprotocol(serv, &port, &protocol, &local_hints))) {
+	/* Only supporting TCP and UDP for now.  If protocol is 0, later we'll
+	 * make addrinfos for both (TODO).  Likewise, we only support DGRAM or
+	 * STREAM for socktype. */
+	if ((ret = serv_get_portprotocol(serv, &port, &protocol, &local_hints)))
+	{
 		freeaddrinfo(ai);
 		return ret;
 	}
@@ -178,9 +181,9 @@ int getaddrinfo(const char *node, const char *serv,
 	/* We have a mostly full addrinfo.  Still missing ai_protocol, socktype,
 	 * flags (already 0) and canonname (already 0).
 	 *
-	 * We might have restrictions on our protocol from the hints or from what
-	 * serv specifies.  If we don't have a protocol yet (== 0), that means we
-	 * have no restrictions from serv. */
+	 * We might have restrictions on our protocol from the hints or from
+	 * what serv specifies.  If we don't have a protocol yet (== 0), that
+	 * means we have no restrictions from serv. */
 	if (local_hints.ai_protocol) {
 		if (protocol && protocol != local_hints.ai_protocol) {
 			/* requested protocol wasn't available */
@@ -195,8 +198,8 @@ int getaddrinfo(const char *node, const char *serv,
 	} else {
 		/* no serv restrictions, no preferences */
 		ai->ai_protocol = IPPROTO_TCP;
-		/* TODO: consider building a second addrinfo for UDP.  while you're at
-		 * it, support IPv6 and a bunch of other options! */
+		/* TODO: consider building a second addrinfo for UDP.  while
+		 * you're at it, support IPv6 and a bunch of other options! */
 	}
 	if (ai->ai_protocol == -1) {
 		freeaddrinfo(ai);
@@ -218,6 +221,7 @@ libc_hidden_def(getaddrinfo)
 void freeaddrinfo(struct addrinfo *ai)
 {
 	struct addrinfo *next;
+
 	if (!ai)
 		return;
 	free(ai->ai_addr);

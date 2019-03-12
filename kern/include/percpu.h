@@ -47,8 +47,8 @@
  *
  * // One core can print them all out
  * for_each_core(i)
- *		printk("Addr %p, value %lu\n", _PERCPU_VARPTR(*foos, i),
- *		       _PERCPU_VAR(*foos, i));
+ *	printk("Addr %p, value %lu\n", _PERCPU_VARPTR(*foos, i),
+ *	       _PERCPU_VAR(*foos, i));
  *
  * // Free, but don't deref here.  'foos' is your handle.
  * percpu_free(foos);
@@ -71,16 +71,16 @@
 #define PERCPU_SIZE (PERCPU_STATIC_SIZE + PERCPU_DYN_SIZE)
 #define PERCPU_OFFSET(var) ((char *) &(var) - PERCPU_START_VAR)
 
-#define __PERCPU_VARPTR(var, cpu)										\
-	({																	\
-		typeof(var) *__cv;												\
-		if (likely(percpu_base))										\
-			__cv = (typeof(var) *) (percpu_base + cpu * PERCPU_SIZE +	\
-			                            PERCPU_OFFSET(var));				\
-		else															\
-			__cv = &var;												\
-		__cv;															\
-	})
+#define __PERCPU_VARPTR(var, cpu)					\
+({									\
+	typeof(var) *__cv;						\
+	if (likely(percpu_base))					\
+		__cv = (typeof(var) *) (percpu_base + cpu * PERCPU_SIZE + \
+					PERCPU_OFFSET(var));		\
+	else								\
+		__cv = &var;						\
+	__cv;								\
+})
 #define _PERCPU_VARPTR(var, cpu) __PERCPU_VARPTR(var, cpu)
 #define PERCPU_VARPTR(var) __PERCPU_VARPTR(var, core_id())
 
@@ -89,8 +89,8 @@
 
 #define DEFINE_PERCPU(type, var)						\
 	__typeof__(type) var __attribute__ ((section (PERCPU_SECTION_STR)))
-#define DECLARE_PERCPU(type, var)								\
-	extern __typeof__(type) var									\
+#define DECLARE_PERCPU(type, var)					\
+	extern __typeof__(type) var					\
 		__attribute__ ((section (PERCPU_SECTION_STR)))
 
 #define PERCPU_INIT_SECTION __percpu_init
@@ -100,9 +100,9 @@
 #define PERCPU_INIT_STOP_VAR PASTE(__stop_, PERCPU_INIT_SECTION)
 
 #define PERCPU_INIT_NAME(func) PASTE(__percpu_, func)
-#define DEFINE_PERCPU_INIT(func)										\
-	static void func(void);												\
-	void (* const PERCPU_INIT_NAME(func))(void)							\
+#define DEFINE_PERCPU_INIT(func)					\
+	static void func(void);						\
+	void (* const PERCPU_INIT_NAME(func))(void)			\
 		__attribute__ ((section (PERCPU_INIT_SECTION_STR))) = (func)
 
 extern char __attribute__((weak)) PERCPU_START_VAR[];

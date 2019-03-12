@@ -92,15 +92,19 @@ void parlib_parse_cores(const char *str, struct core_set *cores)
 				exit(1);
 			}
 			if (fcpu >= parlib_nr_total_cores()) {
-				fprintf(stderr, "CPU number out of bound: %u\n", fcpu);
+				fprintf(stderr, "CPU number out of bound: %u\n",
+					fcpu);
 				exit(1);
 			}
 			if (ncpu >= parlib_nr_total_cores()) {
-				fprintf(stderr, "CPU number out of bound: %u\n", ncpu);
+				fprintf(stderr, "CPU number out of bound: %u\n",
+					ncpu);
 				exit(1);
 			}
 			if (fcpu > ncpu) {
-				fprintf(stderr, "CPU range is backwards: %u-%u\n", fcpu, ncpu);
+				fprintf(stderr,
+					"CPU range is backwards: %u-%u\n",
+					fcpu, ncpu);
 				exit(1);
 			}
 			for (; fcpu <= ncpu; fcpu++)
@@ -109,7 +113,7 @@ void parlib_parse_cores(const char *str, struct core_set *cores)
 			fcpu = atoi(tok);
 			if (fcpu >= parlib_nr_total_cores()) {
 				fprintf(stderr, "CPU number out of bound: %u\n",
-						fcpu);
+					fcpu);
 				exit(1);
 			}
 			parlib_set_core(cores, fcpu);
@@ -136,7 +140,8 @@ void parlib_not_core_set(struct core_set *dcs)
 {
 	size_t max_cores = parlib_nr_total_cores();
 
-	for (size_t i = 0; (max_cores > 0) && (i < sizeof(dcs->core_set)); i++) {
+	for (size_t i = 0; (max_cores > 0) && (i < sizeof(dcs->core_set)); i++)
+	{
 		size_t nb = (max_cores >= CHAR_BIT) ? CHAR_BIT : max_cores;
 
 		dcs->core_set[i] = (~dcs->core_set[i]) & ((1 << nb) - 1);

@@ -71,12 +71,14 @@ int dtls_cache_init(void)
 	/* Initialize the global cache of dtls_keys */
 	__dtls_keys_cache =
 	    kmem_cache_create("dtls_keys_cache", sizeof(struct dtls_key),
-	                      __alignof__(struct dtls_key), 0, NULL, NULL, NULL);
+			      __alignof__(struct dtls_key), 0, NULL, NULL,
+			      NULL);
 
 	/* Initialize the global cache of dtls_values */
 	__dtls_values_cache =
 	    kmem_cache_create("dtls_values_cache", sizeof(struct dtls_value),
-	                      __alignof__(struct dtls_value), 0, NULL, NULL, NULL);
+			      __alignof__(struct dtls_value), 0, NULL, NULL,
+			      NULL);
 
 	return 0;
 }
@@ -185,15 +187,15 @@ static inline void __destroy_dtls(dtls_data_t *dtls_data)
 	v = TAILQ_FIRST(&dtls_data->list);
 	while (v != NULL) {
 		key = v->key;
-		/* The dtor must be called outside of a spinlock so that it can call
-		 * code that may deschedule it for a while (i.e. a mutex). Probably a
-		 * good idea anyway since it can be arbitrarily long and is written by
-		 * the user. Note, there is a small race here on the valid field,
-		 * whereby we may run a destructor on an invalid key. At least the keys
-		 * memory wont be deleted though, as protected by the ref count. Any
-		 * reasonable usage of this interface should safeguard that a key is
-		 * never destroyed before all of the threads that use it have exited
-		 * anyway. */
+		/* The dtor must be called outside of a spinlock so that it can
+		 * call code that may deschedule it for a while (i.e. a mutex).
+		 * Probably a good idea anyway since it can be arbitrarily long
+		 * and is written by the user. Note, there is a small race here
+		 * on the valid field, whereby we may run a destructor on an
+		 * invalid key. At least the keys memory wont be deleted though,
+		 * as protected by the ref count. Any reasonable usage of this
+		 * interface should safeguard that a key is never destroyed
+		 * before all of the threads that use it have exited anyway. */
 		if (key->valid && key->dtor) {
 			dtls = v->dtls;
 			v->dtls = NULL;
@@ -201,9 +203,10 @@ static inline void __destroy_dtls(dtls_data_t *dtls_data)
 		}
 		n = TAILQ_NEXT(v, link);
 		TAILQ_REMOVE(&dtls_data->list, v, link);
-		/* Free both the key (which is v->key) and v *after* removing v from the
-		 * list.  It's possible that free() will call back into the DTLS (e.g.
-		 * pthread_getspecific()), and v must be off the list by then.
+		/* Free both the key (which is v->key) and v *after* removing v
+		 * from the list.  It's possible that free() will call back into
+		 * the DTLS (e.g.  pthread_getspecific()), and v must be off the
+		 * list by then.
 		 *
 		 * For a similar, hilarious bug in glibc, check out:
 		 * https://sourceware.org/bugzilla/show_bug.cgi?id=3317 */

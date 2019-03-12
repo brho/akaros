@@ -10,6 +10,6 @@
 #include <ros/bits/event.h>
 
 struct evbitmap {
-	bool						check_bits;
-	uint8_t						bitmap[(MAX_NR_EVENT - 1) / 8 + 1];
+	bool				check_bits;
+	uint8_t				bitmap[(MAX_NR_EVENT - 1) / 8 + 1];
 };

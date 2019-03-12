@@ -147,6 +147,7 @@ int memcpy_from_safe(void *dst, const void *src, size_t amt)
 void *user_memdup(struct proc *p, const void *va, int len)
 {
 	void* kva = NULL;
+
 	if (len < 0 || (kva = kmalloc(len, 0)) == NULL)
 		return ERR_PTR(-ENOMEM);
 	if (memcpy_from_user(p, kva, va, len)) {
@@ -159,6 +160,7 @@ void *user_memdup(struct proc *p, const void *va, int len)
 void *user_memdup_errno(struct proc *p, const void *va, int len)
 {
 	void *kva = user_memdup(p, va, len);
+
 	if (IS_ERR(kva)) {
 		set_errno(-PTR_ERR(kva));
 		return NULL;
@@ -179,6 +181,7 @@ void user_memdup_free(struct proc *p, void *va)
 char *user_strdup(struct proc *p, const char *u_string, size_t strlen)
 {
 	char *k_string = user_memdup(p, u_string, strlen + 1);
+
 	if (!IS_ERR(k_string))
 		k_string[strlen] = '\0';
 	return k_string;
@@ -198,6 +201,7 @@ char *user_strdup_errno(struct proc *p, const char *u_string, size_t strlen)
 void *kmalloc_errno(int len)
 {
 	void *kva = NULL;
+
 	if (len < 0 || (kva = kmalloc(len, 0)) == NULL)
 		set_errno(ENOMEM);
 	return kva;
@@ -210,6 +214,7 @@ bool uva_is_kva(struct proc *p, void *uva, void *kva)
 {
 	struct page *u_page;
 	assert(kva);				/* catch bugs */
+
 	/* Check offsets first */
 	if (PGOFF(uva) != PGOFF(kva))
 		return FALSE;
@@ -227,6 +232,7 @@ uintptr_t uva2kva(struct proc *p, void *uva, size_t len, int prot)
 {
 	struct page *u_page;
 	uintptr_t offset = PGOFF(uva);
+
 	if (!p)
 		return 0;
 	if (prot & PROT_WRITE) {

@@ -10,5 +10,5 @@
 
 #pragma once
 
-#define CPU_FEAT_RISCV_FOO				(__CPU_FEAT_ARCH_START + 0)
-#define __NR_CPU_FEAT					(__CPU_FEAT_ARCH_START + 64)
+#define CPU_FEAT_RISCV_FOO	(__CPU_FEAT_ARCH_START + 0)
+#define __NR_CPU_FEAT		(__CPU_FEAT_ARCH_START + 64)

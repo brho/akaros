@@ -41,98 +41,102 @@ int __libc_accept4(int fd, __SOCKADDR_ARG addr, socklen_t *alen, int a4_flags)
 	}
 
 	switch (r->domain) {
-		case PF_INET:
-			switch (r->stype) {
-				case SOCK_DGRAM:
-					net = "udp";
-					break;
-				case SOCK_STREAM:
-					net = "tcp";
-					break;
-			}
-			/* at this point, our FD is for the data file.  we need to open the
-			 * listen file. */
-			_sock_get_conv_filename(r, "listen", listen);
+	case PF_INET:
+		switch (r->stype) {
+		case SOCK_DGRAM:
+			net = "udp";
+			break;
+		case SOCK_STREAM:
+			net = "tcp";
+			break;
+		}
+		/* at this point, our FD is for the data file.  we need to open
+		 * the listen file. */
+		_sock_get_conv_filename(r, "listen", listen);
+		open_flags = O_RDWR;
+		/* This is for the listen - maybe don't block on open */
+		open_flags |= (r->sopts & SOCK_NONBLOCK ? O_NONBLOCK : 0);
+		/* This is for the ctl we get back - maybe CLOEXEC, based on
+		 * what accept4 wants for the child */
+		open_flags |= (a4_flags & SOCK_CLOEXEC ? O_CLOEXEC : 0);
+		lcfd = open(listen, open_flags);
+		if (lcfd < 0)
+			return -1;
+		/* at this point, we have a new conversation, and lcfd is its
+		 * ctl fd.  nfd will be the FD for that conv's data file.
+		 * sock_data will store our lcfd in the rock and return the data
+		 * file fd.
+		 *
+		 * Note, we pass the listen socket's stype, but not it's sopts.
+		 * The sopts (e.g. SOCK_NONBLOCK) apply to the original socket,
+		 * not to the new one.  Instead, we pass the accept4 flags,
+		 * which are the sopts for the new socket.  Note that this is
+		 * just the sopts.  Both the listen socket and the new socket
+		 * have the same stype. */
+		nfd = _sock_data(lcfd, net, r->domain, a4_flags | r->stype,
+		                 r->protocol, &nr);
+		if (nfd < 0)
+			return -1;
+
+		/* get remote address */
+		ip = (struct sockaddr_in *)&nr->raddr;
+		_sock_ingetaddr(nr, ip, &n, "remote");
+		if (addr.__sockaddr__) {
+			memmove(addr.__sockaddr_in__, ip,
+				sizeof(struct sockaddr_in));
+			*alen = sizeof(struct sockaddr_in);
+		}
+
+		return nfd;
+	case PF_UNIX:
+		if (r->other >= 0) {
+			errno = EINVAL;	// was EGREG
+			return -1;
+		}
+
+		for (;;) {
+			/* read path to new connection */
+			n = read(fd, name, sizeof(name) - 1);
+			if (n < 0)
+				return -1;
+			if (n == 0)
+				continue;
+			name[n] = 0;
+
+			/* open new connection */
+			_sock_srvname(file, name);
 			open_flags = O_RDWR;
 			/* This is for the listen - maybe don't block on open */
-			open_flags |= (r->sopts & SOCK_NONBLOCK ? O_NONBLOCK : 0);
-			/* This is for the ctl we get back - maybe CLOEXEC, based on what
-			 * accept4 wants for the child */
+			open_flags |= (r->sopts &
+				       SOCK_NONBLOCK ? O_NONBLOCK : 0);
+			/* This is for the ctl we get back - maybe CLOEXEC,
+			 * based on what accept4 wants for the child */
 			open_flags |= (a4_flags & SOCK_CLOEXEC ? O_CLOEXEC : 0);
-			lcfd = open(listen, open_flags);
-			if (lcfd < 0)
-				return -1;
-			/* at this point, we have a new conversation, and lcfd is its ctl
-			 * fd.  nfd will be the FD for that conv's data file.  sock_data
-			 * will store our lcfd in the rock and return the data file fd.
-			 *
-			 * Note, we pass the listen socket's stype, but not it's sopts.  The
-			 * sopts (e.g. SOCK_NONBLOCK) apply to the original socket, not to
-			 * the new one.  Instead, we pass the accept4 flags, which are the
-			 * sopts for the new socket.  Note that this is just the sopts.
-			 * Both the listen socket and the new socket have the same stype. */
-			nfd = _sock_data(lcfd, net, r->domain, a4_flags | r->stype,
-			                 r->protocol, &nr);
+			nfd = open(file, open_flags);
 			if (nfd < 0)
-				return -1;
+				continue;
 
-			/* get remote address */
-			ip = (struct sockaddr_in *)&nr->raddr;
-			_sock_ingetaddr(nr, ip, &n, "remote");
-			if (addr.__sockaddr__) {
-				memmove(addr.__sockaddr_in__, ip, sizeof(struct sockaddr_in));
-				*alen = sizeof(struct sockaddr_in);
-			}
+			/* confirm opening on new connection */
+			if (write(nfd, name, strlen(name)) > 0)
+				break;
 
-			return nfd;
-		case PF_UNIX:
-			if (r->other >= 0) {
-				errno = EINVAL;	// was EGREG
-				return -1;
-			}
+			close(nfd);
+		}
 
-			for (;;) {
-				/* read path to new connection */
-				n = read(fd, name, sizeof(name) - 1);
-				if (n < 0)
-					return -1;
-				if (n == 0)
-					continue;
-				name[n] = 0;
-
-				/* open new connection */
-				_sock_srvname(file, name);
-				open_flags = O_RDWR;
-				/* This is for the listen - maybe don't block on open */
-				open_flags |= (r->sopts & SOCK_NONBLOCK ? O_NONBLOCK : 0);
-				/* This is for the ctl we get back - maybe CLOEXEC, based on
-				 * what accept4 wants for the child */
-				open_flags |= (a4_flags & SOCK_CLOEXEC ? O_CLOEXEC : 0);
-				nfd = open(file, open_flags);
-				if (nfd < 0)
-					continue;
-
-				/* confirm opening on new connection */
-				if (write(nfd, name, strlen(name)) > 0)
-					break;
-
-				close(nfd);
-			}
-
-			nr = _sock_newrock(nfd);
-			if (nr == 0) {
-				close(nfd);
-				return -1;
-			}
-			nr->domain = r->domain;
-			nr->stype = r->stype;
-			nr->sopts = a4_flags;
-			nr->protocol = r->protocol;
-
-			return nfd;
-		default:
-			errno = EOPNOTSUPP;
+		nr = _sock_newrock(nfd);
+		if (nr == 0) {
+			close(nfd);
 			return -1;
+		}
+		nr->domain = r->domain;
+		nr->stype = r->stype;
+		nr->sopts = a4_flags;
+		nr->protocol = r->protocol;
+
+		return nfd;
+	default:
+		errno = EOPNOTSUPP;
+		return -1;
 	}
 }
 weak_alias(__libc_accept4, accept4)

@@ -98,8 +98,8 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 {
 	uint32_t vcoreid = vcore_id();
 	if (current_uthread) {
-		/* Prep the pthread to run any pending posix signal handlers registered
-         * via pthread_kill once it is restored. */
+		/* Prep the pthread to run any pending posix signal handlers
+		 * registered via pthread_kill once it is restored. */
 		uthread_prep_pending_signals(current_uthread);
 		/* Run the thread itself */
 		run_current_uthread();
@@ -107,9 +107,11 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 	}
 	/* no one currently running, so lets get someone from the ready queue */
 	struct pthread_tcb *new_thread = NULL;
-	/* Try to get a thread.  If we get one, we'll break out and run it.  If not,
-	 * we'll try to yield.  vcore_yield() might return, if we lost a race and
-	 * had a new event come in, one that may make us able to get a new_thread */
+
+	/* Try to get a thread.  If we get one, we'll break out and run it.  If
+	 * not, we'll try to yield.  vcore_yield() might return, if we lost a
+	 * race and had a new event come in, one that may make us able to get a
+	 * new_thread */
 	do {
 		handle_events(vcoreid);
 		__check_preempt_pending(vcoreid);
@@ -127,8 +129,9 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 			threads_active++;
 			threads_ready--;
 			mcs_pdr_unlock(&queue_lock);
-			/* If you see what looks like the same uthread running in multiple
-			 * places, your list might be jacked up.  Turn this on. */
+			/* If you see what looks like the same uthread running
+			 * in multiple places, your list might be jacked up.
+			 * Turn this on. */
 			printd("[P] got uthread %08p on vc %d state %08p flags %08p\n",
 			       new_thread, vcoreid,
 			       ((struct uthread*)new_thread)->state,
@@ -138,12 +141,12 @@ static void __attribute__((noreturn)) pth_sched_entry(void)
 		mcs_pdr_unlock(&queue_lock);
 		/* no new thread, try to yield */
 		printd("[P] No threads, vcore %d is yielding\n", vcore_id());
-		/* TODO: you can imagine having something smarter here, like spin for a
-		 * bit before yielding. */
+		/* TODO: you can imagine having something smarter here, like
+		 * spin for a bit before yielding. */
 		vcore_yield(FALSE);
 	} while (1);
 	/* Prep the pthread to run any pending posix signal handlers registered
-     * via pthread_kill once it is restored. */
+	 * via pthread_kill once it is restored. */
 	uthread_prep_pending_signals((struct uthread*)new_thread);
 	/* Run the thread itself */
 	run_uthread((struct uthread*)new_thread);
@@ -162,33 +165,36 @@ static void __pthread_run(void)
 static void pth_thread_runnable(struct uthread *uthread)
 {
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
-	/* At this point, the 2LS can see why the thread blocked and was woken up in
-	 * the first place (coupling these things together).  On the yield path, the
-	 * 2LS was involved and was able to set the state.  Now when we get the
-	 * thread back, we can take a look. */
-	printd("pthread %08p runnable, state was %d\n", pthread, pthread->state);
+
+	/* At this point, the 2LS can see why the thread blocked and was woken
+	 * up in the first place (coupling these things together).  On the yield
+	 * path, the 2LS was involved and was able to set the state.  Now when
+	 * we get the thread back, we can take a look. */
+	printd("pthread %08p runnable, state was %d\n", pthread,
+	       pthread->state);
 	switch (pthread->state) {
-		case (PTH_CREATED):
-		case (PTH_BLK_YIELDING):
-		case (PTH_BLK_SYSC):
-		case (PTH_BLK_PAUSED):
-		case (PTH_BLK_MUTEX):
-		case (PTH_BLK_MISC):
-			/* can do whatever for each of these cases */
-			break;
-		default:
-			panic("Odd state %d for pthread %08p\n", pthread->state, pthread);
+	case (PTH_CREATED):
+	case (PTH_BLK_YIELDING):
+	case (PTH_BLK_SYSC):
+	case (PTH_BLK_PAUSED):
+	case (PTH_BLK_MUTEX):
+	case (PTH_BLK_MISC):
+		/* can do whatever for each of these cases */
+		break;
+	default:
+		panic("Odd state %d for pthread %08p\n", pthread->state,
+		      pthread);
 	}
 	pthread->state = PTH_RUNNABLE;
-	/* Insert the newly created thread into the ready queue of threads.
-	 * It will be removed from this queue later when vcore_entry() comes up */
+	/* Insert the newly created thread into the ready queue of threads.  It
+	 * will be removed from this queue later when vcore_entry() comes up */
 	mcs_pdr_lock(&queue_lock);
 	/* Again, GIANT WARNING: if you change this, change batch wakeup code */
 	TAILQ_INSERT_TAIL(&ready_queue, pthread, tq_next);
 	threads_ready++;
 	mcs_pdr_unlock(&queue_lock);
-	/* Smarter schedulers should look at the num_vcores() and how much work is
-	 * going on to make a decision about how many vcores to request. */
+	/* Smarter schedulers should look at the num_vcores() and how much work
+	 * is going on to make a decision about how many vcores to request. */
 	vcore_request_more(threads_ready);
 }
 
@@ -209,9 +215,9 @@ static void pth_thread_paused(struct uthread *uthread)
 	__pthread_generic_yield(pthread);
 	/* communicate to pth_thread_runnable */
 	pthread->state = PTH_BLK_PAUSED;
-	/* At this point, you could do something clever, like put it at the front of
-	 * the runqueue, see if it was holding a lock, do some accounting, or
-	 * whatever. */
+	/* At this point, you could do something clever, like put it at the
+	 * front of the runqueue, see if it was holding a lock, do some
+	 * accounting, or whatever. */
 	pth_thread_runnable(uthread);
 }
 
@@ -236,14 +242,16 @@ static void pth_handle_syscall(struct event_msg *ev_msg, unsigned int ev_type,
 	struct syscall *sysc;
 	assert(in_vcore_context());
 	/* if we just got a bit (not a msg), it should be because the process is
-	 * still an SCP and hasn't started using the MCP ev_q yet (using the simple
-	 * ev_q and glibc's blockon) or because the bit is still set from an old
-	 * ev_q (blocking syscalls from before we could enter vcore ctx).  Either
-	 * way, just return.  Note that if you screwed up the pth ev_q and made it
-	 * NO_MSG, you'll never notice (we used to assert(ev_msg)). */
+	 * still an SCP and hasn't started using the MCP ev_q yet (using the
+	 * simple ev_q and glibc's blockon) or because the bit is still set from
+	 * an old ev_q (blocking syscalls from before we could enter vcore ctx).
+	 * Either way, just return.  Note that if you screwed up the pth ev_q
+	 * and made it NO_MSG, you'll never notice (we used to assert(ev_msg)).
+	 * */
 	if (!ev_msg)
 		return;
-	/* It's a bug if we don't have a msg (we're handling a syscall bit-event) */
+	/* It's a bug if we don't have a msg (we're handling a syscall
+	 * bit-event) */
 	assert(ev_msg);
 	/* Get the sysc from the message and just restart it */
 	sysc = ev_msg->ev_arg3;
@@ -268,8 +276,8 @@ static void pth_thread_blockon_sysc(struct uthread *uthread, void *syscall)
 	sysc->u_data = uthread;
 	/* Register our vcore's syscall ev_q to hear about this syscall. */
 	if (!register_evq(sysc, sysc_mgmt[vcoreid].ev_q)) {
-		/* Lost the race with the call being done.  The kernel won't send the
-		 * event.  Just restart him. */
+		/* Lost the race with the call being done.  The kernel won't
+		 * send the event.  Just restart him. */
 		restart_thread(sysc);
 	}
 	/* GIANT WARNING: do not touch the thread after this point. */
@@ -280,8 +288,8 @@ static void pth_thread_has_blocked(struct uthread *uthread, int flags)
 	struct pthread_tcb *pthread = (struct pthread_tcb*)uthread;
 
 	__pthread_generic_yield(pthread);
-	/* Whatever we do here, we are mostly communicating to our future selves in
-	 * pth_thread_runnable(), which gets called by whoever triggered this
+	/* Whatever we do here, we are mostly communicating to our future selves
+	 * in pth_thread_runnable(), which gets called by whoever triggered this
 	 * callback */
 	switch (flags) {
 	case UTH_EXT_BLK_YIELD:
@@ -456,9 +464,9 @@ static void pth_thread_exited(struct uthread *uth)
 	uthread_cleanup(uth);
 	/* Cleanup, mirroring pthread_create() */
 	__pthread_free_stack(pthread);
-	/* If we were the last pthread, we exit for the whole process.  Keep in mind
-	 * that thread0 is counted in this, so this will only happen if that thread
-	 * calls pthread_exit(). */
+	/* If we were the last pthread, we exit for the whole process.  Keep in
+	 * mind that thread0 is counted in this, so this will only happen if
+	 * that thread calls pthread_exit(). */
 	if ((atomic_fetch_and_add(&threads_total, -1) == 1))
 		exit(0);
 }
@@ -573,7 +581,7 @@ int pthread_attr_getguardsize(pthread_attr_t *attr, size_t *guardsize)
 }
 
 int pthread_attr_getstack(const pthread_attr_t *__restrict __attr,
-						   void **__stackaddr, size_t *__stacksize)
+			  void **__stackaddr, size_t *__stacksize)
 {
 	*__stackaddr = __attr->stackaddr;
 	*__stacksize = __attr->stacksize;
@@ -606,11 +614,13 @@ static void pth_pre_fork(void)
 	if (in_multi_mode())
 		panic("Tried to fork from an MCP!");
 	pth_0->fork_generation = fork_generation + 1;
-	cmb();	/* in case we get interrupted after incrementing the global gen */
-	/* We're single-core and thread0 here, so we can modify fork_generation */
+	/* in case we get interrupted after incrementing the global gen */
+	cmb();
+	/* We're single-core and thread0 here, so we can modify fork_generation
+	 */
 	fork_generation++;
-	/* At this point, whether we come back as the child or the parent, no old
-	 * thread (from the previous generation) will run. */
+	/* At this point, whether we come back as the child or the parent, no
+	 * old thread (from the previous generation) will run. */
 }
 
 static void pth_post_fork(pid_t ret)
@@ -637,7 +647,8 @@ void pth_sched_init(void)
 	ret = posix_memalign((void**)&t, __alignof__(struct pthread_tcb),
 	                     sizeof(struct pthread_tcb));
 	assert(!ret);
-	memset(t, 0, sizeof(struct pthread_tcb));	/* aggressively 0 for bugs */
+	/* aggressively 0 for bugs */
+	memset(t, 0, sizeof(struct pthread_tcb));
 	t->id = get_next_pid();
 	t->fork_generation = fork_generation;
 	t->stacksize = USTACK_NUM_PAGES * PGSIZE;
@@ -651,12 +662,13 @@ void pth_sched_init(void)
 	threads_active++;
 	TAILQ_INSERT_TAIL(&active_queue, t, tq_next);
 	mcs_pdr_unlock(&queue_lock);
-	/* Tell the kernel where and how we want to receive events.  This is just an
-	 * example of what to do to have a notification turned on.  We're turning on
-	 * USER_IPIs, posting events to vcore 0's vcpd, and telling the kernel to
-	 * send to vcore 0.  Note sys_self_notify will ignore the vcoreid and
-	 * private preference.  Also note that enable_kevent() is just an example,
-	 * and you probably want to use parts of event.c to do what you want. */
+	/* Tell the kernel where and how we want to receive events.  This is
+	 * just an example of what to do to have a notification turned on.
+	 * We're turning on USER_IPIs, posting events to vcore 0's vcpd, and
+	 * telling the kernel to send to vcore 0.  Note sys_self_notify will
+	 * ignore the vcoreid and private preference.  Also note that
+	 * enable_kevent() is just an example, and you probably want to use
+	 * parts of event.c to do what you want. */
 	enable_kevent(EV_USER_IPI, 0, EVENT_IPI | EVENT_VCORE_PRIVATE);
 	/* Set up the per-vcore structs to track outstanding syscalls */
 	sysc_mgmt = malloc(sizeof(struct sysc_mgmt) * max_vcores());
@@ -668,8 +680,8 @@ void pth_sched_init(void)
 	                             MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE,
 	                             -1, 0);
 	assert(mmap_block);
-	/* Could be smarter and do this on demand (in case we don't actually want
-	 * max_vcores()). */
+	/* Could be smarter and do this on demand (in case we don't actually
+	 * want max_vcores()). */
 	for (int i = 0; i < max_vcores(); i++) {
 		/* Each vcore needs to point to a non-VCPD ev_q */
 		sysc_mgmt[i].ev_q = get_eventq_raw();
@@ -686,9 +698,10 @@ void pth_sched_init(void)
 #endif 
 #if 0   /* One global ev_mbox, separate ev_q per vcore */
 	struct event_mbox *sysc_mbox = malloc(sizeof(struct event_mbox));
-	uintptr_t two_pages = (uintptr_t)mmap(0, PGSIZE * 2, PROT_WRITE | PROT_READ,
-	                                      MAP_POPULATE | MAP_ANONYMOUS |
-	                                      MAP_PRIVATE, -1, 0);
+	uintptr_t two_pages = (uintptr_t)mmap(0, PGSIZE * 2, PROT_WRITE |
+					      PROT_READ, MAP_POPULATE |
+					      MAP_ANONYMOUS | MAP_PRIVATE, -1,
+					      0);
 	printd("Global ucq: %08p\n", &sysc_mbox->ev_msgs);
 	assert(sysc_mbox);
 	assert(two_pages);
@@ -716,9 +729,9 @@ void pthread_mcp_init()
 	parlib_init_once_racy(return);
 
 	uthread_mcp_init();
-	/* From here forward we are an MCP running on vcore 0. Could consider doing
-	 * other pthread specific initialization based on knowing we are an mcp
-	 * after this point. */
+	/* From here forward we are an MCP running on vcore 0. Could consider
+	 * doing other pthread specific initialization based on knowing we are
+	 * an mcp after this point. */
 }
 
 int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
@@ -729,16 +742,17 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	struct pthread_tcb *pthread;
 	int ret;
 
-	/* For now, unconditionally become an mcp when creating a pthread (if not
-	 * one already). This may change in the future once we support 2LSs in an
-	 * SCP. */
+	/* For now, unconditionally become an mcp when creating a pthread (if
+	 * not one already). This may change in the future once we support 2LSs
+	 * in an SCP. */
 	pthread_mcp_init();
 
 	parent = (struct pthread_tcb*)current_uthread;
 	ret = posix_memalign((void**)&pthread, __alignof__(struct pthread_tcb),
 	                     sizeof(struct pthread_tcb));
 	assert(!ret);
-	memset(pthread, 0, sizeof(struct pthread_tcb));	/* aggressively 0 for bugs*/
+	/* aggressively 0 for bugs*/
+	memset(pthread, 0, sizeof(struct pthread_tcb));
 	pthread->stacksize = PTHREAD_STACK_SIZE;	/* default */
 	pthread->state = PTH_CREATED;
 	pthread->id = get_next_pid();
@@ -746,7 +760,7 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	SLIST_INIT(&pthread->cr_stack);
 	/* Respect the attributes */
 	if (attr) {
-		if (attr->stacksize)					/* don't set a 0 stacksize */
+		if (attr->stacksize)	/* don't set a 0 stacksize */
 			pthread->stacksize = attr->stacksize;
 		if (attr->detachstate == PTHREAD_CREATE_DETACHED)
 			uth_attr.detached = TRUE;
@@ -755,8 +769,8 @@ int __pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	if (__pthread_allocate_stack(pthread))
 		printf("We're fucked\n");
 	/* Set the u_tf to start up in __pthread_run, which will call the real
-	 * start_routine and pass it the arg.  Note those aren't set until later in
-	 * pthread_create(). */
+	 * start_routine and pass it the arg.  Note those aren't set until later
+	 * in pthread_create(). */
 	init_user_ctx(&pthread->uthread.u_ctx, (uintptr_t)&__pthread_run,
 	              (uintptr_t)(pthread->stacktop));
 	pthread->start_routine = start_routine;
@@ -831,6 +845,7 @@ void pthread_cleanup_push(void (*routine)(void *), void *arg)
 {
 	struct pthread_tcb *p = pthread_self();
 	struct pthread_cleanup_routine *r = malloc(sizeof(*r));
+
 	r->routine = routine;
 	r->arg = arg;
 	SLIST_INSERT_HEAD(&p->cr_stack, r, cr_next);
@@ -840,6 +855,7 @@ void pthread_cleanup_pop(int execute)
 {
 	struct pthread_tcb *p = pthread_self();
 	struct pthread_cleanup_routine *r = SLIST_FIRST(&p->cr_stack);
+
 	if (r) {
 		SLIST_REMOVE_HEAD(&p->cr_stack, cr_next);
 		if (execute)
@@ -992,7 +1008,8 @@ int pthread_cond_init(pthread_cond_t *c, const pthread_condattr_t *a)
 {
 	if (a) {
 		if (a->pshared != PTHREAD_PROCESS_PRIVATE)
-			fprintf(stderr, "pthreads only supports private condvars");
+			fprintf(stderr,
+				"pthreads only supports private condvars");
 		/* We also ignore clock_id */
 	}
 	uth_cond_var_init(c);
@@ -1141,17 +1158,18 @@ pthread_t pthread_self(void)
 
 int pthread_equal(pthread_t t1, pthread_t t2)
 {
-  return t1 == t2;
+	return t1 == t2;
 }
 
 int pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
 {
-	/* pthread_once's init routine doesn't take an argument, like parlibs.  This
-	 * means the func will be run with an argument passed to it, but it'll be
-	 * ignored. */
+	/* pthread_once's init routine doesn't take an argument, like parlibs.
+	 * This means the func will be run with an argument passed to it, but
+	 * it'll be ignored. */
 	parlib_run_once(once_control, (void (*)(void *))init_routine, NULL);
-	/* The return for pthread_once isn't an error from the function, it's just
-	 * an overall error.  Note pthread's init_routine() has no return value. */
+	/* The return for pthread_once isn't an error from the function, it's
+	 * just an overall error.  Note pthread's init_routine() has no return
+	 * value. */
 	return 0;
 }
 
@@ -1168,19 +1186,19 @@ int pthread_barrier_init(pthread_barrier_t *b,
 }
 
 struct barrier_junk {
-	pthread_barrier_t				*b;
-	int								ls;
+	pthread_barrier_t		*b;
+	int				ls;
 };
 
 /* Helper for spinning sync, returns TRUE if it is okay to keep spinning.
  *
  * Alternatives include:
- * 		old_count <= num_vcores() (barrier code, pass in old_count as *state,
- * 		                           but this only works if every awake pthread
- * 		                           will belong to the barrier).
- * 		just spin for a bit       (use *state to track spins)
- * 		FALSE                     (always is safe)
- * 		etc...
+ * 	old_count <= num_vcores() (barrier code, pass in old_count as *state,
+ * 	                           but this only works if every awake pthread
+ * 	                           will belong to the barrier).
+ * 	just spin for a bit       (use *state to track spins)
+ * 	FALSE                     (always is safe)
+ * 	etc...
  * 'threads_ready' isn't too great since sometimes it'll be non-zero when it is
  * about to become 0.  We really want "I have no threads waiting to run that
  * aren't going to run on their on unless this core yields instead of spins". */
@@ -1199,7 +1217,8 @@ static void __pth_barrier_cb(struct uthread *uthread, void *junk)
 	uthread_has_blocked(uthread, UTH_EXT_BLK_MUTEX);
 	/* TODO: if we used a trylock, we could bail as soon as we see sense */
 	spin_pdr_lock(&b->lock);
-	/* If sense is ls (our free value), we lost the race and shouldn't sleep */
+	/* If sense is ls (our free value), we lost the race and shouldn't sleep
+	 */
 	if (b->sense == ls) {
 		spin_pdr_unlock(&b->lock);
 		uthread_runnable(uthread);
@@ -1228,7 +1247,8 @@ static void __pth_barrier_cb(struct uthread *uthread, void *junk)
 int pthread_barrier_wait(pthread_barrier_t *b)
 {
 	unsigned int spin_state = 0;
-	int ls = !b->sense;	/* when b->sense is the value we read, then we're free*/
+	/* when b->sense is the value we read, then we're free*/
+	int ls = !b->sense;
 	uth_sync_t restartees;
 	struct uthread *uth_i;
 	struct barrier_junk local_junk;
@@ -1236,12 +1256,13 @@ int pthread_barrier_wait(pthread_barrier_t *b)
 	long old_count = atomic_fetch_and_add(&b->count, -1);
 
 	if (old_count == 1) {
-		/* TODO: we might want to grab the lock right away, so a few short
-		 * circuit faster? */
+		/* TODO: we might want to grab the lock right away, so a few
+		 * short circuit faster? */
 		atomic_set(&b->count, b->total_threads);
-		/* we still need to maintain ordering btw count and sense, in case
-		 * another thread doesn't sleep (if we wrote sense first, they could
-		 * break out, race around, and muck with count before it is time) */
+		/* we still need to maintain ordering btw count and sense, in
+		 * case another thread doesn't sleep (if we wrote sense first,
+		 * they could break out, race around, and muck with count before
+		 * it is time) */
 		/* wmb(); handled by the spin lock */
 		spin_pdr_lock(&b->lock);
 		/* Sense is only protected in addition to decisions to sleep */
@@ -1258,7 +1279,8 @@ int pthread_barrier_wait(pthread_barrier_t *b)
 		__uth_sync_wake_all(&restartees);
 		return PTHREAD_BARRIER_SERIAL_THREAD;
 	} else {
-		/* Spin if there are no other threads to run.  No sense sleeping */
+		/* Spin if there are no other threads to run.  No sense sleeping
+		 */
 		do {
 			if (b->sense == ls)
 				return 0;
@@ -1342,8 +1364,8 @@ int pthread_attr_setschedparam(pthread_attr_t *attr,
 {
 	/* The set of acceptable priorities are based on the scheduling policy.
 	 * We'll just accept any old number, since we might not know the policy
-	 * yet.  I didn't see anything in the man pages saying attr had to have a
-	 * policy set before setting priority. */
+	 * yet.  I didn't see anything in the man pages saying attr had to have
+	 * a policy set before setting priority. */
 	attr->sched_priority = param->sched_priority;
 	return 0;
 }

@@ -29,10 +29,10 @@ struct msr_value {
 };
 
 int msr_cores_read(const struct core_set *cset, const struct msr_address *msra,
-				   struct msr_value *msrv);
+		   struct msr_value *msrv);
 int msr_core_read(unsigned int core, uint32_t addr, uint64_t *value);
 int msr_cores_write(const struct core_set *cset, const struct msr_address *msra,
-					const struct msr_value *msrv);
+		    const struct msr_value *msrv);
 int msr_core_write(unsigned int core, uint32_t addr, uint64_t value);
 
 static inline void msr_set_address(struct msr_address *msra, uint32_t addr)
@@ -42,8 +42,8 @@ static inline void msr_set_address(struct msr_address *msra, uint32_t addr)
 }
 
 static inline void msr_set_addresses(struct msr_address *msra,
-									 const uint32_t *addresses,
-									 size_t num_addresses)
+				     const uint32_t *addresses,
+				     size_t num_addresses)
 {
 	ZERO_DATA(*msra);
 	msra->addresses = addresses;
@@ -51,8 +51,8 @@ static inline void msr_set_addresses(struct msr_address *msra,
 }
 
 static inline int msr_get_core_address(unsigned int coreno,
-									   const struct msr_address *msra,
-									   uint32_t *paddr)
+				       const struct msr_address *msra,
+				       uint32_t *paddr)
 {
 	if (msra->addresses != NULL) {
 		if (coreno >= (unsigned int) msra->num_addresses)
@@ -73,7 +73,7 @@ static inline void msr_set_value(struct msr_value *msrv, uint64_t value)
 }
 
 static inline void msr_set_values(struct msr_value *msrv,
-								  const uint64_t *values, size_t num_values)
+				  const uint64_t *values, size_t num_values)
 {
 	ZERO_DATA(*msrv);
 
@@ -85,7 +85,7 @@ static inline void msr_set_values(struct msr_value *msrv,
 }
 
 static inline int msr_set_core_value(unsigned int coreno, uint64_t value,
-									 struct msr_value *msrv)
+				     struct msr_value *msrv)
 {
 	if (msrv->values != NULL) {
 		if (coreno >= (unsigned int) msrv->num_values)
@@ -100,8 +100,8 @@ static inline int msr_set_core_value(unsigned int coreno, uint64_t value,
 }
 
 static inline int msr_get_core_value(unsigned int coreno,
-									 const struct msr_value *msrv,
-									 uint64_t *pvalue)
+				     const struct msr_value *msrv,
+				     uint64_t *pvalue)
 {
 	if (msrv->values != NULL) {
 		if (coreno >= (unsigned int) msrv->num_values)

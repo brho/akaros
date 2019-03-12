@@ -106,7 +106,8 @@ static struct chan *capopen(struct chan *c, int omode)
 	switch ((uint32_t)c->qid.path) {
 	case Qhash:
 		if (!iseve())
-			error(EPERM, "Permission denied: only eve can open Qhash");
+			error(EPERM,
+			      "Permission denied: only eve can open Qhash");
 		break;
 	}
 
@@ -250,7 +251,8 @@ static size_t capwrite(struct chan *c, void *va, size_t n, off64_t m)
 
 		p = remcap((uint8_t *)hashstr);
 		if (p == NULL) {
-			snprintf(err, sizeof(err), "invalid capability %s@%s", from, key);
+			snprintf(err, sizeof(err), "invalid capability %s@%s",
+				 from, key);
 			error(EINVAL, err);
 		}
 

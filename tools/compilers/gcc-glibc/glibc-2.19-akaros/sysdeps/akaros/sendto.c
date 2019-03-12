@@ -40,8 +40,8 @@ static ssize_t __sendto_udp(Rock *r, int fd, const struct iovec *iov, int
 
 	/* Might not have a to if we were called from send() */
 	if (!to.__sockaddr__) {
-		/* if they didn't connect yet, then there's no telling what raddr
-		 * will be.  TODO: check a state flag or something? */
+		/* if they didn't connect yet, then there's no telling what
+		 * raddr will be.  TODO: check a state flag or something? */
 		to.__sockaddr__ = (struct sockaddr *)(&r->raddr);
 	}
 	remote_addr = (to.__sockaddr_in__)->sin_addr.s_addr;
@@ -83,8 +83,8 @@ ssize_t __sendto_iov(int fd, const struct iovec *iov, int iovcnt,
 
 /* Send N bytes of BUF on socket FD to peer at address TO (which is TOLEN bytes
  * long).  Returns the number sent, or -1 for errors.  */
-ssize_t __sendto(int fd, const void *buf, size_t n,
-				 int flags, __CONST_SOCKADDR_ARG to, socklen_t tolen)
+ssize_t __sendto(int fd, const void *buf, size_t n, int flags,
+		 __CONST_SOCKADDR_ARG to, socklen_t tolen)
 {
 	struct iovec iov[1];
 

@@ -38,6 +38,7 @@ uint8_t ethaddr[] = {
 int main(int argc, char **argv)
 {
 	int ret;
+
 	if (register_printf_specifier('i', printf_ipaddr, printf_ipaddr_info))
 		printf("Failed to register 'i'\n");
 	if (register_printf_specifier('M', printf_ipmask, printf_ipmask_info))

@@ -221,7 +221,8 @@ struct ipifc *readipifc(char *net, struct ipifc *ifc, int index)
 				continue;
 			if (strcmp(de->d_name, "stats") == 0)
 				continue;
-			snprintf(buf, sizeof(buf), "%s/%s/status", directory, de->d_name);
+			snprintf(buf, sizeof(buf), "%s/%s/status", directory,
+				 de->d_name);
 			l = _readipifc(buf, l, atoi(de->d_name));
 		}
 		closedir(d);

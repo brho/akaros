@@ -29,6 +29,7 @@ static char PCI2CARDBUS[] = "PCI-Cardbus Bridge";
 static uint32_t pci_getbar(struct pci_device *pcidev, unsigned int bar)
 {
 	uint8_t type;
+
 	if (bar >= MAX_PCI_BAR)
 		panic("Nonexistant bar requested!");
 	type = pcidev_read8(pcidev, PCI_HEADER_REG);
@@ -66,6 +67,7 @@ static bool pci_is_membar64(uint32_t bar)
 static uint32_t pci_getmembar32(uint32_t bar)
 {
 	uint8_t type = bar & PCI_MEMBAR_TYPE;
+
 	if (type != PCI_MEMBAR_32BIT) {
 		warn("Unhandled PCI membar type: %02p\n", type >> 1);
 		return 0;
@@ -91,6 +93,7 @@ static uint32_t __pci_membar_get_sz(struct pci_device *pcidev, int bar)
 	uint32_t bar_off = PCI_BAR0_STD + bar * PCI_BAR_OFF;
 	uint32_t old_val = pcidev_read32(pcidev, bar_off);
 	uint32_t retval;
+
 	pcidev_write32(pcidev, bar_off, 0xffffffff);
 	/* Don't forget to mask the lower 3 bits! */
 	retval = pcidev_read32(pcidev, bar_off) & PCI_BAR_MEM_MASK;
@@ -107,13 +110,15 @@ static void __pci_handle_bars(struct pci_device *pcidev)
 {
 	uint32_t bar_val;
 	int max_bars;
+
 	if (pcidev->header_type == STD_PCI_DEV)
 		max_bars = MAX_PCI_BAR;
 	else if (pcidev->header_type == PCI2PCI)
 		max_bars = 2;
 	else
 		max_bars = 0;
-	/* TODO: consider aborting for classes 00, 05 (memory ctlr), 06 (bridge) */
+	/* TODO: consider aborting for classes 00, 05 (memory ctlr), 06 (bridge)
+	 */
 	for (int i = 0; i < max_bars; i++) {
 		bar_val = pci_getbar(pcidev, i);
 		pcidev->bar[i].raw_bar = bar_val;
@@ -123,23 +128,31 @@ static void __pci_handle_bars(struct pci_device *pcidev)
 			pcidev->bar[i].pio_base = pci_getiobar32(bar_val);
 		} else {
 			if (pci_is_membar32(bar_val)) {
-				pcidev->bar[i].mmio_base32 = bar_val & PCI_BAR_MEM_MASK;
-				pcidev->bar[i].mmio_sz = __pci_membar_get_sz(pcidev, i);
+				pcidev->bar[i].mmio_base32 =
+					bar_val & PCI_BAR_MEM_MASK;
+				pcidev->bar[i].mmio_sz =
+					__pci_membar_get_sz(pcidev, i);
 			} else if (pci_is_membar64(bar_val)) {
-				/* 64 bit, the lower 32 are in this bar, the upper
-				 * are in the next bar */
-				pcidev->bar[i].mmio_base64 = bar_val & PCI_BAR_MEM_MASK;
+				/* 64 bit, the lower 32 are in this bar, the
+				 * upper are in the next bar */
+				pcidev->bar[i].mmio_base64 =
+					bar_val & PCI_BAR_MEM_MASK;
 				assert(i < max_bars - 1);
-				bar_val = pci_getbar(pcidev, i + 1);	/* read next bar */
-				/* note we don't check for IO or memsize.  the entire next bar
-				 * is supposed to be for the upper 32 bits. */
-				pcidev->bar[i].mmio_base64 |= (uint64_t)bar_val << 32;
-				pcidev->bar[i].mmio_sz = __pci_membar_get_sz(pcidev, i);
+				/* read next bar */
+				bar_val = pci_getbar(pcidev, i + 1);
+				/* note we don't check for IO or memsize.  the
+				 * entire next bar is supposed to be for the
+				 * upper 32 bits. */
+				pcidev->bar[i].mmio_base64 |=
+					(uint64_t)bar_val << 32;
+				pcidev->bar[i].mmio_sz =
+					__pci_membar_get_sz(pcidev, i);
 				i++;
 			}
 		}
-		/* this will track the maximum bar we've had.  it'll include the 64 bit
-		 * uppers, as well as devices that have only higher numbered bars. */
+		/* this will track the maximum bar we've had.  it'll include the
+		 * 64 bit uppers, as well as devices that have only higher
+		 * numbered bars. */
 		pcidev->nr_bars = i + 1;
 	}
 }
@@ -148,18 +161,19 @@ static void __pci_parse_caps(struct pci_device *pcidev)
 {
 	uint32_t cap_off;	/* not sure if this can be extended from u8 */
 	uint8_t cap_id;
+
 	if (!(pcidev_read16(pcidev, PCI_STATUS_REG) & (1 << 4)))
 		return;
 	switch (pcidev_read8(pcidev, PCI_HEADER_REG) & 0x7f) {
-		case 0:				/* etc */
-		case 1:				/* pci to pci bridge */
-			cap_off = 0x34;
-			break;
-		case 2:				/* cardbus bridge */
-			cap_off = 0x14;
-			break;
-		default:
-			return;
+	case 0:				/* etc */
+	case 1:				/* pci to pci bridge */
+		cap_off = 0x34;
+		break;
+	case 2:				/* cardbus bridge */
+		cap_off = 0x14;
+		break;
+	default:
+		return;
 	}
 	/* initial offset points to the addr of the first cap */
 	cap_off = pcidev_read8(pcidev, cap_off);
@@ -167,16 +181,16 @@ static void __pci_parse_caps(struct pci_device *pcidev)
 	while (cap_off) {
 		cap_id = pcidev_read8(pcidev, cap_off);
 		if (cap_id > PCI_CAP_ID_MAX) {
-			printk("PCI %x:%x:%x had bad cap 0x%x\n", pcidev->bus, pcidev->dev,
-			       pcidev->func, cap_id);
+			printk("PCI %x:%x:%x had bad cap 0x%x\n", pcidev->bus,
+			       pcidev->dev, pcidev->func, cap_id);
 			return;
 		}
 		pcidev->caps[cap_id] = cap_off;
 		cap_off = pcidev_read8(pcidev, cap_off + 1);
 		/* not sure if subsequent caps must be aligned or not */
 		if (cap_off & 0x3)
-			printk("PCI %x:%x:%x had unaligned cap offset 0x%x\n", pcidev->bus,
-			       pcidev->dev, pcidev->func, cap_off);
+			printk("PCI %x:%x:%x had unaligned cap offset 0x%x\n",
+			       pcidev->bus, pcidev->dev, pcidev->func, cap_off);
 	}
 }
 
@@ -188,9 +202,9 @@ void pci_init(void)
 	uint16_t dev_id, ven_id;
 	struct pci_device *pcidev;
 	int max_nr_func;
-	/* In earlier days bus address 0xff caused problems so we only iterated to
-	 * PCI_MAX_BUS - 1, but this should no longer be an issue.
-	 * Old comment: phantoms at 0xff */
+	/* In earlier days bus address 0xff caused problems so we only iterated
+	 * to PCI_MAX_BUS - 1, but this should no longer be an issue.  Old
+	 * comment: phantoms at 0xff */
 	for (int i = 0; i < PCI_MAX_BUS; i++) {
 		for (int j = 0; j < PCI_MAX_DEV; j++) {
 			max_nr_func = 1;
@@ -199,16 +213,18 @@ void pci_init(void)
 				dev_id = result >> 16;
 				ven_id = result & 0xffff;
 				/* Skip invalid IDs (not a device)
-				 * If the first function doesn't exist then no device is
-				 * connected, but there can be gaps in the other function
-				 * numbers. Eg. 0,2,3 is ok. */
+				 * If the first function doesn't exist then no
+				 * device is connected, but there can be gaps in
+				 * the other function numbers. Eg. 0,2,3 is ok.
+				 * */
 				if (ven_id == INVALID_VENDOR_ID) {
 					if (k == 0)
 						break;
 					continue;
 				}
 				pcidev = kzmalloc(sizeof(struct pci_device), 0);
-				/* we don't need to lock it til we post the pcidev to the list*/
+				/* we don't need to lock it til we post the
+				 * pcidev to the list*/
 				spinlock_init_irqsave(&pcidev->lock);
 				pcidev->bus = i;
 				pcidev->dev = j;
@@ -219,43 +235,58 @@ void pci_init(void)
 				pcidev->dev_id = dev_id;
 				pcidev->ven_id = ven_id;
 				/* Get the Class/subclass */
-				pcidev->class = pcidev_read8(pcidev, PCI_CLASS_REG);
-				pcidev->subclass = pcidev_read8(pcidev, PCI_SUBCLASS_REG);
-				pcidev->progif = pcidev_read8(pcidev, PCI_PROGIF_REG);
-				/* All device types (0, 1, 2) have the IRQ in the same place */
+				pcidev->class =
+					pcidev_read8(pcidev, PCI_CLASS_REG);
+				pcidev->subclass =
+					pcidev_read8(pcidev, PCI_SUBCLASS_REG);
+				pcidev->progif =
+					pcidev_read8(pcidev, PCI_PROGIF_REG);
+				/* All device types (0, 1, 2) have the IRQ in
+				 * the same place */
 				/* This is the PIC IRQ the device is wired to */
-				pcidev->irqline = pcidev_read8(pcidev, PCI_IRQLINE_STD);
-				/* This is the interrupt pin the device uses (INTA# - INTD#) */
-				pcidev->irqpin = pcidev_read8(pcidev, PCI_IRQPIN_STD);
+				pcidev->irqline =
+					pcidev_read8(pcidev, PCI_IRQLINE_STD);
+				/* This is the interrupt pin the device uses
+				 * (INTA# - INTD#) */
+				pcidev->irqpin =
+					pcidev_read8(pcidev, PCI_IRQPIN_STD);
 				/* bottom 7 bits are header type */
-				switch (pcidev_read8(pcidev, PCI_HEADER_REG) & 0x7c) {
-					case 0x00:
-						pcidev->header_type = STD_PCI_DEV;
-						break;
-					case 0x01:
-						pcidev->header_type = PCI2PCI;
-						break;
-					case 0x02:
-						pcidev->header_type = PCI2CARDBUS;
-						break;
-					default:
-						pcidev->header_type = "Unknown Header Type";
+				switch (pcidev_read8(pcidev, PCI_HEADER_REG)
+					& 0x7c) {
+				case 0x00:
+					pcidev->header_type = STD_PCI_DEV;
+					break;
+				case 0x01:
+					pcidev->header_type = PCI2PCI;
+					break;
+				case 0x02:
+					pcidev->header_type = PCI2CARDBUS;
+					break;
+				default:
+					pcidev->header_type =
+						"Unknown Header Type";
 				}
+				
 				__pci_handle_bars(pcidev);
 				__pci_parse_caps(pcidev);
-				/* we're the only writer at this point in the boot process */
-				STAILQ_INSERT_TAIL(&pci_devices, pcidev, all_dev);
+				/* we're the only writer at this point in the
+				 * boot process */
+				STAILQ_INSERT_TAIL(&pci_devices, pcidev,
+						   all_dev);
 				#ifdef CONFIG_PCI_VERBOSE
 				pcidev_print_info(pcidev, 4);
 				#else
 				pcidev_print_info(pcidev, 0);
 				#endif /* CONFIG_PCI_VERBOSE */
-				/* Top bit determines if we have multiple functions on this
-				 * device.  We can't just check for more functions, since
-				 * non-multifunction devices exist that respond to different
-				 * functions with the same underlying device (same bars etc).
-				 * Note that this style allows for devices that only report
-				 * multifunction in the first function's header. */
+				/* Top bit determines if we have multiple
+				 * functions on this device.  We can't just
+				 * check for more functions, since
+				 * non-multifunction devices exist that respond
+				 * to different functions with the same
+				 * underlying device (same bars etc).  Note that
+				 * this style allows for devices that only
+				 * report multifunction in the first function's
+				 * header. */
 				if (pcidev_read8(pcidev, PCI_HEADER_REG) & 0x80)
 					max_nr_func = PCI_MAX_FUNC;
 			}
@@ -269,8 +300,8 @@ uint32_t pci_config_addr(uint8_t bus, uint8_t dev, uint8_t func, uint32_t reg)
 	                  ((uint32_t)dev << 11) |
 	                  ((uint32_t)func << 8) |
 	                  (reg & 0xfc) |
-	                  ((reg & 0xf00) << 16) |	/* extended PCI CFG space... */
-					  0x80000000);
+	                  ((reg & 0xf00) << 16) |/* extended PCI CFG space... */
+	                  0x80000000);
 }
 
 /* Helper to read 32 bits from the config space of B:D:F.  'Offset' is how far
@@ -278,6 +309,7 @@ uint32_t pci_config_addr(uint8_t bus, uint8_t dev, uint8_t func, uint32_t reg)
 uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
 {
 	uint32_t ret;
+
 	spin_lock_irqsave(&pci_lock);
 	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
 	ret = inl(PCI_CONFIG_DATA);
@@ -299,6 +331,7 @@ void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
 uint16_t pci_read16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
 {
 	uint16_t ret;
+
 	spin_lock_irqsave(&pci_lock);
 	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
 	ret = inw(PCI_CONFIG_DATA + (offset & 2));
@@ -318,6 +351,7 @@ void pci_write16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
 uint8_t pci_read8(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
 {
 	uint8_t ret;
+
 	spin_lock_irqsave(&pci_lock);
 	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
 	ret = inb(PCI_CONFIG_DATA + (offset & 3));
@@ -369,7 +403,7 @@ void pcidev_write8(struct pci_device *pcidev, uint32_t offset, uint8_t value)
 static void pcidev_get_cldesc(struct pci_device *pcidev, char **class,
                               char **subclass, char **progif)
 {
-	int	i ;
+	int i;
 	*class = *subclass = *progif = "";
 
 	for (i = 0; i < PCI_CLASSCODETABLE_LEN; i++) {
@@ -378,8 +412,10 @@ static void pcidev_get_cldesc(struct pci_device *pcidev, char **class,
 				*class = PciClassCodeTable[i].BaseDesc;
 			if (PciClassCodeTable[i].SubClass == pcidev->subclass) {
 				if (!(**subclass))
-					*subclass = PciClassCodeTable[i].SubDesc;
-				if (PciClassCodeTable[i].ProgIf == pcidev->progif) {
+					*subclass =
+						PciClassCodeTable[i].SubDesc;
+				if (PciClassCodeTable[i].ProgIf ==
+				    pcidev->progif) {
 					*progif = PciClassCodeTable[i].ProgDesc;
 					break ;
 				}
@@ -392,7 +428,7 @@ static void pcidev_get_cldesc(struct pci_device *pcidev, char **class,
 static void pcidev_get_devdesc(struct pci_device *pcidev, char **vend_short,
                                char **vend_full, char **chip, char **chip_desc)
 {
-	int	i ;
+	int i;
 	*vend_short = *vend_full = *chip = *chip_desc = "";
 
 	for (i = 0; i < PCI_VENTABLE_LEN; i++) {
@@ -416,6 +452,7 @@ static void pcidev_get_devdesc(struct pci_device *pcidev, char **vend_short,
 void pcidev_print_info(struct pci_device *pcidev, int verbosity)
 {
 	char *ven_sht, *ven_fl, *chip, *chip_txt, *class, *subcl, *progif;
+
 	pcidev_get_cldesc(pcidev, &class, &subcl, &progif);
 	pcidev_get_devdesc(pcidev, &ven_sht, &ven_fl, &chip, &chip_txt);
 
@@ -448,7 +485,8 @@ void pcidev_print_info(struct pci_device *pcidev, int verbosity)
 			assert(pcidev->bar[i].pio_base);
 			printk("IO port 0x%04x\n", pcidev->bar[i].pio_base);
 		} else {
-			bool bar_is_64 = pci_is_membar64(pcidev->bar[i].raw_bar);
+			bool bar_is_64 =
+				pci_is_membar64(pcidev->bar[i].raw_bar);
 			printk("MMIO Base%s %p, MMIO Size %p\n",
 			       bar_is_64 ? "64" : "32",
 			       bar_is_64 ? pcidev->bar[i].mmio_base64 :
@@ -456,7 +494,7 @@ void pcidev_print_info(struct pci_device *pcidev, int verbosity)
 			       pcidev->bar[i].mmio_sz);
 			/* Takes up two bars */
 			if (bar_is_64) {
-				assert(!pcidev->bar[i].mmio_base32);	/* double-check */
+				assert(!pcidev->bar[i].mmio_base32);
 				i++;
 			}
 		}
@@ -480,6 +518,7 @@ void pci_set_bus_master(struct pci_device *pcidev)
 void pci_clr_bus_master(struct pci_device *pcidev)
 {
 	uint16_t reg;
+
 	spin_lock_irqsave(&pcidev->lock);
 	reg = pcidev_read16(pcidev, PCI_CMD_REG);
 	reg &= ~PCI_CMD_BUS_MAS;
@@ -491,6 +530,7 @@ struct pci_device *pci_match_tbdf(int tbdf)
 {
 	struct pci_device *search;
 	int bus, dev, func;
+
 	bus = BUSBNO(tbdf);
 	dev = BUSDNO(tbdf);
 	func = BUSFNO(tbdf);
@@ -513,8 +553,8 @@ uintptr_t pci_get_membar(struct pci_device *pcidev, int bir)
 		assert(pci_is_membar64(pcidev->bar[bir].raw_bar));
 		return pcidev->bar[bir].mmio_base64;
 	}
-	/* we can just return mmio_base32, even if it's 0.  but i'd like to do the
-	 * assert too. */
+	/* we can just return mmio_base32, even if it's 0.  but i'd like to do
+	 * the assert too. */
 	if (pcidev->bar[bir].mmio_base32) {
 		assert(pci_is_membar32(pcidev->bar[bir].raw_bar));
 		return pcidev->bar[bir].mmio_base32;
@@ -555,15 +595,16 @@ uint16_t pci_get_device(struct pci_device *pcidev)
 uint16_t pci_get_subvendor(struct pci_device *pcidev)
 {
 	uint8_t header_type = pcidev_read8(pcidev, PCI_HEADER_REG) & 0x7c;
+
 	switch (header_type) {
-		case 0x00: /* STD_PCI_DEV */
-			return pcidev_read16(pcidev, PCI_SUBSYSVEN_STD);
-		case 0x01: /* PCI2PCI */
-			return -1;
-		case 0x02: /* PCI2CARDBUS */
-			return pcidev_read16(pcidev, PCI_SUBVENID_CB);
-		default:
-			warn("Unknown Header Type, %d", header_type);
+	case 0x00: /* STD_PCI_DEV */
+		return pcidev_read16(pcidev, PCI_SUBSYSVEN_STD);
+	case 0x01: /* PCI2PCI */
+		return -1;
+	case 0x02: /* PCI2CARDBUS */
+		return pcidev_read16(pcidev, PCI_SUBVENID_CB);
+	default:
+		warn("Unknown Header Type, %d", header_type);
 	}
 	return -1;
 }
@@ -571,15 +612,16 @@ uint16_t pci_get_subvendor(struct pci_device *pcidev)
 uint16_t pci_get_subdevice(struct pci_device *pcidev)
 {
 	uint8_t header_type = pcidev_read8(pcidev, PCI_HEADER_REG) & 0x7c;
+
 	switch (header_type) {
-		case 0x00: /* STD_PCI_DEV */
-			return pcidev_read16(pcidev, PCI_SUBSYSID_STD);
-		case 0x01: /* PCI2PCI */
-			return -1;
-		case 0x02: /* PCI2CARDBUS */
-			return pcidev_read16(pcidev, PCI_SUBDEVID_CB);
-		default:
-			warn("Unknown Header Type, %d", header_type);
+	case 0x00: /* STD_PCI_DEV */
+		return pcidev_read16(pcidev, PCI_SUBSYSID_STD);
+	case 0x01: /* PCI2PCI */
+		return -1;
+	case 0x02: /* PCI2CARDBUS */
+		return pcidev_read16(pcidev, PCI_SUBDEVID_CB);
+	default:
+		warn("Unknown Header Type, %d", header_type);
 	}
 	return -1;
 }
@@ -600,8 +642,9 @@ int pci_find_cap(struct pci_device *pcidev, uint8_t cap_id, uint32_t *cap_reg)
 		return -EINVAL;
 	if (!pcidev->caps[cap_id])
 		return -ENOENT;
-	/* The actual value at caps[id] is the offset in the PCI config space where
-	 * that ID was stored.  That's needed for accessing the capability. */
+	/* The actual value at caps[id] is the offset in the PCI config space
+	 * where that ID was stored.  That's needed for accessing the
+	 * capability. */
 	if (cap_reg)
 		*cap_reg = pcidev->caps[cap_id];
 	return 0;
@@ -616,6 +659,7 @@ uintptr_t pci_map_membar(struct pci_device *dev, int bir)
 {
 	uintptr_t paddr = pci_get_membar(dev, bir);
 	size_t sz = pci_get_membar_sz(dev, bir);
+	
 	if (!paddr || !sz)
 		return 0;
 	return vmap_pmem_nocache(paddr, sz);

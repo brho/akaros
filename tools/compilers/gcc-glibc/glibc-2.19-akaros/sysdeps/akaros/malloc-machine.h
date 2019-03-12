@@ -37,10 +37,10 @@ typedef struct spin_pdr_lock mutex_t;
 #include <bits/libc-tsd.h>
 
 typedef void* tsd_key_t;	/* no key data structure, libc magic does it */
-__libc_tsd_define (static, void *, MALLOC)	/* declaration/common definition */
-#define tsd_key_create(key, destr)	((void) (key))
-#define tsd_setspecific(key, data)	__libc_tsd_set (void *, MALLOC, (data))
-#define tsd_getspecific(key, vptr)	((vptr) = __libc_tsd_get (void *, MALLOC))
+__libc_tsd_define (static, void *, MALLOC) /* declaration/common definition */
+#define tsd_key_create(key, destr) ((void) (key))
+#define tsd_setspecific(key, data) __libc_tsd_set (void *, MALLOC, (data))
+#define tsd_getspecific(key, vptr) ((vptr) = __libc_tsd_get (void *, MALLOC))
 
 /* TODO: look into pthread's version.  We might need this, and it could be that
  * glibc has the fork_cbs already. */

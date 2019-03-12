@@ -77,21 +77,22 @@ static void send_evbitmap_msg(struct evbitmap *evbm, struct event_msg *msg)
 static void post_ev_msg(struct proc *p, struct event_mbox *mbox,
                         struct event_msg *msg, int ev_flags)
 {
-	printd("[kernel] Sending event type %d to mbox %p\n", msg->ev_type, mbox);
+	printd("[kernel] Sending event type %d to mbox %p\n",
+	       msg->ev_type, mbox);
 	/* Sanity check */
 	assert(p);
 	switch (mbox->type) {
-		case (EV_MBOX_UCQ):
-			send_ucq_msg(&mbox->ucq, p, msg);
-			break;
-		case (EV_MBOX_BITMAP):
-			send_evbitmap_msg(&mbox->evbm, msg);
-			break;
-		case (EV_MBOX_CEQ):
-			send_ceq_msg(&mbox->ceq, p, msg);
-			break;
-		default:
-			printk("[kernel] Unknown mbox type %d!\n", mbox->type);
+	case (EV_MBOX_UCQ):
+		send_ucq_msg(&mbox->ucq, p, msg);
+		break;
+	case (EV_MBOX_BITMAP):
+		send_evbitmap_msg(&mbox->evbm, msg);
+		break;
+	case (EV_MBOX_CEQ):
+		send_ceq_msg(&mbox->ceq, p, msg);
+		break;
+	default:
+		printk("[kernel] Unknown mbox type %d!\n", mbox->type);
 	}
 }
 
@@ -104,10 +105,11 @@ static void post_vc_msg(struct proc *p, uint32_t vcoreid,
 {
 	struct preempt_data *vcpd = &__procdata.vcore_preempt_data[vcoreid];
 	post_ev_msg(p, ev_mbox, ev_msg, ev_flags);
-	/* Set notif pending so userspace doesn't miss the message while yielding */
+	/* Set notif pending so userspace doesn't miss the message while
+	 * yielding */
 	wmb(); /* Ensure ev_msg write is before notif_pending */
-	/* proc_notify() also sets this, but the ev_q might not have requested an
-	 * IPI, so we have to do it here too. */
+	/* proc_notify() also sets this, but the ev_q might not have requested
+	 * an IPI, so we have to do it here too. */
 	vcpd->notif_pending = TRUE;
 }
 
@@ -135,11 +137,12 @@ static void spam_vcore(struct proc *p, uint32_t vcoreid,
 static bool try_spam_vcore(struct proc *p, uint32_t vcoreid,
                            struct event_msg *ev_msg, int ev_flags)
 {
-	/* Not sure if we can or not, so check before spamming.  Technically, the
-	 * only critical part is that we __alert, then check can_alert. */
+	/* Not sure if we can or not, so check before spamming.  Technically,
+	 * the only critical part is that we __alert, then check can_alert. */
 	if (can_msg_vcore(vcoreid)) {
 		spam_vcore(p, vcoreid, ev_msg, ev_flags);
-		wrmb();	/* prev write (notif_pending) must come before following reads*/
+		/* prev write (notif_pending) must come before following reads*/
+		wrmb();
 		if (can_msg_vcore(vcoreid))
 			return TRUE;
 	}
@@ -160,33 +163,37 @@ static bool spam_list_member(struct vcore_tailq *list, struct proc *p,
 	uint32_t vcoreid;
 	int loops = 0;
 	vc = TAILQ_FIRST(list);
-	/* If the list appears empty, we'll bail out (failing) after the loop. */
+	/* If the list appears empty, we'll bail out (failing) after the loop.
+	 */
 	while (vc) {
 		vcoreid = vcore2vcoreid(p, vc);
-		/* post the alert.  Not using the try_spam_vcore() helper since I want
-		 * something more customized for the lists. */
+		/* post the alert.  Not using the try_spam_vcore() helper since
+		 * I want something more customized for the lists. */
 		spam_vcore(p, vcoreid, ev_msg, ev_flags);
-		wrmb();	/* prev write (notif_pending) must come before following reads*/
-		/* I used to check can_msg_vcore(vcoreid) here, but that would make
-		 * spamming list members unusable for MUST_RUN scenarios.
+		/* prev write (notif_pending) must come before following reads*/
+		wrmb();
+		/* I used to check can_msg_vcore(vcoreid) here, but that would
+		 * make spamming list members unusable for MUST_RUN scenarios.
 		 *
-		 * Regardless, if they are still the first on the list, then they are
-		 * still going to get the message.  For the online list, proc_yield()
-		 * will return them to userspace (where they will get the message)
-		 * because __alert_vcore() set notif_pending.  For the BP list, they
-		 * will either be turned on later, or have a preempt message sent about
-		 * their demise.
+		 * Regardless, if they are still the first on the list, then
+		 * they are still going to get the message.  For the online
+		 * list, proc_yield() will return them to userspace (where they
+		 * will get the message) because __alert_vcore() set
+		 * notif_pending.  For the BP list, they will either be turned
+		 * on later, or have a preempt message sent about their demise.
 		 *
-		 * We race on list membership (and not exclusively VC_CAN_RCV_MSG, so
-		 * that when it fails we can get a new vcore to try (or know WHP there
-		 * are none). */
+		 * We race on list membership (and not exclusively
+		 * VC_CAN_RCV_MSG, so that when it fails we can get a new vcore
+		 * to try (or know WHP there are none). */
 		vc_first = TAILQ_FIRST(list);
 		if (vc == vc_first)
 			return TRUE;
-		/* At this point, the list has changed and the vcore we tried yielded,
-		 * so we try the *new* list head.  Track loops for sanity reasons. */
+		/* At this point, the list has changed and the vcore we tried
+		 * yielded, so we try the *new* list head.  Track loops for
+		 * sanity reasons. */
 		if (loops++ > 10) {
-			warn("Too many (%d) attempts to find a vcore, failing!", loops);
+			warn("Too many (%d) attempts to find a vcore, failing!",
+			     loops);
 			return FALSE;	/* always safe to fail! */
 		}
 		/* Get set up for your attack run! */
@@ -217,7 +224,7 @@ static bool spam_list_member(struct vcore_tailq *list, struct proc *p,
  * we try to send_event() (in theory, there isn't code that can send that event
  * yet).  Someone else will get the event and wake up the preempted vcore. */
 static void spam_public_msg(struct proc *p, struct event_msg *ev_msg,
-							uint32_t vcoreid, int ev_flags)
+			    uint32_t vcoreid, int ev_flags)
 {
 	struct vcore *vc;
 	if (!__proc_is_mcp(p)) {
@@ -225,11 +232,15 @@ static void spam_public_msg(struct proc *p, struct event_msg *ev_msg,
 		return;
 	}
 	if (ev_flags & EVENT_VCORE_MUST_RUN) {
-		/* Could check for waiting and skip these spams, which will fail.  Could
-		 * also skip trying for vcoreid, and just spam any old online VC. */
-		if (vcore_is_mapped(p, vcoreid)) {	/* check, signal, check again */
+		/* Could check for waiting and skip these spams, which will
+		 * fail.  Could also skip trying for vcoreid, and just spam any
+		 * old online VC. */
+		if (vcore_is_mapped(p, vcoreid)) {
+			/* check, signal, check again */
 			spam_vcore(p, vcoreid, ev_msg, ev_flags);
-			wrmb();	/* notif_pending write must come before following read */
+			/* notif_pending write must come before following read
+			 */
+			wrmb();
 			if (vcore_is_mapped(p, vcoreid))
 				return;
 		}
@@ -244,8 +255,8 @@ static void spam_public_msg(struct proc *p, struct event_msg *ev_msg,
 	if (p->state == PROC_WAITING)
 		goto ultimate_fallback;
 	/* If we're here, the desired vcore is unreachable, but the process is
-	 * probably RUNNING_M (online_vs) or RUNNABLE_M (bulk preempted or recently
-	 * woken up), so we'll need to find another vcore. */
+	 * probably RUNNING_M (online_vs) or RUNNABLE_M (bulk preempted or
+	 * recently woken up), so we'll need to find another vcore. */
 	if (spam_list_member(&p->online_vcs, p, ev_msg, ev_flags))
 		return;
 	if (spam_list_member(&p->bulk_preempted_vcs, p, ev_msg, ev_flags))
@@ -257,55 +268,57 @@ static void spam_public_msg(struct proc *p, struct event_msg *ev_msg,
 	vc = TAILQ_FIRST(&p->inactive_vcs);
 	if (vc) {	/* might be none in rare circumstances */
 		if (try_spam_vcore(p, vcore2vcoreid(p, vc), ev_msg, ev_flags)) {
-			/* It's possible that we're WAITING here.  EVENT_WAKEUP will handle
-			 * it.  One way for this to happen is if a normal vcore was
-			 * preempted right as another vcore was yielding, and the preempted
-			 * message was sent after the last vcore yielded (which caused us to
-			 * be WAITING). */
+			/* It's possible that we're WAITING here.  EVENT_WAKEUP
+			 * will handle it.  One way for this to happen is if a
+			 * normal vcore was preempted right as another vcore was
+			 * yielding, and the preempted message was sent after
+			 * the last vcore yielded (which caused us to be
+			 * WAITING). */
 			return;
 		}
 	}
 ultimate_fallback:
 	/* At this point, we can't find one.  This could be due to a (hopefully
-	 * rare) weird yield/request storm, or more commonly because the lists were
-	 * empty and the process is simply WAITING (yielded all of its vcores and is
-	 * waiting on an event).  Time for the ultimate fallback: locking.  Note
-	 * that when we __alert_vcore(), there is a chance we need to mmap, which
-	 * grabs the vmr_lock and pte_lock. */
+	 * rare) weird yield/request storm, or more commonly because the lists
+	 * were empty and the process is simply WAITING (yielded all of its
+	 * vcores and is waiting on an event).  Time for the ultimate fallback:
+	 * locking.  Note that when we __alert_vcore(), there is a chance we
+	 * need to mmap, which grabs the vmr_lock and pte_lock. */
 	spin_lock(&p->proc_lock);
 	if (p->state != PROC_WAITING) {
-		/* We need to check the online and bulk_preempt lists again, now that we
-		 * are sure no one is messing with them.  If we're WAITING, we can skip
-		 * these (or assert they are empty!). */
+		/* We need to check the online and bulk_preempt lists again, now
+		 * that we are sure no one is messing with them.  If we're
+		 * WAITING, we can skip these (or assert they are empty!). */
 		vc = TAILQ_FIRST(&p->online_vcs);
 		if (vc) {
-			/* there's an online vcore, so just alert it (we know it isn't going
-			 * anywhere), and return */
+			/* there's an online vcore, so just alert it (we know it
+			 * isn't going anywhere), and return */
 			spam_vcore(p, vcore2vcoreid(p, vc), ev_msg, ev_flags);
 			spin_unlock(&p->proc_lock);
 			return;
 		}
 		vc = TAILQ_FIRST(&p->bulk_preempted_vcs);
 		if (vc) {
-			/* the process is bulk preempted, similar deal to above */
+			/* the process is bulk preempted, similar deal to above
+			 */
 			spam_vcore(p, vcore2vcoreid(p, vc), ev_msg, ev_flags);
 			spin_unlock(&p->proc_lock);
 			return;
 		}
 	}
-	/* At this point, we're sure all vcores are yielded, though we might not be
-	 * WAITING.  Post to the first on the inactive list (which is the one that
-	 * will definitely be woken up) */
+	/* At this point, we're sure all vcores are yielded, though we might not
+	 * be WAITING.  Post to the first on the inactive list (which is the one
+	 * that will definitely be woken up) */
 	vc = TAILQ_FIRST(&p->inactive_vcs);
 	assert(vc);
 	spam_vcore(p, vcore2vcoreid(p, vc), ev_msg, ev_flags);
-	/* Set the vcore's alertable flag, to short circuit our last ditch effort
-	 * above */
+	/* Set the vcore's alertable flag, to short circuit our last ditch
+	 * effort above */
 	set_vcore_msgable(vcore2vcoreid(p, vc));
-	/* The first event to catch the process with no online/bp vcores will need
-	 * to wake it up, which is handled elsewhere if they requested EVENT_WAKEUP.
-	 * We could be RUNNABLE_M here if another event already woke us and we
-	 * didn't get lucky with the penultimate fallback. */
+	/* The first event to catch the process with no online/bp vcores will
+	 * need to wake it up, which is handled elsewhere if they requested
+	 * EVENT_WAKEUP.  We could be RUNNABLE_M here if another event already
+	 * woke us and we didn't get lucky with the penultimate fallback. */
 	spin_unlock(&p->proc_lock);
 }
 
@@ -314,11 +327,11 @@ static void send_indir(struct proc *p, struct event_queue *ev_q,
                        uint32_t vcoreid)
 {
 	struct event_msg local_msg = {0};
-	/* If an alert is already pending and they don't want repeats, just return.
-	 * One of the few uses of NOTHROTTLE will be for preempt_msg ev_qs.  Ex: an
-	 * INDIR was already sent to the preempted vcore, then alert throttling
-	 * would stop another vcore from getting the message about the original
-	 * vcore. */
+	/* If an alert is already pending and they don't want repeats, just
+	 * return.  One of the few uses of NOTHROTTLE will be for preempt_msg
+	 * ev_qs.  Ex: an INDIR was already sent to the preempted vcore, then
+	 * alert throttling would stop another vcore from getting the message
+	 * about the original vcore. */
 	if (!(ev_q->ev_flags & EVENT_NOTHROTTLE) && (ev_q->ev_alert_pending))
 		return;
 	/* We'll eventually get an INDIR through, so don't send any more til
@@ -326,24 +339,25 @@ static void send_indir(struct proc *p, struct event_queue *ev_q,
 	 * eventually send an alert that causes userspace to turn throttling off
 	 * again (before handling all of the ev_q's events).
 	 *
-	 * This will also squelch IPIs, since there's no reason to send the IPI if
-	 * the INDIR is still un-acknowledged.  The vcore is either in vcore
-	 * context, attempting to deal with the INDIR, or offline.  This statement
-	 * is probably true. */
+	 * This will also squelch IPIs, since there's no reason to send the IPI
+	 * if the INDIR is still un-acknowledged.  The vcore is either in vcore
+	 * context, attempting to deal with the INDIR, or offline.  This
+	 * statement is probably true. */
 	ev_q->ev_alert_pending = TRUE;
 	wmb();	/* force this write to happen before any event writes */
 	local_msg.ev_type = EV_EVENT;
 	local_msg.ev_arg3 = ev_q;
 	/* If we're not spamming indirs, just send and be done with it.
 	 *
-	 * It's possible that the user does not want to poll their evq and wants an
-	 * INDIR, but also doesn't care about sleeping or otherwise not getting the
-	 * message right away.  The INDIR could sit in the VCPD of a vcore that
-	 * doesn't run for a while.  Perhaps if the app always made sure VC 0 was
-	 * on when it was running at all, and sent the INDIR there.  Or there was a
-	 * per-vc evq that only needed to be handled when the VC turned on.  This
-	 * gets at another aspect of INDIRs, other than it's need for "only once"
-	 * operation: maybe the mbox type isn't a UCQ (like the VCPD mboxes). */
+	 * It's possible that the user does not want to poll their evq and wants
+	 * an INDIR, but also doesn't care about sleeping or otherwise not
+	 * getting the message right away.  The INDIR could sit in the VCPD of a
+	 * vcore that doesn't run for a while.  Perhaps if the app always made
+	 * sure VC 0 was on when it was running at all, and sent the INDIR
+	 * there.  Or there was a per-vc evq that only needed to be handled when
+	 * the VC turned on.  This gets at another aspect of INDIRs, other than
+	 * it's need for "only once" operation: maybe the mbox type isn't a UCQ
+	 * (like the VCPD mboxes). */
 	if (!(ev_q->ev_flags & EVENT_SPAM_INDIR)) {
 		spam_vcore(p, vcoreid, &local_msg, ev_q->ev_flags);
 		return;
@@ -375,16 +389,17 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 	 * address space */
 	old_proc = switch_to(p);
 	/* Get the vcoreid that we'll message (if appropriate).  For INDIR and
-	 * SPAMMING, this is the first choice of a vcore, but other vcores might get
-	 * it.  Common case is !APPRO and !ROUNDROBIN.  Note we are clobbering the
-	 * vcoreid parameter. */
+	 * SPAMMING, this is the first choice of a vcore, but other vcores might
+	 * get it.  Common case is !APPRO and !ROUNDROBIN.  Note we are
+	 * clobbering the vcoreid parameter. */
 	if (!(ev_q->ev_flags & EVENT_VCORE_APPRO))
 		vcoreid = ev_q->ev_vcore;	/* use the ev_q's vcoreid */
 	/* Note that RR overwrites APPRO */
 	if (ev_q->ev_flags & EVENT_ROUNDROBIN) {
-		/* Pick a vcore, round-robin style.  Assuming ev_vcore was the previous
-		 * one used.  Note that round-robin overrides the passed-in vcoreid.
-		 * Also note this may be 'wrong' if num_vcores changes. */
+		/* Pick a vcore, round-robin style.  Assuming ev_vcore was the
+		 * previous one used.  Note that round-robin overrides the
+		 * passed-in vcoreid.  Also note this may be 'wrong' if
+		 * num_vcores changes. */
 		vcoreid = (ev_q->ev_vcore + 1) % p->procinfo->num_vcores;
 		ev_q->ev_vcore = vcoreid;
 	}
@@ -393,30 +408,32 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		printk("[kernel] Vcoreid %d unsafe! (too big?)\n", vcoreid);
 		goto out;
 	}
-	/* If we're a SPAM_PUBLIC, they just want us to spam the message.  Note we
-	 * don't care about the mbox, since it'll go to VCPD public mboxes, and
-	 * we'll prefer to send it to whatever vcoreid we determined at this point
-	 * (via APPRO or whatever). */
+	/* If we're a SPAM_PUBLIC, they just want us to spam the message.  Note
+	 * we don't care about the mbox, since it'll go to VCPD public mboxes,
+	 * and we'll prefer to send it to whatever vcoreid we determined at this
+	 * point (via APPRO or whatever). */
 	if (ev_q->ev_flags & EVENT_SPAM_PUBLIC) {
 		spam_public_msg(p, msg, vcoreid, ev_q->ev_flags);
 		goto wakeup;
 	}
 	/* We aren't spamming and we know the default vcore, and now we need to
-	 * figure out which mbox to use.  If they provided an mbox, we'll use it.
-	 * If not, we'll use a VCPD mbox (public or private, depending on the
-	 * flags). */
+	 * figure out which mbox to use.  If they provided an mbox, we'll use
+	 * it.  If not, we'll use a VCPD mbox (public or private, depending on
+	 * the flags). */
 	ev_mbox = ev_q->ev_mbox;
 	if (!ev_mbox)
 		ev_mbox = get_vcpd_mbox(vcoreid, ev_q->ev_flags);
-	/* At this point, we ought to have the right mbox to send the msg to, and
-	 * which vcore to alert (IPI/INDIR) (if applicable).  The mbox could be the
-	 * vcore's vcpd ev_mbox. */
+	/* At this point, we ought to have the right mbox to send the msg to,
+	 * and which vcore to alert (IPI/INDIR) (if applicable).  The mbox could
+	 * be the vcore's vcpd ev_mbox. */
 	if (!ev_mbox) {
-		/* This shouldn't happen any more, this is more for sanity's sake */
+		/* This shouldn't happen any more, this is more for sanity's
+		 * sake */
 		warn("[kernel] ought to have an mbox by now!");
 		goto out;
 	}
-	/* Even if we're using an mbox in procdata (VCPD), we want a user pointer */
+	/* Even if we're using an mbox in procdata (VCPD), we want a user
+	 * pointer */
 	if (!is_user_rwaddr(ev_mbox, sizeof(struct event_mbox))) {
 		/* Ought to kill them, just warn for now */
 		printk("[kernel] Illegal addr for ev_mbox\n");

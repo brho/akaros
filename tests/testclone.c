@@ -17,6 +17,7 @@ int main(int argc, char** argv)
 {
 	int iter = 1000;
 	char *name = "/net/tcp/clone";
+
 	if (argc > 1)
 		iter = atoi(argv[1]);
 	if (argc > 2)

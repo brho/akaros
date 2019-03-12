@@ -8,13 +8,17 @@
  * syscalls themselves */
 struct syscall;
 typedef enum {
-	RES_free,  // The response has been digested by the user space, can be reallocated
-	REQ_alloc, // Space fo request is allocated
-	REQ_ready, // The request is populated by the caller
-	REQ_processing, // The request is being processed,
-					// or a kernel thread is going to pick up the stack to process this later.
-
-	RES_ready // The response is ready to be picked up
+	// The response has been digested by the user space, can be reallocated
+	RES_free, 
+	// Space fo request is allocated
+	REQ_alloc,
+	// The request is populated by the caller
+	REQ_ready,
+	// The request is being processed, or a kernel thread is going to pick
+	// up the stack to process this later.
+	REQ_processing,
+	// The response is ready to be picked up
+	RES_ready
 } syscall_status_t;
 
 typedef struct syscall_req {
