@@ -25,9 +25,9 @@ akaros-patches := $(sort $(wildcard akaros-patches/$(version)/*))
 $(build-dir): $(tarball) $(akaros-patches)
 	rm -fr $(src-dir)
 	tar -xf $<
-	$(Q)mkdir $(build-dir) &&                                                  \
-	for i in $(akaros-patches); do                                             \
-		(cd $(src-dir) && patch -p1 < ../$$i);                                 \
+	$(Q)mkdir $(build-dir) &&                                              \
+	for i in $(akaros-patches); do                                         \
+		(cd $(src-dir) && patch -p1 < ../$$i);                         \
 	done
 
 PHONY += config
@@ -46,8 +46,8 @@ install: make
 
 PHONY += clean
 clean:
-	$(Q)[ -d $(build-dir) ] &&                                                 \
-	    [ -f $(build-dir)/Makefile ] &&                                        \
+	$(Q)[ -d $(build-dir) ] &&                                             \
+	    [ -f $(build-dir)/Makefile ] &&                                    \
 	    $(MAKE) -C $(build-dir) clean || true
 
 PHONY += mrproper

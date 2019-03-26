@@ -18,17 +18,19 @@ SECTIONS
 		*(.boottext .bootdata .bootbss)
 	}
 
-	/* Needed this for syslinux, which was sitting around 16MB phys.  This just
-	 * jumps us forward to the 32MB mark, both physically and virtually. */
+	/* Needed this for syslinux, which was sitting around 16MB phys.  This
+	 * just jumps us forward to the 32MB mark, both physically and
+	 * virtually. */
 	. = 0x02000000;
 
-	/* Link the main kernel for the space after entry + KERN_LOAD_ADDR.  We'll
-	 * still load it adjacent in physical memory */
+	/* Link the main kernel for the space after entry + KERN_LOAD_ADDR.
+	 * We'll still load it adjacent in physical memory */
 	. += KERN_LOAD_ADDR;
 
 	.text : AT(ADDR(.text) - KERN_LOAD_ADDR) {
 		*(.text .stub .text.* .gnu.linkonce.t.*)
-		PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
+		/* Define the 'etext' symbol to this value */
+		PROVIDE(etext = .);
 	}
 
 	INCLUDE kern/linker_tables.ld
@@ -53,8 +55,8 @@ SECTIONS
 		PROVIDE(__stop_bss = .);
 	}
 
-	/* 'end' isn't a real section, but everything needs a name.  It'll show up
-	 * as 'N' (debug) in the nm / ksyms.map output. */
+	/* 'end' isn't a real section, but everything needs a name.  It'll show
+	 * up as 'N' (debug) in the nm / ksyms.map output. */
 	.end : {
 		PROVIDE(end = .);
 	}

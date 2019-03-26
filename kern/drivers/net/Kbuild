@@ -1,6 +1,6 @@
 # need at least one obj file to build for Kbuild
 obj-y							+= dummy.o
-obj-$(CONFIG_BNX2X)				+= bnx2x/
+obj-$(CONFIG_BNX2X)					+= bnx2x/
 obj-$(CONFIG_MLX4_CORE)					+= mlx4/
 #obj-$(CONFIG_MLX4_INFINIBAND)				+= mlx4u/
 #obj-$(CONFIG_MLX4_INFINIBAND)				+= udrvr/

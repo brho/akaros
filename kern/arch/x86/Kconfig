@@ -11,16 +11,17 @@ config PCI_VERBOSE
 	bool "Verbose PCI Output"
 	default n
 	help
-		Will print out extra information related to PCI.
+	  Will print out extra information related to PCI.
 
 config NOFASTCALL_FSBASE
 	depends on X86_64
 	bool "Disable fastcall to set FS base"
 	default n
 	help
-		Disable the fast path syscall to set FS base.  If your hardware allows
-		setting FS base from userspace, you can say y to disable the fastcall
-		for a slight improvement for all syscalls.  If unsure, say n.
+	  Disable the fast path syscall to set FS base.  If your hardware
+	  allows setting FS base from userspace, you can say y to disable the
+	  fastcall for a slight improvement for all syscalls.  If unsure, say
+	  n.
 
 endmenu
 
@@ -30,49 +31,49 @@ config LOUSY_LAPIC_TIMER
 	bool "Lousy Local APIC Timer"
 	default n
 	help
-		This turns our one-shot APIC timer into a periodic timer.  If your
-		system seems to lock up until you hit the keyboard, say 'Y' here and
-		report the results.
+	  This turns our one-shot APIC timer into a periodic timer.  If your
+	  system seems to lock up until you hit the keyboard, say 'Y' here and
+	  report the results.
 
-		Qemu without KVM had issues firing a one-shot LAPIC timer (the timer IRQ
-		would only go off when some other IRQ fired), but it worked with a
-		periodic tick.  Since we aggressively disarm the timer, this config
-		shouldn't be a performance hit.
+	  Qemu without KVM had issues firing a one-shot LAPIC timer (the timer
+	  IRQ would only go off when some other IRQ fired), but it worked with
+	  a periodic tick.  Since we aggressively disarm the timer, this config
+	  shouldn't be a performance hit.
 
 config NOMTRRS
 	bool "Disable MTRRs"
 	default y
 	help
-		Old debug option from when we were having issues with MTRRs.  If your
-		machine won't boot, try turning this on.
+	  Old debug option from when we were having issues with MTRRs.  If your
+	  machine won't boot, try turning this on.
 
 config KB_CORE0_ONLY
 	bool "Keyboard from core0 only"
 	default n
 	help
-		Say 'n' unless you are using a buggy x86 machine that can't handle
-		polling the keyboard PIO from cores other than core 0.
+	  Say 'n' unless you are using a buggy x86 machine that can't handle
+	  polling the keyboard PIO from cores other than core 0.
 
 config X86_DISABLE_KEYBOARD
 	bool "Disable Keyboard"
 	default n
 	help
-		x86 machines with a legacy USB keyboard often implement the USB stack
-		in SMM mode.  When doing anything with the keyboard, including polling
-		the keyboard from the kernel monitor, SMM mode can dramatically
-		interfere with other cores (like a 10-15x performance impact on some
-		benchmarks).
-		
-		Say 'y' if you have such a machine and do not need the keyboard.
+	  x86 machines with a legacy USB keyboard often implement the USB stack
+	  in SMM mode.  When doing anything with the keyboard, including
+	  polling the keyboard from the kernel monitor, SMM mode can
+	  dramatically interfere with other cores (like a 10-15x performance
+	  impact on some benchmarks).
+
+	  Say 'y' if you have such a machine and do not need the keyboard.
 
 config ENABLE_LEGACY_USB
 	bool "Enable Legacy USB"
 	default n
 	help
-		Say 'y' if you want to use a USB keyboard.  Given that we do not have a
-		USB stack, disabling legacy USB means USB keyboards will not work.  We
-		disable legacy USB by default, since our primary console communication
-		is serial, and legacy USB support results in SMM interference that
-		affects all cores.
+	  Say 'y' if you want to use a USB keyboard.  Given that we do not have
+	  a USB stack, disabling legacy USB means USB keyboards will not work.
+	  We disable legacy USB by default, since our primary console
+	  communication is serial, and legacy USB support results in SMM
+	  interference that affects all cores.
 
 endmenu

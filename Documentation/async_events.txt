@@ -124,11 +124,11 @@ To receive an event on a syscall completion or status change, just fill in the
 event_q pointer.  If it is 0, the kernel will assume you poll the actual
 syscall struct.
 
-	struct syscall {
-		current stuff 			/* arguments, retvals */
-		struct ev_queue * 		/* struct used for messaging, including IPIs*/
-		void * 					/* used by 2LS, usually a struct u_thread * */
-	}
+struct syscall {
+	current stuff 		/* arguments, retvals */
+	struct ev_queue * 	/* struct used for messaging, including IPIs*/
+	void * 			/* used by 2LS, usually a struct u_thread * */
+}
 
 One issue with async syscalls is that there can be too many outstanding IOs
 (normally sync calls provide feedback / don't allow you to over-request).
@@ -279,22 +279,22 @@ syscalls for completion (but don't bother turning on the ev_q).
 ----------------------------------------------
 The mbox (mailbox) is where the actual messages go.
 
-	struct ev_mbox {
-		bcq of notif_events 	/* bounded buffer, multi-consumer/producer */
-		msg_bitmap
-	}
-	struct ev_queue {			/* aka, event_q, ev_q, etc. */
-		struct ev_mbox * 
-		void handler(struct event_q *)
-		vcore_to_be_told
-		flags 					/* IPI_WANTED, RR, 2L-handle-it, etc */
-	}
-	struct ev_queue_big {
-		struct ev_mbox *		/* pointing to the internal storage */
-		vcore_to_be_told
-		flags 					/* IPI_WANTED, RR, 2L-handle-it, etc */
-		struct ev_mbox { }		/* never access this directly */
-	}
+struct ev_mbox {
+	bcq of notif_events 	/* bounded buffer, multi-consumer/producer */
+	msg_bitmap
+}
+struct ev_queue {		/* aka, event_q, ev_q, etc. */
+	struct ev_mbox *
+	void handler(struct event_q *)
+	vcore_to_be_told
+	flags 			/* IPI_WANTED, RR, 2L-handle-it, etc */
+}
+struct ev_queue_big {
+	struct ev_mbox *	/* pointing to the internal storage */
+	vcore_to_be_told
+	flags 			/* IPI_WANTED, RR, 2L-handle-it, etc */
+	struct ev_mbox { }	/* never access this directly */
+}
 
 The purpose of the big one is to simply embed some storage.  Still, only
 access the mbox via the pointer.  The big one can be casted (and stored as)

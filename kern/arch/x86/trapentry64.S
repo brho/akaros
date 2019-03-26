@@ -19,90 +19,90 @@
  * It also builds this traps portion of the trap_tbl.
  * Use TRAPHANDLER for traps where the CPU automatically pushes an error code.
  */
-#define TRAPHANDLER(name, num)									\
-	.text;														\
+#define TRAPHANDLER(name, num)						\
+	.text;								\
 	.globl name;		/* define global symbol for 'name' */	\
 	.type name, @function;	/* symbol type is function */		\
-	.align 2;		/* align function definition */				\
-	name:			/* function starts here */					\
-	pushq $(num);												\
-	jmp _alltraps;												\
-	.data;														\
-	.quad name;													\
+	.align 2;		/* align function definition */		\
+	name:			/* function starts here */		\
+	pushq $(num);							\
+	jmp _alltraps;							\
+	.data;								\
+	.quad name;							\
 	.long num
 
 /* Use TRAPHANDLER_NOEC for traps where the CPU doesn't push an error code.
  * It pushes a 0 in place of the error code, so the trap frame has the same
  * format in either case.  */
-#define TRAPHANDLER_NOEC(name, num)		\
+#define TRAPHANDLER_NOEC(name, num)					\
 	.text;								\
-	.globl name;						\
-	.type name, @function;				\
+	.globl name;							\
+	.type name, @function;						\
 	.align 2;							\
 	name:								\
 	pushq $0;							\
-	pushq $(num);						\
-	jmp _alltraps;						\
+	pushq $(num);							\
+	jmp _alltraps;							\
 	.data;								\
 	.quad name;							\
 	.long num
 
 /* Same as NOEC, but for IRQs instead.  num is the ISR number it is mapped to */
-#define IRQ_HANDLER(name, num)			\
+#define IRQ_HANDLER(name, num)						\
 	.text;								\
-	.globl name;						\
-	.type name, @function;				\
+	.globl name;							\
+	.type name, @function;						\
 	.align 2;							\
 	name:								\
 	pushq $0;							\
-	pushq $(num);						\
-	jmp _allirqs;						\
+	pushq $(num);							\
+	jmp _allirqs;							\
 	.data;								\
 	.quad name;							\
 	.long num
 
-#define NMI_HANDLER(name, num)			\
+#define NMI_HANDLER(name, num)						\
 	.text;								\
-	.globl name;						\
-	.type name, @function;				\
+	.globl name;							\
+	.type name, @function;						\
 	.align 2;							\
 	name:								\
 	pushq $0;							\
-	pushq $(num);						\
-	jmp _nmi_entry;						\
+	pushq $(num);							\
+	jmp _nmi_entry;							\
 	.data;								\
 	.quad name;							\
 	.long num
 
 #define DOUBLEFAULT_HANDLER(name, num)	\
 	.text;								\
-	.globl name;						\
-	.type name, @function;				\
+	.globl name;							\
+	.type name, @function;						\
 	.align 2;							\
 	name:								\
-	pushq $(num);						\
-	jmp _dblf_entry;					\
+	pushq $(num);							\
+	jmp _dblf_entry;						\
 	.data;								\
 	.quad name;							\
 	.long num
 
 /* Bare minimum IRQ handler: send a LAPIC_EOI and immediately iret. */
-#define POKE_HANDLER(name, num)			\
+#define POKE_HANDLER(name, num)						\
 	.text;								\
-	.globl name;						\
-	.type name, @function;				\
+	.globl name;							\
+	.type name, @function;						\
 	.align 2;							\
 	name:;								\
-	pushq %rax;			\
-	pushq %rcx;			\
-	pushq %rdx;			\
-	movq $0, %rax;			\
-	movq $0, %rdx;			\
-	movq $(MSR_LAPIC_EOI), %rcx; 	\
-	wrmsr;				\
-	popq %rdx;			\
-	popq %rcx;			\
-	popq %rax;			\
+	pushq %rax;							\
+	pushq %rcx;							\
+	pushq %rdx;							\
+	movq $0, %rax;							\
+	movq $0, %rdx;							\
+	movq $(MSR_LAPIC_EOI), %rcx; 					\
+	wrmsr;								\
+	popq %rdx;							\
+	popq %rcx;							\
+	popq %rax;							\
 	iretq;								\
 	.data;								\
 	.quad name;							\
@@ -402,18 +402,18 @@ _alltraps:
 	pushq %rax
 	cmpw $GD_KT, 0x90(%rsp)	# 0x90 - diff btw tf_cs and tf_rax
 	je trap_all_tf
-	# this is a user TF.  we need to swapgs to get the kernel's gs and mark the
-	# context as partial
-	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
+	# this is a user TF.  we need to swapgs to get the kernel's gs and mark
+	# the context as partial
+	swapgs			# user's GS is now in MSR_KERNEL_GS_BASE
 	movl $0x1, 0xac(%rsp)	# 0xac - diff btw tf_padding0 and tf_rax
 trap_all_tf:
-	pushq $0				# fsbase space
-	pushq $0				# gsbase space
-	movq $0, %rbp			# so we can backtrace to this point
+	pushq $0		# fsbase space
+	pushq $0		# gsbase space
+	movq $0, %rbp		# so we can backtrace to this point
 	movq %rsp, %rdi
 	call trap
 	# the return paths are only used by the kernel
-	addq $0x10, %rsp			# skip fs/gs base
+	addq $0x10, %rsp	# skip fs/gs base
 	popq %rax
 	popq %rbx
 	popq %rcx
@@ -429,7 +429,7 @@ trap_all_tf:
 	popq %r13
 	popq %r14
 	popq %r15
-	addq $0x10, %rsp			# skip trapno and err
+	addq $0x10, %rsp	# skip trapno and err
 	iretq
 
 # might merge this with _alltraps
@@ -452,18 +452,18 @@ _allirqs:
 	pushq %rax
 	cmpw $GD_KT, 0x90(%rsp)	# 0x90 - diff btw tf_cs and tf_rax
 	je irq_all_tf
-	# this is a user TF.  we need to swapgs to get the kernel's gs and mark the
-	# context as partial
-	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
+	# this is a user TF.  we need to swapgs to get the kernel's gs and mark
+	# the context as partial
+	swapgs			# user's GS is now in MSR_KERNEL_GS_BASE
 	movl $0x1, 0xac(%rsp)	# 0xac - diff btw tf_padding0 and tf_rax
 irq_all_tf:
-	pushq $0				# fsbase space
-	pushq $0				# gsbase space
-	movq $0, %rbp			# so we can backtrace to this point
+	pushq $0		# fsbase space
+	pushq $0		# gsbase space
+	movq $0, %rbp		# so we can backtrace to this point
 	movq %rsp, %rdi
 	call handle_irq
 	# the return paths are only used by the kernel
-	addq $0x10, %rsp			# skip fs/gs base
+	addq $0x10, %rsp	# skip fs/gs base
 	popq %rax
 	popq %rbx
 	popq %rcx
@@ -479,7 +479,7 @@ irq_all_tf:
 	popq %r13
 	popq %r14
 	popq %r15
-	addq $0x10, %rsp			# skip trapno and err
+	addq $0x10, %rsp	# skip trapno and err
 	iretq
 
 # Similar to the NMI handler, we come in on a special stack, but we can trust
@@ -510,14 +510,14 @@ _dblf_entry:
 	pushq %rax
 	cmpw $GD_KT, 0x90(%rsp)	# 0x90 - diff btw tf_cs and tf_rax
 	je dblf_all_tf
-	# this is a user TF.  we need to swapgs to get the kernel's gs and mark the
-	# context as partial
-	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
+	# this is a user TF.  we need to swapgs to get the kernel's gs and mark
+	# the context as partial
+	swapgs			# user's GS is now in MSR_KERNEL_GS_BASE
 	movl $0x1, 0xac(%rsp)	# 0xac - diff btw tf_padding0 and tf_rax
 dblf_all_tf:
-	pushq $0				# fsbase space
-	pushq $0				# gsbase space
-	movq $0, %rbp			# so we can backtrace to this point
+	pushq $0		# fsbase space
+	pushq $0		# gsbase space
+	movq $0, %rbp		# so we can backtrace to this point
 	movq %rsp, %rdi
 	call handle_double_fault
 dblf_spin:
@@ -566,56 +566,57 @@ _nmi_entry:
 	pushq %rax
 	cmpw $GD_KT, 0x90(%rsp)	# 0x90 - diff btw tf_cs and tf_rax
 	je nmi_kern_tf
-	# this is a user TF.  we need to swapgs to get the kernel's gs and mark the
-	# context as partial
-	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
+	# this is a user TF.  we need to swapgs to get the kernel's gs and mark
+	# the context as partial
+	swapgs			# user's GS is now in MSR_KERNEL_GS_BASE
 	movl $0x1, 0xac(%rsp)	# 0xac - diff btw tf_padding0 and tf_rax
-	pushq $0				# fsbase space
-	pushq $0				# gsbase space
+	pushq $0		# fsbase space
+	pushq $0		# gsbase space
 	jmp nmi_all_tf
 nmi_kern_tf:
-	# this is a kernel TF.  but we don't know if they set up gs yet, so we'll
-	# save and restore whatever they had loaded and use our own
-	pushq $0				# fsbase space
+	# this is a kernel TF.  but we don't know if they set up gs yet, so
+	# we'll save and restore whatever they had loaded and use our own
+	pushq $0		# fsbase space
 	# Get the current GS base into rax
 	movl $MSR_GS_BASE, %ecx
 	rdmsr
 	shlq $32, %rdx
 	orq %rdx, %rax
-	# Get the real GS base from the top of the stack.  This was set in smp_boot,
-	# and our rsp pointed to it when we entered the kernel.
+	# Get the real GS base from the top of the stack.  This was set in
+	# smp_boot, and our rsp pointed to it when we entered the kernel.
 	movq 0xb8(%rsp), %rdx	# 0xb8 from fs_base to the top
-	# Compare them.  If they are the same, we can just push 0 for gsbase (which
-	# later will mean "no need to restore GS".
+	# Compare them.  If they are the same, we can just push 0 for gsbase
+	# (which later will mean "no need to restore GS".
 	cmpq %rdx, %rax
 	je nmi_gs_ok
 	# They weren't the same.  Save the old one and set the new one.
-	pushq %rax				# gsbase space
+	pushq %rax		# gsbase space
 	movq %rdx, %rax
 	shrq $32, %rdx
 	andl $0xffffffff, %eax
 	wrmsr
 	jmp nmi_all_tf
 nmi_gs_ok:
-	pushq $0				# gsbase space
+	pushq $0		# gsbase space
 nmi_all_tf:
-	# At this point, GS is set correctly, either due to swapgs (user TF), wrmsr
-	# (kern TF with bad GS), or it was already fine (and gsbase in the TF = 0).
-	movq $0, %rbp			# so we can backtrace to this point
+	# At this point, GS is set correctly, either due to swapgs (user TF),
+	# wrmsr (kern TF with bad GS), or it was already fine (and gsbase in the
+	# TF = 0).
+	movq $0, %rbp		# so we can backtrace to this point
 	movq %rsp, %rdi
 	call handle_nmi
-	# Unlike in normal IRQs/Traps, both user and kernel contexts return via this
-	# path.
+	# Unlike in normal IRQs/Traps, both user and kernel contexts return via
+	# this path.
 	cmpw $GD_KT, 0xa0(%rsp)	# 0xa0 - diff btw tf_cs and tf_gsbase
 	je nmi_kern_restore_gs
-	# User TF.  Restore whatever was there with swapgs.  We don't care what it
-	# was, nor do we care what was in the TF.
-	swapgs					# user's GS is now in MSR_GS_BASE
-	addq $0x10, %rsp		# skip gs/fs base
+	# User TF.  Restore whatever was there with swapgs.  We don't care what
+	# it was, nor do we care what was in the TF.
+	swapgs			# user's GS is now in MSR_GS_BASE
+	addq $0x10, %rsp	# skip gs/fs base
 	jmp nmi_popal
 nmi_kern_restore_gs:
-	popq %rax				# fetch saved gsbase
-	addq $0x08, %rsp		# skip fs base
+	popq %rax		# fetch saved gsbase
+	addq $0x08, %rsp	# skip fs base
 	cmpq $0, %rax
 	je nmi_popal
 	# gsbase in the TF != 0, which means we need to restore that gsbase
@@ -640,7 +641,7 @@ nmi_popal:
 	popq %r13
 	popq %r14
 	popq %r15
-	addq $0x10, %rsp			# skip trapno and err
+	addq $0x10, %rsp	# skip trapno and err
 	iretq
 
 .globl __nmi_pop_ok_start;
@@ -673,40 +674,42 @@ __nmi_pop_ok_start:
 	jz nmi_ok_cas_worked	# ZF = 1 on successful CAS
 	ret
 nmi_ok_cas_worked:
-	# save callee-saved regs (the pops below clobber them, and we might return)
+	# save callee-saved regs (the pops below clobber them, and we might
+	# return)
 	pushq %rbp
 	pushq %rbx
 	pushq %r12
 	pushq %r13
 	pushq %r14
 	pushq %r15
-	# We need to save the current rsp into the scratch space at the top of the
-	# stack.  This assumes we're within the top page of our stack, which should
-	# always be true.  Careful not to use rdi, which still has an argument.
+	# We need to save the current rsp into the scratch space at the top of
+	# the stack.  This assumes we're within the top page of our stack, which
+	# should always be true.  Careful not to use rdi, which still has an
+	# argument.
 	movq %rsp, %rbx
 	# Want to round rbx up to PGSIZE, then subtract 8, to get our slot.
 	movq $0xfff, %rax
-	notq %rax				# rax = 0xfffffffffffff000
-	andq %rax, %rbx			# round down rbx
-	addq $0x1000, %rbx		# add PGSIZE, assuming rsp was not page aligned
-	subq $0x8, %rbx			# point to the scratch space
-	movq %rsp, (%rbx)		# save rsp in the scratch space
+	notq %rax		# rax = 0xfffffffffffff000
+	andq %rax, %rbx		# round down rbx
+	addq $0x1000, %rbx	# add PGSIZE, assuming rsp was not page aligned
+	subq $0x8, %rbx		# point to the scratch space
+	movq %rsp, (%rbx)	# save rsp in the scratch space
 	# We jump our rsp to the base of the HW_TF.  This is still on the same
-	# stack, just farther back than where our caller is.  We need to be careful
-	# to not clobber the stack.  Otherwise we'll have chaos.
+	# stack, just farther back than where our caller is.  We need to be
+	# careful to not clobber the stack.  Otherwise we'll have chaos.
 	movq %rdi, %rsp
-	# From here down is the same as the normal NMI exit path, but with 'ok' in
-	# the symbol names.
+	# From here down is the same as the normal NMI exit path, but with 'ok'
+	# in the symbol names.
 	cmpw $GD_KT, 0xa0(%rsp)	# 0xa0 - diff btw tf_cs and tf_gsbase
 	je nmi_ok_kern_restore_gs
-	# User TF.  Restore whatever was there with swapgs.  We don't care what it
-	# was, nor do we care what was in the TF.
-	swapgs					# user's GS is now in MSR_GS_BASE
-	addq $0x10, %rsp		# skip gs/fs base
+	# User TF.  Restore whatever was there with swapgs.  We don't care what
+	# it was, nor do we care what was in the TF.
+	swapgs			# user's GS is now in MSR_GS_BASE
+	addq $0x10, %rsp	# skip gs/fs base
 	jmp nmi_ok_popal
 nmi_ok_kern_restore_gs:
-	popq %rax				# fetch saved gsbase
-	addq $0x08, %rsp		# skip fs base
+	popq %rax		# fetch saved gsbase
+	addq $0x08, %rsp	# skip fs base
 	cmpq $0, %rax
 	je nmi_ok_popal
 	# gsbase in the TF != 0, which means we need to restore that gsbase
@@ -731,7 +734,7 @@ nmi_ok_popal:
 	popq %r13
 	popq %r14
 	popq %r15
-	addq $0x10, %rsp			# skip trapno and err
+	addq $0x10, %rsp	# skip trapno and err
 	iretq
 __nmi_pop_ok_end:
 
@@ -740,45 +743,47 @@ __nmi_pop_ok_end:
 # entire operation.
 __nmi_pop_fail_start:
 	# careful only to use caller-saved or argument registers before saving
-	movl %edx, %eax			# load old_val into eax for the CAS
+	movl %edx, %eax		# load old_val into eax for the CAS
 	cmpxchgl %ecx, (%rsi)	# no need for LOCK, since an NMI would serialize
 	jz nmi_fail_cas_worked	# ZF = 1 on successful CAS
 	ret
 nmi_fail_cas_worked:
-	# save callee-saved regs (the pops below clobber them, and we might return)
+	# save callee-saved regs (the pops below clobber them, and we might
+	# return)
 	pushq %rbp
 	pushq %rbx
 	pushq %r12
 	pushq %r13
 	pushq %r14
 	pushq %r15
-	# We need to save the current rsp into the scratch space at the top of the
-	# stack.  This assumes we're within the top page of our stack, which should
-	# always be true.  Careful not to use rdi, which still has an argument.
+	# We need to save the current rsp into the scratch space at the top of
+	# the stack.  This assumes we're within the top page of our stack, which
+	# should always be true.  Careful not to use rdi, which still has an
+	# argument.
 	movq %rsp, %rbx
 	# Want to round rbx up to PGSIZE, then subtract 8, to get our slot.
 	movq $0xfff, %rax
-	notq %rax				# rax = 0xfffffffffffff000
-	andq %rax, %rbx			# round down rbx
-	addq $0x1000, %rbx		# add PGSIZE, assuming rsp was not page aligned
-	subq $0x8, %rbx			# point to the scratch space
-	movq %rsp, (%rbx)		# save rsp in the scratch space
+	notq %rax		# rax = 0xfffffffffffff000
+	andq %rax, %rbx		# round down rbx
+	addq $0x1000, %rbx	# add PGSIZE, assuming rsp was not page aligned
+	subq $0x8, %rbx		# point to the scratch space
+	movq %rsp, (%rbx)	# save rsp in the scratch space
 	# We jump our rsp to the base of the HW_TF.  This is still on the same
-	# stack, just farther back than where our caller is.  We need to be careful
-	# to not clobber the stack.  Otherwise we'll have chaos.
+	# stack, just farther back than where our caller is.  We need to be
+	# careful to not clobber the stack.  Otherwise we'll have chaos.
 	movq %rdi, %rsp
-	# From here down is the same as the normal NMI exit path and the ok path,
-	# but with 'fail' in the symbol names.
+	# From here down is the same as the normal NMI exit path and the ok
+	# path, but with 'fail' in the symbol names.
 	cmpw $GD_KT, 0xa0(%rsp)	# 0xa0 - diff btw tf_cs and tf_gsbase
 	je nmi_fail_kern_restore_gs
-	# User TF.  Restore whatever was there with swapgs.  We don't care what it
-	# was, nor do we care what was in the TF.
-	swapgs					# user's GS is now in MSR_GS_BASE
-	addq $0x10, %rsp		# skip gs/fs base
+	# User TF.  Restore whatever was there with swapgs.  We don't care what
+	# it was, nor do we care what was in the TF.
+	swapgs			# user's GS is now in MSR_GS_BASE
+	addq $0x10, %rsp	# skip gs/fs base
 	jmp nmi_fail_popal
 nmi_fail_kern_restore_gs:
-	popq %rax				# fetch saved gsbase
-	addq $0x08, %rsp		# skip fs base
+	popq %rax		# fetch saved gsbase
+	addq $0x08, %rsp	# skip fs base
 	cmpq $0, %rax
 	je nmi_fail_popal
 	# gsbase in the TF != 0, which means we need to restore that gsbase
@@ -803,33 +808,34 @@ nmi_fail_popal:
 	popq %r13
 	popq %r14
 	popq %r15
-	addq $0x10, %rsp		# skip trapno and err
+	addq $0x10, %rsp	# skip trapno and err
 	# Here's is where we differ from OK.  Time to undo everything and return
-	# rsp currently is pointing at tf->tf_rip.  Remember that we don't want to
-	# write anything to the stack - everything in the TF is still the way it was
-	# when we started to pop.
+	# rsp currently is pointing at tf->tf_rip.  Remember that we don't want
+	# to write anything to the stack - everything in the TF is still the way
+	# it was when we started to pop.
 	#
 	# First off, let's get the stack addr of the pcpui pointer loaded
 	movq %rsp, %rbx
 	movq $0xfff, %rax
-	notq %rax				# rax = 0xfffffffffffff000
-	andq %rax, %rbx			# round down rbx
-	addq $0x1000, %rbx		# add PGSIZE, assuming rsp was not page aligned
-	subq $0x10, %rbx		# point to the pcpui pointer
+	notq %rax		# rax = 0xfffffffffffff000
+	andq %rax, %rbx		# round down rbx
+	addq $0x1000, %rbx	# add PGSIZE, assuming rsp was not page aligned
+	subq $0x10, %rbx	# point to the pcpui pointer
 	# Now let's start to unwind
-	subq $0x98, %rsp		# jump from rip to tf_gsbase (top of hw_tf)
+	subq $0x98, %rsp	# jump from rip to tf_gsbase (top of hw_tf)
 	# Need to restore gs, just like on an NMI entry
 	cmpw $GD_KT, 0xa0(%rsp)	# 0xa0 - diff btw tf_cs and tf_gsbase
 	je nmi_pop_fail_kern_tf
 	# This is a user TF.  We need to swapgs to get the kernel's gs
 	# We don't need to mark the context as partial (we never do for NMIs,
-	# actually), and in general, we don't want to write anything on the stack.
-	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
+	# actually), and in general, we don't want to write anything on the
+	# stack.
+	swapgs			# user's GS is now in MSR_KERNEL_GS_BASE
 	jmp nmi_pop_fail_all_tf
 nmi_pop_fail_kern_tf:
 	# Kernel TF.  We basically need to do the same thing on entry, since we
-	# might have restored some weird GS base.  We can tell based on tf_gsbase
-	# 0 for gsbase means we didn't need to change GS
+	# might have restored some weird GS base.  We can tell based on
+	# tf_gsbase 0 for gsbase means we didn't need to change GS
 	cmpq $0, (%rsp)
 	je nmi_pop_fail_gs_fine
 	# rbx points to where pcpui* is stored
@@ -841,7 +847,7 @@ nmi_pop_fail_kern_tf:
 	wrmsr
 nmi_pop_fail_gs_fine:
 nmi_pop_fail_all_tf:
-	addq $0x8, %rbx			# move to the scratch slot, holding rsp
+	addq $0x8, %rbx		# move to the scratch slot, holding rsp
 	mov (%rbx), %rsp
 	# restore callee-saved regs
 	popq %r15
@@ -864,7 +870,7 @@ sysenter_handler:
 	# When rdi has the magic number, rsi has the new base
 	movabs $FASTCALL_SETFSBASE, %rax
 	cmp %rax, %rdi
-	jne normal_syscall	# could profile this and handle the jump differently
+	jne normal_syscall	# could profile this and jump differently
 	# need to check rsi, make sure it is canonical (will enfore below ULIM).
 	# need to either do this check, or handle the kernel GP fault on wrmsr.
 	movq %rsi, %rdi
@@ -885,25 +891,25 @@ fastcall_pop:
 normal_syscall:
 #endif
 	# cld is handled by the SFMASK
-	swapgs					# user's GS is now in MSR_KERNEL_GS_BASE
+	swapgs			# user's GS is now in MSR_KERNEL_GS_BASE
 	movq %gs:0, %rsp
 	# Saving the FPU callee-saved state for now.  Might be able to have the
 	# preempt handler deal with it.
-	pushq $0				# space for mxcsr, fpucw, and padding0
+	pushq $0		# space for mxcsr, fpucw, and padding0
 	movw $0x1, 0x6(%rsp)	# tf_padding0 = 1, partial context
 	fnstcw 0x4(%rsp)
 	stmxcsr (%rsp)
-	pushq %rdx			# rsp, saved by userspace
-	pushq %rcx			# rip, saved by hardware
+	pushq %rdx		# rsp, saved by userspace
+	pushq %rcx		# rip, saved by hardware
 	pushq %r15
 	pushq %r14
 	pushq %r13
 	pushq %r12
 	pushq %rbp
 	pushq %rbx
-	pushq $0			# fsbase space
-	pushq $0			# gsbase space
-	movq $0, %rbp			# so we can backtrace to this point
+	pushq $0		# fsbase space
+	pushq $0		# gsbase space
+	movq $0, %rbp		# so we can backtrace to this point
 	movq %rsp, %rdx
 	# arg0, rdi: struct sysc*.  arg1, rsi: count.  arg2, rdx: sw_tf
 	call sysenter_callwrapper
@@ -917,17 +923,17 @@ vmexit_handler:
 	# rflags has all flags = 0, so cli and cld already.
 	# HOST_GS_BASE and RSP is set by the hardware
 	# Set default values.  Most of these will be set in C later.
-	pushq $0			# guest_pa
-	pushq $0			# guest_va
-	pushq $0			# intrinfo2 and 1
-	pushq $0			# exit_qual + exit_reason
-	pushq $0			# pad + trap_inject
-	pushq $0			# flags + guest_pcorid
-	pushq $0			# cr3
-	pushq $0			# cr2
-	pushq $0			# rsp
-	pushq $0			# rflags
-	pushq $0			# rip
+	pushq $0		# guest_pa
+	pushq $0		# guest_va
+	pushq $0		# intrinfo2 and 1
+	pushq $0		# exit_qual + exit_reason
+	pushq $0		# pad + trap_inject
+	pushq $0		# flags + guest_pcorid
+	pushq $0		# cr3
+	pushq $0		# cr2
+	pushq $0		# rsp
+	pushq $0		# rflags
+	pushq $0		# rip
 	# Save register state
 	pushq %r15
 	pushq %r14
@@ -944,7 +950,7 @@ vmexit_handler:
 	pushq %rcx
 	pushq %rbx
 	pushq %rax
-	movq $0, %rbp			# so we can backtrace to this point
+	movq $0, %rbp		# so we can backtrace to this point
 	movq %rsp, %rdi
 	call handle_vmexit
 vmexit_spin:

@@ -21,7 +21,8 @@ slim_setjmp:
 	xorl %eax,%eax     # Zero out the return value for our first return
 	pop  %rsi          # Temporarily grab the return address and adjust %rsp
 	movq %rsi,(%rdi)   # Save the return address
-	movq %rsp,8(%rdi)  # The adjusted %rsp is the post-return %rsp (see longjmp)
+	movq %rsp,8(%rdi)  # The adjusted %rsp is the post-return %rsp
+			   # (see longjmp)
 	movq %rbp,16(%rdi)
 	push %rsi          # Restore stuff to make the call/return stack happy
 	ret

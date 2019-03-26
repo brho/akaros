@@ -9,8 +9,9 @@ file.
 	- Superblock: Specific instance of a mounted filesystem.  All
 	  synchronization is done with the one spinlock.
 	- Inode: represents a specific file
-	- Dentry: in memory object, corresponding to an element of a path.  E.g. /,
-	  usr, bin, and vim are all dentries.  All have inodes.  Vim happens to be a
+	- Dentry: in memory object, corresponding to an element of a path.
+	  E.g. /, usr, bin, and vim are all dentries.  All have inodes.  Vim
+	  happens to be a
 	  file instead of a directory.
 	- File: represents a file opened by a process.
 

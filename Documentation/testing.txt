@@ -19,7 +19,8 @@ At a minimum we need a framework that can automate the following on every commit
 	- Verify successful compilation of our user libraries
 	- Verify successful compilation of the cross compiler for all supported
 	  archs on commits that touch a file in the cross compiler
-	- Compile and run a suite of kernel and user tests and verify their success
+	- Compile and run a suite of kernel and user tests and verify their
+	  success
 
 The framework should support easily adding/removing tests, as well as a way to
 easily turn them on and off, without actually removing them. We should also
@@ -117,26 +118,26 @@ TODO: Write
 
 2.3 Post-boot kernel unit tests
 ------------------------------------------------------------------
-	1. Go to akaros/kern/src/tests_pb_kernel.c
-	2. Create a new function for the test. Follow the following pattern:
-		bool test_[NAME](void)
-		{
-			[CODE]
-			return true;
-		}
-	3. Inside the [CODE] section, use the following assertion functions:
-		* KT_ASSERT(boolean-expression): runs the expression and, if it fails, 
-		  it finishes the full unit test with a result of FAILED.
-		* KT_ASSERT_M(message, boolean-expression): like KT_ASSERT but, in case
-		  of failure, the message gets printed as cause of failure.
-	4. Go to akaros/kern/src/tests.c
-	5. Add inside the pb_kernel_tests array a line like the following:
-		PB_K_TEST_REG([NAME], true), 
-		(Optionally, disable temporarily the test by setting the second arg to
-		false).
+1. Go to akaros/kern/src/tests_pb_kernel.c
+2. Create a new function for the test. Follow the following pattern:
+	bool test_[NAME](void)
+	{
+		[CODE]
+		return true;
+	}
+3. Inside the [CODE] section, use the following assertion functions:
+	* KT_ASSERT(boolean-expression): runs the expression and, if it fails,
+	  it finishes the full unit test with a result of FAILED.
+	* KT_ASSERT_M(message, boolean-expression): like KT_ASSERT but, in case
+	  of failure, the message gets printed as cause of failure.
+4. Go to akaros/kern/src/tests.c
+5. Add inside the pb_kernel_tests array a line like the following:
+	PB_K_TEST_REG([NAME], true),
+	(Optionally, disable temporarily the test by setting the second arg to
+	false).
 
-		If you'd like a test to be ran only in a given architecture, surround
-		it here by #ifdefine CONFIG_[ARCH] ... #endif tags.
+	If you'd like a test to be ran only in a given architecture, surround
+	it here by #ifdefine CONFIG_[ARCH] ... #endif tags.
 
 2.4 Userspace unit tests
 ------------------------------------------------------------------
@@ -183,8 +184,8 @@ To accomplish post-boot testing, the following files are involved:
 	akaros/include/test_infrastructure.h
 
 test_infrastructure.h:
-	This file defines macros used for assertions, as well as data structures,
-	variables and a macro for registering postboot tests.
+	This file defines macros used for assertions, as well as data
+	structures, variables and a macro for registering postboot tests.
 
 tests_pb_kernel.c:
 	This file contains the implementation of all the tests in this category.

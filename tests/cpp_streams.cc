@@ -11,7 +11,8 @@ struct foobar {
 	int x;
 };
 
-int main() {
+int main(void)
+{
 	string line;
 	ifstream myfile;
 	/* grep the asm for M_release to verify we're using atomics */

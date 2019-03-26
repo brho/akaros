@@ -93,13 +93,13 @@ function build_config() {
 	esac
 
 	# Enable tests to run.
-	# These don't take much to execute so we can run them always and just parse
-	# results if needed.
+	# These don't take much to execute so we can run them always and just
+	# parse results if needed.
 	echo "CONFIG_KERNEL_TESTING=y" >> .config
 	echo "CONFIG_USERSPACE_TESTING=y" >> .config
 	echo "CONFIG_LOUSY_LAPIC_TIMER=y" >> .config
-	# Set all config variables dependent on the above changes to their defaults
-	# without prompting
+	# Set all config variables dependent on the above changes to their
+	# defaults without prompting
 	make olddefconfig 
 
 	echo -e "[SET_MAKE_CONFIG]: End\n"
@@ -228,7 +228,8 @@ function run_qemu() {
 	# Then we wait....
 	wait $MAKE_PID
 
-	# clean and cat the output of the file so we can see it in the console log
+	# clean and cat the output of the file so we can see it in the console
+	# log
 	sed -i -e 's///g' $AKAROS_OUTPUT_FILE
 	cat $AKAROS_OUTPUT_FILE
 

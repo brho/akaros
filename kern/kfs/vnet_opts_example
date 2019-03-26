@@ -4,7 +4,7 @@
 #
 # Options include:
 #
-# snoop				# Mirror traffic to #srv/snoop-PID
+# snoop			# Mirror traffic to #srv/snoop-PID
 # nat_timeout = 200	# Timeout NAT maps after 200 seconds
 # real_address		# Let the guest think it has the host's IP address
 # map_diagnostics	# Respond to 'notify 9' with a print of the NAT map

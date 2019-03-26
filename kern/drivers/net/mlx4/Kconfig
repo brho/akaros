@@ -18,8 +18,8 @@ config MLX4_EN_DCB
 	---help---
 	  Say Y here if you want to use Data Center Bridging (DCB) in the
 	  driver.
-	  If set to N, will not be able to configure QoS and ratelimit attributes.
-	  This flag is depended on the kernel's DCB support.
+	  If set to N, will not be able to configure QoS and ratelimit
+	  attributes.  This flag is depended on the kernel's DCB support.
 
 	  If unsure, set to Y
 

@@ -90,8 +90,8 @@ else
 	if [ ! -n "$me" ]
 	then
 		# By default, configure for QEMU.
-		# We only use qemu's setting when we don't have ipconfig so that we can
-		# test ipconfig + DHCP with qemu.
+		# We only use qemu's setting when we don't have ipconfig so
+		# that we can test ipconfig + DHCP with qemu.
 		me='10.0.2.15'
 		mask='255.255.255.0'
 		remote='10.0.2.0'

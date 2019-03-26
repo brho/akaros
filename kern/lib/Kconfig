@@ -4,12 +4,12 @@ config ZLIB_DEFLATE
 	bool "Zlib Deflation"
 	default y
 	help
-		Zlib deflation
+	  Zlib deflation
 
 config ZLIB_INFLATE
 	bool "Zlib Inflation"
 	default y
 	help
-		Zlib inflation
+	  Zlib inflation
 
 endmenu

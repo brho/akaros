@@ -22,7 +22,8 @@ _git_track ()
 	# remove the / for the ls-remote
 	trim_remote="${remote::-1}"
 	remote_branches="$(git ls-remote --heads $trim_remote | grep -o '[^/]*$')"
-	# arg3: generate completion matches, should be current string minus remote/
+	# arg3: generate completion matches, should be current string minus
+	# remote/
 	__gitcomp_nl "$remote_branches" "$remote" "${cur#$remote}"
 }
 

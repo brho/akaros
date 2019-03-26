@@ -54,9 +54,10 @@ then
 	cd "$LAST_ARG"
 	set_sed_arg $LAST_ARG
 	# call global with the last arg taken off.  need to do it in one line,
-	# since bash sucks and it won't keep any quoted wildcards intact otherwise
-	# (or will still muck with the arguments in some weird way).  this is
-	# similar to doing NEW_ARGS=${@:1:$LAST_MINUS_ONE}, and passing NEW_ARGS
+	# since bash sucks and it won't keep any quoted wildcards intact
+	# otherwise (or will still muck with the arguments in some weird way).
+	# this is similar to doing NEW_ARGS=${@:1:$LAST_MINUS_ONE}, and passing
+	# NEW_ARGS
 	LAST_MINUS_ONE=$(($#-1))
 	global -ln "${@:1:$LAST_MINUS_ONE}" | sed "s/\.\/\($SED_ARG\)/\1/g"
 else # plain old global

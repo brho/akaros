@@ -10,7 +10,8 @@ SECTIONS
 
 	.text 0xFFFFFFFF80002000 : AT(0x2000) {
 		*(.text .stub .text.* .gnu.linkonce.t.*)
-		PROVIDE(etext = .);	/* Define the 'etext' symbol to this value */
+		/* Define the 'etext' symbol to this value */
+		PROVIDE(etext = .);
 	}
 
 	INCLUDE kern/linker_tables.ld

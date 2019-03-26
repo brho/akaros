@@ -33,9 +33,9 @@ akaros-patches := $(sort $(wildcard akaros-patches/$(version)/*))
 $(build-dir): $(tarball) $(akaros-patches)
 	$(Q)rm -rf $@
 	tar -xf $<
-	$(Q)cd $@ &&                                                               \
-	for i in $(akaros-patches); do                                             \
-		patch -p1 < ../$$i;                                                    \
+	$(Q)cd $@ &&                                                           \
+	for i in $(akaros-patches); do                                         \
+		patch -p1 < ../$$i;                                            \
 	done
 
 PHONY += config
@@ -52,14 +52,14 @@ install: make
 
 PHONY += clean
 clean:
-	$(Q)[ -d $(build-dir) ] &&                                                 \
-	    [ -f $(build-dir)/Makefile ] &&                                        \
+	$(Q)[ -d $(build-dir) ] &&                                             \
+	    [ -f $(build-dir)/Makefile ] &&                                    \
 	    $(MAKE) -C $(build-dir) clean || true
 
 PHONY += mrproper
 mrproper:
-	$(Q)[ -d $(build-dir) ] &&                                                 \
-	    [ -f $(build-dir)/Makefile ] &&                                        \
+	$(Q)[ -d $(build-dir) ] &&                                             \
+	    [ -f $(build-dir)/Makefile ] &&                                    \
 	    $(MAKE) -C $(build-dir) uninstall || true
 	$(Q)rm -rf $(build-dir)
 

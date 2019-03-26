@@ -1349,9 +1349,9 @@ Here's some good ideas for the ordering of locks/irqs/messages:
 - You can't hold a spinlock of any sort and then wait on a routine kernel
   message.  The core where that runs may be waiting on you, or some scenario
   like above.
-	- Similarly, think about how this works with kthreads.  A kthread restart
-	  is a routine KMSG.  You shouldn't be waiting on code that could end up
-	  kthreading, mostly because those calls block!
+	- Similarly, think about how this works with kthreads.  A kthread
+	  restart is a routine KMSG.  You shouldn't be waiting on code that
+	  could end up kthreading, mostly because those calls block!
 - You can hold a spinlock and wait on an IMMED kmsg, if the waiters of the
   spinlock have irqs enabled while spinning (this is what we used to do with
   the proc lock and IMMED kmsgs, and 54c6008 is an example of doing it wrong)
@@ -1360,9 +1360,10 @@ Here's some good ideas for the ordering of locks/irqs/messages:
 - For broadcast trees, you'd have to send IMMEDs for the intermediates, and
   then it'd be okay to wait on those intermediate, immediate messages (if we
   wanted confirmation of the posting of RKM)
-  	- The main thing any broadcast mechanism needs to do is make sure all
+	- The main thing any broadcast mechanism needs to do is make sure all
 	  messages get delivered in order to particular pcores (the central
-	  premise of KMSGs) (and not deadlock due to waiting on a KMSG improperly)
+	  premise of KMSGs) (and not deadlock due to waiting on a KMSG
+	  improperly)
 - Alternatively, we could use routines for the intermediates if we didn't want
   to wait for RKMs to hit their destination, we'd need to always use the same
   proxy for the same destination pcore, e.g., core 16 always covers 16-31.
@@ -1371,8 +1372,8 @@ Here's some good ideas for the ordering of locks/irqs/messages:
 	  ordering of intermediate msgs on the message queues of a particular
 	  core.
 	- All kmsgs would need to use this broadcasting style (couldn't mix
-	  regular direct messages with broadcast), so odds are this style would be
-	  of limited use.
+	  regular direct messages with broadcast), so odds are this style would
+	  be of limited use.
 	- since we're not waiting on execution of a message, we could use RKMs
 	  (while holding a spinlock)
 - There might be some bad effects with kthreads delaying the reception of RKMS

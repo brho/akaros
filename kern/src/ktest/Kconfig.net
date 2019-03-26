@@ -1,19 +1,19 @@
 menuconfig NET_KTESTS
-    depends on KERNEL_TESTING
-    bool "Networking unit tests"
-    default y
+	depends on KERNEL_TESTING
+	bool "Networking unit tests"
+	default y
 
 config TEST_ptclbsum
-    depends on NET_KTESTS
-    bool "Unit tests for ptclbsum"
-    default y
+	depends on NET_KTESTS
+	bool "Unit tests for ptclbsum"
+	default y
 
 config TEST_simplesum_bench
-    depends on NET_KTESTS
-    bool "Checksum benchmark: baseline"
-    default y
+	depends on NET_KTESTS
+	bool "Checksum benchmark: baseline"
+	default y
 
 config TEST_ptclbsum_bench
-    depends on NET_KTESTS
-    bool "Checksum benchmark: ptclbsum"
-    default y
+	depends on NET_KTESTS
+	bool "Checksum benchmark: ptclbsum"
+	default y

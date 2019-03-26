@@ -36,7 +36,7 @@ function gen_request()
 	base_sha1=${base_sha1:0:7}
 
 	# Get the text from a git request-pull
-    request=$(git request-pull ${patch} ${base} ${remote} ${head});
+	request=$(git request-pull ${patch} ${base} ${remote} ${head});
 	ret=${?};
 	if [ "${ret}" != "0" ]; then
 		kill -s TERM $TOP_PID

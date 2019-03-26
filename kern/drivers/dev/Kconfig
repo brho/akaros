@@ -2,20 +2,20 @@ config REGRESS
         bool "Include the regression test device"
         default y
         help
-                The regression test device allows you to push commands to monitor()
-		for testing. Defaults to 'y' for now.
+	  The regression test device allows you to push commands to monitor()
+	  for testing. Defaults to 'y' for now.
 
 config DEVVARS
 	bool "#vars kernel variable exporter"
 	default y
 	help
-		The #vars device exports read access to select kernel variables.
+	  The #vars device exports read access to select kernel variables.
 
 config DEVVARS_TEST
 	bool "#vars test files"
 	depends on DEVVARS
 	default n
 	help
-		Have #vars include a collection of test files that devvars utest uses.
-		Say 'y' if you plan to use the utest, at the expense of having a
-		cluttered #vars.
+	  Have #vars include a collection of test files that devvars utest
+	  uses.  Say 'y' if you plan to use the utest, at the expense of having
+	  a cluttered #vars.

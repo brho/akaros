@@ -1,8 +1,8 @@
 menuconfig KERNEL_TESTING
-    bool "Kernel testing"
-    default n
-    help
-        Run unit tests for the kernel
+	bool "Kernel testing"
+	default n
+	help
+	  Run unit tests for the kernel
 
 source "kern/src/ktest/Kconfig.postboot"
 source "kern/src/ktest/Kconfig.net"

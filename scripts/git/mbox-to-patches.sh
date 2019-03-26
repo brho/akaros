@@ -50,7 +50,8 @@ do
 	AUTHOR=`grep "^Author:" MI_header | cut -f 2- -d' '`
 	EMAIL=`grep "^Email:" MI_header | cut -f 2- -d' '`
 
-	# Determine the subject for naming the patch, replace spaces and weird chars
+	# Determine the subject for naming the patch, replace spaces and weird
+	# chars
 	SUBJECT=`grep "^Subject:" MI_header | cut -f 2- -d' ' |
 	         sed 's/[^[:alnum:]]/-/g'`
 

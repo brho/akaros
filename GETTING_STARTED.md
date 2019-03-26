@@ -109,8 +109,8 @@ instance, my path contains:
 
 `/home/brho/classes/akaros/akaros-gcc-glibc/install-x86_64-ucb-akaros-gcc/bin`
 
-You can also set up `MAKE_JOBS`, so you don't over or under load your system when
-building.  I have a 2 core laptop, so I use `MAKE_JOBS := 3`
+You can also set up `MAKE_JOBS`, so you don't over or under load your system
+when building.  I have a 2 core laptop, so I use `MAKE_JOBS := 3`
 
 At this point, you can build (for example):
 
@@ -170,7 +170,7 @@ see this, then you probably didn't actually fill KFS properly.
 
 ```
 	Building initramfs:
-		Adding kern/kfs to initramfs...
+	Adding kern/kfs to initramfs...
 ```
 
 
@@ -235,10 +235,10 @@ Anyway, I put that img in `AKAROS-ROOT/mnt/`, and make a folder next to it:
 Personally, I always have `hdd.img` mounted.  Some of the other devs have make
 targets that mount and umount it.  Whenever I reboot my development machine, I
 run a script (as root) that mounts the image file and sets up a few things for
-networking.  I put a script I use for this in `scripts/kvm-up.sh`.  You'll likely
-want to copy it to the directory **above** the akaros root directory and edit it
-accordingly. Feel free to comment out the networking stuff.  That's for using
-networking in `qemu`.
+networking.  I put a script I use for this in `scripts/kvm-up.sh`.  You'll
+likely want to copy it to the directory **above** the akaros root directory and
+edit it accordingly. Feel free to comment out the networking stuff.  That's for
+using networking in `qemu`.
 
 Now that your image file is mounted at `mnt/hdd`, you'll want to copy your
 freshly built kernel to the root of the image.  I have a make target in my
@@ -289,8 +289,8 @@ networking, replace the "`-net user`" section with:
 
 `-net tap,ifname=tap0,script=no`
 
-The "`-net dump`" option saves a pcap trace of the network traffic.  This is very
-useful for debugging, but probably not needed for most people.
+The "`-net dump`" option saves a pcap trace of the network traffic.  This is
+very useful for debugging, but probably not needed for most people.
 
 Feel free to pick different values for the number of cpus and RAM (8 and 4096
 in the example).

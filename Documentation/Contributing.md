@@ -248,7 +248,7 @@ That's pretty crazy, so I have the following in my `~/.gitconfig`
 
 ```
 [alias]
-	    gr  = log --graph --full-history --all --color --pretty=format:"%x1b[31m%h%x09%x1b[32m%d%x1b[0m%x20%s%x20%x1b[33m(%an)%x1b[0m"
+        gr  = log --graph --full-history --all --color --pretty=format:"%x1b[31m%h%x09%x1b[32m%d%x1b[0m%x20%s%x20%x1b[33m(%an)%x1b[0m"
         grs = log --graph --full-history --all --color --pretty=format:"%x1b[31m%h%x09%x1b[32m%d%x1b[0m%x20%s%x20%x1b[33m(%an)%x1b[0m" --simplify-by-decoration
 ```
 
@@ -262,7 +262,7 @@ things off, make sure you are up to date.
 
 ```
 $ git checkout master 		# make sure you're on master
-$ git fetch 				# grab the latest from origin/
+$ git fetch 			# grab the latest from origin/
 $ git merge origin/master
 ```
 
@@ -365,7 +365,7 @@ Say you are on the branch `monitor-change`, and `origin/master` has updated.
 Here's a reasonable workflow to deal with this situation:
 
 ```
-$ git fetch 				# notice origin/master changed
+$ git fetch 			# notice origin/master changed
 $ git checkout master 		# switch to master
 $ git merge origin/master 	# fast-forward merge - straight line of commits
 ```
@@ -391,8 +391,8 @@ already pushed your branch to the repo, you'll want to update that branch.
 
 `$ git push -f origin monitor-change`
 
-The `-f` replaces the `origin/monitor-change` with your `monitor-change`.  See below
-for more on `-f`.
+The `-f` replaces the `origin/monitor-change` with your `monitor-change`.  See
+below for more on `-f`.
 
 If you don't want to bother with maintaining your master right now, you can cut
 it down to a few steps (assuming you are on `SOMEBRANCH`):
@@ -421,9 +421,9 @@ Let's say you have a string of commits, e.g.: (edited from my `git gr`)
 * 1234567        (master, origin/master) Some Other Commit
 ```
 
-You're working on the `vmmcp` branch, and you realize that `d76b4c6` adds a bunch
-of debug `printk`s in it and that there is a bug in `HEAD` that you introduced in
-`f62dd6c`.
+You're working on the `vmmcp` branch, and you realize that `d76b4c6` adds a
+bunch of debug `printk`s in it and that there is a bug in `HEAD` that you
+introduced in `f62dd6c`.
 
 The lousy option would be to make a new commit on top of `876d5b0 (HEAD)` that
 removes the prints and fixes the bugs.  The problem with this is that there is
@@ -441,28 +441,28 @@ $ git checkout vmmcp
 $ git rebase -i master
 ```
 
-This will replay all commits from (`1234567`, `876d5b0`] (not including `1234567`) on
-top of `master` (`1234567`).  Check out `git help rebase` for more info,
-including some nifty diagrams.  In short, that `rebase` command is the shorthand
-for:
+This will replay all commits from (`1234567`, `876d5b0`] (not including
+`1234567`) on top of `master` (`1234567`).  Check out `git help rebase` for
+more info, including some nifty diagrams.  In short, that `rebase` command is
+the shorthand for:
 
 `$ git rebase -i --onto master master vmmcp`
 
-The `rebase` command `-i` option (interactive) will pop open an editor, where you
-can change the order of commits, squash multiple commits into a single commit,
-or stop and edit the commit.  Note that commits are presented in the order in
-which they will be committed, which is the opposite of `gitk` and `git gr`, where
-the newest commit is on top.
+The `rebase` command `-i` option (interactive) will pop open an editor, where
+you can change the order of commits, squash multiple commits into a single
+commit, or stop and edit the commit.  Note that commits are presented in the
+order in which they will be committed, which is the opposite of `gitk` and `git
+gr`, where the newest commit is on top.
 
-Let's edit the commit `d76b4c6` (change '`pick`' to '`e`').  Save and exit, and the
-rebase will proceed.  When git hits that commit, it will stop and you can amend
-your commit.
+Let's edit the commit `d76b4c6` (change '`pick`' to '`e`').  Save and exit, and
+the rebase will proceed.  When git hits that commit, it will stop and you can
+amend your commit.
 
 ```
-$ vi somefile 			# make your changes
+$ vi somefile 		# make your changes
 $ git add -p somefile  	# add them to the index (building a commit)
 $ git commit --amend 	# amend your *old* commit (d76b4c6)
-$ git status 			# see how you are doing
+$ git status 		# see how you are doing
 $ git rebase --continue
 ```
 
@@ -474,7 +474,7 @@ Let's do that to fix the bug in `f62dd6c`.
 
 ```
 $ git checkout vmmcp 	# start from the top of the tree
-$ vi somefile 			# make your changes
+$ vi somefile 		# make your changes
 $ git add -p somefile	# stage the changes
 $ git commit -m WIP-fixes-vmm-bug
 ```
@@ -496,19 +496,19 @@ Clearly you don't want that WIP commit (WIP = work in progress).  Let's rebase!
 
 `$ git rebase -i master`
 
-Reorder the commits so that the WIP happens after `f62dd6c`, and change the WIP's
-command from '`pick`' to '`f`'.
+Reorder the commits so that the WIP happens after `f62dd6c`, and change the
+WIP's command from '`pick`' to '`f`'.
 
 Assuming everything applies cleanly, you're done.  The WIP approach is even
-easier than the `rebase` with `amend`.  I use it when a change applies to both the
-current tip as well as the faulty commit.
+easier than the `rebase` with `amend`.  I use it when a change applies to both
+the current tip as well as the faulty commit.
 
 You can even use `git rebase` to logically reorder commits so that together, the
 'story' is more cohesive.
 
-But wait, your version of `vmmcp` differs from `origin/vmmcp`!  The repo's `vmmcp`
-branch still looks like the old one.  You need to `push -f` to force the repo's
-branch to agree with yours:
+But wait, your version of `vmmcp` differs from `origin/vmmcp`!  The repo's
+`vmmcp` branch still looks like the old one.  You need to `push -f` to force
+the repo's branch to agree with yours:
 
 `$ git push -f origin vmmcp`
 
@@ -532,10 +532,10 @@ $ git checkout vmmcp
 $ git reset --hard origin/vmmcp
 ```
 
-This throws away any differences between your tree and `origin/vmmcp`, in essence
-making it replicate the current state of `origin/vmmcp`.  If you had any changes,
-you just lost them.  Yikes!  If in doubt, you can make a temp branch before
-doing anything dangerous with reset.
+This throws away any differences between your tree and `origin/vmmcp`, in
+essence making it replicate the current state of `origin/vmmcp`.  If you had
+any changes, you just lost them.  Yikes!  If in doubt, you can make a temp
+branch before doing anything dangerous with reset.
 
 `$ git branch temp 		# keeps a pointer called 'temp' to the current tip`
 
@@ -553,12 +553,12 @@ commits from your old `vmmcp` branch to the new one:
 
 `$ git rebase --onto origin/vmmcp PREVIOUS-ORIGIN-VMMCP`
 
-You'll need to look at `gitk`, `git log`, `git gr`, or whatever to find the commit
-name (SHA1) of the original `origin/vmmcp` (before you fetched).  For this
-reason, you could have a branch called vmmcp-mine for all of your changes, and
-keep your branch `vmmcp` around to just track `origin/vmmcp`.  This is what many
-people do with `master`: it only tracks `origin/master`, and all changes happen on
-separate branches.
+You'll need to look at `gitk`, `git log`, `git gr`, or whatever to find the
+commit name (SHA1) of the original `origin/vmmcp` (before you fetched).  For
+this reason, you could have a branch called vmmcp-mine for all of your changes,
+and keep your branch `vmmcp` around to just track `origin/vmmcp`.  This is what
+many people do with `master`: it only tracks `origin/master`, and all changes
+happen on separate branches.
 
 Note that you can probably just do a:
 
@@ -605,8 +605,9 @@ scripts/checkpatch.pl is modified from Linux's checkpatch and takes a patchfile 
 $ git checkpatch master..my_branch_head
 ```
 
-That will generate the patches from master..my_branch_head and run checkpatch on each of them in series.
-If you don't have the git scripts in your path, you'll have to do something like:
+That will generate the patches from master..my_branch_head and run checkpatch
+on each of them in series.  If you don't have the git scripts in your path,
+you'll have to do something like:
 
 ```
 $ ./scripts/git/git-checkpatch master..my_branch_head

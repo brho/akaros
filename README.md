@@ -8,16 +8,17 @@ support for application-directed resource management and 100% isolation from
 other jobs running on the system.
 
 Although not yet integrated as such, it is designed to operate as a low-level
-node OS with a higher-level Cluster OS, such as [Mesos](http://mesos.apache.org/),
-governing how resources are shared amongst applications running on each node.
-Its system call API and "Many Core Process" abstraction better match the
-requirements of a Cluster OS, eliminating many of the obstacles faced by other
-systems when trying to isolate simultaneously running processes.  Moreover,
-Akaros’s resource provisioning interfaces allow for node-local decisions to be
-made that enforce the resource allocations set up by a Cluster OS.  This can be
-used to simplify global allocation decisions, reduce network communication, and
-ultimately promote more efficient sharing of resources.  There is limited
-support for such functionality on existing operating systems.
+node OS with a higher-level Cluster OS, such as
+[Mesos](http://mesos.apache.org/), governing how resources are shared amongst
+applications running on each node.  Its system call API and "Many Core Process"
+abstraction better match the requirements of a Cluster OS, eliminating many of
+the obstacles faced by other systems when trying to isolate simultaneously
+running processes.  Moreover, Akaros’s resource provisioning interfaces allow
+for node-local decisions to be made that enforce the resource allocations set
+up by a Cluster OS.  This can be used to simplify global allocation decisions,
+reduce network communication, and ultimately promote more efficient sharing of
+resources.  There is limited support for such functionality on existing
+operating systems.
 
 Akaros is still very young, but preliminary results show that processes running
 on Akaros have an order of magnitude less noise than on Linux, as well as fewer

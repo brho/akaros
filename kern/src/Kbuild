@@ -1,8 +1,9 @@
 $(src)/build_info.cid:
 	@echo `git rev-parse HEAD` > $(src)/build_info.cid.tmp
 	@if [ ! -f $(src)/build_info.cid ] || \
-		[ `cmp -s $(src)/build_info.cid $(src)/build_info.cid.tmp` -ne 0 ]; then \
-			cp $(src)/build_info.cid.tmp $(src)/build_info.cid; fi;
+	    [ `cmp -s $(src)/build_info.cid $(src)/build_info.cid.tmp` -ne 0 ];\
+	    then \
+		cp $(src)/build_info.cid.tmp $(src)/build_info.cid; fi;
 	@rm -f $(src)/build_info.cid.tmp
 
 $(src)/build_info.c: $(src)/build_info.cid
@@ -37,11 +38,11 @@ obj-y						+= dmapool.o
 obj-y						+= elf.o
 obj-y						+= env.o
 obj-y						+= err.o
-obj-$(CONFIG_ETH_AUDIO)		+= eth_audio.o
+obj-$(CONFIG_ETH_AUDIO)				+= eth_audio.o
 obj-y						+= event.o
 obj-y						+= ex_table.o
 obj-y						+= fdtap.o
-obj-$(CONFIG_COREALLOC_FCFS) += corealloc_fcfs.o
+obj-$(CONFIG_COREALLOC_FCFS)			+= corealloc_fcfs.o
 obj-y						+= find_next_bit.o
 obj-y						+= find_last_bit.o
 obj-y						+= hashtable.o

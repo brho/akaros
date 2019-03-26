@@ -68,8 +68,8 @@ done
 #	prov -tc -p$PTHPID -v1 >> tmpfile 2>&1
 #	prov -tc -p$PTHPID -v2 >> tmpfile 2>&1
 #
-#	# the extra preempts here are to make us wait longer, to see gaps where we
-#	# "locked up" more clearly.
+#	# the extra preempts here are to make us wait longer, to see gaps where
+#	# we "locked up" more clearly.
 #	usleep $PREEMPT_DELAY
 #	usleep $PREEMPT_DELAY
 #	usleep $PREEMPT_DELAY

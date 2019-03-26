@@ -1,10 +1,10 @@
 #!/bin/bash
 # Barret Rhoden 2012-03-07
 
-# Builds/updates a gtags database for all directories/paths listed in GTAGS_INC_FILE
-# (.gtagsinclude).  If you are in a gtags-managed directory (subdir), it will
-# update from the rootdir.  If not, it will attempt to build a new gtags
-# database, if you have the whitelist file.
+# Builds/updates a gtags database for all directories/paths listed in
+# GTAGS_INC_FILE (.gtagsinclude).  If you are in a gtags-managed directory
+# (subdir), it will update from the rootdir.  If not, it will attempt to build
+# a new gtags database, if you have the whitelist file.
 #
 # This will also do the incremental update, so run this when you have new files
 # in the system.  Don't run global -u, since it takes forever, and is probably

@@ -1,14 +1,14 @@
 
 menuconfig USERSPACE_TESTING
-    bool "User-space testing"
-    default n
-    help
-        Run userspace unit tests after the kernel has booted.
+	bool "User-space testing"
+	default n
+	help
+	  Run userspace unit tests after the kernel has booted.
 
 config USERSPACE_TESTING_SCRIPT
-    depends on USERSPACE_TESTING
-    string "Path to test launcher script."
-    default /bin/tests/utest/runall.sh
-    help
-        Run userspace unit tests from the specified path. 
+	depends on USERSPACE_TESTING
+	string "Path to test launcher script."
+	default /bin/tests/utest/runall.sh
+	help
+	  Run userspace unit tests from the specified path.
 

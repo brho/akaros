@@ -3,37 +3,37 @@
 #
 #
 # Notes:
-# 	- I downloaded the kbuild guts from git://github.com/lacombar/kconfig.git,
-# 	and added things from a recent linux makefile.  It is from aug 2011, so
-# 	some things might not match up.
-# 	- Kernel output in obj/: So Linux has the ability to output into another
-# 	directory, via the KBUILD_OUTPUT variable.  This induces a recursive make
-# 	in the output directory.  I mucked with it for a little, but didn't get it
-# 	to work quite right.  Also, there will be other Akaros issues since this
-# 	makefile is also used for userspace and tests.  For now, I'm leaving things
-# 	the default Linux way.
-#	- Kconfig wants to use include/ in the root directory.  We can change some
-#	of the default settings that silentoldconfig uses, but I'll leave it as-is
-#	for now, and just symlink that into kern/include.  It'll be easier for us,
-#	and also potentially easier if we ever move kern/ up a level.  Similarly,
-#	there are default Kconfigs in arch/, not in kern/arch.  I just symlinked
-#	arch->kern/arch to keep everything simple.
+# - I downloaded the kbuild guts from git://github.com/lacombar/kconfig.git,
+# and added things from a recent linux makefile.  It is from aug 2011, so
+# some things might not match up.
+# - Kernel output in obj/: So Linux has the ability to output into another
+# directory, via the KBUILD_OUTPUT variable.  This induces a recursive make
+# in the output directory.  I mucked with it for a little, but didn't get it
+# to work quite right.  Also, there will be other Akaros issues since this
+# makefile is also used for userspace and tests.  For now, I'm leaving things
+# the default Linux way.
+# - Kconfig wants to use include/ in the root directory.  We can change some
+# of the default settings that silentoldconfig uses, but I'll leave it as-is
+# for now, and just symlink that into kern/include.  It'll be easier for us,
+# and also potentially easier if we ever move kern/ up a level.  Similarly,
+# there are default Kconfigs in arch/, not in kern/arch.  I just symlinked
+# arch->kern/arch to keep everything simple.
 #
 # TODO:
-#	- Consider merging the two target-detection bits (Linux's config, mixed, or
-#	dot target, and the symlink handling).  Also, could consider moving around
-#	the KFS target.  Clean doesn't need to know about it, for instance.
+# - Consider merging the two target-detection bits (Linux's config, mixed, or
+# dot target, and the symlink handling).  Also, could consider moving around
+# the KFS target.  Clean doesn't need to know about it, for instance.
 #
-#	- Review, with an eye for being better about $(srctree).  It might only be
-#	necessary in this file, if we every do the KBUILD_OUTPUT option.  But we
-#	don't always want it (like for the implicit rule for Makefile)
+# - Review, with an eye for being better about $(srctree).  It might only be
+# necessary in this file, if we every do the KBUILD_OUTPUT option.  But
+# we don't always want it (like for the implicit rule for Makefile)
 #
-#	- It's a bit crazy that we build symlinks for parlib, instead of it
-#	managing its own links based on $(ARCH)
+# - It's a bit crazy that we build symlinks for parlib, instead of it
+# managing its own links based on $(ARCH)
 #
-#	- Consider using Kbuild to build userspace and tests
+# - Consider using Kbuild to build userspace and tests
 #
-#	- There are a few other TODOs sprinkled throughout the makefile.
+# - There are a few other TODOs sprinkled throughout the makefile.
 
 # Number of make jobs to spawn.  Can override this in Makelocal
 MAKE_JOBS ?= $(shell expr `cat /proc/cpuinfo | grep processor | wc -l` - 1)
@@ -341,10 +341,10 @@ CPP	    := $(CROSS_COMPILE)g++
 AS	    := $(CROSS_COMPILE)as
 AR	    := $(CROSS_COMPILE)ar
 LD	    := $(CROSS_COMPILE)ld
-OBJCOPY	:= $(CROSS_COMPILE)objcopy
-OBJDUMP	:= $(CROSS_COMPILE)objdump
+OBJCOPY	    := $(CROSS_COMPILE)objcopy
+OBJDUMP	    := $(CROSS_COMPILE)objdump
 NM	    := $(CROSS_COMPILE)nm
-STRIP   := $(CROSS_COMPILE)strip
+STRIP       := $(CROSS_COMPILE)strip
 KERNEL_LD ?= kernel.ld
 
 # These may have bogus values if there is no compiler.  The kernel and user
@@ -467,8 +467,8 @@ kern_cpio_obj := $(kern_cpio).o
 kfs-paths-check := $(shell for i in $(kfs-paths); do \
                                if [ ! -d "$$i" ]; then \
                                    echo "Can't find KFS directory $$i"; \
-	                               $(MAKE) -f $(srctree)/Makefile \
-								           silentoldconfig > /dev/null; \
+                                   $(MAKE) -f $(srctree)/Makefile \
+                                   silentoldconfig > /dev/null; \
                                    exit -1; \
                                fi; \
                            done; echo "ok")
@@ -483,14 +483,14 @@ kern_initramfs_files := $(shell find $(kfs-paths))
 $(kern_cpio) initramfs: $(kern_initramfs_files)
 	@echo "  Building initramfs:"
 	@if [ "$(CONFIG_KFS_CPIO_BIN)" != "" ]; then \
-        sh $(CONFIG_KFS_CPIO_BIN); \
-    fi
+		sh $(CONFIG_KFS_CPIO_BIN); \
+	fi
 	@cat /dev/null | cpio --quiet -oH newc -O $(kern_cpio)
 	$(Q)for i in $(kfs-paths); do cd $$i; \
-        echo "    Adding $$i to initramfs..."; \
-        find -L . | cpio --quiet -oAH newc -O $(CURDIR)/$(kern_cpio); \
-        cd $$OLDPWD; \
-    done;
+		echo "    Adding $$i to initramfs..."; \
+		find -L . | cpio --quiet -oAH newc -O $(CURDIR)/$(kern_cpio); \
+		cd $$OLDPWD; \
+	done;
 
 ld_emulation = $(shell $(OBJDUMP) -i 2>/dev/null | \
                        grep -v BFD | grep ^[a-z] | head -n1)

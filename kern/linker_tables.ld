@@ -1,11 +1,12 @@
 /* this is INCLUDEd into the arch-specific ld scripts */
 
 	/* Linker-made tables.  Our tables (e.g. devtab) are 2^6 aligned,
-	 * independently of us aligning '.'.  We align '.' to get the right start,
-	 * e.g.  __devtabstart. */
+	 * independently of us aligning '.'.  We align '.' to get the right
+	 * start, e.g.  __devtabstart. */
 	. = ALIGN(64);
 	/* We shouldn't have to use PROVIDE, but if we don't, we get the wrong
-	 * value for '.'.  And items with empty tables get the KLA (basically 0) */
+	 * value for '.'.  And items with empty tables get the KLA (basically
+	 * 0) */
 	.devtab : {
 		PROVIDE(__devtabstart = .);
 		PROVIDE(devtab = .);

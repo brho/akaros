@@ -13,21 +13,21 @@ config 64BIT
 	bool "64-bit kernel"
 	default y
 	help
-		Say yes to build a 64-bit kernel.  Must be 'y' for x86.
+	  Say yes to build a 64-bit kernel.  Must be 'y' for x86.
 
 menuconfig RUN_INIT_SCRIPT
 	bool "Run init script after boot"
 	default n
 	help
-		Run an init script after boot instead of dropping into the monitor
+	  Run an init script after boot instead of dropping into the monitor
 
 config INIT_SCRIPT_PATH_AND_ARGS
-    depends on RUN_INIT_SCRIPT
-    string "Path to init script, followed by its arguments."
-    default /bin/init.sh
-    help
-		Path to the init script run at boot time, followed by a space separated
-		list of arguments
+	depends on RUN_INIT_SCRIPT
+	string "Path to init script, followed by its arguments."
+	default /bin/init.sh
+	help
+	  Path to the init script run at boot time, followed by a space
+	  separated list of arguments
 
 source "kern/arch/$SRCARCH/Kconfig"
 
@@ -41,48 +41,48 @@ config KFS
 	bool "KFS filesystem"
 	default y
 	help
-		KFS is an initramfs bundled into the kernel, and contains your root
-		filesystem.
+	  KFS is an initramfs bundled into the kernel, and contains your root
+	  filesystem.
 
 config KFS_PATHS
 	depends on KFS
 	string "KFS/Initramfs paths"
 	default kern/kfs
 	help
-		Space separated list of paths to directories to bundle into KFS.  This
-		will be your root filesystem.
+	  Space separated list of paths to directories to bundle into KFS.
+	  This will be your root filesystem.
 
 config KFS_CPIO_BIN
 	depends on KFS
 	string "KFS CPIO helper"
 	default ""
 	help
-		This binary (relative to the root directory) will be run before
-		bundling the KFS Paths into the CPIO.
+	  This binary (relative to the root directory) will be run before
+	  bundling the KFS Paths into the CPIO.
 
 endmenu
 
 choice COREALLOC_POLICY
 	prompt "Core Allocation Policy"
 	help
-		Select a policy for allocating cores to a process upon request.  All
-		strategies first allocate cores from the set of provisioned cores for a
-		process, but differ in how they select cores beyond this.
+	  Select a policy for allocating cores to a process upon request.  All
+	  strategies first allocate cores from the set of provisioned cores for
+	  a process, but differ in how they select cores beyond this.
 
 config COREALLOC_FCFS
 	bool "Simple FCFS"
 	help
-		Allocate cores to processes on a first-come-first-served basis. All
-		cores are treated equally, and no topology information is used to try
-		and optimize which cores are given to which processes upon request.
+	  Allocate cores to processes on a first-come-first-served basis. All
+	  cores are treated equally, and no topology information is used to try
+	  and optimize which cores are given to which processes upon request.
 
 config COREALLOC_PACKED
 	bool "Packed Topology"
 	help
-		Allocate cores to a process based on a topology-aware algorithm that
-		tries to pack allocated cores as close together as possible.  It first
-		tries to pair new cores with their hyper-threaded pair, then keep them
-		on the same socket, then the same numa domain.
+	  Allocate cores to a process based on a topology-aware algorithm that
+	  tries to pack allocated cores as close together as possible.  It
+	  first tries to pair new cores with their hyper-threaded pair, then
+	  keep them on the same socket, then the same numa domain.
 
 endchoice
 
@@ -94,20 +94,20 @@ config TRACE_KMSGS
 	bool "KMSG Tracing"
 	default n
 	help
-		Turns on KMSG tracing, using the per-cpu ring buffer (holds about 256
-		events).  You can access this from the monitor via "trace pcpui".  Turn
-		this off for a slight performance improvement on every KMSG (and every
-		MCP proc_yield).
+	  Turns on KMSG tracing, using the per-cpu ring buffer (holds about 256
+	  events).  You can access this from the monitor via "trace pcpui".
+	  Turn this off for a slight performance improvement on every KMSG (and
+	  every MCP proc_yield).
 
 config TRACE_LOCKS
 	bool "Lock Tracing"
 	depends on SPINLOCK_DEBUG
 	default n
 	help
-		Turns on lock tracing, using the per-cpu ring buffer.  This records the
-		a timestamp and lock address, in an over-write tracing style (meaning
-		it'll clobber older events).  If you have locking issues, this may give
-		you clues as to which locks were grabbed recently.
+	  Turns on lock tracing, using the per-cpu ring buffer.  This records
+	  the a timestamp and lock address, in an over-write tracing style
+	  (meaning it'll clobber older events).  If you have locking issues,
+	  this may give you clues as to which locks were grabbed recently.
 
 endmenu
 
@@ -115,86 +115,86 @@ config DEVELOPMENT_ASSERTIONS
 	bool "dasserts"
 	default n
 	help
-		Turn on dassert() in code, dassert will compile to assert().
+	  Turn on dassert() in code, dassert will compile to assert().
 
 config SPINLOCK_DEBUG
 	bool "Spinlock debugging"
 	default n
 	help
-		Turns on debugging, which tracks the last time a lock was acquired and
-		detects improper lock acquisition based on IRQ levels (e.g. using
-		spin_lock() in IRQ context).  This will slow down all lock
-		acquisitions.
+	  Turns on debugging, which tracks the last time a lock was acquired
+	  and detects improper lock acquisition based on IRQ levels (e.g. using
+	  spin_lock() in IRQ context).  This will slow down all lock
+	  acquisitions.
 
 config SEQLOCK_DEBUG
 	bool "Seqlock debugging"
 	default n
 	help
-		Provides asserts to detect seqlock errors.  This will allow a malicious
-		userspace to trigger a panic in the kernel.
+	  Provides asserts to detect seqlock errors.  This will allow a
+	  malicious userspace to trigger a panic in the kernel.
 
 config SEMAPHORE_DEBUG
 	bool "Semaphore debugging"
 	default n
 	help
-		Turns on debugging, which tracks the last time and location that a
-		semaphore was downed, and provides a linked list of all semaphores that
-		have waiters.  This will slow down all semaphore ups and downs.
+	  Turns on debugging, which tracks the last time and location that a
+	  semaphore was downed, and provides a linked list of all semaphores
+	  that have waiters.  This will slow down all semaphore ups and downs.
 
 config SEM_SPINWAIT
 	bool "Semaphore spinwaiting"
 	default n
 	help
-		Turns on semaphore spinwaiting.  In lieu of intelligent Adaptive
-		Mutexes, busy semaphores will just spin for a while before fully
-		sleeping.
+	  Turns on semaphore spinwaiting.  In lieu of intelligent Adaptive
+	  Mutexes, busy semaphores will just spin for a while before fully
+	  sleeping.
 
 config SEM_SPINWAIT_NR_LOOPS
 	int "Number of polls before sleeping"
 	depends on SEM_SPINWAIT
 	default 100
 	help
-		How many times to poll a busy semaphore before going to sleep.
+	  How many times to poll a busy semaphore before going to sleep.
 
 config DISABLE_SMT
 	bool "Disables symmetric multithreading"
 	default n
 	help
-		Disables hyperthreading by telling the kernel to never give out even
-		numbered cores to MCPs.  This does not check to see if the threads are
-		in fact siblings, or if the target machine is hyperthreaded.
+	  Disables hyperthreading by telling the kernel to never give out even
+	  numbered cores to MCPs.  This does not check to see if the threads
+	  are in fact siblings, or if the target machine is hyperthreaded.
 
 config PRINTK_NO_BACKSPACE
 	bool "Printk with no backspace"
 	default n
 	help
-		One of the serial devices I was using a while back had issues printing
-		backspaces.  This was an old hack to deal with that.
+	  One of the serial devices I was using a while back had issues
+	  printing backspaces.  This was an old hack to deal with that.
 
 config SYSCALL_STRING_SAVING
 	bool "Syscall string saving"
 	default n
 	help
-		Kmallocs a small buffer for each syscall and attaches it to the
-		kthread, which can be viewed when debugging semaphores.  Individual
-		syscalls can save info in this buffer.
+	  Kmallocs a small buffer for each syscall and attaches it to the
+	  kthread, which can be viewed when debugging semaphores.  Individual
+	  syscalls can save info in this buffer.
 
 config BLOCK_EXTRAS
 	bool "Block Extra Data"
 	default y
 	help
-		Extends blocks to have a list of other memory blocks.  Useful for
-		networking performance.  This is only an option while we debug the
-		implementation.  Say y.  If you have networking bugs, try turning this
-		off, and if that helps, tell someone.
+	  Extends blocks to have a list of other memory blocks.  Useful for
+	  networking performance.  This is only an option while we debug the
+	  implementation.  Say y.  If you have networking bugs, try turning
+	  this off, and if that helps, tell someone.
 
 config BETTER_BACKTRACE
 	bool "Better backtraces, less optimizations"
 	default n
 	help
-		The kernel uses the frame pointer and call stacks for backtraces.
-		Tail-call optimizations remove some of this information.  Say 'Y' here
-		to have better backtraces, at the expense of performance.
+	  The kernel uses the frame pointer and call stacks for backtraces.
+	  Tail-call optimizations remove some of this information.  Say 'Y'
+	  here to have better backtraces, at the expense of performance.
 
 endmenu
 
@@ -204,37 +204,37 @@ config ARSC_SERVER
 	bool "Asynchronous remote syscalls"
 	default n
 	help
-		Code to run a syscall-server on a core.  A process can submit syscalls
-		and get the results asynchronously.  Hasn't been used in years.  Say
-		'n' unless you want to play around.
+	  Code to run a syscall-server on a core.  A process can submit
+	  syscalls and get the results asynchronously.  Hasn't been used in
+	  years.  Say 'n' unless you want to play around.
 
 # SPARC auto-selects this
 config APPSERVER
 	bool "Appserver"
 	default n
 	help
-		Old school I/O was through a remote machine.  Not sure if anyone uses
-		this anymore.
+	  Old school I/O was through a remote machine.  Not sure if anyone uses
+	  this anymore.
 
 config SERIAL_IO
 	bool "Serial IO"
 	default n
 	help
-		Like the appserver, serial I/O was an old attempt to process I/O on a
-		remote machine across the serial port.
+	  Like the appserver, serial I/O was an old attempt to process I/O on a
+	  remote machine across the serial port.
 
 config SINGLE_CORE
 	bool "Single core"
 	default n
 	help
-		Have the kernel boot only a single core.  Can be useful for debugging,
-		but hasn't been used in years.
+	  Have the kernel boot only a single core.  Can be useful for
+	  debugging, but hasn't been used in years.
 
 config BSD_ON_CORE0
 	bool "BSD on core 0"
 	default n
 	help
-		This was an old joke.  Say 'n', since we can't simply #include <bsd>.
+	  This was an old joke.  Say 'n', since we can't simply #include <bsd>.
 
 endmenu
 

@@ -95,7 +95,8 @@ plot_densities <- function(vecs, names=NULL, outfile="",
 	# can manually move it if we don't want to waste space
 	if (!is.null(names)) {
 		plot(c(min_x,max_x), c(0, max_y), type="n", xaxt="n", yaxt="n")
-		legend_sz = legend("topright", legend=names, lty=linetype, plot=FALSE)
+		legend_sz = legend("topright", legend=names, lty=linetype,
+		                   plot=FALSE)
 		max_y = 1.04 * (max_y + legend_sz$rect$h)
 		invisible(dev.off())
 	}
@@ -208,14 +209,15 @@ plot_tput <- function(data, title="Lock Acquisition Throughput", outfile="")
 	msec_times = trunc(total_acq/1e6)
 
 	# if we just table directly, we'll lose the absent values (msec where no
-	# timestamp happened).  not sure if factor is the best way, the help says
-	# it should be a small range.
+	# timestamp happened).  not sure if factor is the best way, the help
+	# says it should be a small range.
 	# http://stackoverflow.com/questions/1617061/including-absent-values-in-table-results-in-r
 	msec_times = factor(msec_times, 0:max(msec_times))
 
 	# without the c(), it'll be a bunch of bars at each msec
 	tab = c(table(msec_times))
-	plot(tab, type="o", main=title, xlab="Time (msec)", ylab="Locks per msec")
+	plot(tab, type="o", main=title, xlab="Time (msec)",
+	     ylab="Locks per msec")
 
 	if (outfile != "")
 		invisible(dev.off())

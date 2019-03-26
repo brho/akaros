@@ -66,10 +66,10 @@ deregister the tap".  We could come up with enough info to the device to make it
 work - we'd probably want to pass in the FD (integer), proc*, and probably the
 chan.  However, once we closed, the FD is now free, and we could have something
 like:
-	Trying to close:						User opens and taps a conv:
+	Trying to close:	User opens and taps a conv:
 	close(5) (FD 5 was 1/data with a tap)
-											open(/net/tcp/1/data) (get 5 back)
-											register_fd_tap(5) (two taps on 5, might fail!)
+				open(/net/tcp/1/data) (get 5 back)
+				register_fd_tap(5) (two taps on 5, might fail!)
 	deregister_fd_tap(5)
 	cclose (needed to keep the chan alive)
 At the end, we might have no taps on 5.  Or if we opened 2/data instead of
@@ -78,9 +78,9 @@ At the end, we might have no taps on 5.  Or if we opened 2/data instead of
 
 Maybe we deregister first, then close, to avoid FD reuse problems.  Remember
 that the only locking goes on in close.  Now consider:
-	Trying to close:						User tries to add (another) tap:
+	Trying to close:	User tries to add (another) tap:
 	deregister_fd_tap(5)
-											register_fd_tap(5)
+				register_fd_tap(5)
 	close(5) (was 1/data with a tap)
 Now we just closed with a tap still registered.  Eventually, that FD tap might
 fire.  Spurious events are okay, but we could run into issues.  Say the evq in
@@ -116,12 +116,12 @@ yanks it out, then call device dereg, then frees.  We still have some issues:
 
 - What if a legit deregister occurs while we are registering and eventually will
   succeed?  Say:
-											sys_register_fd_tap(0xf00)
-											adds to fdset, unlocks
+						sys_register_fd_tap(0xf00)
+						adds to fdset, unlocks
 	close(5)
 	yanks 0xf00 from the fd
 	deregister tap 0xf00 (fails, spurious)
-											register tap(chan, 0xf00)
+						register tap(chan, 0xf00)
 	free 0xf00?
 The deregister fails, since it was never there (remember we said it could have
 spurious deregister calls).  Then register happens.  But the FD is closed!  And
@@ -148,15 +148,15 @@ happen:
 	lock FDT
 	add tap 0xf00 to FD 5
 	unlock FDT
-											lock FDT
-											remove tap from FD 5
-											unlock FDT
-											decref 0xf00
-											(new syscall)
-											lock FDT
-											add tap 0xbar to FD 5
-											unlock FDT
-											register tap 0xbar for FD 5
+						lock FDT
+						remove tap from FD 5
+						unlock FDT
+						decref 0xf00
+						(new syscall)
+						lock FDT
+						add tap 0xbar to FD 5
+						unlock FDT
+						register tap 0xbar for FD 5
 	register tap 0xf00 for FD 5
 	decref and trigger a deregister of f00
 
