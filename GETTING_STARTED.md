@@ -54,6 +54,9 @@ environment.  AKAROS_ROOT is the Akaros repo directory.  AKAROS_XCC_ROOT is a
 directory of your choosing where the toolchain will be installed (more on that
 in Section 3.1 below).
 
+I also suggest running `scripts/one-time-setup.sh`, once per `git clone`.  This
+performs various checks and other setup.  Check it out for details.
+
 The first step is to configure the kernel.  Targets like `config`,
 `menuconfig`, and some of the other KBuild targets work.  Defconfig gives you a
 default configuration.  For example, to config for 64-bit x86:
