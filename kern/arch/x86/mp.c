@@ -87,6 +87,40 @@ static void mpintrprint(char *s, uint8_t * p)
 	printk(format, p[1], l16get(p + 2), p[4], p[5], p[6], p[7]);
 }
 
+/* I've seen busted MP tables routes with invalid IOAPIC ids and INTINs that are
+ * out of range.  We can look at the INTINs to try to figure out which IOAPIC
+ * they meant, and then adjust the INTINs too.
+ *
+ * Specifically, the machine I saw had two IOAPICs, neither of which had good
+ * iointr APIC IDs.  ACPI and the MP tables said I had IOAPICS 8 and 9.  The
+ * IOINTRs APIC IDs were 0 and 2.  Additionally, 2's INTINs were all beyond the
+ * range of the 24 nrtds for that IOAPIC.  However, that IOAPIC's ibase was 24
+ * too.
+ *
+ * Combined, these two clues mean the INTINs are in the global ibase/route
+ * space, and we can tell which IOAPIC to use based on the INTIN.  This works at
+ * least for the IOAPIC 0 (8) on my hardware (IRQ routing works).  I haven't
+ * been able to test on devices on the upper APIC (9). */
+static int repair_iointr(uint8_t *iointr)
+{
+	struct apic *ioapic;
+	int ioapic_id;
+	int intin = iointr[7];
+
+	for (int i = 0; i < Napic; i++) {
+		ioapic = &xioapic[i];
+		if (!ioapic->useable)
+			continue;
+		if (ioapic->ibase <= intin &&
+		    intin < ioapic->ibase + ioapic->nrdt) {
+			iointr[6] = i;
+			iointr[7] = intin - ioapic->ibase;
+			return 0;
+		}
+	}
+	return -1;
+}
+
 static uint32_t mpmkintr(uint8_t * p)
 {
 	uint32_t v;
@@ -119,7 +153,13 @@ static uint32_t mpmkintr(uint8_t * p)
 			apic = &xioapic[p[6]];
 			if (!apic->useable) {
 				mpintrprint("unuseable ioapic", p);
-				return 0;
+				if (repair_iointr(p)) {
+					mpintrprint("unrepairable iointr", p);
+					return 0;
+				}
+				mpintrprint("repaired iointr", p);
+				/* Repair found a usable apic */
+				apic = &xioapic[p[6]];
 			}
 			if (p[7] >= apic->nrdt) {
 				mpintrprint("IO INTIN out of range", p);
