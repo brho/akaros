@@ -310,7 +310,8 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 	write_mmreg32(apic->addr + Ioregsel, Ioapicid);
 	write_mmreg32(apic->addr + Iowin, id << 24);
 	spin_unlock(&apic->lock);
-	printk("IOAPIC initialized at %p\n", apic->addr);
+	printk("IOAPIC initialized at %p, nrdt %d, ibase %d\n", apic->addr,
+	       apic->nrdt, apic->ibase);
 }
 
 char *ioapicdump(char *start, char *end)

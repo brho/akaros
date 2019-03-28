@@ -410,7 +410,7 @@ static int mpparse(PCMP * pcmp, int maxcores)
 			break;
 		case 128:
 			printd("address space mapping\n");
-			printd(" bus %d type %d base %#llux length %#llux\n",
+			printd(" bus %d type %d base %p length %p\n",
 				   p[2], p[3], l64get(p + 4), l64get(p + 12));
 			p += p[1];
 			break;
