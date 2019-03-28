@@ -59,6 +59,10 @@ static Mpbus mpbusdef[] = {
 	{"ISA   ", IPhigh, TMedge,},
 };
 
+/* Editable version of the MP tables so we can fix botched entries.  Kmalloced,
+ * never freed.  Might be NULL if pcmp checks failed.*/
+static PCMP *pcmp;
+
 static Mpbus *mpbus[Nbus];
 int mpisabusno = -1;
 #define MP_VERBOSE_DEBUG 0
@@ -420,12 +424,22 @@ static void *sigsearch(char *signature)
 //  return sigscan(KADDR(0xa0000 - 1024), 1024, signature);
 }
 
+static PCMP *copy_pcmp(PCMP *pcmp)
+{
+	PCMP *new_pcmp;
+	size_t n = l16get(pcmp->length) + l16get(pcmp->xlength);
+
+	new_pcmp = kmalloc(n, MEM_ATOMIC);
+	assert(new_pcmp);
+	memcpy(new_pcmp, pcmp, n);
+	return new_pcmp;
+}
+
 int mpsinit(int maxcores)
 {
 	uint8_t *p;
-	int i, n;
+	int i;
 	_MP_ *mp;
-	PCMP *pcmp;
 
 	if ((mp = sigsearch("_MP_")) == NULL) {
 		printk("No mp tables found, might have issues!\n");
@@ -448,14 +462,16 @@ int mpsinit(int maxcores)
 	if ((pcmp = KADDR_NOCHECK(l32get(mp->addr))) == NULL)
 		return maxcores;
 	if (pcmp->revision != 1 && pcmp->revision != 4) {
+		pcmp = NULL;
 		return maxcores;
 	}
-	n = l16get(pcmp->length) + l16get(pcmp->xlength);
-	if ((pcmp = KADDR_NOCHECK(l32get(mp->addr))) == NULL)
-		return maxcores;
 	if (sigchecksum(pcmp, l16get(pcmp->length)) != 0) {
+		pcmp = NULL;
 		return maxcores;
 	}
+
+	pcmp = copy_pcmp(pcmp);
+
 	if (MP_VERBOSE_DEBUG) {
 		printk("PCMP @ %#p length %p revision %d\n",
 			   pcmp, l16get(pcmp->length), pcmp->revision);
