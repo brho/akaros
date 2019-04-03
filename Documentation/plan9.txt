@@ -141,6 +141,41 @@ If you overflow or underflow the error stack the kernel will panic.
 The implementation is in kern/src/error.c, the macros are in
 kern/include/plan9.h.
 
+Giant warning: if you access any automatic (local) variables inside the waserror
+block that may have been modified after you started the waserror, those
+variables need to be volatile.  waserror() is implemented with setjmp and
+according to one of the man pages:
+
+	automatic variables  are  unspecified  after  a  call  to longjmp() if
+	they meet all the following criteria:
+	- they are local to the function that made the corresponding setjmp(3)
+	  call;
+	- their  values  are  changed  between  the  calls  to  setjmp(3)  and
+	  longjmp(); and
+	- they are not declared as volatile.
+
+We could ask the compiler to tell us which variables are potentially clobbered
+with -Wclobbered, however it is a noisy warning.  It will warn even if the
+variables are not used in the error case.  That may be because the compiler has
+a hard time deciding whether a variable is used or not, since we often longjmp
+from within an error handler, though on gcc 4.9.2, even if we return
+immediately, we still get a warning.  On a related note, it's not always
+possible to tell which case is the error handling case - consider the "discard"
+pattern for waserror.
+
+No amount of "returns_twice" or register clobbering or "memory" clobbering is
+enough.  Think about what happens when the variable is changed after the setjmp
+call, i.e. farther down in the function.  It's may be in a register, then we
+call some other function, and that longjmps.  That register value is gone (it
+might be somewhere else on the stack).  The compiler needs to know when it makes
+that write that it needs to go onto the stack storage of the automatic variable.
+That's 'volatile.'
+
+The best we can hope for is the compiler to know what variables could be written
+from one side of the setjmp and used on the other.  Perhaps that will show up,
+and then we can turn on -Wclobbered.  Until then, we have to be vigilant, or use
+different patterns for waserror.  Note there are a bunch of bugs with
+-Wclobbered detection, e.g. https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65041.
 
 For info on the format of Ms (which are part of the kernel interface):
 	http://9p.cat-v.org/documentation/rfc/ 

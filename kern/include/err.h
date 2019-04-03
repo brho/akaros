@@ -9,7 +9,7 @@
 #define ERRSTACK(x) struct errbuf *prev_errbuf; struct errbuf errstack[(x)];   \
                     int curindex = 0;
 #define waserror() setjmp(&(errpush(errstack, ARRAY_SIZE(errstack), &curindex, \
-									&prev_errbuf)->jmpbuf))
+				    &prev_errbuf)->jmpbuf))
 
 /* In syscall.h, but want to avoid circular include issues. */
 extern void set_error(int error, const char *fmt, ...);
