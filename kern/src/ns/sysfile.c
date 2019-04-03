@@ -725,8 +725,10 @@ static long rread(int fd, void *va, long n, int64_t * offp)
 	 */
 	if (dir) {
 		int amt;
-		/* expecting only one dirent at a time, o/w we're busted */
-		assert(n >= sizeof(struct kdirent));
+
+		if (n < sizeof(struct kdirent))
+			error(EINVAL, "readdir needs to read at least %d",
+			      sizeof(struct kdirent));
 		if (!c->buf) {
 			c->buf = kmalloc(DIRREADSIZE, MEM_WAIT);
 			c->bufused = 0;
