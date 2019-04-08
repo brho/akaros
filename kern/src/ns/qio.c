@@ -141,7 +141,7 @@ struct block *padblock(struct block *bp, int size)
 
 		PANIC_EXTRA(bp);
 		if (bp->next)
-			panic("padblock %p", getcallerpc(&bp));
+			panic("%s %p had a next", __func__, bp);
 		n = BLEN(bp);
 		padblockcnt++;
 		nbp = block_alloc(size + n, MEM_WAIT);
@@ -158,7 +158,7 @@ struct block *padblock(struct block *bp, int size)
 		PANIC_EXTRA(bp);
 
 		if (bp->next)
-			panic("padblock %p", getcallerpc(&bp));
+			panic("%s %p had a next", __func__, bp);
 
 		if (bp->lim - bp->wp >= size)
 			return bp;

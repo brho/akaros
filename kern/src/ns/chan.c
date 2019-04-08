@@ -331,7 +331,7 @@ void cclose(struct chan *c)
 		return;
 
 	if (c->flag & CFREE)
-		panic("cclose %p", getcallerpc(&c));
+		panic("double cclose %p.  maybe kfunc channame and hexdump", c);
 
 	kref_put(&c->ref);
 }

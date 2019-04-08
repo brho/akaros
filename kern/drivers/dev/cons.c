@@ -323,11 +323,6 @@ void sysfatal(char *fmt, ...)
 	panic("sysfatal: %s", err);
 }
 
-void _assert(char *fmt)
-{
-	panic("assert failed at %#p: %s", getcallerpc(&fmt), fmt);
-}
-
 #if 0
 int pprint(char *fmt, ...)
 {

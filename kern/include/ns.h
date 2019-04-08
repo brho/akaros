@@ -67,10 +67,6 @@ extern double pow10(int);
  * one-of-a-kind
  */
 extern char *cleanname(char *unused_char_p_t);
-static inline uint32_t getcallerpc(void *v)
-{
-	return 0;
-}
 
 extern int getfields(char *unused_char_p_t, char **unused_char_pp_t,
 					 int unused_int, int, char *);
