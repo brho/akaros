@@ -1684,6 +1684,7 @@ static struct chan *walk_symlink(struct chan *symlink, struct walk_helper *wh,
 	struct dir *dir;
 	char *link_name, *link_store;
 	struct chan *from;
+	bool old_nofollow;
 	Elemlist e = {0};
 
 	/* mildly expensive: need to rlock the namespace */
@@ -1727,18 +1728,27 @@ static struct chan *walk_symlink(struct chan *symlink, struct walk_helper *wh,
 	kfree(link_store);
 
 	wh->nr_loops++;
+	/* no_follow applies to the outermost walk, i.e. the one that the
+	 * original namec performs.  At this point, we've decided that we're
+	 * going to try and follow a symlink: even if its no_follow, that only
+	 * applies to the last link in the original path.  Our sub-walks are not
+	 * no_follow.
+	 *
+	 * Note the other wh vars need to stay with the walk: nr_loops,
+	 * since its our method of detecting symlink loops, and can_mount, which
+	 * is a property of the overall namec() call. */
+	old_nofollow = wh->no_follow;
+	wh->no_follow = false;
 	if (walk(&from, e.elems, e.ARRAY_SIZEs, wh, NULL) < 0) {
 		cclose(from);
 		from = NULL;
 	} else {
+		/* We can still have a successful walk and have the new 'from'
+		 * be a symlink.  We'd need walk_symlink to return a symlink
+		 * chan, which happens if the symlink is a mount point. */
 		cclose(symlink);
-		if (from->qid.type & QTSYMLINK) {
-			symlink = from;
-			from = walk_symlink(symlink, wh, nr_names_left);
-			if (!from)
-				cclose(symlink);
-		}
 	}
+	wh->no_follow = old_nofollow;
 	wh->nr_loops--;
 
 	kfree(e.name);
