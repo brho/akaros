@@ -653,6 +653,11 @@ static bool mmap_flags_priv_ok(int flags)
 	       (flags & (MAP_PRIVATE | MAP_SHARED)) == MAP_SHARED;
 }
 
+static bool prot_has_access(int prot)
+{
+	return prot & (PROT_READ | PROT_WRITE | PROT_EXEC);
+}
+
 /* Error values aren't quite comprehensive - check man mmap() once we do better
  * with the FS.
  *
@@ -731,7 +736,7 @@ out_ref:
  * treat as success.  So when we return 0, *a* page is mapped here, but not
  * necessarily the one you passed in. */
 static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
-                            int prot)
+                            int pte_prot)
 {
 	pte_t pte;
 
@@ -758,10 +763,10 @@ static int map_page_at_addr(struct proc *p, struct page *page, uintptr_t addr,
 	 * documentation), but it's probably a sign of another bug. */
 	assert(!pte_is_mapped(pte));
 	/* preserve the dirty bit - pm removal could be looking concurrently */
-	prot |= (pte_is_dirty(pte) ? PTE_D : 0);
+	pte_prot |= (pte_is_dirty(pte) ? PTE_D : 0);
 	/* We have a ref to page (for non PMs), which we are storing in the PTE
 	 */
-	pte_write(pte, page2pa(page), prot);
+	pte_write(pte, page2pa(page), pte_prot);
 	spin_unlock(&p->pte_lock);
 	return 0;
 }
@@ -941,7 +946,7 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 
 	vmr = merge_me(vmr);		/* attempts to merge with neighbors */
 
-	if (flags & MAP_POPULATE && prot != PROT_NONE) {
+	if (flags & MAP_POPULATE && prot_has_access(prot)) {
 		int pte_prot = (prot & PROT_WRITE) ? PTE_USER_RW :
 	                   (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : 0;
 		unsigned long nr_pgs = len >> PGSHIFT;
@@ -1367,7 +1372,7 @@ unsigned long populate_va(struct proc *p, uintptr_t va, unsigned long nr_pgs)
 		vmr = find_vmr(p, va);
 		if (!vmr)
 			break;
-		if (vmr->vm_prot == PROT_NONE)
+		if (!prot_has_access(vmr->vm_prot))
 			break;
 		pte_prot = (vmr->vm_prot & PROT_WRITE) ? PTE_USER_RW :
 		           (vmr->vm_prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO
