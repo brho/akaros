@@ -653,6 +653,12 @@ static bool mmap_flags_priv_ok(int flags)
 	       (flags & (MAP_PRIVATE | MAP_SHARED)) == MAP_SHARED;
 }
 
+static bool prot_is_valid(int prot)
+{
+	/* Remember PROT_NONE (0) is valid. */
+	return !(prot & ~PROT_VALID_PROTS);
+}
+
 static bool prot_has_access(int prot)
 {
 	return prot & (PROT_READ | PROT_WRITE | PROT_EXEC);
@@ -679,6 +685,11 @@ void *mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	       addr, len, prot, flags, fd, offset);
 	if (!mmap_flags_priv_ok(flags)) {
 		set_errno(EINVAL);
+		return MAP_FAILED;
+	}
+	if (!prot_is_valid(prot)) {
+		set_error(EINVAL, "invalid prot 0x%x (%x)", prot,
+			  PROT_VALID_PROTS);
 		return MAP_FAILED;
 	}
 	if (!len) {
@@ -871,6 +882,8 @@ void *do_mmap(struct proc *p, uintptr_t addr, size_t len, int prot, int flags,
 	struct vm_region *vmr, *vmr_temp;
 
 	assert(mmap_flags_priv_ok(flags));
+	assert(prot_is_valid(prot));
+
 	vmr = vmr_zalloc();
 
 	/* Sanity check, for callers that bypass mmap().  We want addr for anon
@@ -980,6 +993,11 @@ int mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	int ret;
 
 	printd("mprotect: (addr %p, len %p, prot 0x%x)\n", addr, len, prot);
+	if (!prot_is_valid(prot)) {
+		set_error(EINVAL, "invalid prot 0x%x (%x)", prot,
+			  PROT_VALID_PROTS);
+		return -1;
+	}
 	if (!len)
 		return 0;
 	len = ROUNDUP(len, PGSIZE);
@@ -1011,6 +1029,7 @@ int __do_mprotect(struct proc *p, uintptr_t addr, size_t len, int prot)
 	int pte_prot = (prot & PROT_WRITE) ? PTE_USER_RW :
 	               (prot & (PROT_READ|PROT_EXEC)) ? PTE_USER_RO : PTE_NONE;
 
+	assert(prot_is_valid(prot));
 	/* TODO: this is aggressively splitting, when we might not need to if
 	 * the prots are the same as the previous.  Plus, there are three
 	 * excessive scans. */

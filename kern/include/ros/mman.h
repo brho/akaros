@@ -15,6 +15,7 @@
 #define PROT_WRITE		0x2
 #define PROT_EXEC		0x4
 #define PROT_NONE		0x0
+#define PROT_VALID_PROTS	(PROT_READ | PROT_WRITE | PROT_EXEC)
 
 /* mmap flags, only anonymous is supported now, feel free to pass others */
 #define MAP_SHARED		0x01
