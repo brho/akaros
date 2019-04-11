@@ -160,6 +160,7 @@ void vthread_init_ctx(struct vthread *vth, uintptr_t entry_pt, uintptr_t arg,
 	vm_tf->tf_rip = entry_pt;
 	vm_tf->tf_rdi = arg;
 	vm_tf->tf_rsp = stacktop;
+	vm_tf->tf_rflags = FL_RSVD_1;
 }
 
 void vthread_run(struct vthread *vthread)
