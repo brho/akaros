@@ -1352,6 +1352,7 @@ void proc_notify(struct proc *p, uint32_t vcoreid)
 {
 	struct preempt_data *vcpd = &p->procdata->vcore_preempt_data[vcoreid];
 
+	assert(proc_vcoreid_is_safe(p, vcoreid));
 	/* If you're thinking about checking notif_pending and then returning if
 	 * it is already set, note that some callers (e.g. the event system) set
 	 * notif_pending when they deliver a message, regardless of whether
@@ -2100,8 +2101,7 @@ int proc_change_to_vcore(struct proc *p, uint32_t new_vcoreid,
 
 	/* Need to not reach outside the vcoremap, which might be smaller in the
 	 * future, but should always be as big as max_vcores */
-	if (new_vcoreid >= p->procinfo->max_vcores)
-		return -EINVAL;
+	assert(proc_vcoreid_is_safe(p, new_vcoreid));
 	/* Need to lock to prevent concurrent vcore changes, like in yield. */
 	spin_lock(&p->proc_lock);
 	/* new_vcoreid is already runing, abort */

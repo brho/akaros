@@ -118,6 +118,14 @@ void proc_free_set(struct process_set *pset);
 
 /* Vcoremap info: */
 uint32_t proc_get_vcoreid(struct proc *p);
+
+/* In some places, vcoreid may be an int.  In other/older places, it's unsigned.
+ * Casting to unsigned will also catch < 0 for sane systems. */
+static inline bool proc_vcoreid_is_safe(struct proc *p, uint32_t vcoreid)
+{
+	return vcoreid < p->procinfo->max_vcores;
+}
+
 /* TODO: make all of these inline once we gut the Env crap */
 bool vcore_is_mapped(struct proc *p, uint32_t vcoreid);
 uint32_t vcore2vcoreid(struct proc *p, struct vcore *vc);

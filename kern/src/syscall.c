@@ -865,8 +865,13 @@ static int sys_proc_yield(struct proc *p, bool being_nice)
 }
 
 static int sys_change_vcore(struct proc *p, uint32_t vcoreid,
-                             bool enable_my_notif)
+                            bool enable_my_notif)
 {
+	if (!proc_vcoreid_is_safe(p, vcoreid)) {
+		set_error(EINVAL, "vcoreid %d out of range %d", vcoreid,
+			  p->procinfo->max_vcores);
+		return -1;
+	}
 	/* Note retvals can be negative, but we don't mess with errno in case
 	 * callers use this in low-level code and want to extract the 'errno'.
 	 */
@@ -1456,6 +1461,11 @@ static int sys_self_notify(struct proc *p, uint32_t vcoreid,
 		       ev_type, u_msg, u_msg ? u_msg->ev_type : 0);
 		return -1;
 	}
+	if (!proc_vcoreid_is_safe(p, vcoreid)) {
+		set_error(EINVAL, "vcoreid %d out of range %d", vcoreid,
+			  p->procinfo->max_vcores);
+		return -1;
+	}
 	/* this will post a message and IPI, regardless of
 	 * wants/needs/debutantes.*/
 	post_vcore_event(p, &local_msg, vcoreid,
@@ -1475,6 +1485,11 @@ static int sys_send_event(struct proc *p, struct event_queue *ev_q,
 	}
 	if (!is_user_rwaddr(ev_q, sizeof(struct event_queue))) {
 		set_error(EINVAL, "bad event_queue %p", ev_q);
+		return -1;
+	}
+	if (!proc_vcoreid_is_safe(p, vcoreid)) {
+		set_error(EINVAL, "vcoreid %d out of range %d", vcoreid,
+			  p->procinfo->max_vcores);
 		return -1;
 	}
 	send_event(p, ev_q, &local_msg, vcoreid);

@@ -506,6 +506,11 @@ int mon_notify(int argc, char **argv, struct hw_trapframe *hw_tf)
 	msg.ev_type = strtol(argv[2], 0, 0);
 	if (argc == 4) {
 		vcoreid = strtol(argv[3], 0, 0);
+		if (!proc_vcoreid_is_safe(p, vcoreid)) {
+			printk("Bad vcoreid %d\n", vcoreid);
+			proc_decref(p);
+			return -1;
+		}
 		/* This will go to the private mbox */
 		post_vcore_event(p, &msg, vcoreid, EVENT_VCORE_PRIVATE);
 		proc_notify(p, vcoreid);

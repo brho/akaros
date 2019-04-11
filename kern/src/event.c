@@ -18,16 +18,6 @@
 #include <pmap.h>
 #include <schedule.h>
 
-/* Userspace could give us a vcoreid that causes us to compute a vcpd that is
- * outside procdata.  If we hit UWLIM, then we've gone farther than we should.
- * We check the vcoreid, instead of the resulting address, to avoid issues like
- * address wrap-around. */
-static bool vcoreid_is_safe(uint32_t vcoreid)
-{
-	/* MAX_NUM_VCORES == MAX_NUM_CORES (check procinfo/procdata) */
-	return vcoreid < MAX_NUM_CORES;
-}
-
 /* Note these three helpers return the user address of the mbox, not the KVA.
  * Load current to access this, and it will work for any process. */
 static struct event_mbox *get_vcpd_mbox_priv(uint32_t vcoreid)
@@ -403,7 +393,7 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		vcoreid = (ev_q->ev_vcore + 1) % p->procinfo->num_vcores;
 		ev_q->ev_vcore = vcoreid;
 	}
-	if (!vcoreid_is_safe(vcoreid)) {
+	if (!proc_vcoreid_is_safe(p, vcoreid)) {
 		/* Ought to kill them, just warn for now */
 		printk("[kernel] Vcoreid %d unsafe! (too big?)\n", vcoreid);
 		goto out;
@@ -487,6 +477,7 @@ void post_vcore_event(struct proc *p, struct event_msg *msg, uint32_t vcoreid,
 	struct per_cpu_info *pcpui = &per_cpu_info[core_id()];
 	uintptr_t old_proc = switch_to(p);
 
+	assert(proc_vcoreid_is_safe(p, vcoreid));
 	/* *ev_mbox is the user address of the vcpd mbox */
 	post_vc_msg(p, vcoreid, get_vcpd_mbox(vcoreid, ev_flags), msg, ev_flags);
 	switch_back(p, old_proc);
