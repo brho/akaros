@@ -418,11 +418,6 @@ bool handle_vmexit(struct guest_thread *gth)
 		/* TODO: just ignore these? */
 		return TRUE;
 	default:
-		fprintf(stderr,
-			"VMM library: don't know how to handle exit %d\n",
-		        vm_tf->tf_exit_reason);
-		fprintf(stderr, "RIP %p, shutdown 0x%x\n", vm_tf->tf_rip,
-		        vm_tf->tf_exit_reason);
 		return FALSE;
 	}
 }

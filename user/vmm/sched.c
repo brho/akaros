@@ -421,10 +421,10 @@ static void __ctlr_entry(void)
 
 	if (!handle_vmexit(cth->buddy)) {
 		struct vm_trapframe *vm_tf = gth_to_vmtf(cth->buddy);
+		static struct spin_pdr_lock spew = SPINPDR_INITIALIZER;
 
-		fprintf(stderr, "vmm: handle_vmexit returned false\n");
-		fprintf(stderr,
-			"Note: this may be a kernel module, not the kernel\n");
+		spin_pdr_lock(&spew);
+		fprintf(stderr, "vmm: handle_vmexit failed!\n");
 		fprintf(stderr, "RSP was %p, ", (void *)vm_tf->tf_rsp);
 		fprintf(stderr, "RIP was %p:\n", (void *)vm_tf->tf_rip);
 		/* TODO: properly walk the kernel page tables to map the tf_rip
@@ -433,6 +433,7 @@ static void __ctlr_entry(void)
 		 */
 		hexdump(stderr, (void *)(vm_tf->tf_rip & 0x3fffffff), 16);
 		showstatus(stderr, cth->buddy);
+		spin_pdr_unlock(&spew);
 		exit(0);
 	}
 	/* We want to atomically yield and start/reenqueue our buddy.  We do so
