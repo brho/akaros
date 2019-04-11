@@ -5,7 +5,7 @@
  * Various option parsing utility functions. */
 
 #include <parlib/opts.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <errno.h>
 #include <string.h>
 #include <ctype.h>

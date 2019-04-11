@@ -9,13 +9,13 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include <unistd.h>
 #include <parlib/parlib.h>
 #include <parlib/core_set.h>
+#include <parlib/stdio.h>
 
 static const unsigned int llcores[] = {
 	0

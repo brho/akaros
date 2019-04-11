@@ -22,7 +22,7 @@
 
 
 #include <stdlib.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <unistd.h>
 
 static int isprint(int c)

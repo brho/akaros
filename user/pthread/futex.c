@@ -4,7 +4,7 @@
 #include <parlib/uthread.h>
 #include <parlib/parlib.h>
 #include <parlib/assert.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <errno.h>
 #include <parlib/slab.h>
 #include <parlib/mcs.h>

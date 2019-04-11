@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <errno.h>
 #include <parlib/parlib.h>
 #include <parlib/vcore.h>

@@ -147,7 +147,7 @@
 #include <parlib/kref.h>
 
 #include <stdlib.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <assert.h>

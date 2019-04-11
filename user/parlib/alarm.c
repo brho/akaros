@@ -25,7 +25,6 @@
 #include <sys/queue.h>
 #include <sys/time.h>
 #include <parlib/alarm.h>
-#include <stdio.h>
 #include <parlib/assert.h>
 #include <parlib/stdio.h>
 #include <stdlib.h>

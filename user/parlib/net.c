@@ -5,7 +5,7 @@
  * Networking helpers for dealing with the plan 9 interface. */
 
 #include <stdlib.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <parlib/assert.h>

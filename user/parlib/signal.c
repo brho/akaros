@@ -27,7 +27,6 @@
 // Needed for sigmask functions...
 #define _GNU_SOURCE
 
-#include <stdio.h>
 #include <parlib/parlib.h>
 #include <parlib/signal.h>
 #include <parlib/uthread.h>

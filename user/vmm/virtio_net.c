@@ -27,7 +27,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <fcntl.h>
 #include <vmm/virtio.h>
 #include <vmm/virtio_mmio.h>

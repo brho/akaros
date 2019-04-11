@@ -4,7 +4,7 @@
  *
  * Helper functions to query information about the system. */
 
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/types.h>

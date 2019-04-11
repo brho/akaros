@@ -1,7 +1,7 @@
 #include <parlib/uthread.h>
 #include <parlib/assert.h>
 #include <semaphore.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <errno.h>
 
 int sem_init(sem_t *__sem, int __pshared, unsigned int __value)

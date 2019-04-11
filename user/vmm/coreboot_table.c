@@ -19,9 +19,10 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
  * MA 02110-1301 USA
  */
-#include <parlib/common.h>
 
-#include <stdio.h>
+#include <parlib/common.h>
+#include <parlib/stdio.h>
+
 #include <stdarg.h>
 #include <string.h>
 #include <vmm/coreboot_tables.h>

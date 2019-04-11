@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/mman.h>
-#include <stdio.h>
 #include <parlib/event.h>
 #include <parlib/uthread.h>
 #include <parlib/ucq.h>

@@ -10,7 +10,7 @@
 #include <vmm/vmm.h>
 #include <parlib/arch/trap.h>
 #include <parlib/bitmask.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 
 static bool pir_notif_is_set(struct vmm_gpcore_init *gpci)
 {

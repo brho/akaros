@@ -36,7 +36,7 @@
  * SOFTWARE. */
 
 #include <parlib/printf-ext.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>

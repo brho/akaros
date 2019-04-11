@@ -26,8 +26,8 @@
 #include <parlib/vcore.h>
 #include <parlib/assert.h>
 #include <parlib/spinlock.h>
+#include <parlib/stdio.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <sys/mman.h>
 
 void ceq_init(struct ceq *ceq, uint8_t op, unsigned int nr_events,

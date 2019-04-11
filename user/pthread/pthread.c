@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <parlib/assert.h>
-#include <stdio.h>
 #include <errno.h>
 #include <parlib/parlib.h>
 #include <ros/event.h>

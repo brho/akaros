@@ -7,7 +7,7 @@
 #pragma once
 
 #include <vmm/sched.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 
 /* Test for alignment, e.g. 2^6 */
 #define ALIGNED(p, a)	(!(((uintptr_t)(p)) & ((a)-1)))

@@ -6,7 +6,7 @@
  * See LICENSE for details.
  */
 
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>

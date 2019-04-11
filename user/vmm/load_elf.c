@@ -3,7 +3,7 @@
  *
  * ELF loading. */
 
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <libelf.h>

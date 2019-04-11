@@ -2,7 +2,7 @@
 #include <parlib/common.h>
 #include <parlib/timing.h>
 #include <ros/procinfo.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 
 uint64_t udelay(uint64_t usec)
 {

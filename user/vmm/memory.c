@@ -3,7 +3,7 @@
  *
  * Memory, paging, e820, bootparams and other helpers */
 
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <ros/arch/mmu.h>

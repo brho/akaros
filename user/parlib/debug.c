@@ -2,7 +2,6 @@
 #include <parlib/assert.h>
 #include <parlib/stdio.h>
 #include <parlib/parlib.h>
-#include <stdio.h>
 #include <unistd.h>
 #include <parlib/spinlock.h>
 #include <ros/common.h>

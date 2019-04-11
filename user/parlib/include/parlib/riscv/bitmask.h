@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <parlib/arch/atomic.h>
-#include <stdio.h>
+#include <parlib/stdio.h>
 
 __BEGIN_DECLS
 

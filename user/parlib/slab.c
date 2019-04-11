@@ -13,7 +13,6 @@
  * Ported directly from the kernel's slab allocator. */
 
 #include <parlib/slab.h>
-#include <stdio.h>
 #include <parlib/assert.h>
 #include <parlib/parlib.h>
 #include <parlib/stdio.h>

@@ -16,7 +16,7 @@
  * See COPYING for details on the GNU General Public License.
  */
 
-#include <stdio.h>
+#include <parlib/stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
