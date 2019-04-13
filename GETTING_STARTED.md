@@ -273,7 +273,7 @@ to `format=raw`) with "`-kernel obj/kern/akaros-kernel`".
 
 The `-monitor` is the qemu monitor, which is a CLI for qemu.  Pick a
 tab/terminal/pty in Linux that you will only use for qemu monitoring, and enter
-`tty'.  Whatever it tells you, put in place of `/dev/pts/3`.  I've been using
+'`tty`'.  Whatever it tells you, put in place of `/dev/pts/3`.  I've been using
 the same tab for about 4 years now.  In that tab, enter '`sleep 999999999`'.
 Qemu will still access it, but you won't have to worry about bash trying to
 handle your inputs.
@@ -393,7 +393,7 @@ Early on as a dev, there are lots of times where you accidentally don't run the
 right program (or kernel) and won't understand why your change isn't happening.
 A few `printk("WTF\n")`'s later, you realize you didn't have the `hdd.img`
 mounted, or you didn't fill KFS, or you didn't relink your binaries, or you
-forgot to save all files in `vi1 (and not just the current buffer).  But after
+forgot to save all files in `vi` (and not just the current buffer).  But after
 doing a couple `hello worlds`, you're set.
 
 Alternatively, you could have a make target to run qemu, which also touches all
