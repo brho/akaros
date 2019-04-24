@@ -12,15 +12,24 @@
 #include <string.h>
 #include <ros/syscall.h>
 
+static void usage_exit(void)
+{
+	fprintf(stderr, "usage: bind [-a|-b] [-c] [-v] src_path onto_path\n");
+	exit(1);
+}
+
 /* The naming for the args in bind is messy historically.  We do:
  * 	bind src_path onto_path
  * plan9 says bind NEW OLD, where new is *src*, and old is *onto*.
- * Linux says mount --bind OLD NEW, where OLD is *src* and NEW is *onto*. */
+ * Linux says mount --bind OLD NEW, where OLD is *src* and NEW is *onto*.
+ *
+ * Maybe we should go with WHAT WHERE... */
 int main(int argc, char *argv[])
 {
 	int ret;
 	int flag = 0;
 	char *src_path, *onto_path;
+	bool verbose = false;
 
 	/* crap arg handling for now. */
 	argc--, argv++;
@@ -35,20 +44,27 @@ int main(int argc, char *argv[])
 		case 'c':
 			flag |= 4;
 			break;
+		case 'v':
+			verbose = true;
+			break;
 		default:
-			printf("-a or -b and/or -c for now\n");
-			exit(0);
+			usage_exit();
+		}
+		/* extremely disgusting */
+		if (argv[0][2]) {
+			fprintf(stderr, "sorry, only one argument per -\n");
+			usage_exit();
 		}
 		argc--, argv++;
 	}
 
-	if (argc < 2) {
-		fprintf(stderr, "usage: bind [-a|-b] src_path onto_path\n");
-		exit(1);
-	}
+	if (argc < 2)
+		usage_exit();
 	src_path = argv[0];
 	onto_path = argv[1];
-	printf("bind %s -> %s flag %d\n", src_path, onto_path, flag);
+	if (verbose)
+		printf("bind %s (onto) -> %s (src) flag %d\n", onto_path,
+		       src_path, flag);
 	ret = syscall(SYS_nbind, src_path, strlen(src_path), onto_path,
 	              strlen(onto_path), flag);
 	if (ret < 0)
