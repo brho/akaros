@@ -894,27 +894,7 @@ int walk(struct chan **cp, char **names, int nnames, struct walk_helper *wh,
 					return -1;
 				}
 				n = wq->nqid;
-				if (wq->clone->qid.type & QTSYMLINK) {
-					nc = walk_symlink(wq->clone, wh, nnames
-							  - nhave - n);
-					if (!nc) {
-						/* walk_symlink() set error.
-						 * This seems to be the standard
-						 * walk() error-cleanup. */
-						if (nerror)
-							*nerror = nhave +
-								wq->nqid;
-						cclose(c);
-						cclose(wq->clone);
-						cnameclose(cname);
-						kfree(wq);
-						if (mh != NULL)
-							putmhead(mh);
-						return -1;
-					}
-				} else {
-					nc = wq->clone;
-				}
+				nc = wq->clone;
 			} else {	/* stopped early, at a mount point */
 				if (wq->clone != NULL) {
 					cclose(wq->clone);
@@ -922,6 +902,26 @@ int walk(struct chan **cp, char **names, int nnames, struct walk_helper *wh,
 				}
 				lastmountpoint = nc;
 				n = i + 1;
+			}
+			if (nc->qid.type & QTSYMLINK) {
+				struct chan *old_nc = nc;
+
+				nc = walk_symlink(old_nc, wh,
+						  nnames - nhave - n);
+				if (!nc) {
+					/* walk_symlink() set error.
+					 * This seems to be the standard
+					 * walk() error-cleanup. */
+					if (nerror)
+						*nerror = nhave + n;
+					cclose(c);
+					cclose(old_nc);
+					cnameclose(cname);
+					kfree(wq);
+					if (mh != NULL)
+						putmhead(mh);
+					return -1;
+				}
 			}
 			for (i = 0; i < n; i++)
 				cname = addelem(cname, names[nhave + i]);
