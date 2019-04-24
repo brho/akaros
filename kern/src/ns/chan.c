@@ -426,6 +426,14 @@ int cmount(struct chan *new, struct chan *old, int flag, char *spec)
 	struct mhead *m, **l, *mh;
 	struct mount *nm, *f, *um, **h;
 
+	/* Can't bind pointing to a symlink, since it vastly complicates namec
+	 * and walk.  In particular, walk() only follows mounts on the
+	 * intermediate path elements.  Grep 'ntry - 1'.  Because of that,
+	 * walk() can end on a symlink.  Having domount() follow symlinks is a
+	 * pain: undomount. */
+	if (new->qid.type & QTSYMLINK)
+		error(EINVAL, "cannot bind a symlink");
+
 	/* Can bind anything onto a symlink's name.  Otherwise, both the old and
 	 * the new must agree on whether or not it is a directory. */
 	if (!(old->qid.type & QTSYMLINK) &&
