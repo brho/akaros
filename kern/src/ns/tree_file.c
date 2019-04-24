@@ -743,7 +743,7 @@ struct chan *tree_chan_open(struct chan *c, int omode)
 	if ((c->qid.type & QTDIR) && (omode & O_WRITE))
 		error(EISDIR, "can't open a dir for writing");
 	if (c->qid.type & QTSYMLINK)
-		error(ELOOP, "can't open a symlink");
+		error(EINVAL, "can't open a symlink");
 	tree_file_perm_check(tf, omode);
 	/* TODO: if we want to support DMEXCL on dir.mode, we'll need to
 	 * lock/sync on the fs_file (have a flag for FSF_IS_OPEN, handle in
