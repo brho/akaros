@@ -132,17 +132,27 @@ int remove_fd_tap(struct proc *p, int fd)
 	struct fd_table *fdt = &p->open_files;
 	struct fd_tap *tap;
 
-	spin_lock(&fdt->lock);
-	tap = fdt->fd[fd].fd_tap;
-	fdt->fd[fd].fd_tap = 0;
-	spin_unlock(&fdt->lock);
-	if (tap) {
-		kref_put(&tap->kref);
-		return 0;
-	} else {
-		set_error(EBADF, "FD %d was not tapped", fd);
+	if (fd < 0) {
+		set_errno(EBADF);
 		return -1;
 	}
+	spin_lock(&fdt->lock);
+	if (fd >= fdt->max_fdset) {
+		set_errno(ENFILE);
+		goto err_with_lock;
+	}
+	tap = fdt->fd[fd].fd_tap;
+	if (!tap) {
+		set_error(EBADF, "FD %d was not tapped", fd);
+		goto err_with_lock;
+	}
+	fdt->fd[fd].fd_tap = 0;
+	spin_unlock(&fdt->lock);
+	kref_put(&tap->kref);
+	return 0;
+err_with_lock:
+	spin_unlock(&fdt->lock);
+	return -1;
 }
 
 /* Fires off tap, with the events of filter having occurred.  Returns -1 on
