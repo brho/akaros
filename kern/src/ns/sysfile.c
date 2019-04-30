@@ -307,31 +307,6 @@ int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
 	return 0;
 }
 
-char *sysfd2path(int fd)
-{
-	ERRSTACK(1);
-	struct chan *c;
-	char *s;
-
-	if (waserror()) {
-		poperror();
-		return NULL;
-	}
-	c = fdtochan(&current->open_files, fd, -1, 0, 1);
-	s = NULL;
-	if (c->name != NULL) {
-		s = kzmalloc(c->name->len + 1, 0);
-		if (s == NULL) {
-			cclose(c);
-			error(ENOMEM, ERROR_FIXME);
-		}
-		memmove(s, c->name->s, c->name->len + 1);
-	}
-	cclose(c);
-	poperror();
-	return s;
-}
-
 char *sysgetcwd(void)
 {
 	char *s = NULL;

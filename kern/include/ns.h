@@ -1074,7 +1074,6 @@ int sys_dup_to(struct proc *from_proc, unsigned int from_fd,
                struct proc *to_proc, unsigned int to_fd);
 int sysfstat(int fd, uint8_t*, int n);
 int sysfstatakaros(int fd, struct kstat *);
-char *sysfd2path(int fd);
 char *sysgetcwd(void);
 int sysfauth(int fd, char *aname);
 int sysfversion(int fd, unsigned int msize, char *vers, unsigned int arglen);
