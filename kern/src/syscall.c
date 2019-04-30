@@ -2042,11 +2042,13 @@ intreg_t sys_readlink(struct proc *p, char *path, size_t path_l,
 	ssize_t copy_amt;
 	int ret = -1;
 	char *t_path = copy_in_path(p, path, path_l);
-	struct dir *dir = NULL;
+	struct dir *dir;
 
 	if (t_path == NULL)
 		return -1;
 	dir = sysdirlstat(t_path);
+	if (!dir)
+		return -1;
 	if (!(dir->mode & DMSYMLINK))
 		set_error(EINVAL, "not a symlink: %s", t_path);
 	else
