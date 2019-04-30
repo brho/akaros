@@ -1301,6 +1301,8 @@ Open:
 		 * the way out, we putmhead if we have an m, and clean up our
 		 * chans.  On success, c becomes cnew (thus close the old c).
 		 * On failure, we just close cnew. */
+		if (!(c->qid.type & QTDIR))
+			error(ENOTDIR, "rename target parent is not a dir");
 		e.ARRAY_SIZEs++;
 		m = NULL;
 		cnew = NULL;
