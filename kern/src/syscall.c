@@ -2289,6 +2289,7 @@ intreg_t sys_nmount(struct proc *p,
 
 	if (t_ontopath == NULL)
 		return -1;
+	/* TODO: if we ever pass in the spec/auth, copy those in. */
 	ret = sysmount(fd, afd, t_ontopath, flag, /* spec or auth */"/");
 	free_path(p, t_ontopath);
 	return ret;
