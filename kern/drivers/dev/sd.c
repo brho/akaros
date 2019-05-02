@@ -137,6 +137,7 @@ void sdaddpart(struct sdunit *unit, char *name, uint64_t start, uint64_t end)
 		if (pp == NULL)
 			error(ENOMEM,
 			      "%s: Can't allocate space for %d partitions",
+			      __func__,
 			      unit->npart + SDnpart);
 		memmove(pp, unit->part, sizeof(struct sdpart) * unit->npart);
 		kfree(unit->part);
@@ -846,7 +847,7 @@ static size_t sdbio(struct chan *c, int write, char *a, size_t len, off64_t off)
 
 	b = kzmalloc(nb * unit->secsize, MEM_WAIT);
 	if (b == NULL)
-		error(ENOMEM, "%s: could not allocate %d bytes",
+		error(ENOMEM, "%s: could not allocate %d bytes", __func__,
 		      nb * unit->secsize);
 	if (waserror()) {
 		kfree(b);
