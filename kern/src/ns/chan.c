@@ -118,8 +118,8 @@ void kstrdup(char **p, char *s)
 			panic("kstrdup: no memory");
 	}
 	memmove(t, s, n);
-	prev = *p;
-	*p = t;
+
+	prev = atomic_swap_ptr((void**)p, t);
 	kfree(prev);
 }
 
