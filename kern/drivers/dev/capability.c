@@ -200,9 +200,8 @@ static size_t capread(struct chan *c, void *va, size_t n, off64_t m)
 static size_t capwrite(struct chan *c, void *va, size_t n, off64_t m)
 {
 	struct Caphash *p;
-	char *cp;
+	char *cp, *hashstr;
 	uint8_t hash[Hashlen + 1] = {0};
-	char *hashstr = NULL;
 	char *key, *from, *to;
 	int ret;
 	ERRSTACK(1);
@@ -222,13 +221,13 @@ static size_t capwrite(struct chan *c, void *va, size_t n, off64_t m)
 	case Quse:
 		/* copy key to avoid a fault in hmac_xx and so we can enforce
 		 * null termination. */
-		cp = NULL;
+		cp = kzmalloc(n + 1, MEM_WAIT);
+		hashstr = kzmalloc(sizeof(hash), MEM_WAIT);
 		if (waserror()) {
 			kfree(cp);
 			kfree(hashstr);
 			nexterror();
 		}
-		cp = kzmalloc(n + 1, MEM_WAIT);
 		memmove(cp, va, n);
 		cp[n] = 0;
 
@@ -244,7 +243,6 @@ static size_t capwrite(struct chan *c, void *va, size_t n, off64_t m)
 			error(EINVAL, "HMAC failed");
 
 		// Convert to ASCII text
-		hashstr = (char *)kzmalloc(sizeof(hash), MEM_WAIT);
 		ret = __hashstr(hashstr, hash, VB2_SHA256_DIGEST_SIZE);
 		if (ret != VB2_SHA256_DIGEST_SIZE)
 			error(EINVAL, "hash is wrong length");
@@ -252,9 +250,7 @@ static size_t capwrite(struct chan *c, void *va, size_t n, off64_t m)
 		p = remcap((uint8_t *)hashstr);
 		if (p == NULL)
 			error(EINVAL, "invalid capability %s@%s", from, key);
-
-		kfree(hashstr);
-		hashstr = NULL;
+		kfree(p);
 
 		/* if a from user is supplied, make sure it matches */
 		to = strchr(from, '@');
@@ -275,8 +271,8 @@ static size_t capwrite(struct chan *c, void *va, size_t n, off64_t m)
 		proc_set_username(current, to);
 		//up->basepri = PriNormal;
 
-		kfree(p);
 		kfree(cp);
+		kfree(hashstr);
 		poperror();
 		break;
 
