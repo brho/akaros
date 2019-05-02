@@ -13,6 +13,12 @@ void _panic(struct hw_trapframe *, const char *, int, const char *, ...)
 #define warn_once(...) run_once_racy(warn(__VA_ARGS__))
 #define warn_on(x) do { if (x) warn(#x);} while (0)
 #define warn_on_once(x) do { if (x) warn_once(#x);} while (0)
+
+#define warn_on_user_ptr(x) do { \
+	uintptr_t _x = (uintptr_t)(x); \
+	warn_on(_x && _x < ULIM); \
+} while (0)
+
 #define panic(...) _panic(NULL, __FILE__, __LINE__, __VA_ARGS__)
 #define panic_hwtf(x, ...) _panic(x, __FILE__, __LINE__, __VA_ARGS__)
 #define exhausted(...) _panic(NULL, __FILE__, __LINE__, __VA_ARGS__)
