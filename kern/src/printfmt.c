@@ -42,7 +42,7 @@ void printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
 void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt,
 	       va_list ap)
 {
-	register const char *p;
+	const char *s;
 	const char *last_fmt;
 	register int ch, err;
 	unsigned long long num;
@@ -170,23 +170,23 @@ void vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt,
 
 		// string
 		case 's':
-			if ((p = va_arg(ap, char *)) == NULL)
-				p = "(null)";
+			if ((s = va_arg(ap, char *)) == NULL)
+				s = "(null)";
 			if (width > 0 && padc != '-')
-				for (width -= strnlen(p, precision);
+				for (width -= strnlen(s, precision);
 				     width > 0;
 				     width--)
 					putch(padc, putdat);
 			for (;
-			     (ch = *p) != '\0' && (precision < 0
+			     (ch = *s) != '\0' && (precision < 0
 						   || --precision >= 0);
 			     width--) {
 				if (altflag && (ch < ' ' || ch > '~'))
 					putch('?', putdat);
 				else
 					putch(ch, putdat);
-				// zra: make sure *p isn't '\0' before inc'ing
-				p++;
+				// zra: make sure *s isn't '\0' before inc'ing
+				s++;
 			}
 			for (; width > 0; width--)
 				putch(' ', putdat);
