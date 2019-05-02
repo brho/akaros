@@ -150,9 +150,12 @@ static size_t regresswrite(struct chan *c, void *a, size_t n, off64_t unused)
 		nexterror();
 	}
 
-	switch((int)(c->qid.path)){
+	switch ((int)(c->qid.path)) {
 	case Monitorctlqid:
-		if(strncmp(a, "ktest", 5) == 0){
+		if (cb->nf < 1)
+			error(EFAIL, "%s no command, need %s", __func__,
+			      ctlcommands);
+		if (!strcmp(cb->f[0], "ktest")) {
 			run_registered_ktest_suites();
 		} else {
 			error(EFAIL, "regresswrite: only commands are %s",
