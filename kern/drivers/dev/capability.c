@@ -204,7 +204,6 @@ static size_t capwrite(struct chan *c, void *va, size_t n, off64_t m)
 	uint8_t hash[Hashlen + 1] = {0};
 	char *hashstr = NULL;
 	char *key, *from, *to;
-	char err[256];
 	int ret;
 	ERRSTACK(1);
 
@@ -221,7 +220,8 @@ static size_t capwrite(struct chan *c, void *va, size_t n, off64_t m)
 		break;
 
 	case Quse:
-		/* copy key to avoid a fault in hmac_xx */
+		/* copy key to avoid a fault in hmac_xx and so we can enforce
+		 * null termination. */
 		cp = NULL;
 		if (waserror()) {
 			kfree(cp);
@@ -250,11 +250,8 @@ static size_t capwrite(struct chan *c, void *va, size_t n, off64_t m)
 			error(EINVAL, "hash is wrong length");
 
 		p = remcap((uint8_t *)hashstr);
-		if (p == NULL) {
-			snprintf(err, sizeof(err), "invalid capability %s@%s",
-				 from, key);
-			error(EINVAL, err);
-		}
+		if (p == NULL)
+			error(EINVAL, "invalid capability %s@%s", from, key);
 
 		kfree(hashstr);
 		hashstr = NULL;
