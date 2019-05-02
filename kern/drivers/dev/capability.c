@@ -155,7 +155,7 @@ static void addcap(uint8_t *hash)
 {
 	struct Caphash *p, *t, **l;
 
-	p = kzmalloc(sizeof(*p), 0);
+	p = kzmalloc(sizeof(*p), MEM_WAIT);
 	memmove(p->hash, hash, Hashlen);
 	p->next = NULL;
 
@@ -228,7 +228,7 @@ static size_t capwrite(struct chan *c, void *va, size_t n, off64_t m)
 			kfree(hashstr);
 			nexterror();
 		}
-		cp = kzmalloc(n + 1, 0);
+		cp = kzmalloc(n + 1, MEM_WAIT);
 		memmove(cp, va, n);
 		cp[n] = 0;
 
