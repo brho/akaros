@@ -406,14 +406,16 @@ static size_t kprof_write(struct chan *c, void *a, size_t n, off64_t unused)
 		}
 		break;
 	case Kprintxqid:
-		if (!strncmp(a, "on", 2))
+		if (cb->nf < 1)
+			error(EFAIL, "no printx option: (on|off|toggle)");
+		if (!strcmp(cb->f[0], "on"))
 			set_printx(1);
-		else if (!strncmp(a, "off", 3))
+		else if (!strcmp(cb->f[0], "off"))
 			set_printx(0);
-		else if (!strncmp(a, "toggle", 6))
+		else if (!strcmp(cb->f[0], "toggle"))
 			set_printx(2);
 		else
-			error(EFAIL, "Invalid option to Kprintx %s\n", a);
+			error(EFAIL, "bad printx option: (on|off|toggle)");
 		break;
 	case Kmpstatqid:
 	case Kmpstatrawqid:
