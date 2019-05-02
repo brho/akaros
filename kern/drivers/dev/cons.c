@@ -1096,6 +1096,12 @@ static size_t conswrite(struct chan *c, void *va, size_t n, off64_t off)
 		break;
 
 	case Qconsctl:
+		error(EPERM, "Cannot write to consctl QID");
+
+		/* TODO: here's the old code.  Replace this with parsecmd, if
+		 * possible, or just throw it all away, depending on how we want
+		 * to handle the console, raw mode, etc. */
+#if 0
 		if (n >= sizeof(buf))
 			n = sizeof(buf) - 1;
 		strncpy(buf, a, n);
@@ -1117,6 +1123,7 @@ static size_t conswrite(struct chan *c, void *va, size_t n, off64_t off)
 				a++;
 		}
 		break;
+#endif
 
 	case Qtime:
 		if (!iseve())
@@ -1147,10 +1154,8 @@ static size_t conswrite(struct chan *c, void *va, size_t n, off64_t off)
 		break;
 
 	case Qsysctl:
-		// if (!iseve()) error(EPERM, ERROR_FIXME);
-		cb = parsecmd(a, n);
-		if (cb->nf > 1)
-			printd("cons sysctl cmd %s\n", cb->f[0]);
+		error(EPERM, "Cannot write to sysctl QID");
+		break;
 
 	case Qreboot:
 		if (!iseve())
