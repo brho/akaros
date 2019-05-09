@@ -389,8 +389,14 @@ void send_event(struct proc *p, struct event_queue *ev_q, struct event_msg *msg,
 		/* Pick a vcore, round-robin style.  Assuming ev_vcore was the
 		 * previous one used.  Note that round-robin overrides the
 		 * passed-in vcoreid.  Also note this may be 'wrong' if
-		 * num_vcores changes. */
-		vcoreid = (ev_q->ev_vcore + 1) % p->procinfo->num_vcores;
+		 * num_vcores changes.  Also also note that SCPs currently have
+		 * 0 vcores. */
+		if (__proc_is_mcp(p)) {
+			vcoreid = (ev_q->ev_vcore + 1) %
+				  p->procinfo->num_vcores;
+		} else {
+			vcoreid = 0;
+		}
 		ev_q->ev_vcore = vcoreid;
 	}
 	if (!proc_vcoreid_is_safe(p, vcoreid)) {
