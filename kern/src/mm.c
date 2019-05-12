@@ -65,10 +65,14 @@ char *foc_to_name(struct file_or_chan *foc)
 	panic("unknown F_OR_C type");
 }
 
-char *foc_abs_path(struct file_or_chan *foc, char *path, size_t max_size)
+char *foc_abs_path(struct file_or_chan *foc)
 {
 	switch (foc->type) {
 	case F_OR_C_CHAN:
+		/* Not sure, but I'd like to know if we have externally visible
+		 * chans that have no name. */
+		assert(foc->chan->name);
+		assert(foc->chan->name->s);
 		return foc->chan->name->s;
 	}
 	panic("unknown F_OR_C type");

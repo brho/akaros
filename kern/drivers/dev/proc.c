@@ -411,7 +411,7 @@ static void build_maps_cb(struct vm_region *vmr, void *arg)
 	unsigned long inode_nr;
 
 	if (vmr_has_file(vmr)) {
-		path = foc_abs_path(vmr->__vm_foc, path_buf, sizeof(path_buf));
+		path = foc_abs_path(vmr->__vm_foc);
 		inode_nr = 0; /* TODO: do we care about this? */
 	} else {
 		strlcpy(path_buf, "[heap]", sizeof(path_buf));

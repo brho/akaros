@@ -533,20 +533,13 @@ void profiler_notify_mmap(struct proc *p, uintptr_t addr, size_t size, int prot,
                           int flags, struct file_or_chan *foc, size_t offset)
 {
 	struct profiler *prof;
+	char *path;
 
 	rcu_read_lock();
 	prof = rcu_dereference(gbl_prof);
-	if (prof) {
-		if (foc && (prot & PROT_EXEC)) {
-			char path_buf[PROFILER_MAX_PRG_PATH];
-			char *path = foc_abs_path(foc, path_buf,
-						  sizeof(path_buf));
-
-			if (likely(path))
-				profiler_push_pid_mmap(prof, p, addr, size,
-						       offset, path);
-		}
-	}
+	if (prof && foc && (prot & PROT_EXEC))
+		profiler_push_pid_mmap(prof, p, addr, size, offset,
+				       foc_abs_path(foc));
 	rcu_read_unlock();
 }
 

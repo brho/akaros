@@ -30,7 +30,7 @@ struct file_or_chan {
 };
 
 char *foc_to_name(struct file_or_chan *foc);
-char *foc_abs_path(struct file_or_chan *foc, char *path, size_t max_size);
+char *foc_abs_path(struct file_or_chan *foc);
 ssize_t foc_read(struct file_or_chan *foc, void *buf, size_t amt, off64_t off);
 struct file_or_chan *foc_open(char *path, int omode, int perm);
 struct file_or_chan *fd_to_foc(struct fd_table *fdt, int fd);
