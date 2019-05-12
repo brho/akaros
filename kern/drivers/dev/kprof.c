@@ -160,8 +160,6 @@ static void kprof_flush_profiler(void)
 
 static void kprof_init(void)
 {
-	profiler_init();
-
 	qlock_init(&kprof.lock);
 	kprof.profiling = FALSE;
 	kprof.opened = FALSE;
@@ -225,9 +223,11 @@ static struct chan *kprof_open(struct chan *c, int omode)
 			qunlock(&kprof.lock);
 			error(EBUSY, "Global profiler is already open");
 		}
+		if (profiler_setup() < 0) {
+			qunlock(&kprof.lock);
+			error(ENOMEM, "failed to set up profiler");
+		}
 		kprof.opened = TRUE;
-		/* TODO: have a creation function for a non-global profiler */
-		profiler_setup();
 		qunlock(&kprof.lock);
 		break;
 	}
