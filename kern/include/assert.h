@@ -26,7 +26,7 @@ void _panic(struct hw_trapframe *, const char *, int, const char *, ...)
 #define assert(x)		\
 	do { if (unlikely(!(x))) panic("assertion failed: %s", #x); } while (0)
 
-#define error_assert(e, x) \
+#define error_check(e, x) \
 	do { if (unlikely(!(x))) error(e, "Assertion failed: " #x); } while (0)
 
 // static_assert(x) will generate a compile-time error if 'x' is false.

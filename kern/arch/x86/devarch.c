@@ -357,9 +357,9 @@ static const uint8_t *arch_read_core_set(struct core_set *cset,
 	int i, nb;
 	uint32_t n;
 
-	error_assert(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
+	error_check(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
 	kptr = get_le_u32(kptr, &n);
-	error_assert(EBADMSG, (kptr + n) <= ktop);
+	error_check(EBADMSG, (kptr + n) <= ktop);
 	core_set_init(cset);
 	nb = MIN((int) n * 8, num_cores);
 	for (i = 0; i < nb; i++) {
@@ -393,14 +393,14 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 
 	kptr = kdata;
 	ktop = kptr + usize;
-	error_assert(EBADMSG, (kptr + 1) <= ktop);
+	error_check(EBADMSG, (kptr + 1) <= ktop);
 	switch (*kptr++) {
 	case PERFMON_CMD_COUNTER_OPEN: {
 		int ped;
 		struct perfmon_event pev;
 		struct core_set cset;
 
-		error_assert(EBADMSG, (kptr + 3 * sizeof(uint64_t)) <= ktop);
+		error_check(EBADMSG, (kptr + 3 * sizeof(uint64_t)) <= ktop);
 		perfmon_init_event(&pev);
 		kptr = get_le_u64(kptr, &pev.event);
 		kptr = get_le_u64(kptr, &pev.flags);
@@ -420,7 +420,7 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 		uint8_t *rptr;
 		struct perfmon_status *pef;
 
-		error_assert(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
+		error_check(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
 		kptr = get_le_u32(kptr, &ped);
 
 		pef = perfmon_get_event_status(pc->ps, (int) ped);
@@ -437,7 +437,7 @@ static long arch_perf_write(struct perf_context *pc, const void *udata,
 	case PERFMON_CMD_COUNTER_CLOSE: {
 		uint32_t ped;
 
-		error_assert(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
+		error_check(EBADMSG, (kptr + sizeof(uint32_t)) <= ktop);
 		kptr = get_le_u32(kptr, &ped);
 
 		perfmon_close_event(pc->ps, (int) ped);
