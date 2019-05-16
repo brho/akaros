@@ -221,12 +221,9 @@ static bool handle_vmcall_smpboot(struct guest_thread *gth)
 	/* We use the BSP's CR3 for now. This should be fine because they
 	 * change it later anyway. */
 	vm_tf_ap->tf_cr3 = vm_tf->tf_cr3;
-
-	/* Starting RIP is passed in via rdi. */
 	vm_tf_ap->tf_rip = vm_tf->tf_rdi;
-
-	/* Starting RSP is passed in via rsi. */
 	vm_tf_ap->tf_rsp = vm_tf->tf_rsi;
+	vm_tf_ap->tf_rflags = FL_RSVD_1;
 
 	vm->up_gpcs++;
 
