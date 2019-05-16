@@ -50,7 +50,7 @@ int gva2gpa(struct guest_thread *vm_thread, uint64_t va, uint64_t *pa)
 {
 	assert(vm_thread != NULL);
 	struct vm_trapframe *vm_tf = gth_to_vmtf(vm_thread);
-	uint64_t *ptptr = (uint64_t *)vm_tf->tf_cr3;
+	uint64_t *ptptr = (uint64_t*)PTE_ADDR(vm_tf->tf_cr3);
 	uint64_t entry;
 
 	for (int shift = PML4_SHIFT;
