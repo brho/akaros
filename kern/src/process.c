@@ -2429,7 +2429,8 @@ void proc_get_set(struct process_set *pset)
 		struct process_set *pset = (struct process_set *) opaque;
 
 		if (pset->num_processes < pset->size) {
-			proc_incref(p, 1);
+			if (!kref_get_not_zero(&p->p_kref, 1))
+				return;
 
 			pset->procs[pset->num_processes] = p;
 			pset->num_processes++;
