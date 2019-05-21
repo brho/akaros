@@ -139,7 +139,7 @@ static struct cmdtab proccmd[] = {
 #define PID(q) ((q).vers)
 #define NOTEID(q) ((q).vers)
 
-static void procctlreq(struct proc *, char *, int);
+static void procctlreq(struct proc *, char *, size_t);
 static int procctlmemio(struct proc *, uintptr_t, int, void *, int);
 // static struct chan*   proctext(struct chan*, struct proc*);
 // static Segment* txt2data(struct proc*, Segment*);
@@ -1309,7 +1309,7 @@ static void strace_release(struct kref *a)
 	kfree(strace);
 }
 
-static void procctlreq(struct proc *p, char *va, int n)
+static void procctlreq(struct proc *p, char *va, size_t n)
 {
 	ERRSTACK(1);
 	int8_t irq_state = 0;

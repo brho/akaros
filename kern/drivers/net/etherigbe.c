@@ -710,7 +710,7 @@ static struct cmdtab igbectlmsg[] = {
     {CMrdtr, "rdtr", 2},
 };
 
-static long igbectl(struct ether *edev, void *buf, long n)
+static long igbectl(struct ether *edev, void *buf, size_t n)
 {
 	ERRSTACK(2);
 	int v;

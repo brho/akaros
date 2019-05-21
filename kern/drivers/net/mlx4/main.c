@@ -3890,7 +3890,7 @@ static long mlx4_ifstat(struct ether *edev, void *a, long n, uint32_t offset)
 	return linux_ifstat(mlx4_en_get_stats(edev), a, n, offset);
 }
 
-static long mlx4_ctl(struct ether *edev, void *buf, long n)
+static long mlx4_ctl(struct ether *edev, void *buf, size_t n)
 {
 	panic("Not implemented");
 }

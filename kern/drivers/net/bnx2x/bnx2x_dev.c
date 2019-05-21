@@ -89,7 +89,7 @@ static long bnx2x_ifstat(struct ether *edev, void *a, long n, uint32_t offset)
 	return n;
 }
 
-static long bnx2x_ctl(struct ether *edev, void *buf, long n)
+static long bnx2x_ctl(struct ether *edev, void *buf, size_t n)
 {
 	ERRSTACK(1);
 	int v;

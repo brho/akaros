@@ -831,7 +831,7 @@ static struct cmdtab i82563ctlmsg[] = {
     {CMan, "an", 1},
 };
 
-static long i82563ctl(struct ether *edev, void *buf, long n)
+static long i82563ctl(struct ether *edev, void *buf, size_t n)
 {
 	ERRSTACK(1);
 	char *p;

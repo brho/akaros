@@ -193,7 +193,7 @@ long netlogread(struct Fs *f, void *a, uint32_t unused, long n)
 	return n;
 }
 
-void netlogctl(struct Fs *f, char *s, int n)
+void netlogctl(struct Fs *f, char *s, size_t n)
 {
 	ERRSTACK(1);
 	int i, set = 0;

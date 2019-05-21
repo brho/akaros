@@ -66,7 +66,7 @@ static int ncmdfield(char *p, int n)
 /*
  *  parse a command written to a device
  */
-struct cmdbuf *parsecmd(char *p, int n)
+struct cmdbuf *parsecmd(char *p, size_t n)
 {
 	ERRSTACK(1);
 	struct cmdbuf *volatile cb;

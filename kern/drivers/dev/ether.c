@@ -549,7 +549,7 @@ static void nop(struct ether *unused)
 {
 }
 
-static long vlanctl(struct ether *ether, void *buf, long n)
+static long vlanctl(struct ether *ether, void *buf, size_t n)
 {
 	uint8_t ea[Eaddrlen];
 	struct ether *master;

@@ -8721,7 +8721,7 @@ static long rtl8169_ifstat(struct ether *edev, void *a, long n, uint32_t offset)
 	return linux_ifstat(&edev->stats, a, n, offset);
 }
 
-static long rtl8169_ctl(struct ether *edev, void *buf, long n)
+static long rtl8169_ctl(struct ether *edev, void *buf, size_t n)
 {
 	ERRSTACK(1);
 	int v;

@@ -436,7 +436,7 @@ enum {
 void netloginit(struct Fs *);
 void netlogopen(struct Fs *);
 void netlogclose(struct Fs *);
-void netlogctl(struct Fs *, char *unused_char_p_t, int);
+void netlogctl(struct Fs *, char *unused_char_p_t, size_t);
 long netlogread(struct Fs *, void *, uint32_t, long);
 void netlog(struct Fs *, int unused_int, char *unused_char_p_t, ...);
 void ifcloginit(struct Fs *);
@@ -511,7 +511,8 @@ extern void v6delroute(struct Fs *f, uint8_t * a, uint8_t * mask, int dolock);
 extern struct route *v4lookup(struct Fs *f, uint8_t * a, struct conv *c);
 extern struct route *v6lookup(struct Fs *f, uint8_t * a, struct conv *c);
 extern long routeread(struct Fs *f, char *unused_char_p_t, uint32_t, int);
-extern long routewrite(struct Fs *f, struct chan *, char *unused_char_p_t, int);
+extern long routewrite(struct Fs *f, struct chan *, char *unused_char_p_t,
+		       size_t);
 extern void routetype(int unused_int, char *unused_char_p_t);
 extern void ipwalkroutes(struct Fs *, struct routewalk *);
 extern void convroute(struct route *r, uint8_t * u8pt, uint8_t * u8pt1,
@@ -1170,7 +1171,7 @@ struct ether {
 	void (*detach) (struct ether *);
 	void (*transmit) (struct ether *);
 	long (*ifstat) (struct ether *, void *, long, uint32_t);
-	long (*ctl) (struct ether *, void *, long); /* custom ctl messages */
+	long (*ctl) (struct ether *, void *, size_t); /* custom ctl messages */
 	void (*power) (struct ether *, int);	/* power on/off */
 	void (*shutdown) (struct ether *); /* shutdown hardware before reboot */
 	void *ctlr;

@@ -817,7 +817,7 @@ int routeflush(struct Fs *f, struct route *r, char *tag)
 	return 0;
 }
 
-long routewrite(struct Fs *f, struct chan *c, char *p, int n)
+long routewrite(struct Fs *f, struct chan *c, char *p, size_t n)
 {
 	ERRSTACK(1);
 	int h, changed;

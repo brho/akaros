@@ -1053,7 +1053,7 @@ void devtabinit();
 void devtabreset();
 
 /* kern/src/ns/parse.c */
-struct cmdbuf *parsecmd(char *p, int n);
+struct cmdbuf *parsecmd(char *p, size_t n);
 void cmderror(struct cmdbuf *cb, char *s);
 struct cmdtab *lookupcmd(struct cmdbuf *cb, struct cmdtab *ctab, int nctab);
 
