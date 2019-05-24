@@ -1,7 +1,5 @@
-earlyprintk=vmcall,keep
+earlyprintk=akaros
  console=hvc0
  lapic=notscdeadline
- clocksource=tsc
- pit=none
  nortc
  nozswap
