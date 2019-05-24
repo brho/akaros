@@ -901,8 +901,8 @@ static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 	const char kvm_sig[] = "KVMKVMKVM\0\0\0";
 	const char akaros_sig[] = "AKAROSINSIDE";
 
-	if (tf->tf_rax == 0x0B)
-		return FALSE;	// Handle in userspace.
+	if (vmm_user_handles_cpuid(tf->tf_rax, tf->tf_rcx))
+		return false;
 
 	cpuid(tf->tf_rax, tf->tf_rcx, &eax, &ebx, &ecx, &edx);
 	switch (tf->tf_rax) {

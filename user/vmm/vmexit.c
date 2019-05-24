@@ -83,32 +83,42 @@ static bool handle_cpuid(struct guest_thread *gth)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 	struct virtual_machine *vm = gth_to_vm(gth);
-	uint32_t level = vm_tf->tf_rcx & 0x0F;
+	uint32_t eax = vm_tf->tf_rax;
+	uint32_t ecx = vm_tf->tf_rcx;
 
-	if (vm_tf->tf_rax != 0x0B)
-		return FALSE;
+	if (!vmm_user_handles_cpuid(eax, ecx)) {
+		fprintf(stderr, "got an unexpected cpuid 0x%x:%x\n", eax, ecx);
+		return false;
+	}
+
+	switch (eax) {
+	case 0x0b: {
+		uint32_t level = vm_tf->tf_rcx & 0x0F;
+
+		vm_tf->tf_rcx = level;
+		vm_tf->tf_rdx = gth->gpc_id;
+		if (level == CPUID_0B_LEVEL_SMT) {
+			vm_tf->tf_rax = 0;
+			vm_tf->tf_rbx = 1;
+			vm_tf->tf_rcx |= ((level + 1) << 8);
+		}
+		if (level == CPUID_0B_LEVEL_CORE) {
+			uint32_t shift = LOG2_UP(vm->nr_gpcs);
+
+			if (shift > 0x1F)
+				shift = 0x1F;
+			vm_tf->tf_rax = shift;
+			vm_tf->tf_rbx = vm->nr_gpcs;
+			vm_tf->tf_rcx |= ((level + 1) << 8);
+		}
+	}	 break;
+	default:
+		fprintf(stderr, "got an unhandled cpuid 0x%x:%x\n", eax, ecx);
+		return false;
+	}
 
 	vm_tf->tf_rip += 2;
-	vm_tf->tf_rax = 0;
-	vm_tf->tf_rbx = 0;
-	vm_tf->tf_rcx = level;
-	vm_tf->tf_rdx = gth->gpc_id;
-	if (level == CPUID_0B_LEVEL_SMT) {
-		vm_tf->tf_rax = 0;
-		vm_tf->tf_rbx = 1;
-		vm_tf->tf_rcx |= ((level + 1) << 8);
-	}
-	if (level == CPUID_0B_LEVEL_CORE) {
-		uint32_t shift = LOG2_UP(vm->nr_gpcs);
-
-		if (shift > 0x1F)
-			shift = 0x1F;
-		vm_tf->tf_rax = shift;
-		vm_tf->tf_rbx = vm->nr_gpcs;
-		vm_tf->tf_rcx |= ((level + 1) << 8);
-	}
-
-	return TRUE;
+	return true;
 }
 
 static bool handle_ept_fault(struct guest_thread *gth)

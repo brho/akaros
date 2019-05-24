@@ -23,3 +23,12 @@ struct vmm_gpcore_init {
 #define VM_TRAP_ERROR_CODE          (1 << 11)
 #define VM_TRAP_HARDWARE            (3 << 8)
 /* End Intel VM Trap Injection Fields */
+
+static inline bool vmm_user_handles_cpuid(uint32_t eax, uint32_t ecx)
+{
+	switch (eax) {
+	case 0x0b:
+		return true;
+	}
+	return false;
+}
