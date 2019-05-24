@@ -1119,7 +1119,7 @@ static void vmexit_dispatch(struct vm_trapframe *tf)
 	switch (tf->tf_exit_reason) {
 	case EXIT_REASON_VMCALL:
 		if (current->vmm.flags & VMM_CTL_FL_KERN_PRINTC &&
-		    tf->tf_rax == VMCALL_PRINTC) {
+		    tf->tf_rax == AKAROS_VMCALL_PRINTC) {
 			printk("%c", tf->tf_rdi);
 			tf->tf_rip += 3;
 			handled = TRUE;

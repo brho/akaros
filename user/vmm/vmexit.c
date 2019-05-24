@@ -250,16 +250,16 @@ static bool handle_vmcall(struct guest_thread *gth)
 		return vm->vmcall(gth, vm_tf);
 
 	switch (vm_tf->tf_rax) {
-	case VMCALL_PRINTC:
+	case AKAROS_VMCALL_PRINTC:
 		retval = handle_vmcall_printc(gth);
 		break;
-	case VMCALL_SMPBOOT:
+	case AKAROS_VMCALL_SMPBOOT:
 		retval = handle_vmcall_smpboot(gth);
 		break;
-	case VMCALL_GET_TSCFREQ:
+	case AKAROS_VMCALL_GET_TSCFREQ:
 		retval = handle_vmcall_get_tscfreq(gth);
 		break;
-	case VMCALL_TRACE_TF:
+	case AKAROS_VMCALL_TRACE_TF:
 		trace_printf("  rax  0x%016lx\n",      vm_tf->tf_r11);
 		trace_printf("  rbx  0x%016lx\n",      vm_tf->tf_rbx);
 		trace_printf("  rcx  0x%016lx\n",      vm_tf->tf_rcx);
