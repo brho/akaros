@@ -85,7 +85,6 @@ void *init_e820map(struct virtual_machine *vm, struct boot_params *bp)
 		bp->e820_map[bp->e820_entries++].type = E820_RAM;
 	}
 
-	dumpe820(bp->e820_map, bp->e820_entries);
 	return (void *)bp + PGSIZE;
 }
 

@@ -93,9 +93,6 @@ static void virtio_mmio_reset(struct virtio_mmio_dev *mmio_dev)
 	if (!mmio_dev->vqdev)
 		return;
 
-	fprintf(stderr, "virtio mmio device reset: %s\n",
-		mmio_dev->vqdev->name);
-
 	// Clear any driver-activated feature bits
 	mmio_dev->vqdev->dri_feat = 0;
 

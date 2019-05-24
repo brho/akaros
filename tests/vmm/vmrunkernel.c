@@ -251,7 +251,6 @@ void alloc_intr_pages(void)
 
 	a_page = mmap((void *)APIC_GPA, PGSIZE, PROT_READ | PROT_WRITE,
 	              MAP_POPULATE | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-	fprintf(stderr, "a_page mmap pointer %p\n", a_page);
 
 	if (a_page != (void *)APIC_GPA) {
 		perror("Could not mmap APIC");
@@ -423,9 +422,6 @@ int main(int argc, char **argv)
 		{0, 0, 0, 0}
 	};
 
-	fprintf(stderr, "%p %p %p %p\n", PGSIZE, PGSHIFT, PML1_SHIFT,
-	        PML1_PTE_REACH);
-
 	if ((uintptr_t)__procinfo.program_end >= MinMemory) {
 		fprintf(stderr,
 		        "Panic: vmrunkernel binary extends into guest memory\n");
@@ -549,7 +545,6 @@ int main(int argc, char **argv)
 
 	// Set vm->nr_gpcs before it's referenced in the struct setups below.
 	vm->nr_gpcs = num_pcs;
-	fprintf(stderr, "NUM PCS: %d\n", num_pcs);
 	/* These are only used to be passed to vmm_init, which makes copies
 	 * internally */
 	gpcis = (struct vmm_gpcore_init *)
@@ -708,7 +703,6 @@ int main(int argc, char **argv)
 	vm_tf->tf_rsi = (uint64_t) bp;
 	vm_tf->tf_rflags = FL_RSVD_1;
 	vm->up_gpcs = 1;
-	fprintf(stderr, "Start guest: cr3 %p rip %p\n", vm_tf->tf_cr3, entry);
 	start_guest_thread(gpcid_to_gth(vm, 0));
 
 	uthread_sleep_forever();

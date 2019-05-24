@@ -44,15 +44,12 @@ uintptr_t load_elf(char *filename, uint64_t offset, uint64_t *highest,
 		        __func__, filename);
 		goto fail;
 	}
-	fprintf(stderr, "%s ELF entry point is %p\n", filename,
-	        (void *)ehdr->e_entry);
 
 	if (elf_getphdrnum(elf, &phnum) < 0) {
 		fprintf(stderr, "%s: cannot get program header num of %s.\n",
 		        __func__, filename);
 		goto fail;
 	}
-	fprintf(stderr, "%s has %p program headers\n", filename, phnum);
 
 	hdrs = elf64_getphdr(elf);
 	if (hdrs == NULL) {
@@ -66,26 +63,24 @@ uintptr_t load_elf(char *filename, uint64_t offset, uint64_t *highest,
 		Elf64_Phdr *h = &hdrs[i];
 		uintptr_t pa;
 
-		fprintf(stderr,
-		        "%d: type 0x%lx flags 0x%lx  offset 0x%lx vaddr 0x%lx\npaddr 0x%lx size 0x%lx  memsz 0x%lx align 0x%lx\n",
-		        i,
-		        h->p_type,              /* Segment type */
-		        h->p_flags,             /* Segment flags */
-		        h->p_offset,            /* Segment file offset */
-		        h->p_vaddr,             /* Segment virtual address */
-		        h->p_paddr,             /* Segment physical address */
-		        h->p_filesz,            /* Segment size in file */
-		        h->p_memsz,             /* Segment size in memory */
-		        h->p_align              /* Segment alignment */);
+		printd("%d: type 0x%lx flags 0x%lx  offset 0x%lx vaddr 0x%lx\npaddr 0x%lx size 0x%lx  memsz 0x%lx align 0x%lx\n",
+		       i,
+		       h->p_type,              /* Segment type */
+		       h->p_flags,             /* Segment flags */
+		       h->p_offset,            /* Segment file offset */
+		       h->p_vaddr,             /* Segment virtual address */
+		       h->p_paddr,             /* Segment physical address */
+		       h->p_filesz,            /* Segment size in file */
+		       h->p_memsz,             /* Segment size in memory */
+		       h->p_align              /* Segment alignment */);
 		if (h->p_type != PT_LOAD)
 			continue;
 		if ((h->p_flags & (PF_R | PF_W | PF_X)) == 0)
 			continue;
 
 		pa = h->p_paddr;
-		fprintf(stderr,
-		        "Read header %d @offset %p to %p (elf PA is %p) %d bytes:",
-		        i, h->p_offset, pa, h->p_paddr, h->p_filesz);
+		printd("Read header %d @offset %p to %p (elf PA is %p) %d bytes:",
+		       i, h->p_offset, pa, h->p_paddr, h->p_filesz);
 		tot = 0;
 		while (tot < h->p_filesz) {
 			int amt = pread(fd, (void *)(pa + tot + offset),
@@ -95,7 +90,6 @@ uintptr_t load_elf(char *filename, uint64_t offset, uint64_t *highest,
 				break;
 			tot += amt;
 		}
-		fprintf(stderr, "read a total of %d bytes\n", tot);
 		if (tot < h->p_filesz) {
 			fprintf(stderr, "%s: got %d bytes, wanted %d bytes\n",
 			        filename, tot, h->p_filesz);

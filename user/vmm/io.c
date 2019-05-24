@@ -162,7 +162,7 @@ int io(struct guest_thread *vm_thread)
 		 * confused people into thinking we were running
 		 * Windows 98, not Linux.
 		 */
-		printf("(out rax, edx): unhandled IO address dx @%p is 0x%x\n",
+		printd("(out rax, edx): unhandled IO address dx @%p is 0x%x\n",
 		       ip8, edx);
 		return 0;
 	}
@@ -172,7 +172,7 @@ int io(struct guest_thread *vm_thread)
 		vm_tf->tf_rip += 1;
 		/* out al %edx */
 		if (edx == 0xcfb) { // special!
-			printf("Just ignore the damned cfb write\n");
+			printd("Just ignore the damned cfb write\n");
 			return 0;
 		}
 		if ((edx&~3) == 0xcfc) {
@@ -196,7 +196,7 @@ int io(struct guest_thread *vm_thread)
 
 		/* Another case where we print a message but it's not an error.
 		 * */
-		printf("out al, dx: unhandled IO address dx @%p is 0x%x\n", ip8,
+		printd("out al, dx: unhandled IO address dx @%p is 0x%x\n", ip8,
 		       edx); return 0;
 	}
 	/* Silently accept OUT imm8, al */

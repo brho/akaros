@@ -99,13 +99,8 @@ static uint8_t acpi_tb_checksum(uint8_t *buffer, uint32_t length)
 	uint8_t sum = 0;
 	uint8_t *end = buffer + length;
 
-	fprintf(stderr, "tbchecksum %p for %d", buffer, length);
-	while (buffer < end) {
-		if (end - buffer < 2)
-			fprintf(stderr, "%02x\n", sum);
+	while (buffer < end)
 		sum = (uint8_t)(sum + *(buffer++));
-	}
-	fprintf(stderr, " is %02x\n", sum);
 	return sum;
 }
 
@@ -115,12 +110,9 @@ static void gencsum(uint8_t *target, void *data, int len)
 
 	// blast target to zero so it does not get counted
 	// (it might be in the struct we checksum) And, yes, it is, goodness.
-	fprintf(stderr, "gencsum %p target %p source %d bytes\n", target, data,
-	        len);
 	*target = 0;
 	csum = acpi_tb_checksum((uint8_t *)data, len);
 	*target = ~csum + 1;
-	fprintf(stderr, "Cmoputed is %02x\n", *target);
 }
 
 /* Initialize the MADT structs for each local apic. */
@@ -208,7 +200,6 @@ void *setup_biostables(struct virtual_machine *vm,
 	}
 
 	r = a;
-	fprintf(stderr, "install rsdp to %p\n", r);
 	*r = rsdp;
 	a += sizeof(*r);
 	r->xsdt_physical_address = (uint64_t)a;
@@ -232,21 +223,18 @@ void *setup_biostables(struct virtual_machine *vm,
 	x = a;
 	a += sizeof(*x) + 8*sizeof(void *);
 	memset(x, 0, a - (void *)x);
-	fprintf(stderr, "install xsdt to %p\n", x);
 	*x = xsdt;
 	x->table_offset_entry[0] = 0;
 	x->table_offset_entry[1] = 0;
 	x->header.length = a - (void *)x;
 
 	f = a;
-	fprintf(stderr, "install fadt to %p\n", f);
 	*f = fadt;
 	x->table_offset_entry[0] = (uint64_t)f; // fadt MUST be first in xsdt!
 	a += sizeof(*f);
 	f->header.length = a - (void *)f;
 
 	f->Xdsdt = (uint64_t) a;
-	fprintf(stderr, "install dsdt to %p\n", a);
 	memcpy(a, &DSDT_DSDTTBL_Header, 36);
 	a += 36;
 
@@ -260,7 +248,6 @@ void *setup_biostables(struct virtual_machine *vm,
 	*m = madt;
 	x->table_offset_entry[3] = (uint64_t) m;
 	a += sizeof(*m);
-	fprintf(stderr, "install madt to %p\n", m);
 
 	a = init_madt_local_apic(vm, a);
 
@@ -285,8 +272,6 @@ void *setup_biostables(struct virtual_machine *vm,
 		fprintf(stderr, "XSDT has bad checksum; summed to %x\n", csum);
 		exit(1);
 	}
-
-	fprintf(stderr, "allchecksums ok\n");
 
 	a = (void *)(((unsigned long)a + 0xfff) & ~0xfff);
 
