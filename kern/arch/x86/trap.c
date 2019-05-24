@@ -927,6 +927,10 @@ static bool handle_vmexit_cpuid(struct vm_trapframe *tf)
 		ebx |= (current->vmm.nr_guest_pcores & 0xff) << 16;
 		ebx |= (tf->tf_guest_pcoreid & 0xff) << 24;
 		break;
+	case 0x07:
+		/* Do not advertise TSC_ADJUST */
+		ebx &= ~(1 << 1);
+		break;
 	case 0x0A:
 		eax = 0;
 		ebx = 0;
