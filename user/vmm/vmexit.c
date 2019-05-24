@@ -186,8 +186,6 @@ static bool handle_vmcall_printc(struct guest_thread *gth)
 
 	byte = vm_tf->tf_rdi;
 	printf("%c", byte);
-	if (byte == '\n')
-		printf("%c", '%');
 	fflush(stdout);
 	return TRUE;
 }
