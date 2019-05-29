@@ -26,7 +26,6 @@ env:
   - AKAROS_ROOT=$TRAVIS_BUILD_DIR
   - X86_64_INSTDIR="$AKAROS_ROOT/install/x86_64-ucb-akaros-gcc"
   - PATH=$X86_64_INSTDIR/bin:$PATH
-  - AKAROS_XCC_ROOT=$X86_64_INSTDIR
   - MAKE_JOBS=4
 
 notifications:

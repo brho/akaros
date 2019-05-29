@@ -6,11 +6,10 @@
 # this does is set the cross compiler.  You can override some things with a
 # Makelocal.
 #
-# The calling environment must have AKAROS_ROOT and AKAROS_XCC_ROOT set.
+# The calling environment must have AKAROS_ROOT set.
 #
 # Exports CROSS_COMPILE, ARCH, KBUILD_VERBOSE, Q, MAKEFLAGS, AKAROS_ROOT,
-# AKAROS_XCC_ROOT, AKAROS_PREFIX, AKAROS_SYSROOT, MAKE_JOBS, FIRST_KFS_PATH,
-# KFS_ROOT
+# AKAROS_PREFIX, AKAROS_SYSROOT, MAKE_JOBS, FIRST_KFS_PATH, KFS_ROOT
 
 # Do not print "Entering directory ...";
 MAKEFLAGS += --no-print-directory
@@ -20,9 +19,6 @@ MAKEFLAGS += --no-print-directory
 
 ifndef AKAROS_ROOT
     $(error AKAROS_ROOT is empty!  You must set it!)
-endif
-ifndef AKAROS_XCC_ROOT
-    $(error AKAROS_XCC_ROOT is empty!  You must set it!)
 endif
 
 FIRST_KFS_PATH ?= $(AKAROS_ROOT)/kern/kfs
@@ -69,6 +65,5 @@ ifeq ($(CROSS_COMPILE),)
     CROSS_COMPILE := $(ARCH)-ucb-akaros-
 endif
 
-# strip the trailing - from CROSS_COMPILE
-AKAROS_PREFIX = $(shell x=$(CROSS_COMPILE); echo $${x%?})
-AKAROS_SYSROOT = $(AKAROS_XCC_ROOT)/$(AKAROS_PREFIX)/sysroot/
+AKAROS_PREFIX = $(shell x86_64-ucb-akaros-gcc -dumpmachine)
+AKAROS_SYSROOT = $(shell x86_64-ucb-akaros-gcc -print-sysroot)
