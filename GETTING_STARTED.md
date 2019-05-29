@@ -12,7 +12,6 @@ Contents
   - Cross compiler (and glibc)
   - Kernel
   - Userspace
-  - Busybox
   - Building and Loading a Virtual Machine Image
   - Running Qemu
   - Running on Hardware
@@ -49,8 +48,8 @@ usually idling in there (alone), and if I'm at my computer, I'll respond.
 ----------------------------
 I'll describe how to get x86 working.  RISCV is similar.
 
-To start off, make sure AKAROS_ROOT and AKAROS_XCC_ROOT are set in your
-environment.  AKAROS_ROOT is the Akaros repo directory.  AKAROS_XCC_ROOT is a
+To start off, make sure AKAROS_ROOT and AKAROS_TOOLCHAINS are set in your
+environment.  AKAROS_ROOT is the Akaros repo directory.  AKAROS_TOOLCHAINS is a
 directory of your choosing where the toolchain will be installed (more on that
 in Section 3.1 below).
 
@@ -92,25 +91,14 @@ The second step is to build the cross compiler, which lives in
 
 `$ cd tools/compilers/gcc-glibc`
 
-In this directory, you first need to set up your Makelocal file.  There is a
-template to work from.
+You should already have set your `AKAROS_TOOLCHAINS` to some place where you
+want the cross compiler installed.  I have a directory named `akaros-gcc-glibc`
+for this. My bash environment variables are -
 
-`$ cp Makelocal.template Makelocal`
-
-You need to set your `INSTDIRS` to some place where you want the cross compiler
-installed.  I have a directory named `akaros-gcc-glibc` for this.
-
-Additionally, you must set the environment variable `$AKAROS_XCC_ROOT` to point
-to the installation directory for your architecture.  For instance, my
-AKAROS_XCC_ROOT is:
-
-`/home/brho/classes/akaros/akaros-gcc-glibc/install-x86_64-ucb-akaros-gcc/`
-
-You also need to add `bin` directories to your `PATH` where the cross compiler
-will be installed.  This will vary based on your value for `INSTDIRS`.  For
-instance, my path contains:
-
-`/home/brho/classes/akaros/akaros-gcc-glibc/install-x86_64-ucb-akaros-gcc/bin`
+```bash
+export AKAROS_ROOT=/home/brho/classes/akaros/akaros-kernel
+export AKAROS_TOOLCHAINS=/home/brho/classes/akaros/akaros-gcc-glibc
+```
 
 You can also set up `MAKE_JOBS`, so you don't over or under load your system
 when building.  I have a 2 core laptop, so I use `MAKE_JOBS := 3`
@@ -120,6 +108,15 @@ At this point, you can build (for example):
 `$ make x86_64`
 
 This might take a while (10-20 minutes for me on a 2007 era laptop).
+
+Next you will need to add `bin` directories to your `PATH` where the cross
+compiler was installed.  This will vary based on the architecture you built the
+toolchain for.  Refer below for updating your PATH -
+
+* For riscv, add `$AKAROS_TOOLCHAINS/riscv-ucb-akaros-gcc/bin` to your PATH.
+* For x86_64, add `$AKAROS_TOOLCHAINS/x86_64-ucb-akaros-gcc/bin` to your PATH.
+* For x86_64 native, add `$AKAROS_TOOLCHAINS/x86_64-ucb-akaros-gcc-native/bin`
+to your PATH.
 
 Just to double check everything installed correctly, you should be able to run
 `x86_64-ucb-akaros-gcc` from your shell.
@@ -135,7 +132,7 @@ Like the cross compiler, the kernel has its own `Makelocal`.
 
 This file is used to set up custom make targets that are not part of the
 default `Makefile`, but fit nicely into your personal workflow. This file is
-not under version control and can me made to contain just about anything.
+not under version control and can be made to contain just about anything.
 
 Now you're ready to build the kernel:
 
@@ -176,39 +173,7 @@ see this, then you probably didn't actually fill KFS properly.
 	Adding kern/kfs to initramfs...
 ```
 
-
-### 3.4 Busybox
-Busybox provides our shell and some basic utilities.  You almost certainly want
-to build and install busybox.
-
-Userspace programs like busybox need to be compiled with the cross compiler and
-then have their binaries copied to `kern/kfs/bin`.  Since most everyone wants
-busybox and we have a few patches of our own, we have support for automatically
-building and installing it to KFS.
-
-For the default build (`x86_64`):
-
-```
-$ cd tools/apps/busybox
-$ make [x86_64|riscv]
-$ cd -
-```
-
-And you should be set.  Check `kfs` to make sure everything installed.  You
-should get sane results from:
-
-```
-$ ls -l kern/kfs/bin | grep cat
-lrwxrwxrwx 1 brho brho       7 Jan 23 09:19 cat -> busybox
-```
-
-You can customize your busybox installation, including the install prefix, the
-`.config` file, and `make` jobs.  Check out the makefile in
-`tools/apps/busybox` for details.
-
-Now that you've changed KFS, don't forget to remake the kernel.
-
-### 3.5 Building and Loading a Virtual Machine Image
+### 3.4 Building and Loading a Virtual Machine Image
 At this point, you probably have a runnable kernel with programs in KFS.  It
 should be sitting at `obj/kern/akaros-kernel`.  When running in a VM, you can
 either run the kernel directly from `qemu`, or put it in a virtual machine
@@ -259,7 +224,7 @@ Incidentally, I also have the following in my `Makelocal`, so that `make` (and
 Now, `make kvm`.  You should be able to see the new kernel in `mnt/hdd/` (do an
 `ls -l` and check the timestamp).
 
-### 3.6 Running Qemu
+### 3.5 Running Qemu
 Here is the command I use to run `qemu`/`kvm`.  It's evolved over the years,
 and it will vary based on your linux distribution.  Don't run it just yet:
 
@@ -313,7 +278,7 @@ To change it back:
 `$ stty intr ^c`
 
 
-### 3.7 Running on Hardware
+### 3.6 Running on Hardware
 I have a few bootable USB sticks with grub set up to run Akaros.  The make usb
 target (example in `Makelocal.template`) will copy freshly made kernels to your
 USB device.  You'll need to adjust those paths according to your distro.  My
@@ -328,7 +293,7 @@ and its fairly similar to installing grub on any old hard drive (since it's
 just a bloc device).  Much easier than a hard disk image file.
 
 
-### 3.8 Hello World
+### 3.7 Hello World
 So now you can run the kernel.  It's time to edit a program (or make your own).
 In this, I'll go through my workflow for making changes.
 
@@ -356,7 +321,7 @@ ROS(Core 0)> bb (to run busybox)
 (Should print your message)
 ```
 
-### 3.9 Other Dev Workflow Stuff
+### 3.8 Other Dev Workflow Stuff
 One thing to note is that while we use dynamic linking for `libc`, `parlib`
 libraries are statically linked with applications.  In fact, nowadays **all**
 Akaros programs need to be linked againt `parlib` (used to be that single-core
