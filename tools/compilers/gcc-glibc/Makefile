@@ -8,8 +8,14 @@ GMP_VERSION := 5.1.3
 MPFR_VERSION := 3.1.2
 MPC_VERSION := 1.0.2
 
+ifndef AKAROS_TOOLCHAINS
+    $(error AKAROS_TOOLCHAINS is empty!  You must set it!)
+endif
+
 # Defines where to install the toolchain
--include Makelocal
+RISCV_INSTDIR         := $(AKAROS_TOOLCHAINS)/riscv-ucb-akaros-gcc/
+X86_64_INSTDIR        := $(AKAROS_TOOLCHAINS)/x86_64-ucb-akaros-gcc/
+X86_64_NATIVE_INSTDIR := $(AKAROS_TOOLCHAINS)/x86_64-ucb-akaros-gcc-native/
 
 define print-usage
 	@echo "Usage: make <arch> [ <config> ] [ <subcmd> ] "

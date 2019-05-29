@@ -24,8 +24,8 @@ env:
   global:
   - ARCH=x86
   - AKAROS_ROOT=$TRAVIS_BUILD_DIR
-  - X86_64_INSTDIR="$AKAROS_ROOT/install/x86_64-ucb-akaros-gcc"
-  - PATH=$X86_64_INSTDIR/bin:$PATH
+  - AKAROS_TOOLCHAINS="$AKAROS_ROOT/install"
+  - PATH=$AKAROS_TOOLCHAINS/x86_64-ucb-akaros-gcc/bin:$PATH
   - MAKE_JOBS=4
 
 notifications:
