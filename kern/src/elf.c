@@ -34,6 +34,39 @@ fail:
 	return FALSE;
 }
 
+/* Function to get the lengths of the argument and environment strings. */
+static int get_lens(int argc, char *argv[], int arg_lens[])
+{
+	int total = 0;
+
+	for (int i = 0; i < argc; i++) {
+		arg_lens[i] = strlen(argv[i]) + 1;
+		total += arg_lens[i];
+	}
+	return total;
+}
+
+/* Function to help map the argument and environment strings, to their
+ * final location. */
+static int remap(struct proc *p, int argc, char *argv[], char *new_argv[],
+		 char new_argbuf[], int arg_lens[])
+{
+	int offset = 0;
+	char *temp_argv[argc + 1];
+
+	for (int i = 0; i < argc; i++) {
+		if (memcpy_to_user(p, new_argbuf + offset, argv[i],
+				   arg_lens[i]))
+			return -1;
+		temp_argv[i] = new_argbuf + offset;
+		offset += arg_lens[i];
+	}
+	temp_argv[argc] = NULL;
+	if (memcpy_to_user(p, new_argv, temp_argv, sizeof(temp_argv)))
+		return -1;
+	return offset;
+}
+
 static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
                                                 int envc, char *envp[],
                                                 int auxc, elf_aux_t auxv[])
@@ -41,46 +74,16 @@ static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
 	/* Map in pages for p's stack. */
 	int flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
 	uintptr_t stacksz = USTACK_NUM_PAGES*PGSIZE;
+
 	if (do_mmap(p, USTACKTOP-stacksz, stacksz, PROT_READ | PROT_WRITE,
 	            flags, NULL, 0) == MAP_FAILED)
 		return 0;
-
-	/* Function to get the lengths of the argument and environment strings.
-	 */
-	int get_lens(int argc, char *argv[], int arg_lens[])
-	{
-		int total = 0;
-		for (int i = 0; i < argc; i++) {
-			arg_lens[i] = strlen(argv[i]) + 1;
-			total += arg_lens[i];
-		}
-		return total;
-	}
-
-	/* Function to help map the argument and environment strings, to their
-	 * final location. */
-	int remap(int argc, char *argv[], char *new_argv[],
-              char new_argbuf[], int arg_lens[])
-	{
-		int offset = 0;
-		char *temp_argv[argc + 1];
-		for(int i = 0; i < argc; i++) {
-			if (memcpy_to_user(p, new_argbuf + offset, argv[i],
-					   arg_lens[i]))
-				return -1;
-			temp_argv[i] = new_argbuf + offset;
-			offset += arg_lens[i];
-		}
-		temp_argv[argc] = NULL;
-		if (memcpy_to_user(p, new_argv, temp_argv, sizeof(temp_argv)))
-			return -1;
-		return offset;
-	}
 
 	/* Start tracking the size of the buffer necessary to hold all of our
 	 * data on the stack. Preallocate space for argc, argv, envp, and auxv
 	 * in this buffer. */
 	int bufsize = 0;
+
 	bufsize += 1 * sizeof(size_t);
 	bufsize += (auxc + 1) * sizeof(elf_aux_t);
 	bufsize += (envc + 1) * sizeof(char**);
@@ -89,6 +92,7 @@ static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
 	/* Add in the size of the env and arg strings. */
 	int arg_lens[argc];
 	int env_lens[envc];
+
 	bufsize += get_lens(argc, argv, arg_lens);
 	bufsize += get_lens(envc, envp, env_lens);
 
@@ -115,10 +119,11 @@ static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
 
 	/* Map all data for argv and envp into its final location. */
 	int offset = 0;
-	offset = remap(argc, argv, new_argv, new_argbuf, arg_lens);
+
+	offset = remap(p, argc, argv, new_argv, new_argbuf, arg_lens);
 	if (offset == -1)
 		return 0;
-	offset = remap(envc, envp, new_envp, new_argbuf + offset, env_lens);
+	offset = remap(p, envc, envp, new_envp, new_argbuf + offset, env_lens);
 	if (offset == -1)
 		return 0;
 
