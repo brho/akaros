@@ -589,6 +589,10 @@ static int unpack_argenv(struct argenv *argenv, size_t argenv_l,
 	char *argbuf = (char*)(envp + envc);
 	uintptr_t argbuf_offset = (uintptr_t)(argbuf - (char*)(argenv));
 
+	/* ARG_MAX is the max number of bytes, which is an upper bound on the
+	 * number of args or envs. */
+	if (argc > ARG_MAX || envc > ARG_MAX)
+		return -1;
 	if (((char*)argv - (char*)argenv) > argenv_l)
 		return -1;
 	if (((char*)argv + (argc * sizeof(char**)) - (char*)argenv) > argenv_l)
