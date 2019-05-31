@@ -159,6 +159,8 @@ int env_user_mem_walk(env_t *e, void *start, size_t len,
 
 void env_pagetable_free(env_t *e)
 {
+	int ret;
+
 	int pt_free(env_t * e, pte_t * pte, void *va, void *arg)
 	{
 		if (!PAGE_PRESENT(pte))
@@ -167,6 +169,7 @@ void env_pagetable_free(env_t *e)
 		return 0;
 	}
 
-	assert(user_mem_walk_recursive(e, 0, KERNBASE, NULL, NULL, pt_free,
-	                               NULL, e->env_pgdir, 0) == 0);
+	ret = user_mem_walk_recursive(e, 0, KERNBASE, NULL, NULL, pt_free, NULL,
+				      e->env_pgdir, 0)
+	assert(ret == 0);
 }
