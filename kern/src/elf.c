@@ -35,7 +35,7 @@ fail:
 }
 
 /* Function to get the lengths of the argument and environment strings. */
-static int get_lens(int argc, char *argv[], int arg_lens[])
+static int get_lens(int argc, char *argv[], int *arg_lens)
 {
 	int total = 0;
 
@@ -49,20 +49,22 @@ static int get_lens(int argc, char *argv[], int arg_lens[])
 /* Function to help map the argument and environment strings, to their
  * final location. */
 static int remap(struct proc *p, int argc, char *argv[], char *new_argv[],
-		 char new_argbuf[], int arg_lens[])
+		 char new_argbuf[], int *arg_lens)
 {
 	int offset = 0;
-	char *temp_argv[argc + 1];
+	char *one_arg;
+	int i;
 
-	for (int i = 0; i < argc; i++) {
-		if (memcpy_to_user(p, new_argbuf + offset, argv[i],
-				   arg_lens[i]))
+	for (i = 0; i < argc; i++) {
+		one_arg = new_argbuf + offset;
+		if (memcpy_to_user(p, one_arg, argv[i], arg_lens[i]))
 			return -1;
-		temp_argv[i] = new_argbuf + offset;
+		if (memcpy_to_user(p, new_argv + i, &one_arg, sizeof(one_arg)))
+			return -1;
 		offset += arg_lens[i];
 	}
-	temp_argv[argc] = NULL;
-	if (memcpy_to_user(p, new_argv, temp_argv, sizeof(temp_argv)))
+	one_arg = NULL;
+	if (memcpy_to_user(p, new_argv + i, &one_arg, sizeof(one_arg)))
 		return -1;
 	return offset;
 }
@@ -71,6 +73,7 @@ static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
                                                 int envc, char *envp[],
                                                 int auxc, elf_aux_t auxv[])
 {
+	uintptr_t ret = 0;
 	/* Map in pages for p's stack. */
 	int flags = MAP_FIXED | MAP_ANONYMOUS | MAP_PRIVATE;
 	uintptr_t stacksz = USTACK_NUM_PAGES*PGSIZE;
@@ -90,8 +93,8 @@ static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
 	bufsize += (argc + 1) * sizeof(char**);
 
 	/* Add in the size of the env and arg strings. */
-	int arg_lens[argc];
-	int env_lens[envc];
+	int *arg_lens = kzmalloc(sizeof(int) * argc, MEM_WAIT);
+	int *env_lens = kzmalloc(sizeof(int) * envc, MEM_WAIT);
 
 	bufsize += get_lens(argc, argv, arg_lens);
 	bufsize += get_lens(envc, envp, env_lens);
@@ -111,30 +114,34 @@ static uintptr_t populate_stack(struct proc *p, int argc, char *argv[],
 	 * (and any corresponding strings they point to) will fit in the space
 	 * alloted. */
 	if (bufsize > ARG_MAX)
-		return 0;
+		goto out_lens;
 
 	/* Map argc into its final location. */
 	if (memcpy_to_user(p, new_argc, &argc, sizeof(size_t)))
-		return 0;
+		goto out_lens;
 
 	/* Map all data for argv and envp into its final location. */
 	int offset = 0;
 
 	offset = remap(p, argc, argv, new_argv, new_argbuf, arg_lens);
 	if (offset == -1)
-		return 0;
+		goto out_lens;
 	offset = remap(p, envc, envp, new_envp, new_argbuf + offset, env_lens);
 	if (offset == -1)
-		return 0;
+		goto out_lens;
 
 	/* Map auxv into its final location. */
 	elf_aux_t null_aux = {0, 0};
 	if (memcpy_to_user(p, new_auxv, auxv, auxc * sizeof(elf_aux_t)))
-		return 0;
+		goto out_lens;
 	if (memcpy_to_user(p, new_auxv + auxc, &null_aux, sizeof(elf_aux_t)))
-		return 0;
+		goto out_lens;
 
-	return USTACKTOP - bufsize;
+	ret = USTACKTOP - bufsize;
+out_lens:
+	kfree(arg_lens);
+	kfree(env_lens);
+	return ret;
 }
 
 /* We need the writable flag for ld.  Even though the elf header says it wants
