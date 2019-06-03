@@ -949,6 +949,7 @@ struct block *packblock(struct block *bp)
 			memmove((*l)->wp, nbp->rp, n);
 			(*l)->wp += n;
 			(*l)->next = nbp->next;
+			nbp->next = NULL;
 			freeb(nbp);
 		}
 	}
@@ -1368,6 +1369,7 @@ struct block *bl2mem(uint8_t * p, struct block *b, int n)
 		n -= i;
 		p += i;
 		next = b->next;
+		b->next = NULL;
 		freeb(b);
 	}
 	return NULL;
@@ -1387,6 +1389,7 @@ static size_t read_all_blocks(struct block *b, void *va, size_t len)
 		if (BLEN(b) && b->next)
 			panic("Failed to drain entire block (Qmsg?) but had a next!");
 		next = b->next;
+		b->next = NULL;
 		freeb(b);
 		b = next;
 	} while (b);

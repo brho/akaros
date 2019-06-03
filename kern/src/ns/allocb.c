@@ -231,6 +231,7 @@ size_t freeb(struct block *b)
 		b->free(b);
 		return ret;
 	}
+	warn_on(b->next);
 	/* poison the block in case someone is still holding onto it */
 	b->next = dead;
 	b->rp = dead;
