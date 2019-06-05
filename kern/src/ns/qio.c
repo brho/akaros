@@ -1131,64 +1131,9 @@ struct block *qclone(struct queue *q, int header_len, int len, uint32_t offset)
 	return newb;
 }
 
-/*
- *  copy from offset in the queue
- */
-struct block *qcopy_old(struct queue *q, int len, uint32_t offset)
-{
-	int sofar;
-	int n;
-	struct block *b, *nb;
-	uint8_t *p;
-
-	nb = block_alloc(len, MEM_WAIT);
-
-	spin_lock_irqsave(&q->lock);
-
-	/* go to offset */
-	b = q->bfirst;
-	for (sofar = 0;; sofar += n) {
-		if (b == NULL) {
-			spin_unlock_irqsave(&q->lock);
-			return nb;
-		}
-		n = BLEN(b);
-		if (sofar + n > offset) {
-			p = b->rp + offset - sofar;
-			n -= offset - sofar;
-			break;
-		}
-		QDEBUG checkb(b, "qcopy");
-		b = b->next;
-	}
-
-	/* copy bytes from there */
-	for (sofar = 0; sofar < len;) {
-		if (n > len - sofar)
-			n = len - sofar;
-		PANIC_EXTRA(b);
-		memmove(nb->wp, p, n);
-		qcopycnt += n;
-		sofar += n;
-		nb->wp += n;
-		b = b->next;
-		if (b == NULL)
-			break;
-		n = BLEN(b);
-		p = b->rp;
-	}
-	spin_unlock_irqsave(&q->lock);
-
-	return nb;
-}
-
 struct block *qcopy(struct queue *q, int len, uint32_t offset)
 {
-#ifdef CONFIG_BLOCK_EXTRAS
 	return qclone(q, 0, len, offset);
-#else
-	return qcopy_old(q, len, offset);
-#endif
 }
 
 static void qinit_common(struct queue *q)
@@ -1637,7 +1582,7 @@ static struct block *build_block(void *from, size_t len, int mem_flags)
 	/* If len is small, we don't need to bother with the extra_data.  But
 	 * until the whole stack can handle extd blocks, we'll use them
 	 * unconditionally.  */
-#ifdef CONFIG_BLOCK_EXTRAS
+
 	/* allocb builds in 128 bytes of header space to all blocks, but this is
 	 * only available via padblock (to the left).  we also need some space
 	 * for pullupblock for some basic headers (like icmp) that get written
@@ -1660,13 +1605,6 @@ static struct block *build_block(void *from, size_t len, int mem_flags)
 	b->extra_data[0].off = 0;
 	b->extra_data[0].len = len;
 	b->extra_len += len;
-#else
-	b = block_alloc(len, mem_flags);
-	if (!b)
-		return 0;
-	memmove(b->wp, from, len);
-	b->wp += len;
-#endif
 	return b;
 }
 

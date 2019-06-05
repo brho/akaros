@@ -179,15 +179,6 @@ config SYSCALL_STRING_SAVING
 	  kthread, which can be viewed when debugging semaphores.  Individual
 	  syscalls can save info in this buffer.
 
-config BLOCK_EXTRAS
-	bool "Block Extra Data"
-	default y
-	help
-	  Extends blocks to have a list of other memory blocks.  Useful for
-	  networking performance.  This is only an option while we debug the
-	  implementation.  Say y.  If you have networking bugs, try turning
-	  this off, and if that helps, tell someone.
-
 config BETTER_BACKTRACE
 	bool "Better backtraces, less optimizations"
 	default n
