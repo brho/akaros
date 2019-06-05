@@ -121,8 +121,20 @@ void ixsummary(void)
 		   consumecnt, producecnt, qcopycnt);
 }
 
-/*
- *  pad a block to the front (or the back if size is negative)
+/* Pad a block to the front (or the back if size is negative).  Returns the
+ * block pointer that you must use instead of bp.  i.e. bp = padblock(bp, x);
+ *
+ * This space is in the main body / header space, not the extra data.  In
+ * essence, the block has size bytes of uninitialized data placed in the front
+ * (left) of the old header data.  The caller needs to fill in that data,
+ * presumably with packet headers.  Any block[offset] in the old block is now at
+ * block[offset + size].
+ *
+ * Negative padding applies at the end of the block.  This means that there is
+ * space in block header for size bytes (in between wp and lim).  Given that all
+ * of the block 'padding' needs to be in the main header, that means we need to
+ * linearize the entire block, such that the end padding is in the main
+ * body/header space.
  */
 struct block *padblock(struct block *bp, int size)
 {
@@ -132,36 +144,47 @@ struct block *padblock(struct block *bp, int size)
 	QDEBUG checkb(bp, "padblock 1");
 	if (size >= 0) {
 		if (bp->rp - bp->base >= size) {
-			bp->network_offset += size;
-			bp->transport_offset += size;
+			block_add_to_offsets(bp, size);
 			bp->rp -= size;
 			return bp;
 		}
-
-		PANIC_EXTRA(bp);
 		if (bp->next)
 			panic("%s %p had a next", __func__, bp);
-		n = BLEN(bp);
+		n = BHLEN(bp);
 		padblockcnt++;
 		nbp = block_alloc(size + n, MEM_WAIT);
 		block_copy_metadata(nbp, bp);
+		block_replace_extras(nbp, bp);
+		/* This effectively copies the old block main body such that we
+		 * know we have size bytes to the left of rp.  All of the
+		 * metadata offsets (e.g. tx_csum) are relative from this blob
+		 * of data: i.e. nbp->rp + size. */
 		nbp->rp += size;
 		nbp->wp = nbp->rp;
 		memmove(nbp->wp, bp->rp, n);
 		nbp->wp += n;
 		freeb(bp);
+		block_add_to_offsets(nbp, size);
 		nbp->rp -= size;
 	} else {
+		/* No one I know of calls this yet, so this is untested.  Maybe
+		 * we can remove it. */
+		warn_once("pad attempt with negative size %d", size);
 		size = -size;
-
-		PANIC_EXTRA(bp);
-
 		if (bp->next)
 			panic("%s %p had a next", __func__, bp);
-
 		if (bp->lim - bp->wp >= size)
 			return bp;
-
+		/* Negative padding goes after all data.  In essence, we'll need
+		 * to pull all block extra data up into the headers.  The
+		 * easiest thing is to linearize, then do the old algorithm.  We
+		 * may do extra allocations - if we ever use this, we can fix it
+		 * up.  Maybe make linearizeblock/copyblock take neg-padding. */
+		if (bp->extra_len) {
+			bp = linearizeblock(bp);
+			if (bp->lim - bp->wp >= size)
+				return bp;
+		}
 		n = BLEN(bp);
 		padblockcnt++;
 		nbp = block_alloc(size + n, MEM_WAIT);
