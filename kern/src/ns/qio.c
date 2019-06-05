@@ -38,15 +38,6 @@
 #include <smp.h>
 #include <net/ip.h>
 
-#define PANIC_EXTRA(b)							\
-{									\
-	if ((b)->extra_len) {						\
-		printblock(b);						\
-		backtrace();						\
-		panic("%s doesn't handle extra_data", __FUNCTION__);	\
-	}								\
-}
-
 static uint32_t padblockcnt;
 static uint32_t concatblockcnt;
 static uint32_t pullupblockcnt;
@@ -233,24 +224,11 @@ int blockalloclen(struct block *bp)
  */
 struct block *concatblock(struct block *bp)
 {
-	int len;
-	struct block *nb, *f;
-
 	if (bp->next == 0)
 		return bp;
-
-	/* probably use parts of qclone */
-	PANIC_EXTRA(bp);
-	nb = block_alloc(blocklen(bp), MEM_WAIT);
-	for (f = bp; f; f = f->next) {
-		len = BLEN(f);
-		memmove(nb->wp, f->rp, len);
-		nb->wp += len;
-	}
-	concatblockcnt += BLEN(nb);
-	freeblist(bp);
-	QDEBUG checkb(nb, "concatblock 1");
-	return nb;
+	/* If this is slow, we can get fancy and append a bunch of ebds to bp
+	 * for each subsequent block in the list. */
+	return pullupblock(bp, blocklen(bp));
 }
 
 /* Makes an identical copy of the block, collapsing all the data into the block
