@@ -313,14 +313,43 @@ static void block_consume_ebd_bytes(struct block *b, struct extra_bdata *ebd,
 	}
 }
 
-/* Make sure the first block has at least n bytes in its main body.  Pulls up
- * data from the *list* of blocks.  Returns 0 if there is not enough data in the
- * block list. */
-struct block *pullupblock(struct block *bp, int n)
+/* Helper: Yanks up to size bytes worth of extra data blocks from 'from', puts
+ * them in the main body of 'to'.  Returns the amount yanked.  Will panic if
+ * there is not enough room in 'to'. */
+static size_t block_yank_ebd_bytes(struct block *to, struct block *from,
+				   size_t amt)
 {
-	int i, len, seglen;
-	struct block *nbp;
+	size_t copy_amt, total = 0;
 	struct extra_bdata *ebd;
+
+	for (int i = 0; amt && i < from->nr_extra_bufs; i++) {
+		ebd = &from->extra_data[i];
+		if (!ebd->base || !ebd->len)
+			continue;
+		copy_amt = MIN(amt, ebd->len);
+		copy_amt = block_copy_to_body(to, (void*)ebd->base + ebd->off,
+					      copy_amt);
+		if (copy_amt != MIN(amt, ebd->len))
+			panic("'to' block didn't have enough space! %d %d %d",
+			      amt, ebd->len, copy_amt);
+		block_consume_ebd_bytes(from, ebd, copy_amt);
+		total += copy_amt;
+		amt -= copy_amt;
+	}
+	return total;
+}
+
+/* Make sure the first block has at least n bytes in its headers/main body.
+ * Pulls up data from the *list* of blocks.  Returns 0 if there is not enough
+ * data in the block list.
+ *
+ * Any data to the *left* of rp, such as old network headers that were popped
+ * off when processing an inbound packet, may be discarded. */
+struct block *pullupblock(struct block *bp, size_t n)
+{
+	struct block *i;
+	struct extra_bdata *ebd;
+	size_t copy_amt;
 
 	/*
 	 *  this should almost always be true, it's
@@ -333,97 +362,53 @@ struct block *pullupblock(struct block *bp, int n)
 	 * wasteful if there's a long blist that does have enough data. */
 	if (n > blocklen(bp))
 		return 0;
-	/* a start at explicit main-body / header management */
-	if (bp->extra_len) {
-		if (n > bp->lim - bp->rp) {
-			/* would need to realloc a new block and copy everything
-			 * over. */
-			panic("can't pullup %d bytes, no place to put it: bp->lim %p, bp->rp %p, bp->lim-bp->rp %d\n",
-			      n, bp->lim, bp->rp, bp->lim-bp->rp);
-		}
-		len = n - BHLEN(bp);
-		/* Would need to recursively call this, or otherwise pull from
-		 * later blocks and put chunks of their data into the block
-		 * we're building. */
-		if (len > bp->extra_len)
-			panic("pullup more than extra (%d, %d, %d)\n",
-			      n, BHLEN(bp), bp->extra_len);
-		QDEBUG checkb(bp, "before pullup");
-		for (int i = 0; (i < bp->nr_extra_bufs) && len; i++) {
-			ebd = &bp->extra_data[i];
-			if (!ebd->base || !ebd->len)
-				continue;
-			seglen = MIN(ebd->len, len);
-			memcpy(bp->wp, (void*)(ebd->base + ebd->off), seglen);
-			bp->wp += seglen;
-			len -= seglen;
-			ebd->len -= seglen;
-			ebd->off += seglen;
-			bp->extra_len -= seglen;
-			if (ebd->len == 0) {
-				kfree((void *)ebd->base);
-				ebd->off = 0;
-				ebd->base = 0;
-			}
-		}
-		/* maybe just call pullupblock recursively here */
-		if (len)
-			panic("pullup %d bytes overdrawn\n", len);
-		QDEBUG checkb(bp, "after pullup");
-		return bp;
-	}
 
-	/*
-	 *  if not enough room in the first block,
-	 *  add another to the front of the list.
-	 */
-	if (bp->lim - bp->rp < n) {
-		nbp = block_alloc(n, MEM_WAIT);
-		nbp->next = bp;
-		bp = nbp;
-	}
-
-	/*
-	 *  copy bytes from the trailing blocks into the first
-	 */
-	n -= BLEN(bp);
-	while ((nbp = bp->next)) {
-		i = BLEN(nbp);
-		if (i > n) {
-			memmove(bp->wp, nbp->rp, n);
-			pullupblockcnt++;
-			bp->wp += n;
-			nbp->rp += n;
-			QDEBUG checkb(bp, "pullupblock 1");
-			return bp;
+	/* Replace bp with a new block with enough size, and yank up enough of
+	 * its ebds. */
+	bp = block_realloc(bp, n);
+	pullupblockcnt++;
+	n -= BHLEN(bp);
+	n -= block_yank_ebd_bytes(bp, bp, n);
+	/* Need to pull from the remainder of the list, both the main bodies and
+	 * the ebds. */
+	while (n) {
+		i = bp->next;
+		if (!i)
+			panic("Not enough b's in the list; we checked the len");
+		copy_amt = MIN(BHLEN(i), n);
+		block_copy_to_body(bp, i->rp, copy_amt);
+		/* That may or may not have consumed all of the main body */
+		i->rp += copy_amt;
+		/* Subsequent blocks with offsets shouldn't be subject to
+		 * pullup. */
+		warn_on(i->tx_csum_offset || i->network_offset ||
+			i->transport_offset);
+		n -= copy_amt;
+		n -= block_yank_ebd_bytes(bp, i, n);
+		if (!BLEN(i)) {
+			bp->next = i->next;
+			i->next = NULL;
+			freeb(i);
 		} else {
-			memmove(bp->wp, nbp->rp, i);
-			pullupblockcnt++;
-			bp->wp += i;
-			bp->next = nbp->next;
-			nbp->next = 0;
-			freeb(nbp);
-			n -= i;
-			if (n == 0) {
-				QDEBUG checkb(bp, "pullupblock 2");
-				return bp;
-			}
+			assert(!n);
 		}
 	}
-	freeb(bp);
-	return 0;
+	return bp;
 }
 
 /*
  *  make sure the first block has at least n bytes in its main body
  */
-struct block *pullupqueue(struct queue *q, int n)
+struct block *pullupqueue(struct queue *q, size_t n)
 {
 	struct block *b;
 
 	/* TODO: lock to protect the queue links? */
 	if ((BHLEN(q->bfirst) >= n))
 		return q->bfirst;
+	/* This is restoring qio metadata.  If pullupblock did any work, it
+	 * changed the list - at least the first block and possibly the last in
+	 * the blist. */
 	q->bfirst = pullupblock(q->bfirst, n);
 	for (b = q->bfirst; b != NULL && b->next != NULL; b = b->next) ;
 	q->blast = b;

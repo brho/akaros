@@ -928,8 +928,8 @@ void pgrpcpy(struct pgrp *, struct pgrp *);
 int progfdprint(struct chan *, int unused_int, int, char *unused_char_p_t,
 		int i);
 int pullblock(struct block **, int);
-struct block *pullupblock(struct block *, int);
-struct block *pullupqueue(struct queue *, int);
+struct block *pullupblock(struct block *b, size_t n);
+struct block *pullupqueue(struct queue *b, size_t n);
 void putmhead(struct mhead *);
 void putstrn(char *unused_char_p_t, int);
 void qaddlist(struct queue *, struct block *);
