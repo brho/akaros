@@ -100,7 +100,6 @@ enum {
 
 unsigned int qiomaxatomic = Maxatomic;
 
-static size_t copy_to_block_body(struct block *to, void *from, size_t copy_amt);
 static ssize_t __qbwrite(struct queue *q, struct block *b, int flags);
 static struct block *__qbread(struct queue *q, size_t len, int qio_flags,
                               int mem_flags);
@@ -245,13 +244,13 @@ struct block *copyblock(struct block *bp, int mem_flags)
 	newb = block_alloc(BLEN(bp), mem_flags);
 	if (!newb)
 		return 0;
-	amt = copy_to_block_body(newb, bp->rp, BHLEN(bp));
+	amt = block_copy_to_body(newb, bp->rp, BHLEN(bp));
 	assert(amt == BHLEN(bp));
 	for (int i = 0; i < bp->nr_extra_bufs; i++) {
 		ebd = &bp->extra_data[i];
 		if (!ebd->base || !ebd->len)
 			continue;
-		amt = copy_to_block_body(newb, (void*)ebd->base + ebd->off,
+		amt = block_copy_to_body(newb, (void*)ebd->base + ebd->off,
 					 ebd->len);
 		assert(amt == ebd->len);
 	}
@@ -606,15 +605,6 @@ static struct block *pop_first_block(struct queue *q)
 	return b;
 }
 
-/* Helper: copies up to copy_amt from a buf to a block's main body (b->wp) */
-static size_t copy_to_block_body(struct block *to, void *from, size_t copy_amt)
-{
-	copy_amt = MIN(to->lim - to->wp, copy_amt);
-	memcpy(to->wp, from, copy_amt);
-	to->wp += copy_amt;
-	return copy_amt;
-}
-
 /* Accounting helper.  Block b in q lost amt extra_data */
 static void block_and_q_lost_extra(struct block *b, struct queue *q, size_t amt)
 {
@@ -658,7 +648,7 @@ static size_t copy_from_first_block(struct queue *q, struct block *to,
 	/* Try to extract from the main body */
 	copy_amt = MIN(BHLEN(from), len);
 	if (copy_amt) {
-		copy_amt = copy_to_block_body(to, from->rp, copy_amt);
+		copy_amt = block_copy_to_body(to, from->rp, copy_amt);
 		from->rp += copy_amt;
 		/* We only change dlen, (data len), not q->len, since the q
 		 * still has the same block memory allocation (no kfrees
@@ -681,7 +671,7 @@ static size_t copy_from_first_block(struct queue *q, struct block *to,
 				 * main body. */
 				if (copy_amt)
 					return copy_amt;
-				copy_amt = copy_to_block_body(to,
+				copy_amt = block_copy_to_body(to,
 							      (void*)ebd->base +
 							      ebd->off,
 				                              ebd->len);
@@ -696,7 +686,7 @@ static size_t copy_from_first_block(struct queue *q, struct block *to,
 			 * need to split to get anything from it. */
 			if (copy_amt)
 				return copy_amt;
-			copy_amt = copy_to_block_body(to, (void*)ebd->base +
+			copy_amt = block_copy_to_body(to, (void*)ebd->base +
 						      ebd->off, len);
 			ebd->off += copy_amt;
 			ebd->len -= copy_amt;

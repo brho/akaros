@@ -196,6 +196,14 @@ void block_reset_metadata(struct block *b)
 	b->transport_offset = 0;
 }
 
+size_t block_copy_to_body(struct block *to, void *from, size_t copy_amt)
+{
+	copy_amt = MIN(to->lim - to->wp, copy_amt);
+	memcpy(to->wp, from, copy_amt);
+	to->wp += copy_amt;
+	return copy_amt;
+}
+
 void free_block_extra(struct block *b)
 {
 	struct extra_bdata *ebd;

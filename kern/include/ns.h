@@ -773,6 +773,7 @@ int block_append_extra(struct block *b, uintptr_t base, uint32_t off,
                        uint32_t len, int mem_flags);
 void block_copy_metadata(struct block *new_b, struct block *old_b);
 void block_reset_metadata(struct block *b);
+size_t block_copy_to_body(struct block *to, void *from, size_t copy_amt);
 int anyhigher(void);
 int anyready(void);
 void _assert(char *unused_char_p_t);
