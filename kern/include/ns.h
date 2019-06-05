@@ -436,8 +436,8 @@ struct block {
 	void (*free) (struct block *);
 	uint16_t flag;
 	uint16_t mss;               	/* TCP MSS for TSO */
-	uint16_t network_offset;	/* offset from start */
-	uint16_t transport_offset;	/* offset from start */
+	uint16_t network_offset;	/* offset from rp */
+	uint16_t transport_offset;	/* offset from rp */
 	uint16_t tx_csum_offset;	/* offset from tx_offset to store csum */
 	/* might want something to track the next free extra_data slot */
 	size_t extra_len;
@@ -773,6 +773,10 @@ int block_append_extra(struct block *b, uintptr_t base, uint32_t off,
                        uint32_t len, int mem_flags);
 void block_copy_metadata(struct block *new_b, struct block *old_b);
 void block_reset_metadata(struct block *b);
+void block_add_to_offsets(struct block *b, int delta);
+void block_transfer_extras(struct block *new, struct block *old);
+void block_replace_extras(struct block *new, struct block *old);
+struct block *block_realloc(struct block *b, size_t header_space);
 size_t block_copy_to_body(struct block *to, void *from, size_t copy_amt);
 int anyhigher(void);
 int anyready(void);

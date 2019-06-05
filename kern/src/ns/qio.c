@@ -274,6 +274,22 @@ struct block *linearizeblock(struct block *b)
 	return newb;
 }
 
+/* Helper for bookkeeping: we removed amt bytes from block b's ebd, which may
+ * have emptied it. */
+static void block_consume_ebd_bytes(struct block *b, struct extra_bdata *ebd,
+				    size_t amt)
+{
+	ebd->len -= amt;
+	ebd->off += amt;
+	b->extra_len -= amt;
+	if (!ebd->len) {
+		/* we don't actually have to decref here.  it's also
+		 * done in freeb().  this is the earliest we can free. */
+		kfree((void*)ebd->base);
+		ebd->base = ebd->off = 0;
+	}
+}
+
 /* Make sure the first block has at least n bytes in its main body.  Pulls up
  * data from the *list* of blocks.  Returns 0 if there is not enough data in the
  * block list. */
@@ -1264,16 +1280,7 @@ static size_t read_from_block(struct block *b, uint8_t *to, size_t amt)
 		memcpy(to, (void*)(ebd->base + ebd->off), copy_amt);
 		/* we're actually consuming the entries, just like how we
 		 * advance rp up above, and might only consume part of one. */
-		ebd->len -= copy_amt;
-		ebd->off += copy_amt;
-		b->extra_len -= copy_amt;
-		if (!ebd->len) {
-			/* we don't actually have to decref here.  it's also
-			 * done in freeb().  this is the earliest we can free.
-			 */
-			kfree((void*)ebd->base);
-			ebd->base = ebd->off = 0;
-		}
+		block_consume_ebd_bytes(b, ebd, copy_amt);
 		to += copy_amt;
 		amt -= copy_amt;
 		retval += copy_amt;

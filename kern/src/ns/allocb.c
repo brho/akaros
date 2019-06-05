@@ -196,6 +196,85 @@ void block_reset_metadata(struct block *b)
 	b->transport_offset = 0;
 }
 
+/* Adds delta (which may be negative) to the block metadata offsets that are
+ * relative to b->rp. */
+void block_add_to_offsets(struct block *b, int delta)
+{
+	/* Note we do not add to tx_csum_offset.  That is relative to
+	 * transport_offset */
+	b->network_offset += delta;
+	b->transport_offset += delta;
+}
+
+/* Transfers extra data from old to new.  This is not a copy nor a
+ * qclone/refcount increase on the extra data blobs.  The old block loses the
+ * data.  This changes BLEN for both, but not BHLEN.  'new' may have preexisting
+ * ebds. */
+void block_transfer_extras(struct block *new, struct block *old)
+{
+	struct extra_bdata *ebd;
+
+	for (int i = 0; i < old->nr_extra_bufs; i++) {
+		ebd = &old->extra_data[i];
+		if (!ebd->base || !ebd->len)
+			continue;
+		block_append_extra(new, ebd->base, ebd->off, ebd->len,
+				   MEM_WAIT);
+	}
+
+	old->extra_len = 0;
+	old->nr_extra_bufs = 0;
+	kfree(old->extra_data);
+	old->extra_data = NULL;
+}
+
+/* Like block_transfer_extras(), but new may not have preexisting ebds. */
+void block_replace_extras(struct block *new, struct block *old)
+{
+	assert(!new->extra_data);
+	new->extra_len = old->extra_len;
+	new->nr_extra_bufs = old->nr_extra_bufs;
+	new->extra_data = old->extra_data;
+	old->extra_len = 0;
+	old->nr_extra_bufs = 0;
+	old->extra_data = NULL;
+}
+
+/* Given a block, return a block with identical content but as if you allocated
+ * it freshly with 'size', meaning with size bytes in the header/main body, some
+ * of which contain the block's main body data in the new block.  Note all
+ * blocks have an extra Hdrspc bytes to the left that is not counted.
+ *
+ * One thing to consider is a block that has 'moved to the right' in its main
+ * body.  i.e. it used to have data, such as TCP/IP headers, but we've since
+ * incremented b->rp.  We're near the end of the buffer and lim - wp is small.
+ * This will give us a new block with the existing contents at the new 'default'
+ * rp.  The old data to the left of rp will be gone.
+ *
+ * b may be in a blist.  We'll deal with its next pointer.  If b is in the
+ * middle of a blist or a qio bfirst or blast, then the caller needs to deal
+ * with pointers to it. */
+struct block *block_realloc(struct block *b, size_t size)
+{
+	struct block *new;
+	size_t amt;
+
+	/* This means there is enough space for the old block data and the rest
+	 * of 'size'. */
+	if (b->lim - b->wp + BHLEN(b) >= size)
+		return b;
+	size = MAX(size, BHLEN(b));
+	new = block_alloc(size, MEM_WAIT);
+	amt = block_copy_to_body(new, b->rp, BHLEN(b));
+	assert(amt == BHLEN(b));
+	new->next = b->next;
+	b->next = NULL;
+	block_copy_metadata(new, b);
+	block_replace_extras(new, b);
+	freeb(b);
+	return new;
+}
+
 size_t block_copy_to_body(struct block *to, void *from, size_t copy_amt)
 {
 	copy_amt = MIN(to->lim - to->wp, copy_amt);
