@@ -185,6 +185,13 @@ void block_copy_metadata(struct block *new_b, struct block *old_b)
 	new_b->mss = old_b->mss;
 	new_b->network_offset = old_b->network_offset;
 	new_b->transport_offset = old_b->transport_offset;
+	new_b->free = old_b->free;
+
+	/* This is probably OK.  Right now, no one calls us with a blocklist.
+	 * Any callers that do would need to manage 'next', either to avoid
+	 * leaking memory (of old_b is freed) or to have multiple pointers to
+	 * the same block (if new_b is a copy for e.g. snoop). */
+	warn_on(old_b->next);
 }
 
 void block_reset_metadata(struct block *b)
@@ -194,6 +201,7 @@ void block_reset_metadata(struct block *b)
 	b->mss = 0;
 	b->network_offset = 0;
 	b->transport_offset = 0;
+	b->free = NULL;
 }
 
 /* Adds delta (which may be negative) to the block metadata offsets that are
