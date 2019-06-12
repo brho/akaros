@@ -11,6 +11,7 @@
 #include <parlib/arch/trap.h>
 #include <parlib/bitmask.h>
 #include <parlib/stdio.h>
+#include <stdlib.h>
 
 static bool pir_notif_is_set(struct vmm_gpcore_init *gpci)
 {
@@ -303,6 +304,8 @@ static bool handle_vmcall(struct guest_thread *gth)
 		trace_printf("GPA    0x%016lx\n",      vm_tf->tf_guest_pa);
 		retval = true;
 		break;
+	case AKAROS_VMCALL_SHUTDOWN:
+		exit(0);
 	}
 
 	if (retval)
