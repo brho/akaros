@@ -349,11 +349,11 @@ static void proc_open_stdfds(struct proc *p)
 	 * empty or incomplete.  These syscalls shouldn't access user memory,
 	 * especially considering how we're probably in the boot pgdir. */
 	current = p;
-	fd = sysopenat(AT_FDCWD, "#cons/stdin", O_READ);
+	fd = sysopenat(AT_FDCWD, "#cons/stdin", O_READ, 0);
 	assert(fd == 0);
-	fd = sysopenat(AT_FDCWD, "#cons/stdout", O_WRITE);
+	fd = sysopenat(AT_FDCWD, "#cons/stdout", O_WRITE, 0);
 	assert(fd == 1);
-	fd = sysopenat(AT_FDCWD, "#cons/stderr", O_WRITE);
+	fd = sysopenat(AT_FDCWD, "#cons/stderr", O_WRITE, 0);
 	assert(fd == 2);
 	current = old_current;
 }

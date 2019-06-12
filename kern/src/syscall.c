@@ -1803,27 +1803,18 @@ static intreg_t sys_openat(struct proc *p, int fromfd, const char *path,
 			  oflag);
 		return -1;
 	}
+	if (oflag & O_EXCL && !(oflag & O_CREATE)) {
+		set_error(EINVAL, "Cannot open O_EXCL without O_CREATE");
+		return -1;
+	}
 	t_path = copy_in_path(p, path, path_l);
 	if (!t_path)
 		return -1;
 	sysc_save_str("open %s at fd %d", t_path, fromfd);
-	fd = sysopenat(fromfd, t_path, oflag);
-	/* successful lookup with CREATE and EXCL is an error */
-	if (fd != -1) {
-		if ((oflag & O_CREATE) && (oflag & O_EXCL)) {
-			set_errno(EEXIST);
-			sysclose(fd);
-			free_path(p, t_path);
-			return -1;
-		}
-	} else {
-		if (oflag & O_CREATE) {
-			mode &= ~p->umask;
-			mode &= S_PMASK;
-			static_assert(!(DMMODE_BITS & S_PMASK));
-			fd = syscreate(t_path, oflag, mode);
-		}
-	}
+	mode &= ~p->umask;
+	mode &= S_PMASK;
+	static_assert(!(DMMODE_BITS & S_PMASK));
+	fd = sysopenat(fromfd, t_path, oflag, mode);
 	free_path(p, t_path);
 	printd("File %s Open, fd=%d\n", path, fd);
 	return fd;

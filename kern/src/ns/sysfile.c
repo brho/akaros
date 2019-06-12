@@ -556,20 +556,33 @@ int sysunmount(char *src_path, char *onto_path)
 	return 0;
 }
 
-int sysopenat(int fromfd, char *path, int vfs_flags)
+int sysopenat(int fromfd, char *path, int vfs_flags, int perm)
 {
 	ERRSTACK(1);
 	int fd;
 	struct chan *c = 0, *from = 0;
+	int open_or_create = Aopen;
 
+	/* O_EXCL must be O_CREATE (checked in syscall.c); we can skip the Aopen
+	 * call.  Note namec(Acreate) checks O_EXCL internally. */
+	if (vfs_flags & O_EXCL)
+		open_or_create = Acreate;
 	if (waserror()) {
+		if (open_or_create == Aopen && vfs_flags & O_CREATE
+		    && get_errno() == ENOENT) {
+			open_or_create = Acreate;
+			/* Don't poperror - we're keeping ourselves at the
+			 * current waserror() depth.  Returns thrice! */
+			goto retry;
+		}
 		cclose(c);
 		poperror();
 		return -1;
 	}
-	openmode(vfs_flags);	/* error check only */
+retry:
+	openmode(vfs_flags & ~O_EXCL);	/* error check only; O_EXCL okay here */
 	if ((path[0] == '/') || (fromfd == AT_FDCWD)) {
-		c = namec(path, Aopen, vfs_flags, 0, NULL);
+		c = namec(path, open_or_create, vfs_flags, perm, NULL);
 	} else {
 		/* We don't cclose from.  namec_from will convert it to the new
 		 * chan during the walk process (c).  It'll probably close from
@@ -578,7 +591,8 @@ int sysopenat(int fromfd, char *path, int vfs_flags)
 		from = fdtochan(&current->open_files, fromfd, -1, FALSE, TRUE);
 		if (!(from->flag & O_PATH))
 			error(EINVAL, "Cannot openat from a non-O_PATH FD");
-		c = namec_from(from, path, Aopen, vfs_flags, 0, NULL);
+		c = namec_from(from, path, open_or_create, vfs_flags, perm,
+			       NULL);
 	}
 	/* Devices should catch this, but just in case, we'll catch it. */
 	if ((c->qid.type & QTSYMLINK) && (vfs_flags & O_NOFOLLOW))
@@ -592,7 +606,7 @@ int sysopenat(int fromfd, char *path, int vfs_flags)
 
 int sysopen(char *path, int vfs_flags)
 {
-	return sysopenat(AT_FDCWD, path, vfs_flags);
+	return sysopenat(AT_FDCWD, path, vfs_flags, 0);
 }
 
 long unionread(struct chan *c, void *va, long n)

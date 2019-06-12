@@ -1088,7 +1088,7 @@ int sysbind(char *new, char *old, int flags);
 int syssymlink(char *new_path, char *old_path);
 int sysmount(int fd, int afd, char *old, int flags, char *spec);
 int sysunmount(char *old, char *new);
-int sysopenat(int dirfd, char *path, int vfs_flags);
+int sysopenat(int dirfd, char *path, int vfs_flags, int perm);
 int sysopen(char *path, int vfs_flags);
 long unionread(struct chan *c, void *va, long n);
 void read_exactly_n(struct chan *c, void *vp, long n);
