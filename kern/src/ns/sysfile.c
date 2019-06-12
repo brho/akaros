@@ -560,7 +560,7 @@ int sysopenat(int fromfd, char *path, int vfs_flags, int perm)
 {
 	ERRSTACK(1);
 	int fd;
-	struct chan *c = 0, *from = 0;
+	struct chan *c = NULL, *from;
 	int open_or_create = Aopen;
 
 	/* O_EXCL must be O_CREATE (checked in syscall.c); we can skip the Aopen
@@ -589,8 +589,13 @@ retry:
 		 * internally, and give us something new for c.  On error,
 		 * namec_from will cclose from. */
 		from = fdtochan(&current->open_files, fromfd, -1, FALSE, TRUE);
-		if (!(from->flag & O_PATH))
+		if (!(from->flag & O_PATH)) {
+			/* This is the only error path where we need to close
+			 * from.  namec_from will close from for us, regardless
+			 * of whether or not it fails. */
+			cclose(from);
 			error(EINVAL, "Cannot openat from a non-O_PATH FD");
+		}
 		c = namec_from(from, path, open_or_create, vfs_flags, perm,
 			       NULL);
 	}
