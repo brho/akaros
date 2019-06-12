@@ -1,6 +1,10 @@
-#!/bin/bash
-for i in `echo '#proc/*/status'`
-do
-cat $i
-echo
+#!/bin/sh
+PID=$$
+for i in \#proc/*/status; do
+	if [ "$i" == "#proc/self/status" ] || \
+	   [ "$i" == "#proc/$PID/status" ]; then
+		continue
+	fi
+	cat $i
+	echo
 done
