@@ -175,7 +175,8 @@ uint8_t guest_v4_mask[IPV4_ADDR_LEN];
 uint8_t guest_v4_router[IPV4_ADDR_LEN];
 uint8_t guest_v4_dns[IPV4_ADDR_LEN];
 
-/* We'll use this in all our eth headers with the guest. */
+/* We'll use this in all our eth headers with the guest.
+ * Note when using vnet_real_ip_addrs, the guest's MAC ends in 'c'. */
 uint8_t host_eth_addr[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x0a};
 uint8_t guest_eth_addr[] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x0b};
 const char dhcp_hostname[] = "host";
@@ -725,6 +726,8 @@ static void ev_handle_diag(struct event_msg *ev_msg, unsigned int ev_type,
 void vnet_init(struct virtual_machine *vm, struct virtio_vq_dev *vqdev)
 {
 	set_ip_addrs();
+	if (vnet_real_ip_addrs)
+		guest_eth_addr[5] = 0xc;
 	virtio_net_set_mac(vqdev, guest_eth_addr);
 	rx_mtx = uth_mutex_alloc();
 	rx_cv = uth_cond_var_alloc();
