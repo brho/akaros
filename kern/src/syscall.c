@@ -1234,20 +1234,21 @@ static pid_t wait_one(struct proc *parent, struct proc *child, int *ret_status,
                       int options)
 {
 	pid_t retval;
+	struct cv_lookup_elm cle;
 
 	cv_lock(&parent->child_wait);
+	__reg_abortable_cv(&cle, &parent->child_wait);
 	/* retval == 0 means we should block */
 	retval = __try_wait(parent, child, ret_status, options);
 	if ((retval == 0) && (options & WNOHANG))
 		goto out_unlock;
 	while (!retval) {
-		cpu_relax();
-		cv_wait(&parent->child_wait);
-		/* If we're dying, then we don't need to worry about waiting.
-		 * We don't do this yet, but we'll need this outlet when we deal
-		 * with orphaned children and having init inherit them. */
-		if (proc_is_dying(parent))
+		if (should_abort(&cle)) {
+			retval = -1;
+			set_error(EINTR, "wait aborted");
 			goto out_unlock;
+		}
+		cv_wait(&parent->child_wait);
 		/* Any child can wake us up, but we check for the particular
 		 * child we care about */
 		retval = __try_wait(parent, child, ret_status, options);
@@ -1259,6 +1260,7 @@ static pid_t wait_one(struct proc *parent, struct proc *child, int *ret_status,
 	/* Fallthrough */
 out_unlock:
 	cv_unlock(&parent->child_wait);
+	dereg_abortable_cv(&cle);
 	if (retval > 0)
 		proc_decref(child);
 	return retval;
@@ -1271,17 +1273,21 @@ out_unlock:
 static pid_t wait_any(struct proc *parent, int *ret_status, int options)
 {
 	pid_t retval;
+	struct cv_lookup_elm cle;
 	struct proc *child;
 
 	cv_lock(&parent->child_wait);
+	__reg_abortable_cv(&cle, &parent->child_wait);
 	retval = __try_wait_any(parent, ret_status, options, &child);
 	if ((retval == 0) && (options & WNOHANG))
 		goto out_unlock;
 	while (!retval) {
-		cpu_relax();
-		cv_wait(&parent->child_wait);
-		if (proc_is_dying(parent))
+		if (should_abort(&cle)) {
+			retval = -1;
+			set_error(EINTR, "wait aborted");
 			goto out_unlock;
+		}
+		cv_wait(&parent->child_wait);
 		/* Any child can wake us up from the CV.  This is a linear
 		 * __try_wait scan.  If we have a lot of children, we could
 		 * optimize this. */
@@ -1292,6 +1298,7 @@ static pid_t wait_any(struct proc *parent, int *ret_status, int options)
 	/* Fallthrough */
 out_unlock:
 	cv_unlock(&parent->child_wait);
+	dereg_abortable_cv(&cle);
 	if (retval > 0)
 		proc_decref(child);
 	return retval;
