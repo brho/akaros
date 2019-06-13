@@ -84,23 +84,24 @@ static void handle_event(struct event_msg *ev_msg, unsigned int ev_type,
 	int sig_nr;
 	struct siginfo info = {0};
 	info.si_code = SI_USER;
-	struct user_context fake_uctx;
 
 	assert(ev_msg);
 	sig_nr = ev_msg->ev_arg1;
-	/* We're handling a process-wide signal, but signal handlers will want a
-	 * user context.  They operate on the model that some thread got the
-	 * signal, but that didn't happen on Akaros.  If we happen to have a
-	 * current uthread, we can use that - perhaps that's what the user
-	 * wants.  If not, we'll build a fake one representing our current call
-	 * stack. */
-	if (current_uthread) {
-		trigger_posix_signal(sig_nr, &info, get_cur_uth_ctx());
-	} else {
-		init_user_ctx(&fake_uctx, (uintptr_t)handle_event,
-			      get_stack_pointer());
-		trigger_posix_signal(sig_nr, &info, &fake_uctx);
-	}
+	/* These POSIX signals are process-wide, but legacy applications and
+	 * their signal handlers often expect the signals to be routed to
+	 * particular threads.  This manifests in a couple ways: the signal
+	 * handlers expect a user context, and the program expects syscalls to
+	 * be interrupted.  Which context?  Which syscall?
+	 *
+	 * On Akaros, signals only go to the process, since there is no kernel
+	 * notion of a thread/task within a process.  All knowledge of
+	 * threads and how to resolve this mismatch between process-wide signals
+	 * and threads is held in the 2LS.  If we wanted to abort a syscall,
+	 * we'd need to know which one - after all, on Akaros syscalls are
+	 * asynchronous and it is only in the 2LS that they are coupled to
+	 * uthreads.  When it comes to routing the signal, the 2LS could do
+	 * something like pthread_kill, or just execute the handler. */
+	sched_ops->got_posix_signal(sig_nr, &info);
 }
 
 /* Called from uthread_slim_init() */

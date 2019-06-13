@@ -111,6 +111,7 @@ struct schedule_ops {
 	void (*thread_refl_fault)(struct uthread *, struct user_context *);
 	void (*thread_exited)(struct uthread *);
 	struct uthread *(*thread_create)(void *(*)(void *), void *);
+	void (*got_posix_signal)(int sig_nr, struct siginfo *info);
 	/**** Defining these functions is optional. ****/
 	void (*sync_init)(uth_sync_t *);
 	void (*sync_destroy)(uth_sync_t *);

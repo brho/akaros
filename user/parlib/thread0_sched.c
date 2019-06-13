@@ -27,6 +27,7 @@ static void thread0_thread_runnable(struct uthread *uth);
 static void thread0_thread_has_blocked(struct uthread *uth, int flags);
 static void thread0_thread_exited(struct uthread *uth);
 static struct uthread *thread0_thread_create(void *(*func)(void *), void *arg);
+static void thread0_got_posix_signal(int sig_nr, struct siginfo *info);
 static void thread0_sync_init(uth_sync_t *s);
 static void thread0_sync_destroy(uth_sync_t *s);
 static void thread0_sync_enqueue(struct uthread *uth, uth_sync_t *s);
@@ -46,6 +47,7 @@ struct schedule_ops thread0_2ls_ops = {
 	.thread_has_blocked = thread0_thread_has_blocked,
 	.thread_exited = thread0_thread_exited,
 	.thread_create = thread0_thread_create,
+	.got_posix_signal = thread0_got_posix_signal,
 	.sync_init = thread0_sync_init,
 	.sync_destroy = thread0_sync_destroy,
 	.sync_enqueue = thread0_sync_enqueue,
@@ -124,6 +126,7 @@ static void thread0_sched_entry(void)
 static void thread0_thread_blockon_sysc(struct uthread *uthread, void *arg)
 {
 	struct syscall *sysc = (struct syscall*)arg;
+
 	thread0_thread_has_blocked(uthread, 0);
 	if (!register_evq(sysc, sysc_evq))
 		thread0_thread_runnable(uthread);
@@ -190,6 +193,21 @@ static void thread0_thread_exited(struct uthread *uth)
 static struct uthread *thread0_thread_create(void *(*func)(void *), void *arg)
 {
 	panic("Thread0 sched asked to create more threads!");
+}
+
+static void thread0_got_posix_signal(int sig_nr, struct siginfo *info)
+{
+	if (current_uthread)
+		trigger_posix_signal(sig_nr, info, get_cur_uth_ctx());
+	else
+		trigger_posix_signal(sig_nr, info, &thread0_uth->u_ctx);
+	/* Legacy single-threaded programs, which often use thread0, expect
+	 * signals to interrupt their syscall.  For most 2LSes, we can't match a
+	 * process-wide signal to a particular thread; the kernel knows nothing
+	 * of threads, we're just receiving an event.  However, thread0 has only
+	 * one thread. */
+	if (thread0_uth->sysc)
+		sys_abort_sysc(thread0_uth->sysc);
 }
 
 static void thread0_sync_init(uth_sync_t *s)

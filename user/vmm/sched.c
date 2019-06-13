@@ -47,6 +47,7 @@ static void vmm_thread_refl_fault(struct uthread *uth,
                                   struct user_context *ctx);
 static void vmm_thread_exited(struct uthread *uth);
 static struct uthread *vmm_thread_create(void *(*func)(void *), void *arg);
+static void vmm_got_posix_signal(int sig_nr, struct siginfo *info);
 
 struct schedule_ops vmm_sched_ops = {
 	.sched_init = vmm_sched_init,
@@ -58,6 +59,7 @@ struct schedule_ops vmm_sched_ops = {
 	.thread_refl_fault = vmm_thread_refl_fault,
 	.thread_exited = vmm_thread_exited,
 	.thread_create = vmm_thread_create,
+	.got_posix_signal = vmm_got_posix_signal,
 };
 
 struct schedule_ops *sched_ops = &vmm_sched_ops;
@@ -715,6 +717,26 @@ static struct uthread *vmm_thread_create(void *(*func)(void *), void *arg)
 	/* But just in case, let's poison it */
 	((struct vmm_thread*)tth)->vm = (void*)0xdeadbeef;
 	return (struct uthread*)tth;
+}
+
+/* Careful, that fake_uctx takes up a lot of stack space.  We could do something
+ * to route signals to task threads too.  The VMM-2LS has less need for this at
+ * all, so we could just run the signal handler as-is, without worrying about
+ * user contexts.  Note the pthread 2LS has similar code. */
+static void vmm_got_posix_signal(int sig_nr, struct siginfo *info)
+{
+	struct user_context fake_uctx;
+
+	/* If we happen to have a current uthread, we can use that - perhaps
+	 * that's what the user wants.  If not, we'll build a fake one
+	 * representing our current call stack. */
+	if (current_uthread) {
+		trigger_posix_signal(sig_nr, info, get_cur_uth_ctx());
+	} else {
+		init_user_ctx(&fake_uctx, (uintptr_t)vmm_got_posix_signal,
+			      get_stack_pointer());
+		trigger_posix_signal(sig_nr, info, &fake_uctx);
+	}
 }
 
 /* Helpers for tracking nr_unblk_* threads. */

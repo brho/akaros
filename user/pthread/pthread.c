@@ -64,6 +64,7 @@ static void pth_thread_refl_fault(struct uthread *uth,
                                   struct user_context *ctx);
 static void pth_thread_exited(struct uthread *uth);
 static struct uthread *pth_thread_create(void *(*func)(void *), void *arg);
+static void pth_got_posix_signal(int sig_nr, struct siginfo *info);
 static void pth_thread_bulk_runnable(uth_sync_t *wakees);
 
 /* Event Handlers */
@@ -80,6 +81,7 @@ struct schedule_ops pthread_sched_ops = {
 	.thread_refl_fault = pth_thread_refl_fault,
 	.thread_exited = pth_thread_exited,
 	.thread_create = pth_thread_create,
+	.got_posix_signal = pth_got_posix_signal,
 	.thread_bulk_runnable = pth_thread_bulk_runnable,
 };
 
@@ -479,6 +481,24 @@ static struct uthread *pth_thread_create(void *(*func)(void *), void *arg)
 
 	ret = pthread_create(&pth, NULL, func, arg);
 	return ret == 0 ? (struct uthread*)pth : NULL;
+}
+
+/* Careful, that fake_uctx takes up a lot of stack space.  We could call
+ * pthread_kill too.  Note the VMM 2LS has similar code. */
+static void pth_got_posix_signal(int sig_nr, struct siginfo *info)
+{
+	struct user_context fake_uctx;
+
+	/* If we happen to have a current uthread, we can use that - perhaps
+	 * that's what the user wants.  If not, we'll build a fake one
+	 * representing our current call stack. */
+	if (current_uthread) {
+		trigger_posix_signal(sig_nr, info, get_cur_uth_ctx());
+	} else {
+		init_user_ctx(&fake_uctx, (uintptr_t)pth_got_posix_signal,
+			      get_stack_pointer());
+		trigger_posix_signal(sig_nr, info, &fake_uctx);
+	}
 }
 
 static void pth_thread_bulk_runnable(uth_sync_t *wakees)
