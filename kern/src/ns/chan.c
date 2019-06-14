@@ -123,38 +123,6 @@ void kstrdup(char **p, char *s)
 	kfree(prev);
 }
 
-void chandevreset(void)
-{
-	int i;
-
-	for (i = 0; &devtab[i] < __devtabend; i++) {
-		if (devtab[i].reset)
-			devtab[i].reset();
-	}
-}
-
-void chandevinit(void)
-{
-	int i;
-
-	for (i = 0; &devtab[i] < __devtabend; i++) {
-		if (devtab[i].init)
-			devtab[i].init();
-	}
-}
-
-void chandevshutdown(void)
-{
-	int i;
-
-	/* shutdown in reverse order */
-	for (i = 0; &devtab[i] < __devtabend; i++) ;
-	for (i--; i >= 0; i--) {
-		if (devtab[i].shutdown)
-			devtab[i].shutdown();
-	}
-}
-
 static void chan_release(struct kref *kref)
 {
 	struct chan *c = container_of(kref, struct chan, ref);
