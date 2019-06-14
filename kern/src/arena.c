@@ -191,6 +191,8 @@ struct arena *arena_create(char *name, void *base, size_t size, size_t quantum,
 	/* See note in arena_add() */
 	if (source && base)
 		panic("Arena can't have both a source and an initial span");
+	if (!base && size)
+		panic("Arena can't have a base starting at 0");
 	arena = kmalloc(sizeof(struct arena), flags);
 	if (!arena)
 		return 0;
@@ -673,6 +675,8 @@ void *arena_add(struct arena *arena, void *base, size_t size, int flags)
 	 * freeing. */
 	if (arena->source)
 		panic("Arenas with sources must not manually add resources.");
+	if (!base && size)
+		panic("Arena can't have a base starting at 0");
 	return __arena_add(arena, base, size, flags);
 }
 
