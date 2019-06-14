@@ -21,6 +21,7 @@ int main(int argc, char *argv[])
 	retval = stat(argv[1], &st);
 	if (retval < 0) {
 		perror("Stat failed");
+		return -1;
 	} else {
 		printf("STAT RESULTS\n---------------------\n");
 		printf("dev       : %d\n", st.st_dev);
@@ -37,4 +38,5 @@ int main(int argc, char *argv[])
 		printf("mtime     : %d\n", st.st_mtime);
 		printf("ctime     : %d\n", st.st_ctime);
 	}
+	return 0;
 }

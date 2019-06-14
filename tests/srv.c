@@ -56,4 +56,5 @@ int main(int argc, char *argv[])
 		close(dfd);
 		exit(-1);
 	}
+	return 0;
 }
