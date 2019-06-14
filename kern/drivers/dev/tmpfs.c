@@ -30,15 +30,34 @@
 
 struct dev tmpfs_devtab;
 
+/* This is a little wasteful - a u16_pool will work too, though I'd like to
+ * exercise bits of the arena code. */
+static struct arena *tmpfs_ids;
+
 struct tmpfs {
 	struct tree_filesystem		tfs;
-	atomic_t			qid;
+	atomic_t			qid_file;
+	uint16_t			id;
 	struct kref			users;
 };
 
+static struct tmpfs *tree_file_to_tmpfs(struct tree_file *tf)
+{
+	return (struct tmpfs*)(tf->tfs);
+}
+
+#define TMPFS_MAX_QID_FILE ((1ULL << 48) - 1)
+#define TMPFS_MAX_ID ((1 << 16) - 1)
+
+/* Qids are made up of 16 bits for the ID, 48 for the file. */
 static uint64_t tmpfs_get_qid_path(struct tmpfs *tmpfs)
 {
-	return atomic_fetch_and_add(&tmpfs->qid, 1);
+	uint64_t ret = atomic_fetch_and_add(&tmpfs->qid_file, 1);
+
+	/* Wrap-around of qid_file won't happen in our lifetime */
+	if (ret > TMPFS_MAX_QID_FILE)
+		error(ENOSPC, "out of tmpfs files");
+	return ((uint64_t)tmpfs->id << 16) | ret;
 }
 
 static char *devname(void)
@@ -63,7 +82,7 @@ static void __tmpfs_tf_init(struct tree_file *tf, int dir_type, int dir_dev,
 	struct dir *dir = &tf->file.dir;
 
 	fs_file_init_dir(&tf->file, dir_type, dir_dev, user, perm);
-	dir->qid.path = tmpfs_get_qid_path((struct tmpfs*)tf->tfs);
+	dir->qid.path = tmpfs_get_qid_path(tree_file_to_tmpfs(tf));
 	dir->qid.vers = 0;
 	/* This is the "+1 for existing" ref.  There is no backing store for the
 	 * FS, such as a disk or 9p, so we can't get rid of a file until it is
@@ -161,14 +180,13 @@ static void tmpfs_release(struct kref *kref)
 	/* ensures __tf_free() happens before tfs_destroy */
 	rcu_barrier();
 	tfs_destroy(&tmpfs->tfs);
+	arena_free(tmpfs_ids, (void*)(uintptr_t)tmpfs->id, 1);
 	kfree(tmpfs);
 }
 
 static struct tmpfs *chan_to_tmpfs(struct chan *c)
 {
-	struct tree_file *tf = chan_to_tree_file(c);
-
-	return (struct tmpfs*)(tf->tfs);
+	return tree_file_to_tmpfs(chan_to_tree_file(c));
 }
 
 static void incref_tmpfs_chan(struct chan *c)
@@ -181,6 +199,23 @@ static void decref_tmpfs_chan(struct chan *c)
 	kref_put(&chan_to_tmpfs(c)->users);
 }
 
+static void tmpfs_reset(void)
+{
+	/* Note you can't make an arena that hands out '0'.  That's baked into
+	 * the interface.  I'm OK with it for now.  Because of that, the *size*
+	 * of the span is 2^16 - 1; can't count '0'. */
+	tmpfs_ids = arena_create("tmpfs_ids", (void*)1, TMPFS_MAX_ID, 1,
+				 NULL, NULL, NULL, 0, ARENA_NEXTFIT | MEM_WAIT);
+}
+
+/* This is pretty hokey - we never call shutdown, and I don't know if 9ns has
+ * any protections about device use before calling shutdown. */
+static void tmpfs_shutdown(void)
+{
+	arena_destroy(tmpfs_ids);
+	tmpfs_ids = NULL;
+}
+
 static struct chan *tmpfs_attach(char *spec)
 {
 	struct tree_filesystem *tfs = kzmalloc(sizeof(struct tmpfs), MEM_WAIT);
@@ -189,6 +224,7 @@ static struct chan *tmpfs_attach(char *spec)
 	/* All distinct chans get a ref on the filesystem, so that we can
 	 * destroy it when the last user disconnects/closes. */
 	kref_init(&tmpfs->users, tmpfs_release, 1);
+	tmpfs->id = (uint16_t)(uintptr_t)arena_alloc(tmpfs_ids, 1, MEM_WAIT);
 
 	/* This gives us one ref on root, dropped during tmpfs_release(). */
 	tfs_init(tfs);
@@ -262,9 +298,9 @@ static unsigned long tmpfs_chan_ctl(struct chan *c, int op, unsigned long a1,
 
 struct dev tmpfs_devtab __devtab = {
 	.name = "tmpfs",
-	.reset = devreset,
+	.reset = tmpfs_reset,
 	.init = devinit,
-	.shutdown = devshutdown,
+	.shutdown = tmpfs_shutdown,
 	.attach = tmpfs_attach,
 	.walk = tmpfs_walk,
 	.stat = tree_chan_stat,
