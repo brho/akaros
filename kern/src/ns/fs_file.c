@@ -71,7 +71,7 @@ void fs_file_change_basename(struct fs_file *f, const char *name)
 }
 
 /* Helper for building a dir.  Caller sets qid path and vers.  YMMV. */
-void fs_file_init_dir(struct fs_file *f, int dir_type, int dir_dev,
+void fs_file_init_dir(struct fs_file *f, uint16_t dir_type, uint32_t dir_dev,
                       struct username *user, int perm)
 {
 	struct dir *dir = &f->dir;
@@ -84,6 +84,8 @@ void fs_file_init_dir(struct fs_file *f, int dir_type, int dir_dev,
 		dir->qid.type |= QTEXCL;
 	if (perm & DMSYMLINK)
 		dir->qid.type |= QTSYMLINK;
+	dir->type = dir_type;
+	dir->dev = dir_dev;
 	/* dir->mode stores all the DM bits, but note that userspace can only
 	 * affect the permissions (S_PMASK) bits. */
 	dir->mode = perm;

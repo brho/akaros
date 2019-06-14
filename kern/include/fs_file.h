@@ -110,7 +110,7 @@ static inline size_t fs_file_get_length(struct fs_file *f)
 void fs_file_init(struct fs_file *f, const char *name, struct fs_file_ops *ops);
 void fs_file_set_basename(struct fs_file *f, const char *name);
 void fs_file_change_basename(struct fs_file *f, const char *name);
-void fs_file_init_dir(struct fs_file *f, int dir_type, int dir_dev,
+void fs_file_init_dir(struct fs_file *f, uint16_t dir_type, uint32_t dir_dev,
                       struct username *user, int perm);
 void fs_file_copy_from_dir(struct fs_file *f, struct dir *dir);
 void cleanup_fs_file(struct fs_file *f);
