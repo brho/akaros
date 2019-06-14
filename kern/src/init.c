@@ -158,7 +158,12 @@ static void __kernel_init_part_deux(void *arg)
 	enable_irq();
 	run_linker_funcs();
 	/* reset/init devtab after linker funcs 3 and 4.  these run NIC and
-	 * medium pre-inits, which need to happen before devether. */
+	 * medium pre-inits, which need to happen before devether.  Note
+	 * tmpfs_reset.
+	 *
+	 * Reset vs init - who the fuck knows.  Both are called during init
+	 * time.  It might be that init is a one-time ever per boot thing, and
+	 * resets are paired with shutdowns.  So init, reset, shutdown reset. */
 	devtabreset();
 	devtabinit();
 

@@ -177,10 +177,6 @@ static void kprof_init(void)
 	                                sizeof(kprof_control_usage));
 }
 
-static void kprof_shutdown(void)
-{
-}
-
 static struct walkqid *kprof_walk(struct chan *c, struct chan *nc, char **name,
                                   unsigned int nname)
 {
@@ -590,7 +586,7 @@ struct dev kprofdevtab __devtab = {
 
 	.reset = devreset,
 	.init = kprof_init,
-	.shutdown = kprof_shutdown,
+	.shutdown = devshutdown,
 	.attach = kprof_attach,
 	.walk = kprof_walk,
 	.stat = kprof_stat,

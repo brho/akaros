@@ -89,11 +89,6 @@ static void ver_init(void)
 	vertab[Kverkconfig].length = strlen(__kconfig_str) + 1;
 }
 
-static void ver_shutdown(void)
-{
-
-}
-
 static struct walkqid *ver_walk(struct chan *c, struct chan *nc, char **name,
 				unsigned int nname)
 {
@@ -191,7 +186,7 @@ struct dev verdevtab __devtab = {
 
 	.reset = devreset,
 	.init = ver_init,
-	.shutdown = ver_shutdown,
+	.shutdown = devshutdown,
 	.attach = ver_attach,
 	.walk = ver_walk,
 	.stat = ver_stat,
