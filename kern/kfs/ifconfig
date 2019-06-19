@@ -61,7 +61,7 @@ fi
 #/bin/bind '#d' /fd
 #/bin/bind -c '#e' /env
 /bin/bind -b '#proc' /proc
-/bin/bind -b '#srv' /srv
+/bin/bind -c -b '#srv' /srv
 
 #
 # Configure the network mount point.
