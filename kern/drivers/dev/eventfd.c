@@ -295,8 +295,8 @@ static int efd_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
 	switch (c->qid.path) {
 	case Qefd:
 		if (tap->filter & ~EFD_LEGAL_TAPS) {
-			set_error(ENOSYS, "Unsupported #%s tap, must be %p",
-				  devname(), EFD_LEGAL_TAPS);
+			set_error(ENOSYS, "Unsupported #%s tap %p, must be %p",
+				  devname(), tap->filter, EFD_LEGAL_TAPS);
 			return -1;
 		}
 		spin_lock(&efd->tap_lock);

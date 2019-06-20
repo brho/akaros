@@ -498,8 +498,8 @@ static int tap_alarm(struct proc_alarm *a, struct fd_tap *tap, int cmd,
 	int ret;
 
 	if (tap->filter & ~legal_filter) {
-		set_error(ENOSYS, "Unsupported #%s tap, must be %p", devname(),
-				  legal_filter);
+		set_error(ENOSYS, "Unsupported #%s tap %p, must be %p",
+			  devname(), tap->filter, legal_filter);
 		return -1;
 	}
 	cv_lock(&a->cv);

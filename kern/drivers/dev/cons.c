@@ -1302,8 +1302,8 @@ static int tap_stdin(struct chan *c, struct fd_tap *tap, int cmd)
 #define CONS_STDIN_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_HANGUP)
 
 	if (tap->filter & ~CONS_STDIN_TAPS) {
-		set_error(ENOSYS, "Unsupported #%s tap, must be %p", devname(),
-		          CONS_STDIN_TAPS);
+		set_error(ENOSYS, "Unsupported #%s tap %p, must be %p",
+			  devname(), tap->filter, CONS_STDIN_TAPS);
 		return -1;
 	}
 	spin_lock(&cons_q_lock);
@@ -1342,8 +1342,8 @@ static int tap_null(struct chan *c, struct fd_tap *tap, int cmd)
 #define CONS_NULL_TAPS (FDTAP_FILT_WRITABLE | FDTAP_FILT_HANGUP)
 
 	if (tap->filter & ~CONS_NULL_TAPS) {
-		set_error(ENOSYS, "Unsupported #%s tap, must be %p", devname(),
-		          CONS_NULL_TAPS);
+		set_error(ENOSYS, "Unsupported #%s tap %p, must be %p",
+			  devname(), tap->filter, CONS_NULL_TAPS);
 		return -1;
 	}
 	return 0;

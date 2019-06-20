@@ -203,8 +203,8 @@ static int random_tapfd(struct chan *c, struct fd_tap *tap, int cmd)
 	#define RANDOM_TAPS (FDTAP_FILT_READABLE | FDTAP_FILT_HANGUP)
 
 	if (tap->filter & ~RANDOM_TAPS) {
-		set_error(ENOSYS, "Unsupported #%s tap, must be %p", devname(),
-		          RANDOM_TAPS);
+		set_error(ENOSYS, "Unsupported #%s tap %p, must be %p",
+			  devname(), tap->filter, RANDOM_TAPS);
 		return -1;
 	}
 	switch (c->qid.path) {
