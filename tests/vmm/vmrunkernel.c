@@ -574,9 +574,6 @@ int main(int argc, char **argv)
 
 	if (initrd) {
 		initrd_start = ROUNDUP(kernel_max_address, PGSIZE);
-		fprintf(stderr,
-			"kernel_max_address is %#p; Load initrd @ %#p\n",
-		        kernel_max_address, initrd_start);
 		initrd_size = setup_initrd(initrd, (void *)initrd_start,
 		                           memend - initrd_start + 1);
 		if (initrd_size <= 0) {
@@ -588,8 +585,6 @@ int main(int argc, char **argv)
 		bp->hdr.ramdisk_size = initrd_size;
 		bp->hdr.root_dev = 0x100;
 		bp->hdr.type_of_loader = 0xff;
-		fprintf(stderr, "Set bp initrd to %p / %p\n",
-		        initrd_start, initrd_size);
 	}
 
 	/* The MMIO address of the console device is really the address of an
