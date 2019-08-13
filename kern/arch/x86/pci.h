@@ -235,17 +235,6 @@ void pci_init(void);
 void pcidev_print_info(struct pci_device *pcidev, int verbosity);
 uint32_t pci_config_addr(uint8_t bus, uint8_t dev, uint8_t func, uint32_t reg);
 
-/* Read and write helpers (Eventually, we should have these be statics, since no
- * device should touch PCI config space). */
-uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset);
-void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
-                 uint32_t value);
-uint16_t pci_read16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset);
-void pci_write16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
-                 uint16_t value);
-uint8_t pci_read8(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset);
-void pci_write8(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
-                uint8_t value);
 uint32_t pcidev_read32(struct pci_device *pcidev, uint32_t offset);
 void pcidev_write32(struct pci_device *pcidev, uint32_t offset, uint32_t value);
 uint16_t pcidev_read16(struct pci_device *pcidev, uint32_t offset);

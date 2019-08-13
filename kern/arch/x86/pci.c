@@ -25,6 +25,9 @@ static char STD_PCI_DEV[] = "Standard PCI Device";
 static char PCI2PCI[] = "PCI-to-PCI Bridge";
 static char PCI2CARDBUS[] = "PCI-Cardbus Bridge";
 
+static uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func,
+			   uint32_t offset);
+
 /* Gets any old raw bar, with some catches based on type. */
 static uint32_t pci_getbar(struct pci_device *pcidev, unsigned int bar)
 {
@@ -306,7 +309,8 @@ uint32_t pci_config_addr(uint8_t bus, uint8_t dev, uint8_t func, uint32_t reg)
 
 /* Helper to read 32 bits from the config space of B:D:F.  'Offset' is how far
  * into the config space we offset before reading, aka: where we are reading. */
-uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
+static uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func,
+			   uint32_t offset)
 {
 	uint32_t ret;
 
@@ -319,8 +323,8 @@ uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
 
 /* Same, but writes (doing 32bit at a time).  Never actually tested (not sure if
  * PCI lets you write back). */
-void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
-                 uint32_t value)
+static void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
+			uint32_t value)
 {
 	spin_lock_irqsave(&pci_lock);
 	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
@@ -328,7 +332,8 @@ void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
 	spin_unlock_irqsave(&pci_lock);
 }
 
-uint16_t pci_read16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
+static uint16_t pci_read16(uint8_t bus, uint8_t dev, uint8_t func,
+			   uint32_t offset)
 {
 	uint16_t ret;
 
@@ -339,8 +344,8 @@ uint16_t pci_read16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
 	return ret;
 }
 
-void pci_write16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
-                 uint16_t value)
+static void pci_write16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
+			uint16_t value)
 {
 	spin_lock_irqsave(&pci_lock);
 	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
@@ -348,7 +353,8 @@ void pci_write16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
 	spin_unlock_irqsave(&pci_lock);
 }
 
-uint8_t pci_read8(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
+static uint8_t pci_read8(uint8_t bus, uint8_t dev, uint8_t func,
+			 uint32_t offset)
 {
 	uint8_t ret;
 
@@ -359,8 +365,8 @@ uint8_t pci_read8(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset)
 	return ret;
 }
 
-void pci_write8(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
-                uint8_t value)
+static void pci_write8(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
+		       uint8_t value)
 {
 	spin_lock_irqsave(&pci_lock);
 	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
