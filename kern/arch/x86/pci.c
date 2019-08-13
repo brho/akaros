@@ -25,8 +25,8 @@ static char STD_PCI_DEV[] = "Standard PCI Device";
 static char PCI2PCI[] = "PCI-to-PCI Bridge";
 static char PCI2CARDBUS[] = "PCI-Cardbus Bridge";
 
-static uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func,
-			   uint32_t offset);
+static uint32_t pci_cfg_pio_read32(uint8_t bus, uint8_t dev, uint8_t func,
+				   uint32_t offset);
 
 /* Gets any old raw bar, with some catches based on type. */
 static uint32_t pci_getbar(struct pci_device *pcidev, unsigned int bar)
@@ -212,7 +212,8 @@ void pci_init(void)
 		for (int j = 0; j < PCI_MAX_DEV; j++) {
 			max_nr_func = 1;
 			for (int k = 0; k < max_nr_func; k++) {
-				result = pci_read32(i, j, k, PCI_DEV_VEND_REG);
+				result = pci_cfg_pio_read32(i, j, k,
+							    PCI_DEV_VEND_REG);
 				dev_id = result >> 16;
 				ven_id = result & 0xffff;
 				/* Skip invalid IDs (not a device)
@@ -309,8 +310,8 @@ uint32_t pci_config_addr(uint8_t bus, uint8_t dev, uint8_t func, uint32_t reg)
 
 /* Helper to read 32 bits from the config space of B:D:F.  'Offset' is how far
  * into the config space we offset before reading, aka: where we are reading. */
-static uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func,
-			   uint32_t offset)
+static uint32_t pci_cfg_pio_read32(uint8_t bus, uint8_t dev, uint8_t func,
+				   uint32_t offset)
 {
 	uint32_t ret;
 
@@ -323,8 +324,8 @@ static uint32_t pci_read32(uint8_t bus, uint8_t dev, uint8_t func,
 
 /* Same, but writes (doing 32bit at a time).  Never actually tested (not sure if
  * PCI lets you write back). */
-static void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
-			uint32_t value)
+static void pci_cfg_pio_write32(uint8_t bus, uint8_t dev, uint8_t func,
+				uint32_t offset, uint32_t value)
 {
 	spin_lock_irqsave(&pci_lock);
 	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
@@ -332,8 +333,8 @@ static void pci_write32(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
 	spin_unlock_irqsave(&pci_lock);
 }
 
-static uint16_t pci_read16(uint8_t bus, uint8_t dev, uint8_t func,
-			   uint32_t offset)
+static uint16_t pci_cfg_pio_read16(uint8_t bus, uint8_t dev, uint8_t func,
+				   uint32_t offset)
 {
 	uint16_t ret;
 
@@ -344,8 +345,8 @@ static uint16_t pci_read16(uint8_t bus, uint8_t dev, uint8_t func,
 	return ret;
 }
 
-static void pci_write16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
-			uint16_t value)
+static void pci_cfg_pio_write16(uint8_t bus, uint8_t dev, uint8_t func,
+				uint32_t offset, uint16_t value)
 {
 	spin_lock_irqsave(&pci_lock);
 	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
@@ -353,8 +354,8 @@ static void pci_write16(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
 	spin_unlock_irqsave(&pci_lock);
 }
 
-static uint8_t pci_read8(uint8_t bus, uint8_t dev, uint8_t func,
-			 uint32_t offset)
+static uint8_t pci_cfg_pio_read8(uint8_t bus, uint8_t dev, uint8_t func,
+				 uint32_t offset)
 {
 	uint8_t ret;
 
@@ -365,8 +366,8 @@ static uint8_t pci_read8(uint8_t bus, uint8_t dev, uint8_t func,
 	return ret;
 }
 
-static void pci_write8(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
-		       uint8_t value)
+static void pci_cfg_pio_write8(uint8_t bus, uint8_t dev, uint8_t func,
+			       uint32_t offset, uint8_t value)
 {
 	spin_lock_irqsave(&pci_lock);
 	outl(PCI_CONFIG_ADDR, pci_config_addr(bus, dev, func, offset));
@@ -376,32 +377,38 @@ static void pci_write8(uint8_t bus, uint8_t dev, uint8_t func, uint32_t offset,
 
 uint32_t pcidev_read32(struct pci_device *pcidev, uint32_t offset)
 {
-	return pci_read32(pcidev->bus, pcidev->dev, pcidev->func, offset);
+	return pci_cfg_pio_read32(pcidev->bus, pcidev->dev, pcidev->func,
+				  offset);
 }
 
 void pcidev_write32(struct pci_device *pcidev, uint32_t offset, uint32_t value)
 {
-	pci_write32(pcidev->bus, pcidev->dev, pcidev->func, offset, value);
+	pci_cfg_pio_write32(pcidev->bus, pcidev->dev, pcidev->func, offset,
+			    value);
 }
 
 uint16_t pcidev_read16(struct pci_device *pcidev, uint32_t offset)
 {
-	return pci_read16(pcidev->bus, pcidev->dev, pcidev->func, offset);
+	return pci_cfg_pio_read16(pcidev->bus, pcidev->dev, pcidev->func,
+				  offset);
 }
 
 void pcidev_write16(struct pci_device *pcidev, uint32_t offset, uint16_t value)
 {
-	pci_write16(pcidev->bus, pcidev->dev, pcidev->func, offset, value);
+	pci_cfg_pio_write16(pcidev->bus, pcidev->dev, pcidev->func, offset,
+			    value);
 }
 
 uint8_t pcidev_read8(struct pci_device *pcidev, uint32_t offset)
 {
-	return pci_read8(pcidev->bus, pcidev->dev, pcidev->func, offset);
+	return pci_cfg_pio_read8(pcidev->bus, pcidev->dev, pcidev->func,
+				 offset);
 }
 
 void pcidev_write8(struct pci_device *pcidev, uint32_t offset, uint8_t value)
 {
-	pci_write8(pcidev->bus, pcidev->dev, pcidev->func, offset, value);
+	pci_cfg_pio_write8(pcidev->bus, pcidev->dev, pcidev->func, offset,
+			   value);
 }
 
 /* Helper to get the class description strings.  Adapted from
