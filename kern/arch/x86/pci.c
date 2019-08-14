@@ -14,6 +14,7 @@
 #include <mm.h>
 #include <arch/pci_defs.h>
 #include <ros/errno.h>
+#include <acpi.h>
 
 /* List of all discovered devices */
 struct pcidev_stailq pci_devices = STAILQ_HEAD_INITIALIZER(pci_devices);
@@ -197,6 +198,18 @@ static void __pci_parse_caps(struct pci_device *pcidev)
 	}
 }
 
+static uintptr_t pci_get_mmio_cfg(struct pci_device *pcidev)
+{
+	physaddr_t paddr;
+
+	paddr = acpi_pci_get_mmio_cfg_addr(0 /* segment for legacy PCI enum*/,
+					  pcidev->bus, pcidev->dev,
+					  pcidev->func);
+	if (!paddr)
+		return 0;
+	return vmap_pmem_nocache(paddr, 4096);
+}
+
 /* Scans the PCI bus.  Won't actually work for anything other than bus 0, til we
  * sort out how to handle bridge devices. */
 void pci_init(void)
@@ -238,6 +251,8 @@ void pci_init(void)
 					 pcidev->dev, pcidev->func);
 				pcidev->dev_id = dev_id;
 				pcidev->ven_id = ven_id;
+				/* Set up the MMIO CFG before using accessors */
+				pcidev->mmio_cfg = pci_get_mmio_cfg(pcidev);
 				/* Get the Class/subclass */
 				pcidev->class =
 					pcidev_read8(pcidev, PCI_CLASS_REG);
@@ -375,40 +390,101 @@ static void pci_cfg_pio_write8(uint8_t bus, uint8_t dev, uint8_t func,
 	spin_unlock_irqsave(&pci_lock);
 }
 
+/* Some AMD processors require using eax for MMIO config ops. */
+static uint32_t pci_cfg_mmio_read32(uintptr_t mmio_cfg, uint32_t offset)
+{
+	uint32_t val;
+
+	asm volatile("movl (%1),%0" : "=a"(val) : "g"(mmio_cfg + offset));
+	return val;
+}
+
+static void pci_cfg_mmio_write32(uintptr_t mmio_cfg, uint32_t offset,
+				 uint32_t val)
+{
+	asm volatile("movl %0,(%1)" : : "a"(val), "g"(mmio_cfg + offset));
+}
+
+static uint16_t pci_cfg_mmio_read16(uintptr_t mmio_cfg, uint32_t offset)
+{
+	uint16_t val;
+
+	asm volatile("movw (%1),%0" : "=a"(val) : "g"(mmio_cfg + offset));
+	return val;
+}
+
+static void pci_cfg_mmio_write16(uintptr_t mmio_cfg, uint32_t offset,
+				 uint16_t val)
+{
+	asm volatile("movw %0,(%1)" : : "a"(val), "g"(mmio_cfg + offset));
+}
+
+static uint8_t pci_cfg_mmio_read8(uintptr_t mmio_cfg, uint32_t offset)
+{
+	uint8_t val;
+
+	asm volatile("movb (%1),%0" : "=a"(val) : "g"(mmio_cfg + offset));
+	return val;
+}
+
+static void pci_cfg_mmio_write8(uintptr_t mmio_cfg, uint32_t offset,
+				uint8_t val)
+{
+	asm volatile("movb %0,(%1)" : : "a"(val), "g"(mmio_cfg + offset));
+}
+
 uint32_t pcidev_read32(struct pci_device *pcidev, uint32_t offset)
 {
-	return pci_cfg_pio_read32(pcidev->bus, pcidev->dev, pcidev->func,
-				  offset);
+	if (pcidev->mmio_cfg)
+		return pci_cfg_mmio_read32(pcidev->mmio_cfg, offset);
+	else
+		return pci_cfg_pio_read32(pcidev->bus, pcidev->dev,
+					  pcidev->func, offset);
 }
 
 void pcidev_write32(struct pci_device *pcidev, uint32_t offset, uint32_t value)
 {
-	pci_cfg_pio_write32(pcidev->bus, pcidev->dev, pcidev->func, offset,
-			    value);
+	if (pcidev->mmio_cfg)
+		pci_cfg_mmio_write32(pcidev->mmio_cfg, offset, value);
+	else
+		pci_cfg_pio_write32(pcidev->bus, pcidev->dev, pcidev->func,
+				    offset, value);
 }
 
 uint16_t pcidev_read16(struct pci_device *pcidev, uint32_t offset)
 {
-	return pci_cfg_pio_read16(pcidev->bus, pcidev->dev, pcidev->func,
-				  offset);
+	if (pcidev->mmio_cfg)
+		return pci_cfg_mmio_read16(pcidev->mmio_cfg, offset);
+	else
+		return pci_cfg_pio_read16(pcidev->bus, pcidev->dev,
+					  pcidev->func, offset);
 }
 
 void pcidev_write16(struct pci_device *pcidev, uint32_t offset, uint16_t value)
 {
-	pci_cfg_pio_write16(pcidev->bus, pcidev->dev, pcidev->func, offset,
-			    value);
+	if (pcidev->mmio_cfg)
+		pci_cfg_mmio_write16(pcidev->mmio_cfg, offset, value);
+	else
+		pci_cfg_pio_write16(pcidev->bus, pcidev->dev, pcidev->func,
+				    offset, value);
 }
 
 uint8_t pcidev_read8(struct pci_device *pcidev, uint32_t offset)
 {
-	return pci_cfg_pio_read8(pcidev->bus, pcidev->dev, pcidev->func,
-				 offset);
+	if (pcidev->mmio_cfg)
+		return pci_cfg_mmio_read8(pcidev->mmio_cfg, offset);
+	else
+		return pci_cfg_pio_read8(pcidev->bus, pcidev->dev, pcidev->func,
+					 offset);
 }
 
 void pcidev_write8(struct pci_device *pcidev, uint32_t offset, uint8_t value)
 {
-	pci_cfg_pio_write8(pcidev->bus, pcidev->dev, pcidev->func, offset,
-			   value);
+	if (pcidev->mmio_cfg)
+		pci_cfg_mmio_write8(pcidev->mmio_cfg, offset, value);
+	else
+		pci_cfg_pio_write8(pcidev->bus, pcidev->dev, pcidev->func,
+				   offset, value);
 }
 
 /* Helper to get the class description strings.  Adapted from
