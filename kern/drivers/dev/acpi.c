@@ -1409,7 +1409,11 @@ static char *dumpmcfg(char *start, char *end, struct Atable *table)
 
 physaddr_t acpi_pci_get_mmio_cfg_addr(int segment, int bus, int dev, int func)
 {
-	struct acpi_mcfg_data *tbl = mcfgtbl->tbl;
+	struct acpi_mcfg_data *tbl;
+
+	if (!mcfgtbl)
+		return 0;
+	tbl = mcfgtbl->tbl;
 
 	for (int i = 0; i < tbl->nr_entries; i++) {
 		if (segment == tbl->entries[i].segment &&
