@@ -130,6 +130,7 @@ enum {
 	HPET,
 	APIC,
 	DMAR,
+	MCFG,
 	/* DMAR types */
 	DRHD,
 	RMRR,
@@ -503,13 +504,41 @@ struct Dmar {
 	int intr_remap;
 };
 
+struct acpi_mcfg {
+	uint8_t sig[4];
+	uint8_t length[4];
+	uint8_t rev;
+	uint8_t csum;
+	uint8_t oemid[6];
+	uint8_t oemtblid[8];
+	uint8_t oemrev[4];
+	uint8_t creatorid[4];
+	uint8_t creatorrev[4];
+	uint8_t _pad[8];
+	uint8_t entries[0];
+};
+
+struct acpi_mcfg_entry {
+	physaddr_t addr;
+	uint16_t segment;
+	uint8_t start_bus;
+	uint8_t end_bus;
+};
+
+struct acpi_mcfg_data {
+	size_t nr_entries;
+	struct acpi_mcfg_entry entries[];
+};
+
 int acpiinit(void);
 struct Atable *mkatable(struct Atable *parent,
                         int type, char *name, uint8_t *raw,
                         size_t rawsize, size_t addsize);
 struct Atable *finatable(struct Atable *t, struct slice *slice);
 struct Atable *finatable_nochildren(struct Atable *t);
+
 int get_early_num_cores(void);
+physaddr_t acpi_pci_get_mmio_cfg_addr(int segment, int bus, int dev, int func);
 
 extern struct Atable *apics;
 extern struct Atable *dmar;

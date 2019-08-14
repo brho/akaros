@@ -92,6 +92,7 @@ struct Atable *srat;          /* System resource affinity used by physalloc */
 struct Atable *dmar;
 static struct Slit *slit;      /* Sys locality info table used by scheduler */
 static struct Atable *mscttbl; /* Maximum system characteristics table */
+static struct Atable *mcfgtbl;
 static struct Reg *reg;        /* region used for I/O */
 static struct Gpe *gpes;       /* General purpose events */
 static int ngpes;
@@ -1334,6 +1335,95 @@ static struct Atable *parsessdt(struct Atable *parent, char *name, uint8_t *raw,
 	return finatable_nochildren(t);
 }
 
+static struct Atable *parsemcfg(struct Atable *parent, char *name, uint8_t *raw,
+                                size_t rawsize)
+{
+	struct Atable *t;
+	struct acpi_mcfg *mcfg = (struct acpi_mcfg *)raw;
+	struct acpi_mcfg_data *tbl;
+	size_t nr_mcfg_entries;
+	uint8_t *p;
+
+	if (rawsize < 36)
+		return NULL;
+	t = mkatable(parent, MCFG, name, raw, rawsize, 0);
+
+	nr_mcfg_entries = (l32get(mcfg->length) - 36) / 16;
+	tbl = kmalloc(sizeof(struct acpi_mcfg_data)
+		      + sizeof(struct acpi_mcfg_entry) * nr_mcfg_entries,
+		      MEM_WAIT);
+	tbl->nr_entries = nr_mcfg_entries;
+	p = mcfg->entries;
+	for (int i = 0; i < tbl->nr_entries; i++) {
+		tbl->entries[i].addr = l64get(p + 0);
+		tbl->entries[i].segment = l16get(p + 8);
+		tbl->entries[i].start_bus = p[10];
+		tbl->entries[i].end_bus = p[11];
+		p += 16;
+	}
+	t->tbl = tbl;
+
+	mcfgtbl = finatable_nochildren(t);
+
+	return mcfgtbl;
+}
+
+static char *dumpmcfg(char *start, char *end, struct Atable *table)
+{
+	struct acpi_mcfg *mcfg;
+	struct acpi_mcfg_data *tbl;
+
+	if (!table)
+		return start;
+
+	mcfg = (struct acpi_mcfg*)table->raw;
+	tbl = table->tbl;
+
+	start = seprintf(start, end, "mcfg: oem id: %c%c%c%c%c%c\n",
+			 mcfg->oemid[0], mcfg->oemid[1], mcfg->oemid[2],
+			 mcfg->oemid[3], mcfg->oemid[4], mcfg->oemid[5]);
+	start = seprintf(start, end, "mcfg: oem table id: %c%c%c%c%c%c%c%c\n",
+			 mcfg->oemtblid[0], mcfg->oemtblid[1],
+			 mcfg->oemtblid[2], mcfg->oemtblid[3],
+			 mcfg->oemtblid[4], mcfg->oemtblid[5],
+			 mcfg->oemtblid[6], mcfg->oemtblid[7]);
+	start = seprintf(start, end, "mcfg: oem rev: 0x%x\n",
+			 l32get(mcfg->oemrev));
+	start = seprintf(start, end, "mcfg: creator id: %c%c%c%c\n",
+			 mcfg->creatorid[0], mcfg->creatorid[1],
+			 mcfg->creatorid[2], mcfg->creatorid[3]);
+	start = seprintf(start, end, "mcfg: creator rev: 0x%x\n",
+			 l32get(mcfg->creatorrev));
+
+	start = seprintf(start, end, "mcfg: nr_entries %d\n", tbl->nr_entries);
+	for (int i = 0; i < tbl->nr_entries; i++) {
+		start = seprintf(start, end, "\tSeg: %d Bus: %d-%d Addr: %p\n",
+				 tbl->entries[i].segment,
+				 tbl->entries[i].start_bus,
+				 tbl->entries[i].end_bus,
+				 tbl->entries[i].addr);
+	}
+
+	return start;
+}
+
+physaddr_t acpi_pci_get_mmio_cfg_addr(int segment, int bus, int dev, int func)
+{
+	struct acpi_mcfg_data *tbl = mcfgtbl->tbl;
+
+	for (int i = 0; i < tbl->nr_entries; i++) {
+		if (segment == tbl->entries[i].segment &&
+		    tbl->entries[i].start_bus <= bus &&
+		    bus <= tbl->entries[i].end_bus)
+			return tbl->entries[i].addr
+				+ (((bus - tbl->entries[i].start_bus) << 20)
+				   | (dev << 15)
+				   | (func << 12)
+				  );
+	}
+	return 0;
+}
+
 static char *dumptable(char *start, char *end, char *sig, uint8_t *p, int l)
 {
 	int n, i;
@@ -1415,7 +1505,7 @@ struct Parser {
 static struct Parser ptable[] = {
     {"FACP", parsefadt}, {"APIC", parsemadt}, {"DMAR", parsedmar},
     {"SRAT", parsesrat}, {"SLIT", parseslit}, {"MSCT", parsemsct},
-    {"SSDT", parsessdt}, {"HPET", parsehpet},
+    {"SSDT", parsessdt}, {"HPET", parsehpet}, {"MCFG", parsemcfg},
 };
 
 /*
@@ -2030,7 +2120,8 @@ static size_t acpiread(struct chan *c, void *a, size_t n, off64_t off)
 		s = dumpslit(s, e, slit);
 		s = dumpsrat(s, e, srat);
 		s = dumpdmar(s, e, dmar);
-		dumpmsct(s, e, mscttbl);
+		s = dumpmsct(s, e, mscttbl);
+		s = dumpmcfg(s, e, mcfgtbl);
 		return readstr(off, a, n, ttext);
 	default:
 		error(EINVAL, "acpiread: bad path %d\n", q);
