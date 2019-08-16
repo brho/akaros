@@ -168,8 +168,9 @@ static size_t pciread(struct chan *c, void *va, size_t n, off64_t offset)
 		for (i = 0; i < COUNT_OF(p->bar); i++) {
 			if (p->bar[i].mmio_sz == 0)
 				continue;
-			w = seprintf(w, ebuf, " %d:%.8lux %d", i,
-				     p->bar[i].pio_base, p->bar[i].mmio_sz);
+			w = seprintf(w, ebuf, " %d:%.8lux %4x/%8x %d", i,
+				     p->bar[i].pio_base, p->bar[i].mmio_base32,
+				     p->bar[i].mmio_base64, p->bar[i].mmio_sz);
 		}
 		*w++ = '\n';
 		*w = '\0';
