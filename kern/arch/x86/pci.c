@@ -202,7 +202,7 @@ static uintptr_t pci_get_mmio_cfg(struct pci_device *pcidev)
 {
 	physaddr_t paddr;
 
-	paddr = acpi_pci_get_mmio_cfg_addr(0 /* segment for legacy PCI enum*/,
+	paddr = acpi_pci_get_mmio_cfg_addr(pcidev->domain,
 					  pcidev->bus, pcidev->dev,
 					  pcidev->func);
 	if (!paddr)
@@ -243,6 +243,9 @@ void pci_init(void)
 				/* we don't need to lock it til we post the
 				 * pcidev to the list*/
 				spinlock_init_irqsave(&pcidev->lock);
+				/* we only discover domain 0 during legacy
+				 * PCI enumeration */
+				pcidev->domain = 0;
 				pcidev->bus = i;
 				pcidev->dev = j;
 				pcidev->func = k;

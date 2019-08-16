@@ -175,6 +175,7 @@ struct pci_device {
 	void				*dev_data; /* device private pointer */
 	struct device			device;
 	bool				in_use;	/* prevent double discovery */
+	int				domain; /* legacy size was 16-bits */
 	uint8_t				bus;
 	uint8_t				dev;
 	uint8_t				func;
