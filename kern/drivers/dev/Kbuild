@@ -11,6 +11,7 @@ obj-y						+= kprof.o
 obj-y						+= mem.o
 obj-y						+= mnt.o
 obj-y						+= pci.o
+obj-y						+= cbdma.o
 obj-y						+= pipe.o
 obj-y						+= proc.o
 obj-y						+= random.o
