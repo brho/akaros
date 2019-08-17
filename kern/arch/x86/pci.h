@@ -173,6 +173,7 @@ struct pci_device {
 	spinlock_t			lock;
 	uintptr_t			mmio_cfg;
 	void				*dev_data; /* device private pointer */
+	struct iommu			*iommu; /* ptr to controlling iommu */
 	struct device			device;
 	bool				in_use;	/* prevent double discovery */
 	int				domain; /* legacy size was 16-bits */
@@ -200,6 +201,8 @@ struct pci_device {
 	uintptr_t			msix_pba_vaddr;
 	unsigned int			msix_nr_vec;
 	bool				msix_ready;
+	TAILQ_ENTRY(pci_device)		proc_link; /* for device passthru */
+	struct proc			*proc_owner;
 };
 
 struct msix_entry {
@@ -215,6 +218,7 @@ struct msix_irq_vector {
 };
 
 /* List of all discovered devices */
+TAILQ_HEAD(pcidev_tq, pci_device);
 STAILQ_HEAD(pcidev_stailq, pci_device);
 extern struct pcidev_stailq pci_devices;
 

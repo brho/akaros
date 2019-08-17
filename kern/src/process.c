@@ -460,6 +460,7 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	memset(&p->vmm, 0, sizeof(struct vmm));
 	spinlock_init(&p->vmm.lock);
 	qlock_init(&p->vmm.qlock);
+	TAILQ_INIT(&p->pci_devices);
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	*pp = p;
 	return 0;

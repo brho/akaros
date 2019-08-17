@@ -54,6 +54,7 @@
 
 #include <ns.h>
 #include <slice.h>
+#include <arch/intel-iommu.h>
 
 enum {
 
@@ -493,6 +494,7 @@ struct Drhd {
 	uintptr_t all;	// This drhd scope is for everything.
 	size_t nscope;
 	struct DevScope *scopes;
+	struct iommu iommu; /* not part of the ACPI table */
 };
 
 struct Dmar {

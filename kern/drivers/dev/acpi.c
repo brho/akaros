@@ -794,9 +794,10 @@ static char *dumpdmar(char *start, char *end, struct Atable *dmar)
 		struct Drhd *drhd = at->tbl;
 
 		start = seprintf(start, end, "\tDRHD: ");
-		start = seprintf(start, end, "%s 0x%02x 0x%016x\n",
+		start = seprintf(start, end, "%s 0x%02x 0x%016x ",
 		                 drhd->all & 1 ? "INCLUDE_PCI_ALL" : "Scoped",
 		                 drhd->segment, drhd->rba);
+		start = seprintf(start, end, "iommu: %p\n", &drhd->iommu);
 	}
 
 	return start;
@@ -1298,6 +1299,9 @@ static struct Atable *parsedmar(struct Atable *parent, char *name, uint8_t *raw,
 			pathp += 2 * ds->npath;
 			o += dhlen;
 		}
+
+		iommu_initialize(&drhd->iommu, dt->haw, drhd->rba);
+
 		/*
 		 * NOTE: if all is set, there should be no scopes of type
 		 * This being ACPI, where vendors randomly copy tables
@@ -1307,6 +1311,7 @@ static struct Atable *parsedmar(struct Atable *parent, char *name, uint8_t *raw,
 		finatable_nochildren(tt);
 		slice_append(&drhds, tt);
 	}
+	iommu_initialize_global();
 	dmar = finatable(t, &drhds);
 
 	return dmar;
