@@ -53,7 +53,11 @@ struct iommu {
 	TAILQ_ENTRY(iommu) iommu_link;
 	struct proc_list procs; // unused
 	bool supported;
+	bool device_iotlb;
+	bool rwbf;
 
+	uint16_t iotlb_cmd_offset;
+	uint16_t iotlb_addr_offset;
 	void __iomem *regio;
 	uint64_t rba; /* for unique assertion */
 	uint64_t num_assigned_devs;

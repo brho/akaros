@@ -56,6 +56,46 @@ static struct dirtab iommudir[] = {
 	{"power",               {Qpower, 0, QTFILE}, 0, 0755},
 };
 
+/* this is might be necessary when updating mapping structures: context-cache,
+ * IOTLB or IEC. */
+static inline void write_buffer_flush(struct iommu *iommu)
+{
+	uint32_t cmd, status;
+
+	if (!iommu->rwbf)
+		return;
+
+	cmd = read32(iommu->regio + DMAR_GCMD_REG) | DMA_GCMD_WBF;
+	write32(cmd, iommu->regio + DMAR_GCMD_REG);
+
+	/* read status */
+	do {
+		status = read32(iommu->regio + DMAR_GSTS_REG);
+	} while (status & DMA_GSTS_WBFS);
+}
+
+/* this is necessary when caching mode is supported.
+ * ASSUMES: No pending flush requests. This is a problem only if other function
+ * is used to perform the flush. */
+static inline void iotlb_flush(struct iommu *iommu, uint16_t did)
+{
+	uint64_t cmd, status;
+
+	cmd = 0x0
+	| DMA_TLB_IVT        /* issue the flush command */
+	| DMA_TLB_DSI_FLUSH  /* DID specific shootdown */
+	| DMA_TLB_READ_DRAIN
+	| DMA_TLB_WRITE_DRAIN
+	| DMA_TLB_DID(did);
+	write64(cmd, iommu->regio + iommu->iotlb_cmd_offset);
+
+	/* read status */
+	do {
+		status = read64(iommu->regio + iommu->iotlb_cmd_offset);
+		status >>= 63; /* bit 64 (IVT): gets cleared on completion */
+	} while (status);
+}
+
 static inline struct root_entry *get_root_entry(physaddr_t paddr)
 {
 	return (struct root_entry *) KADDR(paddr);
