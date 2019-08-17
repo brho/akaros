@@ -154,14 +154,72 @@ static physaddr_t rt_init(struct iommu *iommu, uint16_t did)
 	return rt;
 }
 
-static void setup_page_tables(struct proc *p, struct pci_device *d)
+static struct context_entry *get_ctx_for(int bus, int dev, int func,
+	physaddr_t roottable)
 {
-	// setup the pte; use the pip as did
+	struct root_entry *rte;
+	physaddr_t cte_phy;
+	struct context_entry *cte;
+	uint32_t offset = 0;
+
+	rte = get_root_entry(roottable) + bus;
+
+	cte_phy = rte->lo & 0xFFFFFFFFFFFFF000;
+	cte = get_context_entry(cte_phy);
+
+	offset = (dev * 8) + func;
+	cte += offset;
+
+	return cte;
 }
 
+/* The process pid is used as the Domain ID (DID) */
+static void setup_page_tables(struct proc *p, struct pci_device *d)
+{
+	uint32_t cmd, status;
+	uint16_t did = p->pid; /* casts down to 16-bit */
+	struct iommu *iommu = d->iommu;
+	struct context_entry *cte =
+		get_ctx_for(d->bus, d->dev, d->func, iommu->roottable);
+
+	/* Mark the entry as not present */
+	cte->lo &= ~0x1;
+	write_buffer_flush(iommu);
+	iotlb_flush(iommu, IOMMU_DID_DEFAULT);
+
+	cte->hi = 0
+		| (did << CTX_HI_DID_SHIFT) // DID bit: 72 to 87
+		| (CTX_AW_L4 << CTX_HI_AW_SHIFT); // AW
+
+	cte->lo = PTE_ADDR(p->env_pgdir.eptp)
+		| (0x0 << CTX_LO_TRANS_SHIFT)
+		| (0x1 << CTX_LO_FPD_SHIFT) // disable faults
+		| (0x1 << CTX_LO_PRESENT_SHIFT); /* mark present */
+}
+
+/* TODO: We should mark the entry as not present to block any stray DMAs from
+ * reaching the kernel. To force a re-attach the device to the kernel, we can
+ * use pid 0. */
 static void teardown_page_tables(struct proc *p, struct pci_device *d)
 {
-	// revert to default did
+	uint16_t did = IOMMU_DID_DEFAULT;
+	struct iommu *iommu = d->iommu;
+	struct context_entry *cte =
+		get_ctx_for(d->bus, d->dev, d->func, iommu->roottable);
+
+	/* Mark the entry as not present */
+	cte->lo &= ~0x1;
+	write_buffer_flush(iommu);
+	iotlb_flush(iommu, p->pid);
+
+	cte->hi = 0
+		| (did << CTX_HI_DID_SHIFT) // DID bit: 72 to 87
+		| (CTX_AW_L4 << CTX_HI_AW_SHIFT); // AW
+
+	cte->lo = 0 /* assumes page alignment */
+		| (0x2 << CTX_LO_TRANS_SHIFT)
+		| (0x1 << CTX_LO_FPD_SHIFT) // disable faults
+		| (0x1 << CTX_LO_PRESENT_SHIFT); /* mark present */
 }
 
 static bool _iommu_enable(struct iommu *iommu)
