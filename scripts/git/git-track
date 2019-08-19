@@ -28,7 +28,7 @@ then
 	if [ $# -ne 2 ]
 	then
 		echo "Remote $REMOTE not tracked yet and no URL passed"
-		echo "Try again with the repo's URL or add the remote manually"
+		echo "	Try again with the repo's URL or add the remote manually"
 		usage
 	fi
 	URL=$2
@@ -37,4 +37,4 @@ else
 	git remote set-branches --add $REMOTE $BRANCH
 fi
 
-git fetch $REMOTE
+git fetch -n $REMOTE $BRANCH
