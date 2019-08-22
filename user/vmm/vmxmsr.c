@@ -128,18 +128,17 @@ static int emsr_fakewrite(struct guest_thread *vm_thread, struct emmsr *msr,
 	uint64_t msr_val;
 	struct vm_trapframe *vm_tf = &(vm_thread->uthread.u_ctx.tf.vm_tf);
 
-	if (!msr->written) {
-		msr_val = read_msr(msr->reg);
-		eax = low32(msr_val);
-		edx = high32(msr_val);
-	} else {
-		eax = msr->eax;
-		edx = msr->edx;
-	}
 	if (opcode == EXIT_REASON_MSR_READ) {
+		if (!msr->written) {
+			msr_val = read_msr(msr->reg);
+			eax = low32(msr_val);
+			edx = high32(msr_val);
+		} else {
+			eax = msr->eax;
+			edx = msr->edx;
+		}
 		vm_tf->tf_rax = eax;
 		vm_tf->tf_rdx = edx;
-		return 0;
 	} else {
 		msr->edx = vm_tf->tf_rdx;
 		msr->eax = vm_tf->tf_rax;
