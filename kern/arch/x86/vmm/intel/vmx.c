@@ -1316,6 +1316,10 @@ int intel_vmm_init(void)
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_STAR);
 	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_SFMASK);
 
+	/* If we pretend to be a processor without this cpuid feature, we should
+	 * intercept and inject a GPF. */
+	__vmx_disable_intercept_for_msr(msr_bitmap, MSR_IA32_PRED_CMD);
+
 	/* TODO: this might be dangerous, since they can do more than just read
 	 * the CMOS */
 	__vmx_disable_intercept_for_io(io_bitmap, CMOS_RAM_IDX);
