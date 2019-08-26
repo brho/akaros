@@ -76,7 +76,7 @@
 #define IOAT_VER_3_4		0x34	/* Version 3.4 */
 
 
-int system_has_dca_enabled(struct pci_dev *pdev);
+int system_has_dca_enabled(struct pci_device *pdev);
 
 #define IOAT_DESC_SZ	64
 

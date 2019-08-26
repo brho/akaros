@@ -71,7 +71,8 @@ static char *chanerr_str[] = {
 
 static void ioat_eh(struct ioatdma_chan *ioat_chan);
 
-static void ioat_print_chanerrs(struct ioatdma_chan *ioat_chan, u32 chanerr)
+static void ioat_print_chanerrs(struct ioatdma_chan *ioat_chan,
+				uint32_t chanerr)
 {
 	int i;
 
@@ -88,33 +89,33 @@ static void ioat_print_chanerrs(struct ioatdma_chan *ioat_chan, u32 chanerr)
  * @irq: interrupt id
  * @data: interrupt data
  */
-irqreturn_t ioat_dma_do_interrupt(int irq, void *data)
+void ioat_dma_do_interrupt(struct hw_trapframe *hw_tf, void *data)
 {
 	struct ioatdma_device *instance = data;
 	struct ioatdma_chan *ioat_chan;
 	unsigned long attnstatus;
 	int bit;
-	u8 intrctrl;
+	uint8_t intrctrl;
 
-	intrctrl = readb(instance->reg_base + IOAT_INTRCTRL_OFFSET);
+	intrctrl = read8(instance->reg_base + IOAT_INTRCTRL_OFFSET);
 
 	if (!(intrctrl & IOAT_INTRCTRL_MASTER_INT_EN))
-		return IRQ_NONE;
+		return;
 
 	if (!(intrctrl & IOAT_INTRCTRL_INT_STATUS)) {
-		writeb(intrctrl, instance->reg_base + IOAT_INTRCTRL_OFFSET);
-		return IRQ_NONE;
+		write8(intrctrl, instance->reg_base + IOAT_INTRCTRL_OFFSET);
+		return;
 	}
 
-	attnstatus = readl(instance->reg_base + IOAT_ATTNSTATUS_OFFSET);
+	attnstatus = read32(instance->reg_base + IOAT_ATTNSTATUS_OFFSET);
 	for_each_set_bit(bit, &attnstatus, BITS_PER_LONG) {
 		ioat_chan = ioat_chan_by_index(instance, bit);
 		if (test_bit(IOAT_RUN, &ioat_chan->state))
 			tasklet_schedule(&ioat_chan->cleanup_task);
 	}
 
-	writeb(intrctrl, instance->reg_base + IOAT_INTRCTRL_OFFSET);
-	return IRQ_HANDLED;
+	write8(intrctrl, instance->reg_base + IOAT_INTRCTRL_OFFSET);
+	return;
 }
 
 /**
@@ -122,20 +123,20 @@ irqreturn_t ioat_dma_do_interrupt(int irq, void *data)
  * @irq: interrupt id
  * @data: interrupt data
  */
-irqreturn_t ioat_dma_do_interrupt_msix(int irq, void *data)
+void ioat_dma_do_interrupt_msix(struct hw_trapframe *hw_tf, void *data)
 {
 	struct ioatdma_chan *ioat_chan = data;
 
 	if (test_bit(IOAT_RUN, &ioat_chan->state))
 		tasklet_schedule(&ioat_chan->cleanup_task);
 
-	return IRQ_HANDLED;
+	return;
 }
 
 void ioat_stop(struct ioatdma_chan *ioat_chan)
 {
 	struct ioatdma_device *ioat_dma = ioat_chan->ioat_dma;
-	struct pci_dev *pdev = ioat_dma->pdev;
+	struct pci_device *pdev = ioat_dma->pdev;
 	int chan_id = chan_num(ioat_chan);
 	struct msix_entry *msix;
 
@@ -152,7 +153,7 @@ void ioat_stop(struct ioatdma_chan *ioat_chan)
 		break;
 	case IOAT_MSI:
 	case IOAT_INTX:
-		synchronize_irq(pdev->irq);
+		synchronize_irq(pdev->irqline);
 		break;
 	default:
 		break;
@@ -172,7 +173,7 @@ static void __ioat_issue_pending(struct ioatdma_chan *ioat_chan)
 {
 	ioat_chan->dmacount += ioat_ring_pending(ioat_chan);
 	ioat_chan->issued = ioat_chan->head;
-	writew(ioat_chan->dmacount,
+	write16(ioat_chan->dmacount,
 	       ioat_chan->reg_base + IOAT_CHAN_DMACOUNT_OFFSET);
 	dev_dbg(to_dev(ioat_chan),
 		"%s: head: %#x tail: %#x issued: %#x count: %#x\n",
@@ -185,9 +186,9 @@ void ioat_issue_pending(struct dma_chan *c)
 	struct ioatdma_chan *ioat_chan = to_ioat_chan(c);
 
 	if (ioat_ring_pending(ioat_chan)) {
-		spin_lock_bh(&ioat_chan->prep_lock);
+		spin_lock(&ioat_chan->prep_lock);
 		__ioat_issue_pending(ioat_chan);
-		spin_unlock_bh(&ioat_chan->prep_lock);
+		spin_unlock(&ioat_chan->prep_lock);
 	}
 }
 
@@ -240,10 +241,10 @@ static void __ioat_start_null_desc(struct ioatdma_chan *ioat_chan)
 
 void ioat_start_null_desc(struct ioatdma_chan *ioat_chan)
 {
-	spin_lock_bh(&ioat_chan->prep_lock);
+	spin_lock(&ioat_chan->prep_lock);
 	if (!test_bit(IOAT_CHAN_DOWN, &ioat_chan->state))
 		__ioat_start_null_desc(ioat_chan);
-	spin_unlock_bh(&ioat_chan->prep_lock);
+	spin_unlock(&ioat_chan->prep_lock);
 }
 
 static void __ioat_restart_chan(struct ioatdma_chan *ioat_chan)
@@ -272,7 +273,7 @@ static int ioat_quiesce(struct ioatdma_chan *ioat_chan, unsigned long tmo)
 {
 	unsigned long end = jiffies + tmo;
 	int err = 0;
-	u32 status;
+	uint32_t status;
 
 	status = ioat_chansts(ioat_chan);
 	if (is_ioat_active(status) || is_ioat_idle(status))
@@ -328,7 +329,7 @@ static dma_cookie_t ioat_tx_submit_unlock(struct dma_async_tx_descriptor *tx)
 	ioat_chan->head += ioat_chan->produce;
 
 	ioat_update_pending(ioat_chan);
-	spin_unlock_bh(&ioat_chan->prep_lock);
+	spin_unlock(&ioat_chan->prep_lock);
 
 	return cookie;
 }
@@ -341,13 +342,13 @@ ioat_alloc_ring_ent(struct dma_chan *chan, int idx, gfp_t flags)
 	struct ioatdma_chan *ioat_chan = to_ioat_chan(chan);
 	int chunk;
 	dma_addr_t phys;
-	u8 *pos;
+	uint8_t *pos;
 	off_t offs;
 
 	chunk = idx / IOAT_DESCS_PER_2M;
 	idx &= (IOAT_DESCS_PER_2M - 1);
 	offs = idx * IOAT_DESC_SZ;
-	pos = (u8 *)ioat_chan->descs[chunk].virt + offs;
+	pos = (uint8_t *)ioat_chan->descs[chunk].virt + offs;
 	phys = ioat_chan->descs[chunk].hw + offs;
 	hw = (struct ioat_dma_descriptor *)pos;
 	memset(hw, 0, sizeof(*hw));
@@ -378,7 +379,7 @@ ioat_alloc_ring(struct dma_chan *c, int order, gfp_t flags)
 	int i, chunks;
 
 	/* allocate the array to hold the software ring */
-	ring = kcalloc(total_descs, sizeof(*ring), flags);
+	ring = kzmalloc((total_descs) * (sizeof(*ring)), flags);
 	if (!ring)
 		return NULL;
 
@@ -440,12 +441,12 @@ ioat_alloc_ring(struct dma_chan *c, int order, gfp_t flags)
 
 	/* setup descriptor pre-fetching for v3.4 */
 	if (ioat_dma->cap & IOAT_CAP_DPS) {
-		u16 drsctl = IOAT_CHAN_DRSZ_2MB | IOAT_CHAN_DRS_EN;
+		uint16_t drsctl = IOAT_CHAN_DRSZ_2MB | IOAT_CHAN_DRS_EN;
 
 		if (chunks == 1)
 			drsctl |= IOAT_CHAN_DRS_AUTOWRAP;
 
-		writew(drsctl, ioat_chan->reg_base + IOAT_CHAN_DRSCTL_OFFSET);
+		write16(drsctl, ioat_chan->reg_base + IOAT_CHAN_DRSCTL_OFFSET);
 
 	}
 
@@ -460,7 +461,7 @@ ioat_alloc_ring(struct dma_chan *c, int order, gfp_t flags)
 int ioat_check_space_lock(struct ioatdma_chan *ioat_chan, int num_descs)
 	__acquires(&ioat_chan->prep_lock)
 {
-	spin_lock_bh(&ioat_chan->prep_lock);
+	spin_lock(&ioat_chan->prep_lock);
 	/* never allow the last descriptor to be consumed, we need at
 	 * least one free at all times to allow for on-the-fly ring
 	 * resizing.
@@ -472,7 +473,7 @@ int ioat_check_space_lock(struct ioatdma_chan *ioat_chan, int num_descs)
 		ioat_chan->produce = num_descs;
 		return 0;  /* with ioat->prep_lock held */
 	}
-	spin_unlock_bh(&ioat_chan->prep_lock);
+	spin_unlock(&ioat_chan->prep_lock);
 
 	dev_dbg_ratelimited(to_dev(ioat_chan),
 			    "%s: ring full! num_descs: %d (%x:%x:%x)\n",
@@ -523,10 +524,10 @@ ioat_free_sed(struct ioatdma_device *ioat_dma, struct ioat_sed_ent *sed)
 	kmem_cache_free(ioat_sed_cache, sed);
 }
 
-static u64 ioat_get_current_completion(struct ioatdma_chan *ioat_chan)
+static uint64_t ioat_get_current_completion(struct ioatdma_chan *ioat_chan)
 {
-	u64 phys_complete;
-	u64 completion;
+	uint64_t phys_complete;
+	uint64_t completion;
 
 	completion = *ioat_chan->completion;
 	phys_complete = ioat_chansts_to_addr(completion);
@@ -538,7 +539,7 @@ static u64 ioat_get_current_completion(struct ioatdma_chan *ioat_chan)
 }
 
 static bool ioat_cleanup_preamble(struct ioatdma_chan *ioat_chan,
-				   u64 *phys_complete)
+				   uint64_t *phys_complete)
 {
 	*phys_complete = ioat_get_current_completion(ioat_chan);
 	if (*phys_complete == ioat_chan->last_completion)
@@ -590,7 +591,7 @@ static void __cleanup(struct ioatdma_chan *ioat_chan, dma_addr_t phys_complete)
 	struct ioat_ring_ent *desc;
 	bool seen_current = false;
 	int idx = ioat_chan->tail, i;
-	u16 active;
+	uint16_t active;
 
 	dev_dbg(to_dev(ioat_chan), "%s: head: %#x tail: %#x issued: %#x\n",
 		__func__, ioat_chan->head, ioat_chan->tail, ioat_chan->issued);
@@ -631,7 +632,7 @@ static void __cleanup(struct ioatdma_chan *ioat_chan, dma_addr_t phys_complete)
 
 		/* skip extended descriptors */
 		if (desc_has_ext(desc)) {
-			BUG_ON(i + 1 >= active);
+			assert(!(i + 1 >= active));
 			i++;
 		}
 
@@ -643,10 +644,10 @@ static void __cleanup(struct ioatdma_chan *ioat_chan, dma_addr_t phys_complete)
 	}
 
 	/* finish all descriptor reads before incrementing tail */
-	smp_mb();
+	mb();
 	ioat_chan->tail = idx + i;
 	/* no active descs have written a completion? */
-	BUG_ON(active && !seen_current);
+	assert(!(active && !seen_current));
 	ioat_chan->last_completion = phys_complete;
 
 	if (active - i == 0) {
@@ -657,8 +658,7 @@ static void __cleanup(struct ioatdma_chan *ioat_chan, dma_addr_t phys_complete)
 
 	/* microsecond delay by sysfs variable  per pending descriptor */
 	if (ioat_chan->intr_coalesce != ioat_chan->prev_intr_coalesce) {
-		writew(min((ioat_chan->intr_coalesce * (active - i)),
-		       IOAT_INTRDELAY_MASK),
+		write16(MIN((ioat_chan->intr_coalesce * (active - i)), IOAT_INTRDELAY_MASK),
 		       ioat_chan->ioat_dma->reg_base + IOAT_INTRDELAY_OFFSET);
 		ioat_chan->prev_intr_coalesce = ioat_chan->intr_coalesce;
 	}
@@ -666,15 +666,15 @@ static void __cleanup(struct ioatdma_chan *ioat_chan, dma_addr_t phys_complete)
 
 static void ioat_cleanup(struct ioatdma_chan *ioat_chan)
 {
-	u64 phys_complete;
+	uint64_t phys_complete;
 
-	spin_lock_bh(&ioat_chan->cleanup_lock);
+	spin_lock(&ioat_chan->cleanup_lock);
 
 	if (ioat_cleanup_preamble(ioat_chan, &phys_complete))
 		__cleanup(ioat_chan, phys_complete);
 
 	if (is_ioat_halted(*ioat_chan->completion)) {
-		u32 chanerr = readl(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
+		uint32_t chanerr = read32(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
 
 		if (chanerr &
 		    (IOAT_CHANERR_HANDLE_MASK | IOAT_CHANERR_RECOVER_MASK)) {
@@ -683,7 +683,7 @@ static void ioat_cleanup(struct ioatdma_chan *ioat_chan)
 		}
 	}
 
-	spin_unlock_bh(&ioat_chan->cleanup_lock);
+	spin_unlock(&ioat_chan->cleanup_lock);
 }
 
 void ioat_cleanup_event(unsigned long data)
@@ -693,17 +693,17 @@ void ioat_cleanup_event(unsigned long data)
 	ioat_cleanup(ioat_chan);
 	if (!test_bit(IOAT_RUN, &ioat_chan->state))
 		return;
-	writew(IOAT_CHANCTRL_RUN, ioat_chan->reg_base + IOAT_CHANCTRL_OFFSET);
+	write16(IOAT_CHANCTRL_RUN, ioat_chan->reg_base + IOAT_CHANCTRL_OFFSET);
 }
 
 static void ioat_restart_channel(struct ioatdma_chan *ioat_chan)
 {
-	u64 phys_complete;
+	uint64_t phys_complete;
 
 	/* set the completion address register again */
-	writel(lower_32_bits(ioat_chan->completion_dma),
+	write32(lower_32_bits(ioat_chan->completion_dma),
 	       ioat_chan->reg_base + IOAT_CHANCMP_OFFSET_LOW);
-	writel(upper_32_bits(ioat_chan->completion_dma),
+	write32(upper_32_bits(ioat_chan->completion_dma),
 	       ioat_chan->reg_base + IOAT_CHANCMP_OFFSET_HIGH);
 
 	ioat_quiesce(ioat_chan, 0);
@@ -718,7 +718,7 @@ static void ioat_abort_descs(struct ioatdma_chan *ioat_chan)
 {
 	struct ioatdma_device *ioat_dma = ioat_chan->ioat_dma;
 	struct ioat_ring_ent *desc;
-	u16 active;
+	uint16_t active;
 	int idx = ioat_chan->tail, i;
 
 	/*
@@ -749,7 +749,7 @@ static void ioat_abort_descs(struct ioatdma_chan *ioat_chan)
 
 		/* skip extended descriptors */
 		if (desc_has_ext(desc)) {
-			WARN_ON(i + 1 >= active);
+			warn_on(i + 1 >= active);
 			i++;
 		}
 
@@ -760,7 +760,7 @@ static void ioat_abort_descs(struct ioatdma_chan *ioat_chan)
 		}
 	}
 
-	smp_mb(); /* finish all descriptor reads before incrementing tail */
+	mb(); /* finish all descriptor reads before incrementing tail */
 	ioat_chan->tail = idx + active;
 
 	desc = ioat_get_ring_ent(ioat_chan, ioat_chan->tail);
@@ -769,14 +769,14 @@ static void ioat_abort_descs(struct ioatdma_chan *ioat_chan)
 
 static void ioat_eh(struct ioatdma_chan *ioat_chan)
 {
-	struct pci_dev *pdev = to_pdev(ioat_chan);
+	struct pci_device *pdev = to_pdev(ioat_chan);
 	struct ioat_dma_descriptor *hw;
 	struct dma_async_tx_descriptor *tx;
-	u64 phys_complete;
+	uint64_t phys_complete;
 	struct ioat_ring_ent *desc;
-	u32 err_handled = 0;
-	u32 chanerr_int;
-	u32 chanerr;
+	uint32_t err_handled = 0;
+	uint32_t chanerr_int;
+	uint32_t chanerr;
 	bool abort = false;
 	struct dmaengine_result res;
 
@@ -784,7 +784,7 @@ static void ioat_eh(struct ioatdma_chan *ioat_chan)
 	if (ioat_cleanup_preamble(ioat_chan, &phys_complete))
 		__cleanup(ioat_chan, phys_complete);
 
-	chanerr = readl(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
+	chanerr = read32(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
 	pci_read_config_dword(pdev, IOAT_PCI_CHANERR_INT_OFFSET, &chanerr_int);
 
 	dev_dbg(to_dev(ioat_chan), "%s: error = %x:%x\n",
@@ -836,7 +836,7 @@ static void ioat_eh(struct ioatdma_chan *ioat_chan)
 		dev_err(to_dev(ioat_chan), "Errors not handled:\n");
 		ioat_print_chanerrs(ioat_chan, (chanerr & ~err_handled));
 
-		BUG();
+		panic("BUG");
 	}
 
 	/* cleanup the faulty descriptor since we are continuing */
@@ -852,7 +852,7 @@ static void ioat_eh(struct ioatdma_chan *ioat_chan)
 	/* mark faulting descriptor as complete */
 	*ioat_chan->completion = desc->txd.phys;
 
-	spin_lock_bh(&ioat_chan->prep_lock);
+	spin_lock(&ioat_chan->prep_lock);
 	/* we need abort all descriptors */
 	if (abort) {
 		ioat_abort_descs(ioat_chan);
@@ -860,11 +860,11 @@ static void ioat_eh(struct ioatdma_chan *ioat_chan)
 		ioat_reset_hw(ioat_chan);
 	}
 
-	writel(chanerr, ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
+	write32(chanerr, ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
 	pci_write_config_dword(pdev, IOAT_PCI_CHANERR_INT_OFFSET, chanerr_int);
 
 	ioat_restart_channel(ioat_chan);
-	spin_unlock_bh(&ioat_chan->prep_lock);
+	spin_unlock(&ioat_chan->prep_lock);
 }
 
 static void check_active(struct ioatdma_chan *ioat_chan)
@@ -882,7 +882,7 @@ void ioat_timer_event(struct timer_list *t)
 {
 	struct ioatdma_chan *ioat_chan = from_timer(ioat_chan, t, timer);
 	dma_addr_t phys_complete;
-	u64 status;
+	uint64_t status;
 
 	status = ioat_chansts(ioat_chan);
 
@@ -890,19 +890,19 @@ void ioat_timer_event(struct timer_list *t)
 	 * programming errors before advancing the completion state
 	 */
 	if (is_ioat_halted(status)) {
-		u32 chanerr;
+		uint32_t chanerr;
 
-		chanerr = readl(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
+		chanerr = read32(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
 		dev_err(to_dev(ioat_chan), "%s: Channel halted (%x)\n",
 			__func__, chanerr);
 		dev_err(to_dev(ioat_chan), "Errors:\n");
 		ioat_print_chanerrs(ioat_chan, chanerr);
 
 		if (test_bit(IOAT_RUN, &ioat_chan->state)) {
-			spin_lock_bh(&ioat_chan->cleanup_lock);
-			spin_lock_bh(&ioat_chan->prep_lock);
+			spin_lock(&ioat_chan->cleanup_lock);
+			spin_lock(&ioat_chan->prep_lock);
 			set_bit(IOAT_CHAN_DOWN, &ioat_chan->state);
-			spin_unlock_bh(&ioat_chan->prep_lock);
+			spin_unlock(&ioat_chan->prep_lock);
 
 			ioat_abort_descs(ioat_chan);
 			dev_warn(to_dev(ioat_chan), "Reset channel...\n");
@@ -910,23 +910,23 @@ void ioat_timer_event(struct timer_list *t)
 			dev_warn(to_dev(ioat_chan), "Restart channel...\n");
 			ioat_restart_channel(ioat_chan);
 
-			spin_lock_bh(&ioat_chan->prep_lock);
+			spin_lock(&ioat_chan->prep_lock);
 			clear_bit(IOAT_CHAN_DOWN, &ioat_chan->state);
-			spin_unlock_bh(&ioat_chan->prep_lock);
-			spin_unlock_bh(&ioat_chan->cleanup_lock);
+			spin_unlock(&ioat_chan->prep_lock);
+			spin_unlock(&ioat_chan->cleanup_lock);
 		}
 
 		return;
 	}
 
-	spin_lock_bh(&ioat_chan->cleanup_lock);
+	spin_lock(&ioat_chan->cleanup_lock);
 
 	/* handle the no-actives case */
 	if (!ioat_ring_active(ioat_chan)) {
-		spin_lock_bh(&ioat_chan->prep_lock);
+		spin_lock(&ioat_chan->prep_lock);
 		check_active(ioat_chan);
-		spin_unlock_bh(&ioat_chan->prep_lock);
-		spin_unlock_bh(&ioat_chan->cleanup_lock);
+		spin_unlock(&ioat_chan->prep_lock);
+		spin_unlock(&ioat_chan->cleanup_lock);
 		return;
 	}
 
@@ -937,9 +937,9 @@ void ioat_timer_event(struct timer_list *t)
 	if (ioat_cleanup_preamble(ioat_chan, &phys_complete))
 		__cleanup(ioat_chan, phys_complete);
 	else if (test_bit(IOAT_COMPLETION_ACK, &ioat_chan->state)) {
-		u32 chanerr;
+		uint32_t chanerr;
 
-		chanerr = readl(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
+		chanerr = read32(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
 		dev_err(to_dev(ioat_chan), "CHANSTS: %#Lx CHANERR: %#x\n",
 			status, chanerr);
 		dev_err(to_dev(ioat_chan), "Errors:\n");
@@ -948,9 +948,9 @@ void ioat_timer_event(struct timer_list *t)
 		dev_dbg(to_dev(ioat_chan), "Active descriptors: %d\n",
 			ioat_ring_active(ioat_chan));
 
-		spin_lock_bh(&ioat_chan->prep_lock);
+		spin_lock(&ioat_chan->prep_lock);
 		set_bit(IOAT_CHAN_DOWN, &ioat_chan->state);
-		spin_unlock_bh(&ioat_chan->prep_lock);
+		spin_unlock(&ioat_chan->prep_lock);
 
 		ioat_abort_descs(ioat_chan);
 		dev_warn(to_dev(ioat_chan), "Resetting channel...\n");
@@ -958,16 +958,16 @@ void ioat_timer_event(struct timer_list *t)
 		dev_warn(to_dev(ioat_chan), "Restarting channel...\n");
 		ioat_restart_channel(ioat_chan);
 
-		spin_lock_bh(&ioat_chan->prep_lock);
+		spin_lock(&ioat_chan->prep_lock);
 		clear_bit(IOAT_CHAN_DOWN, &ioat_chan->state);
-		spin_unlock_bh(&ioat_chan->prep_lock);
-		spin_unlock_bh(&ioat_chan->cleanup_lock);
+		spin_unlock(&ioat_chan->prep_lock);
+		spin_unlock(&ioat_chan->cleanup_lock);
 		return;
 	} else
 		set_bit(IOAT_COMPLETION_ACK, &ioat_chan->state);
 
 	mod_timer(&ioat_chan->timer, jiffies + COMPLETION_TIMEOUT);
-	spin_unlock_bh(&ioat_chan->cleanup_lock);
+	spin_unlock(&ioat_chan->cleanup_lock);
 }
 
 enum dma_status
@@ -992,22 +992,22 @@ int ioat_reset_hw(struct ioatdma_chan *ioat_chan)
 	 * initialized, with ioat3 specific workarounds
 	 */
 	struct ioatdma_device *ioat_dma = ioat_chan->ioat_dma;
-	struct pci_dev *pdev = ioat_dma->pdev;
-	u32 chanerr;
-	u16 dev_id;
+	struct pci_device *pdev = ioat_dma->pdev;
+	uint32_t chanerr;
+	uint16_t dev_id;
 	int err;
 
 	ioat_quiesce(ioat_chan, msecs_to_jiffies(100));
 
-	chanerr = readl(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
-	writel(chanerr, ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
+	chanerr = read32(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
+	write32(chanerr, ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
 
 	if (ioat_dma->version < IOAT_VER_3_3) {
 		/* clear any pending errors */
 		err = pci_read_config_dword(pdev,
 				IOAT_PCI_CHANERR_INT_OFFSET, &chanerr);
 		if (err) {
-			dev_err(&pdev->dev,
+			dev_err(&pdev->linux_dev,
 				"channel error register unreachable\n");
 			return err;
 		}
@@ -1026,23 +1026,23 @@ int ioat_reset_hw(struct ioatdma_chan *ioat_chan)
 	}
 
 	if (is_bwd_ioat(pdev) && (ioat_dma->irq_mode == IOAT_MSIX)) {
-		ioat_dma->msixtba0 = readq(ioat_dma->reg_base + 0x1000);
-		ioat_dma->msixdata0 = readq(ioat_dma->reg_base + 0x1008);
-		ioat_dma->msixpba = readq(ioat_dma->reg_base + 0x1800);
+		ioat_dma->msixtba0 = read64(ioat_dma->reg_base + 0x1000);
+		ioat_dma->msixdata0 = read64(ioat_dma->reg_base + 0x1008);
+		ioat_dma->msixpba = read64(ioat_dma->reg_base + 0x1800);
 	}
 
 
 	err = ioat_reset_sync(ioat_chan, msecs_to_jiffies(200));
 	if (!err) {
 		if (is_bwd_ioat(pdev) && (ioat_dma->irq_mode == IOAT_MSIX)) {
-			writeq(ioat_dma->msixtba0, ioat_dma->reg_base + 0x1000);
-			writeq(ioat_dma->msixdata0, ioat_dma->reg_base + 0x1008);
-			writeq(ioat_dma->msixpba, ioat_dma->reg_base + 0x1800);
+			write64(ioat_dma->msixtba0, ioat_dma->reg_base + 0x1000);
+			write64(ioat_dma->msixdata0, ioat_dma->reg_base + 0x1008);
+			write64(ioat_dma->msixpba, ioat_dma->reg_base + 0x1800);
 		}
 	}
 
 	if (err)
-		dev_err(&pdev->dev, "Failed to reset: %d\n", err);
+		dev_err(&pdev->linux_dev, "Failed to reset: %d\n", err);
 
 	return err;
 }

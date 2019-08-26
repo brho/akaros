@@ -73,24 +73,24 @@ enum ioat_irq_mode {
  * @cap: read DMA capabilities register
  */
 struct ioatdma_device {
-	struct pci_dev *pdev;
+	struct pci_device *pdev;
 	void __iomem *reg_base;
 	struct dma_pool *completion_pool;
 #define MAX_SED_POOLS	5
 	struct dma_pool *sed_hw_pool[MAX_SED_POOLS];
 	struct dma_device dma_dev;
-	u8 version;
+	uint8_t version;
 #define IOAT_MAX_CHANS 4
 	struct msix_entry msix_entries[IOAT_MAX_CHANS];
 	struct ioatdma_chan *idx[IOAT_MAX_CHANS];
 	struct dca_provider *dca;
 	enum ioat_irq_mode irq_mode;
-	u32 cap;
+	uint32_t cap;
 
 	/* shadow version for CB3.3 chan reset errata workaround */
-	u64 msixtba0;
-	u64 msixdata0;
-	u32 msixpba;
+	uint64_t msixtba0;
+	uint64_t msixdata0;
+	uint32_t msixpba;
 };
 
 struct ioat_descs {
@@ -116,7 +116,7 @@ struct ioatdma_chan {
 	#define RESET_DELAY msecs_to_jiffies(100)
 	struct ioatdma_device *ioat_dma;
 	dma_addr_t completion_dma;
-	u64 *completion;
+	uint64_t *completion;
 	struct tasklet_struct cleanup_task;
 	struct kobject kobj;
 
@@ -132,12 +132,12 @@ struct ioatdma_chan {
  * @prep_lock: serializes descriptor preparation (producers)
  */
 	size_t xfercap_log;
-	u16 head;
-	u16 issued;
-	u16 tail;
-	u16 dmacount;
-	u16 alloc_order;
-	u16 produce;
+	uint16_t head;
+	uint16_t issued;
+	uint16_t tail;
+	uint16_t dmacount;
+	uint16_t alloc_order;
+	uint16_t produce;
 	struct ioat_ring_ent **ring;
 	spinlock_t prep_lock;
 	struct ioat_descs descs[2];
@@ -247,43 +247,43 @@ ioat_chan_by_index(struct ioatdma_device *ioat_dma, int index)
 	return ioat_dma->idx[index];
 }
 
-static inline u64 ioat_chansts(struct ioatdma_chan *ioat_chan)
+static inline uint64_t ioat_chansts(struct ioatdma_chan *ioat_chan)
 {
-	return readq(ioat_chan->reg_base + IOAT_CHANSTS_OFFSET);
+	return read64(ioat_chan->reg_base + IOAT_CHANSTS_OFFSET);
 }
 
-static inline u64 ioat_chansts_to_addr(u64 status)
+static inline uint64_t ioat_chansts_to_addr(uint64_t status)
 {
 	return status & IOAT_CHANSTS_COMPLETED_DESCRIPTOR_ADDR;
 }
 
-static inline u32 ioat_chanerr(struct ioatdma_chan *ioat_chan)
+static inline uint32_t ioat_chanerr(struct ioatdma_chan *ioat_chan)
 {
-	return readl(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
+	return read32(ioat_chan->reg_base + IOAT_CHANERR_OFFSET);
 }
 
 static inline void ioat_suspend(struct ioatdma_chan *ioat_chan)
 {
-	u8 ver = ioat_chan->ioat_dma->version;
+	uint8_t ver = ioat_chan->ioat_dma->version;
 
-	writeb(IOAT_CHANCMD_SUSPEND,
+	write8(IOAT_CHANCMD_SUSPEND,
 	       ioat_chan->reg_base + IOAT_CHANCMD_OFFSET(ver));
 }
 
 static inline void ioat_reset(struct ioatdma_chan *ioat_chan)
 {
-	u8 ver = ioat_chan->ioat_dma->version;
+	uint8_t ver = ioat_chan->ioat_dma->version;
 
-	writeb(IOAT_CHANCMD_RESET,
+	write8(IOAT_CHANCMD_RESET,
 	       ioat_chan->reg_base + IOAT_CHANCMD_OFFSET(ver));
 }
 
 static inline bool ioat_reset_pending(struct ioatdma_chan *ioat_chan)
 {
-	u8 ver = ioat_chan->ioat_dma->version;
-	u8 cmd;
+	uint8_t ver = ioat_chan->ioat_dma->version;
+	uint8_t cmd;
 
-	cmd = readb(ioat_chan->reg_base + IOAT_CHANCMD_OFFSET(ver));
+	cmd = read8(ioat_chan->reg_base + IOAT_CHANCMD_OFFSET(ver));
 	return (cmd & IOAT_CHANCMD_RESET) == IOAT_CHANCMD_RESET;
 }
 
@@ -317,51 +317,51 @@ static inline bool is_ioat_bug(unsigned long err)
 #define IOAT_MAX_DESCS 65536
 #define IOAT_DESCS_PER_2M 32768
 
-static inline u32 ioat_ring_size(struct ioatdma_chan *ioat_chan)
+static inline uint32_t ioat_ring_size(struct ioatdma_chan *ioat_chan)
 {
 	return 1 << ioat_chan->alloc_order;
 }
 
 /* count of descriptors in flight with the engine */
-static inline u16 ioat_ring_active(struct ioatdma_chan *ioat_chan)
+static inline uint16_t ioat_ring_active(struct ioatdma_chan *ioat_chan)
 {
 	return CIRC_CNT(ioat_chan->head, ioat_chan->tail,
 			ioat_ring_size(ioat_chan));
 }
 
 /* count of descriptors pending submission to hardware */
-static inline u16 ioat_ring_pending(struct ioatdma_chan *ioat_chan)
+static inline uint16_t ioat_ring_pending(struct ioatdma_chan *ioat_chan)
 {
 	return CIRC_CNT(ioat_chan->head, ioat_chan->issued,
 			ioat_ring_size(ioat_chan));
 }
 
-static inline u32 ioat_ring_space(struct ioatdma_chan *ioat_chan)
+static inline uint32_t ioat_ring_space(struct ioatdma_chan *ioat_chan)
 {
 	return ioat_ring_size(ioat_chan) - ioat_ring_active(ioat_chan);
 }
 
-static inline u16
+static inline uint16_t
 ioat_xferlen_to_descs(struct ioatdma_chan *ioat_chan, size_t len)
 {
-	u16 num_descs = len >> ioat_chan->xfercap_log;
+	uint16_t num_descs = len >> ioat_chan->xfercap_log;
 
 	num_descs += !!(len & ((1 << ioat_chan->xfercap_log) - 1));
 	return num_descs;
 }
 
 static inline struct ioat_ring_ent *
-ioat_get_ring_ent(struct ioatdma_chan *ioat_chan, u16 idx)
+ioat_get_ring_ent(struct ioatdma_chan *ioat_chan, uint16_t idx)
 {
 	return ioat_chan->ring[idx & (ioat_ring_size(ioat_chan) - 1)];
 }
 
 static inline void
-ioat_set_chainaddr(struct ioatdma_chan *ioat_chan, u64 addr)
+ioat_set_chainaddr(struct ioatdma_chan *ioat_chan, uint64_t addr)
 {
-	writel(addr & 0x00000000FFFFFFFF,
+	write32(addr & 0x00000000FFFFFFFF,
 	       ioat_chan->reg_base + IOAT2_CHAINADDR_OFFSET_LOW);
-	writel(addr >> 32,
+	write32(addr >> 32,
 	       ioat_chan->reg_base + IOAT2_CHAINADDR_OFFSET_HIGH);
 }
 
@@ -395,8 +395,8 @@ ioat_prep_pqxor_val(struct dma_chan *chan, dma_addr_t *src,
 		     enum sum_check_flags *result, unsigned long flags);
 
 /* IOAT Operation functions */
-irqreturn_t ioat_dma_do_interrupt(int irq, void *data);
-irqreturn_t ioat_dma_do_interrupt_msix(int irq, void *data);
+void ioat_dma_do_interrupt(struct hw_trapframe *hw_tf, void *data);
+void ioat_dma_do_interrupt_msix(struct hw_trapframe *hw_tf, void *data);
 struct ioat_ring_ent **
 ioat_alloc_ring(struct dma_chan *c, int order, gfp_t flags);
 void ioat_start_null_desc(struct ioatdma_chan *ioat_chan);
@@ -411,8 +411,9 @@ int ioat_check_space_lock(struct ioatdma_chan *ioat_chan, int num_descs);
 void ioat_issue_pending(struct dma_chan *chan);
 
 /* IOAT Init functions */
-bool is_bwd_ioat(struct pci_dev *pdev);
-struct dca_provider *ioat_dca_init(struct pci_dev *pdev, void __iomem *iobase);
+bool is_bwd_ioat(struct pci_device *pdev);
+struct dca_provider *ioat_dca_init(struct pci_device *pdev,
+				   void __iomem *iobase);
 void ioat_kobject_add(struct ioatdma_device *ioat_dma, struct kobj_type *type);
 void ioat_kobject_del(struct ioatdma_device *ioat_dma);
 int ioat_dma_setup_interrupts(struct ioatdma_device *ioat_dma);

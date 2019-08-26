@@ -31,17 +31,17 @@
 /* provide a lookup table for setting the source address in the base or
  * extended descriptor of an xor or pq descriptor
  */
-static const u8 xor_idx_to_desc = 0xe0;
-static const u8 xor_idx_to_field[] = { 1, 4, 5, 6, 7, 0, 1, 2 };
-static const u8 pq_idx_to_desc = 0xf8;
-static const u8 pq16_idx_to_desc[] = { 0, 0, 1, 1, 1, 1, 1, 1, 1,
+static const uint8_t xor_idx_to_desc = 0xe0;
+static const uint8_t xor_idx_to_field[] = { 1, 4, 5, 6, 7, 0, 1, 2 };
+static const uint8_t pq_idx_to_desc = 0xf8;
+static const uint8_t pq16_idx_to_desc[] = { 0, 0, 1, 1, 1, 1, 1, 1, 1,
 				       2, 2, 2, 2, 2, 2, 2 };
-static const u8 pq_idx_to_field[] = { 1, 4, 5, 0, 1, 2, 4, 5 };
-static const u8 pq16_idx_to_field[] = { 1, 4, 1, 2, 3, 4, 5, 6, 7,
+static const uint8_t pq_idx_to_field[] = { 1, 4, 5, 0, 1, 2, 4, 5 };
+static const uint8_t pq16_idx_to_field[] = { 1, 4, 1, 2, 3, 4, 5, 6, 7,
 					0, 1, 2, 3, 4, 5, 6 };
 
 static void xor_set_src(struct ioat_raw_descriptor *descs[2],
-			dma_addr_t addr, u32 offset, int idx)
+			dma_addr_t addr, uint32_t offset, int idx)
 {
 	struct ioat_raw_descriptor *raw = descs[xor_idx_to_desc >> idx & 1];
 
@@ -63,7 +63,8 @@ static dma_addr_t pq16_get_src(struct ioat_raw_descriptor *desc[3], int idx)
 }
 
 static void pq_set_src(struct ioat_raw_descriptor *descs[2],
-		       dma_addr_t addr, u32 offset, u8 coef, int idx)
+		       dma_addr_t addr, uint32_t offset, uint8_t coef,
+		       int idx)
 {
 	struct ioat_pq_descriptor *pq = (struct ioat_pq_descriptor *) descs[0];
 	struct ioat_raw_descriptor *raw = descs[pq_idx_to_desc >> idx & 1];
@@ -73,7 +74,8 @@ static void pq_set_src(struct ioat_raw_descriptor *descs[2],
 }
 
 static void pq16_set_src(struct ioat_raw_descriptor *desc[3],
-			dma_addr_t addr, u32 offset, u8 coef, unsigned idx)
+			dma_addr_t addr, uint32_t offset, uint8_t coef,
+			unsigned idx)
 {
 	struct ioat_pq_descriptor *pq = (struct ioat_pq_descriptor *)desc[0];
 	struct ioat_pq16a_descriptor *pq16 =
@@ -92,7 +94,7 @@ static struct ioat_sed_ent *
 ioat3_alloc_sed(struct ioatdma_device *ioat_dma, unsigned int hw_pool)
 {
 	struct ioat_sed_ent *sed;
-	gfp_t flags = __GFP_ZERO | GFP_ATOMIC;
+	gfp_t flags = __GFP_ZERO | 0;
 
 	sed = kmem_cache_alloc(ioat_sed_cache, flags);
 	if (!sed)
@@ -132,7 +134,7 @@ ioat_dma_prep_memcpy_lock(struct dma_chan *c, dma_addr_t dma_dest,
 		return NULL;
 	i = 0;
 	do {
-		size_t copy = min_t(size_t, len, 1 << ioat_chan->xfercap_log);
+		size_t copy = MIN_T(size_t, len, 1 << ioat_chan->xfercap_log);
 
 		desc = ioat_get_ring_ent(ioat_chan, idx + i);
 		hw = desc->hw;
@@ -174,10 +176,10 @@ __ioat_prep_xor_lock(struct dma_chan *c, enum sum_check_flags *result,
 	struct ioat_xor_ext_descriptor *xor_ex = NULL;
 	struct ioat_dma_descriptor *hw;
 	int num_descs, with_ext, idx, i;
-	u32 offset = 0;
-	u8 op = result ? IOAT_OP_XOR_VAL : IOAT_OP_XOR;
+	uint32_t offset = 0;
+	uint8_t op = result ? IOAT_OP_XOR_VAL : IOAT_OP_XOR;
 
-	BUG_ON(src_cnt < 2);
+	assert(!(src_cnt < 2));
 
 	num_descs = ioat_xferlen_to_descs(ioat_chan, len);
 	/* we need 2x the number of descriptors to cover greater than 5
@@ -202,8 +204,8 @@ __ioat_prep_xor_lock(struct dma_chan *c, enum sum_check_flags *result,
 	i = 0;
 	do {
 		struct ioat_raw_descriptor *descs[2];
-		size_t xfer_size = min_t(size_t,
-					 len, 1 << ioat_chan->xfercap_log);
+		size_t xfer_size = MIN_T(size_t, len,
+					 1 << ioat_chan->xfercap_log);
 		int s;
 
 		desc = ioat_get_ring_ent(ioat_chan, idx + i);
@@ -362,8 +364,8 @@ __ioat_prep_pq_lock(struct dma_chan *c, enum sum_check_flags *result,
 	struct ioat_pq_descriptor *pq;
 	struct ioat_pq_ext_descriptor *pq_ex = NULL;
 	struct ioat_dma_descriptor *hw;
-	u32 offset = 0;
-	u8 op = result ? IOAT_OP_PQ_VAL : IOAT_OP_PQ;
+	uint32_t offset = 0;
+	uint8_t op = result ? IOAT_OP_PQ_VAL : IOAT_OP_PQ;
 	int i, s, idx, with_ext, num_descs;
 	int cb32 = (ioat_dma->version < IOAT_VER_3_3) ? 1 : 0;
 
@@ -371,7 +373,7 @@ __ioat_prep_pq_lock(struct dma_chan *c, enum sum_check_flags *result,
 	/* the engine requires at least two sources (we provide
 	 * at least 1 implied source in the DMA_PREP_CONTINUE case)
 	 */
-	BUG_ON(src_cnt + dmaf_continue(flags) < 2);
+	assert(!(src_cnt + dmaf_continue(flags) < 2));
 
 	num_descs = ioat_xferlen_to_descs(ioat_chan, len);
 	/* we need 2x the number of descriptors to cover greater than 3
@@ -398,7 +400,7 @@ __ioat_prep_pq_lock(struct dma_chan *c, enum sum_check_flags *result,
 	i = 0;
 	do {
 		struct ioat_raw_descriptor *descs[2];
-		size_t xfer_size = min_t(size_t, len,
+		size_t xfer_size = MIN_T(size_t, len,
 					 1 << ioat_chan->xfercap_log);
 
 		desc = ioat_get_ring_ent(ioat_chan, idx + i);
@@ -482,8 +484,8 @@ __ioat_prep_pq16_lock(struct dma_chan *c, enum sum_check_flags *result,
 	struct ioat_ring_ent *desc;
 	size_t total_len = len;
 	struct ioat_pq_descriptor *pq;
-	u32 offset = 0;
-	u8 op;
+	uint32_t offset = 0;
+	uint8_t op;
 	int i, s, idx, num_descs;
 
 	/* this function is only called with 9-16 sources */
@@ -506,7 +508,7 @@ __ioat_prep_pq16_lock(struct dma_chan *c, enum sum_check_flags *result,
 
 	do {
 		struct ioat_raw_descriptor *descs[4];
-		size_t xfer_size = min_t(size_t, len,
+		size_t xfer_size = MIN_T(size_t, len,
 					 1 << ioat_chan->xfercap_log);
 
 		desc = ioat_get_ring_ent(ioat_chan, idx + i);
@@ -605,7 +607,7 @@ ioat_prep_pq(struct dma_chan *chan, dma_addr_t *dst, dma_addr_t *src,
 		dma_addr_t single_source[2];
 		unsigned char single_source_coef[2];
 
-		BUG_ON(flags & DMA_PREP_PQ_DISABLE_Q);
+		assert(!(flags & DMA_PREP_PQ_DISABLE_Q));
 		single_source[0] = src[0];
 		single_source[1] = src[0];
 		single_source_coef[0] = scf[0];
