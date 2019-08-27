@@ -94,7 +94,7 @@ static ssize_t memcpy_count_show(struct device *dev,
 	int i;
 	int err;
 
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 	chan = dev_to_dma_chan(dev);
 	if (chan) {
 		for_each_possible_cpu(i)
@@ -102,7 +102,7 @@ static ssize_t memcpy_count_show(struct device *dev,
 		err = sprintf(buf, "%lu\n", count);
 	} else
 		err = -ENODEV;
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 
 	return err;
 }
@@ -116,7 +116,7 @@ static ssize_t bytes_transferred_show(struct device *dev,
 	int i;
 	int err;
 
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 	chan = dev_to_dma_chan(dev);
 	if (chan) {
 		for_each_possible_cpu(i)
@@ -124,7 +124,7 @@ static ssize_t bytes_transferred_show(struct device *dev,
 		err = sprintf(buf, "%lu\n", count);
 	} else
 		err = -ENODEV;
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 
 	return err;
 }
@@ -136,13 +136,13 @@ static ssize_t in_use_show(struct device *dev, struct device_attribute *attr,
 	struct dma_chan *chan;
 	int err;
 
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 	chan = dev_to_dma_chan(dev);
 	if (chan)
 		err = sprintf(buf, "%d\n", chan->client_count);
 	else
 		err = -ENODEV;
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 
 	return err;
 }
@@ -161,7 +161,7 @@ static void chan_dev_release(struct device *dev)
 	struct dma_chan_dev *chan_dev;
 
 	chan_dev = container_of(dev, typeof(*chan_dev), device);
-	if (atomic_dec_and_test(chan_dev->idr_ref)) {
+	if (atomic_sub_and_test(chan_dev->idr_ref, 1)) {
 		ida_free(&dma_ida, chan_dev->dev_id);
 		kfree(chan_dev->idr_ref);
 	}
@@ -591,7 +591,7 @@ struct dma_chan *dma_get_slave_channel(struct dma_chan *chan)
 	int err = -EBUSY;
 
 	/* lock against __dma_request_channel */
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 
 	if (chan->client_count == 0) {
 		struct dma_device *device = chan->device;
@@ -610,7 +610,7 @@ struct dma_chan *dma_get_slave_channel(struct dma_chan *chan)
 	} else
 		chan = NULL;
 
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 
 
 	return chan;
@@ -626,11 +626,11 @@ struct dma_chan *dma_get_any_slave_channel(struct dma_device *device)
 	dma_cap_set(DMA_SLAVE, mask);
 
 	/* lock against __dma_request_channel */
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 
 	chan = find_candidate(device, &mask, NULL, NULL);
 
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 
 	return IS_ERR(chan) ? NULL : chan;
 }
@@ -651,7 +651,7 @@ struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
 	struct dma_chan *chan = NULL;
 
 	/* Find a channel */
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 	list_for_each_entry_safe(device, _d, &dma_device_list, global_node) {
 		chan = find_candidate(device, mask, fn, fn_param);
 		if (!IS_ERR(chan))
@@ -659,7 +659,7 @@ struct dma_chan *__dma_request_channel(const dma_cap_mask_t *mask,
 
 		chan = NULL;
 	}
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 
 	pr_debug("%s: %s (%s)\n",
 		 __func__,
@@ -717,7 +717,7 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
 	}
 
 	/* Try to find the channel via the DMA filter map(s) */
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 	list_for_each_entry_safe(d, _d, &dma_device_list, global_node) {
 		dma_cap_mask_t mask;
 		const struct dma_slave_map *map = dma_filter_match(d, name, dev);
@@ -732,7 +732,7 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
 		if (!IS_ERR(chan))
 			break;
 	}
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 
 	return chan ? chan : ERR_PTR(-EPROBE_DEFER);
 }
@@ -771,12 +771,12 @@ struct dma_chan *dma_request_chan_by_mask(const dma_cap_mask_t *mask)
 
 	chan = __dma_request_channel(mask, NULL, NULL);
 	if (!chan) {
-		mutex_lock(&dma_list_mutex);
+		qlock(&dma_list_mutex);
 		if (list_empty(&dma_device_list))
 			chan = ERR_PTR(-EPROBE_DEFER);
 		else
 			chan = ERR_PTR(-ENODEV);
-		mutex_unlock(&dma_list_mutex);
+		qunlock(&dma_list_mutex);
 	}
 
 	return chan;
@@ -785,14 +785,14 @@ EXPORT_SYMBOL_GPL(dma_request_chan_by_mask);
 
 void dma_release_channel(struct dma_chan *chan)
 {
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 	WARN_ONCE(chan->client_count != 1,
 		  "chan reference count %d != 1\n", chan->client_count);
 	dma_chan_put(chan);
 	/* drop PRIVATE cap enabled by __dma_request_channel() */
 	if (--chan->device->privatecnt == 0)
 		dma_cap_clear(DMA_PRIVATE, chan->device->cap_mask);
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 }
 EXPORT_SYMBOL_GPL(dma_release_channel);
 
@@ -805,7 +805,7 @@ void dmaengine_get(void)
 	struct dma_chan *chan;
 	int err;
 
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 	dmaengine_ref_count++;
 
 	/* try to grab channels */
@@ -831,7 +831,7 @@ void dmaengine_get(void)
 	 */
 	if (dmaengine_ref_count == 1)
 		dma_channel_rebalance();
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 }
 EXPORT_SYMBOL(dmaengine_get);
 
@@ -843,9 +843,9 @@ void dmaengine_put(void)
 	struct dma_device *device;
 	struct dma_chan *chan;
 
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 	dmaengine_ref_count--;
-	BUG_ON(dmaengine_ref_count < 0);
+	assert(!(dmaengine_ref_count < 0));
 	/* drop channel references */
 	list_for_each_entry(device, &dma_device_list, global_node) {
 		if (dma_has_cap(DMA_PRIVATE, device->cap_mask))
@@ -853,7 +853,7 @@ void dmaengine_put(void)
 		list_for_each_entry(chan, &device->channels, device_node)
 			dma_chan_put(chan);
 	}
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 }
 EXPORT_SYMBOL(dmaengine_put);
 
@@ -898,7 +898,7 @@ static bool device_has_all_tx_types(struct dma_device *device)
 
 static int get_dma_id(struct dma_device *device)
 {
-	int rc = ida_alloc(&dma_ida, GFP_KERNEL);
+	int rc = ida_alloc(&dma_ida, MEM_WAIT);
 
 	if (rc < 0)
 		return rc;
@@ -1006,7 +1006,7 @@ int dma_async_device_register(struct dma_device *device)
 	if (device_has_all_tx_types(device))
 		dma_cap_set(DMA_ASYNC_TX, device->cap_mask);
 
-	idr_ref = kmalloc(sizeof(*idr_ref), GFP_KERNEL);
+	idr_ref = kmalloc(sizeof(*idr_ref), MEM_WAIT);
 	if (!idr_ref)
 		return -ENOMEM;
 	rc = get_dma_id(device);
@@ -1023,7 +1023,7 @@ int dma_async_device_register(struct dma_device *device)
 		chan->local = alloc_percpu(typeof(*chan->local));
 		if (chan->local == NULL)
 			goto err_out;
-		chan->dev = kzalloc(sizeof(*chan->dev), GFP_KERNEL);
+		chan->dev = kzmalloc(sizeof(*chan->dev), MEM_WAIT);
 		if (chan->dev == NULL) {
 			free_percpu(chan->local);
 			chan->local = NULL;
@@ -1059,7 +1059,7 @@ int dma_async_device_register(struct dma_device *device)
 
 	device->chancnt = chancnt;
 
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 	/* take references on public channels */
 	if (dmaengine_ref_count && !dma_has_cap(DMA_PRIVATE, device->cap_mask))
 		list_for_each_entry(chan, &device->channels, device_node) {
@@ -1072,7 +1072,7 @@ int dma_async_device_register(struct dma_device *device)
 				 * guaranteed to get a reference
 				 */
 				rc = -ENODEV;
-				mutex_unlock(&dma_list_mutex);
+				qunlock(&dma_list_mutex);
 				goto err_out;
 			}
 		}
@@ -1080,7 +1080,7 @@ int dma_async_device_register(struct dma_device *device)
 	if (dma_has_cap(DMA_PRIVATE, device->cap_mask))
 		device->privatecnt++;	/* Always private */
 	dma_channel_rebalance();
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 
 	return 0;
 
@@ -1095,9 +1095,9 @@ err_out:
 	list_for_each_entry(chan, &device->channels, device_node) {
 		if (chan->local == NULL)
 			continue;
-		mutex_lock(&dma_list_mutex);
+		qlock(&dma_list_mutex);
 		chan->dev->chan = NULL;
-		mutex_unlock(&dma_list_mutex);
+		qunlock(&dma_list_mutex);
 		device_unregister(&chan->dev->device);
 		free_percpu(chan->local);
 	}
@@ -1116,18 +1116,18 @@ void dma_async_device_unregister(struct dma_device *device)
 {
 	struct dma_chan *chan;
 
-	mutex_lock(&dma_list_mutex);
+	qlock(&dma_list_mutex);
 	list_del_rcu(&device->global_node);
 	dma_channel_rebalance();
-	mutex_unlock(&dma_list_mutex);
+	qunlock(&dma_list_mutex);
 
 	list_for_each_entry(chan, &device->channels, device_node) {
 		WARN_ONCE(chan->client_count,
 			  "%s called while %d clients hold a reference\n",
 			  __func__, chan->client_count);
-		mutex_lock(&dma_list_mutex);
+		qlock(&dma_list_mutex);
 		chan->dev->chan = NULL;
-		mutex_unlock(&dma_list_mutex);
+		qunlock(&dma_list_mutex);
 		device_unregister(&chan->dev->device);
 		free_percpu(chan->local);
 	}
@@ -1153,7 +1153,7 @@ int dmaenginem_async_device_register(struct dma_device *device)
 	void *p;
 	int ret;
 
-	p = devres_alloc(dmam_device_release, sizeof(void *), GFP_KERNEL);
+	p = devres_alloc(dmam_device_release, sizeof(void *), MEM_WAIT);
 	if (!p)
 		return -ENOMEM;
 
@@ -1202,7 +1202,7 @@ static struct dmaengine_unmap_pool *__get_unmap_pool(int nr)
 		return &unmap_pool[3];
 #endif
 	default:
-		BUG();
+		panic("BUG");
 		return NULL;
 	}
 }
@@ -1303,7 +1303,7 @@ void dma_async_tx_descriptor_init(struct dma_async_tx_descriptor *tx,
 {
 	tx->chan = chan;
 	#ifdef CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH
-	spin_lock_init(&tx->lock);
+	spinlock_init_irqsave(&tx->lock);
 	#endif
 }
 EXPORT_SYMBOL(dma_async_tx_descriptor_init);

@@ -31,7 +31,7 @@
  *
  * if dma_cookie_t is >0 it's a DMA request cookie, <0 it's an error code
  */
-typedef s32 dma_cookie_t;
+typedef int32_t dma_cookie_t;
 #define DMA_MIN_COOKIE	1
 
 static inline int dma_submit_error(dma_cookie_t cookie)
@@ -370,10 +370,10 @@ struct dma_slave_config {
 	phys_addr_t dst_addr;
 	enum dma_slave_buswidth src_addr_width;
 	enum dma_slave_buswidth dst_addr_width;
-	u32 src_maxburst;
-	u32 dst_maxburst;
-	u32 src_port_window_size;
-	u32 dst_port_window_size;
+	uint32_t src_maxburst;
+	uint32_t dst_maxburst;
+	uint32_t src_port_window_size;
+	uint32_t dst_port_window_size;
 	bool device_fc;
 	unsigned int slave_id;
 };
@@ -424,10 +424,10 @@ enum dma_residue_granularity {
  * resubmitted multiple times
  */
 struct dma_slave_caps {
-	u32 src_addr_widths;
-	u32 dst_addr_widths;
-	u32 directions;
-	u32 max_burst;
+	uint32_t src_addr_widths;
+	uint32_t dst_addr_widths;
+	uint32_t directions;
+	uint32_t max_burst;
 	bool cmd_pause;
 	bool cmd_resume;
 	bool cmd_terminate;
@@ -466,7 +466,7 @@ enum dmaengine_tx_result {
 
 struct dmaengine_result {
 	enum dmaengine_tx_result result;
-	u32 residue;
+	uint32_t residue;
 };
 
 typedef void (*dma_async_tx_callback_result)(void *dma_async_param,
@@ -474,13 +474,13 @@ typedef void (*dma_async_tx_callback_result)(void *dma_async_param,
 
 struct dmaengine_unmap_data {
 #if IS_ENABLED(CONFIG_DMA_ENGINE_RAID)
-	u16 map_cnt;
+	uint16_t map_cnt;
 #else
-	u8 map_cnt;
+	uint8_t map_cnt;
 #endif
-	u8 to_cnt;
-	u8 from_cnt;
-	u8 bidi_cnt;
+	uint8_t to_cnt;
+	uint8_t from_cnt;
+	uint8_t bidi_cnt;
 	struct device *dev;
 	struct kref kref;
 	size_t len;
@@ -566,7 +566,7 @@ static inline void txd_unlock(struct dma_async_tx_descriptor *txd)
 }
 static inline void txd_chain(struct dma_async_tx_descriptor *txd, struct dma_async_tx_descriptor *next)
 {
-	BUG();
+	panic("BUG");
 }
 static inline void txd_clear_parent(struct dma_async_tx_descriptor *txd)
 {
@@ -586,11 +586,11 @@ static inline struct dma_async_tx_descriptor *txd_parent(struct dma_async_tx_des
 #else
 static inline void txd_lock(struct dma_async_tx_descriptor *txd)
 {
-	spin_lock_bh(&txd->lock);
+	spin_lock(&txd->lock);
 }
 static inline void txd_unlock(struct dma_async_tx_descriptor *txd)
 {
-	spin_unlock_bh(&txd->lock);
+	spin_unlock(&txd->lock);
 }
 static inline void txd_chain(struct dma_async_tx_descriptor *txd, struct dma_async_tx_descriptor *next)
 {
@@ -627,7 +627,7 @@ static inline struct dma_async_tx_descriptor *txd_next(struct dma_async_tx_descr
 struct dma_tx_state {
 	dma_cookie_t last;
 	dma_cookie_t used;
-	u32 residue;
+	uint32_t residue;
 };
 
 /**
@@ -750,10 +750,10 @@ struct dma_device {
 	int dev_id;
 	struct device *dev;
 
-	u32 src_addr_widths;
-	u32 dst_addr_widths;
-	u32 directions;
-	u32 max_burst;
+	uint32_t src_addr_widths;
+	uint32_t dst_addr_widths;
+	uint32_t directions;
+	uint32_t max_burst;
 	bool descriptor_reuse;
 	enum dma_residue_granularity residue_granularity;
 
@@ -798,7 +798,7 @@ struct dma_device {
 		struct dma_chan *chan, struct dma_interleaved_template *xt,
 		unsigned long flags);
 	struct dma_async_tx_descriptor *(*device_prep_dma_imm_data)(
-		struct dma_chan *chan, dma_addr_t dst, u64 data,
+		struct dma_chan *chan, dma_addr_t dst, uint64_t data,
 		unsigned long flags);
 
 	int (*device_config)(struct dma_chan *chan,
@@ -1126,7 +1126,7 @@ static inline int dma_maxpq(struct dma_device *dma, enum dma_ctrl_flags flags)
 		return dma_dev_to_maxpq(dma) - 1;
 	else if (dmaf_continue(flags))
 		return dma_dev_to_maxpq(dma) - 3;
-	BUG();
+	panic("BUG");
 }
 
 static inline size_t dmaengine_get_icg(bool inc, bool sgl, size_t icg,
@@ -1299,7 +1299,8 @@ static inline enum dma_status dma_async_is_complete(dma_cookie_t cookie,
 }
 
 static inline void
-dma_set_tx_state(struct dma_tx_state *st, dma_cookie_t last, dma_cookie_t used, u32 residue)
+dma_set_tx_state(struct dma_tx_state *st, dma_cookie_t last, dma_cookie_t used,
+		 uint32_t residue)
 {
 	if (st) {
 		st->last = last;

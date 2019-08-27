@@ -51,7 +51,7 @@ static inline dma_cookie_t dma_cookie_assign(struct dma_async_tx_descriptor *tx)
  */
 static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)
 {
-	BUG_ON(tx->cookie < DMA_MIN_COOKIE);
+	assert(!(tx->cookie < DMA_MIN_COOKIE));
 	tx->chan->completed_cookie = tx->cookie;
 	tx->cookie = 0;
 }
@@ -72,7 +72,7 @@ static inline enum dma_status dma_cookie_status(struct dma_chan *chan,
 
 	used = chan->cookie;
 	complete = chan->completed_cookie;
-	barrier();
+	cmb();
 	if (state) {
 		state->last = complete;
 		state->used = used;
@@ -81,7 +81,8 @@ static inline enum dma_status dma_cookie_status(struct dma_chan *chan,
 	return dma_async_is_complete(cookie, complete, used);
 }
 
-static inline void dma_set_residue(struct dma_tx_state *state, u32 residue)
+static inline void dma_set_residue(struct dma_tx_state *state,
+				   uint32_t residue)
 {
 	if (state)
 		state->residue = residue;
