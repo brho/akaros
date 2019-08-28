@@ -17,14 +17,12 @@
 #ifndef LINUX_DMAENGINE_H
 #define LINUX_DMAENGINE_H
 
-#include <linux/device.h>
-#include <linux/err.h>
-#include <linux/uio.h>
-#include <linux/bug.h>
-#include <linux/scatterlist.h>
-#include <linux/bitmap.h>
-#include <linux/types.h>
-#include <asm/page.h>
+#include <linux_compat.h>
+
+#define CONFIG_DMA_ENGINE
+#define CONFIG_ASYNC_TX_DMA
+#define CONFIG_ASYNC_TX_ENABLE_CHANNEL_SWITCH
+#define CONFIG_RAPIDIO_DMA_ENGINE
 
 /**
  * typedef dma_cookie_t - an opaque DMA cookie

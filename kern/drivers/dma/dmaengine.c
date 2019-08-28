@@ -43,33 +43,18 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include <linux/platform_device.h>
-#include <linux/dma-mapping.h>
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/mm.h>
-#include <linux/device.h>
+#include <linux_compat.h>
+#include <smallidpool.h>
+
 #include <linux/dmaengine.h>
-#include <linux/hardirq.h>
-#include <linux/spinlock.h>
-#include <linux/percpu.h>
-#include <linux/rcupdate.h>
-#include <linux/mutex.h>
-#include <linux/jiffies.h>
-#include <linux/rculist.h>
-#include <linux/idr.h>
-#include <linux/slab.h>
-#include <linux/acpi.h>
-#include <linux/acpi_dma.h>
-#include <linux/of_dma.h>
-#include <linux/mempool.h>
-#include <linux/numa.h>
 
 static DEFINE_MUTEX(dma_list_mutex);
-static DEFINE_IDA(dma_ida);
-static LIST_HEAD(dma_device_list);
+static struct u16_pool *dma_ida;
+
+static LINUX_LIST_HEAD(dma_device_list);
 static long dmaengine_ref_count;
 
+#if 0 // AKAROS
 /* --- sysfs implementation --- */
 
 /**
@@ -162,7 +147,7 @@ static void chan_dev_release(struct device *dev)
 
 	chan_dev = container_of(dev, typeof(*chan_dev), device);
 	if (atomic_sub_and_test(chan_dev->idr_ref, 1)) {
-		ida_free(&dma_ida, chan_dev->dev_id);
+		put_u16(dma_ida, chan_dev->dev_id);
 		kfree(chan_dev->idr_ref);
 	}
 	kfree(chan_dev);
@@ -173,6 +158,7 @@ static struct class dma_devclass = {
 	.dev_groups	= dma_dev_groups,
 	.dev_release	= chan_dev_release,
 };
+#endif
 
 /* --- client and device registration --- */
 
@@ -191,7 +177,11 @@ __dma_device_satisfies_mask(struct dma_device *device,
 
 static struct module *dma_chan_to_owner(struct dma_chan *chan)
 {
+#if 0 // AKAROS
 	return chan->device->dev->driver->owner;
+#else
+	return NULL;
+#endif
 }
 
 /**
@@ -386,9 +376,13 @@ EXPORT_SYMBOL(dma_issue_pending_all);
  */
 static bool dma_chan_is_local(struct dma_chan *chan, int cpu)
 {
+#if 0 // AKAROS
 	int node = dev_to_node(chan->device->dev);
 	return node == NUMA_NO_NODE ||
 		cpumask_test_cpu(cpu, cpumask_of_node(node));
+#else
+	return true;
+#endif
 }
 
 /**
@@ -451,7 +445,7 @@ static void dma_channel_rebalance(void)
 	/* undo the last distribution */
 	for_each_dma_cap_mask(cap, dma_cap_mask_all)
 		for_each_possible_cpu(cpu)
-			per_cpu_ptr(channel_table[cap], cpu)->chan = NULL;
+			_PERCPU_VARPTR(*channel_table[cap], cpu)->chan = NULL;
 
 	list_for_each_entry(device, &dma_device_list, global_node) {
 		if (dma_has_cap(DMA_PRIVATE, device->cap_mask))
@@ -468,7 +462,7 @@ static void dma_channel_rebalance(void)
 	for_each_dma_cap_mask(cap, dma_cap_mask_all)
 		for_each_online_cpu(cpu) {
 			chan = min_chan(cap, cpu);
-			per_cpu_ptr(channel_table[cap], cpu)->chan = chan;
+			_PERCPU_VARPTR(*channel_table[cap], cpu)->chan = chan;
 		}
 }
 
@@ -702,6 +696,7 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
 	struct dma_device *d, *_d;
 	struct dma_chan *chan = NULL;
 
+#if 0 // AKAROS
 	/* If device-tree is present get slave info from here */
 	if (dev->of_node)
 		chan = of_dma_request_slave_channel(dev->of_node, name);
@@ -709,6 +704,7 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
 	/* If device was enumerated by ACPI get slave info from here */
 	if (has_acpi_companion(dev) && !chan)
 		chan = acpi_dma_request_slave_chan_by_name(dev, name);
+#endif
 
 	if (chan) {
 		/* Valid channel found or requester need to be deferred */
@@ -786,8 +782,8 @@ EXPORT_SYMBOL_GPL(dma_request_chan_by_mask);
 void dma_release_channel(struct dma_chan *chan)
 {
 	qlock(&dma_list_mutex);
-	WARN_ONCE(chan->client_count != 1,
-		  "chan reference count %d != 1\n", chan->client_count);
+	if (chan->client_count != 1)
+		warn_once("chan reference count %d != 1\n", chan->client_count);
 	dma_chan_put(chan);
 	/* drop PRIVATE cap enabled by __dma_request_channel() */
 	if (--chan->device->privatecnt == 0)
@@ -898,7 +894,7 @@ static bool device_has_all_tx_types(struct dma_device *device)
 
 static int get_dma_id(struct dma_device *device)
 {
-	int rc = ida_alloc(&dma_ida, MEM_WAIT);
+	int rc = get_u16(dma_ida);
 
 	if (rc < 0)
 		return rc;
@@ -1031,12 +1027,15 @@ int dma_async_device_register(struct dma_device *device)
 		}
 
 		chan->chan_id = chancnt++;
+#if 0 // AKAROS
 		chan->dev->device.class = &dma_devclass;
 		chan->dev->device.parent = device->dev;
 		chan->dev->chan = chan;
 		chan->dev->idr_ref = idr_ref;
 		chan->dev->dev_id = device->dev_id;
+#endif
 		atomic_inc(idr_ref);
+#if 0 // AKAROS
 		dev_set_name(&chan->dev->device, "dma%dchan%d",
 			     device->dev_id, chan->chan_id);
 
@@ -1048,6 +1047,7 @@ int dma_async_device_register(struct dma_device *device)
 			atomic_dec(idr_ref);
 			goto err_out;
 		}
+#endif
 		chan->client_count = 0;
 	}
 
@@ -1087,7 +1087,7 @@ int dma_async_device_register(struct dma_device *device)
 err_out:
 	/* if we never registered a channel just release the idr */
 	if (atomic_read(idr_ref) == 0) {
-		ida_free(&dma_ida, device->dev_id);
+		put_u16(dma_ida, device->dev_id);
 		kfree(idr_ref);
 		return rc;
 	}
@@ -1098,7 +1098,9 @@ err_out:
 		qlock(&dma_list_mutex);
 		chan->dev->chan = NULL;
 		qunlock(&dma_list_mutex);
+#if 0 // AKAROS
 		device_unregister(&chan->dev->device);
+#endif
 		free_percpu(chan->local);
 	}
 	return rc;
@@ -1122,13 +1124,15 @@ void dma_async_device_unregister(struct dma_device *device)
 	qunlock(&dma_list_mutex);
 
 	list_for_each_entry(chan, &device->channels, device_node) {
-		WARN_ONCE(chan->client_count,
-			  "%s called while %d clients hold a reference\n",
-			  __func__, chan->client_count);
+		if (chan->client_count)
+			warn_once( "%s called while %d clients hold a reference\n",
+				   __func__, chan->client_count);
 		qlock(&dma_list_mutex);
 		chan->dev->chan = NULL;
 		qunlock(&dma_list_mutex);
+#if 0 // AKAROS
 		device_unregister(&chan->dev->device);
+#endif
 		free_percpu(chan->local);
 	}
 }
@@ -1153,6 +1157,7 @@ int dmaenginem_async_device_register(struct dma_device *device)
 	void *p;
 	int ret;
 
+#if 0 // AKAROS
 	p = devres_alloc(dmam_device_release, sizeof(void *), MEM_WAIT);
 	if (!p)
 		return -ENOMEM;
@@ -1164,6 +1169,9 @@ int dmaenginem_async_device_register(struct dma_device *device)
 	} else {
 		devres_free(p);
 	}
+#else
+	ret = dma_async_device_register(device);
+#endif
 
 	return ret;
 }
@@ -1172,7 +1180,9 @@ EXPORT_SYMBOL(dmaenginem_async_device_register);
 struct dmaengine_unmap_pool {
 	struct kmem_cache *cache;
 	const char *name;
+#if 0 // AKAROS
 	mempool_t *pool;
+#endif
 	size_t size;
 };
 
@@ -1229,13 +1239,17 @@ static void dmaengine_unmap(struct kref *kref)
 			       DMA_BIDIRECTIONAL);
 	}
 	cnt = unmap->map_cnt;
+#if 0 // AKAROS
 	mempool_free(unmap, __get_unmap_pool(cnt)->pool);
+#else
+	kmem_cache_free(__get_unmap_pool(cnt)->cache, unmap);
+#endif
 }
 
 void dmaengine_unmap_put(struct dmaengine_unmap_data *unmap)
 {
 	if (unmap)
-		kref_put(&unmap->kref, dmaengine_unmap);
+		kref_put(&unmap->kref);
 }
 EXPORT_SYMBOL_GPL(dmaengine_unmap_put);
 
@@ -1246,8 +1260,10 @@ static void dmaengine_destroy_unmap_pool(void)
 	for (i = 0; i < ARRAY_SIZE(unmap_pool); i++) {
 		struct dmaengine_unmap_pool *p = &unmap_pool[i];
 
+#if 0 // AKAROS
 		mempool_destroy(p->pool);
 		p->pool = NULL;
+#endif
 		kmem_cache_destroy(p->cache);
 		p->cache = NULL;
 	}
@@ -1264,13 +1280,15 @@ static int __init dmaengine_init_unmap_pool(void)
 		size = sizeof(struct dmaengine_unmap_data) +
 		       sizeof(dma_addr_t) * p->size;
 
-		p->cache = kmem_cache_create(p->name, size, 0,
-					     SLAB_HWCACHE_ALIGN, NULL);
+		p->cache = kmem_cache_create(p->name, size, ARCH_CL_SIZE,
+					     0, NULL, NULL, NULL, NULL);
 		if (!p->cache)
 			break;
+#if 0 // AKAROS
 		p->pool = mempool_create_slab_pool(1, p->cache);
 		if (!p->pool)
 			break;
+#endif
 	}
 
 	if (i == ARRAY_SIZE(unmap_pool))
@@ -1285,12 +1303,16 @@ dmaengine_get_unmap_data(struct device *dev, int nr, gfp_t flags)
 {
 	struct dmaengine_unmap_data *unmap;
 
+#if 0 // AKAROS
 	unmap = mempool_alloc(__get_unmap_pool(nr)->pool, flags);
+#else
+	unmap = kmem_cache_alloc(__get_unmap_pool(nr)->cache, flags);
+#endif
 	if (!unmap)
 		return NULL;
 
 	memset(unmap, 0, sizeof(*unmap));
-	kref_init(&unmap->kref);
+	kref_init(&unmap->kref, dmaengine_unmap, 1);
 	unmap->dev = dev;
 	unmap->map_cnt = nr;
 
@@ -1376,8 +1398,17 @@ static int __init dma_bus_init(void)
 
 	if (err)
 		return err;
+#if 0 // AKAROS
 	return class_register(&dma_devclass);
+#else
+	return 0;
+#endif
 }
 arch_initcall(dma_bus_init);
 
-
+static void __init dmaengine_init(void)
+{
+	dma_ida = create_u16_pool(MAX_U16_POOL_SZ);
+	assert(dma_ida);
+}
+init_func_2(dmaengine_init);

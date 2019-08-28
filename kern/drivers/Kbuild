@@ -1,3 +1,4 @@
 obj-y						+= net/
 obj-y						+= dev/
+obj-y						+= dma/
 obj-y						+= timers/
