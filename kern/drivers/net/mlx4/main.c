@@ -3979,8 +3979,9 @@ static int mlx4_pnp(struct ether *edev)
 	return 0;
 }
 
-linker_func_3(ethermlx4_link)
+static void __init ethermlx4_link(void)
 {
 	addethercard("mlx4", mlx4_pnp);
 }
+init_func_3(ethermlx4_link);
 #endif

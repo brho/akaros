@@ -8867,7 +8867,8 @@ static int rtl8169_pnp(struct ether *edev)
 	return 0;
 }
 
-linker_func_3(ether_rtl8169_link)
+static void __init ether_rtl8169_link(void)
 {
 	addethercard("r8169", rtl8169_pnp);
 }
+init_func_3(ether_rtl8169_link);

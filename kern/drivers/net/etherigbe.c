@@ -2040,8 +2040,9 @@ static int igbepnp(struct ether *edev)
 	return 0;
 }
 
-linker_func_3(etherigbelink)
+static void __init etherigbelink()
 {
 	addethercard("i82543", igbepnp);
 	addethercard("igbe", igbepnp);
 }
+init_func_3(etherigbelink);

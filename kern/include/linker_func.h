@@ -9,25 +9,28 @@
  * higher levels.  There is no guarantee of ordering of functions within a
  * level.
  *
- * To use, change your function definition to use the appropriate macro, e.g.
+ * To use, simply add the __init tag and the appropriate init_func_X(func);
  *
- * 		void foo(void)
+ * 		static void foo(void)
  * 		{
  * 			bar();
  * 		}
  *
  * becomes
  *
- * 		linker_func_3(foo)
+ * 		static void __init foo(void)
  * 		{
  * 			bar();
  * 		}
+ * 		init_func_3(foo);
  *
  * And foo() will run during the third level of functions.
  *
  * For now, all levels are run sequentially, and with interrupts enabled. */
 
 #pragma once
+
+#define __init
 
 #define __linkerfunc1  __attribute__((__section__(".linkerfunc1")))
 #define __linkerfunc2  __attribute__((__section__(".linkerfunc2")))
@@ -36,25 +39,11 @@
 
 typedef void (*linker_func_t)(void);
 
-#define linker_func_1(x)                                                       \
-	void (x)(void);                                                        \
-	linker_func_t __linkerfunc1 __##x = (x);                               \
-	void (x)(void)
-
-#define linker_func_2(x)                                                       \
-	void (x)(void);                                                        \
-	linker_func_t __linkerfunc2 __##x = (x);                               \
-	void (x)(void)
-
-#define linker_func_3(x)                                                       \
-	void (x)(void);                                                        \
-	linker_func_t __linkerfunc3 __##x = (x);                               \
-	void (x)(void)
-
-#define linker_func_4(x)                                                       \
-	void (x)(void);                                                        \
-	linker_func_t __linkerfunc4 __##x = (x);                               \
-	void (x)(void)
+/* Casting for the sake of Linux functions, which return an int. */
+#define init_func_1(x) linker_func_t __linkerfunc1 __##x = (linker_func_t)(x);
+#define init_func_2(x) linker_func_t __linkerfunc2 __##x = (linker_func_t)(x);
+#define init_func_3(x) linker_func_t __linkerfunc3 __##x = (linker_func_t)(x);
+#define init_func_4(x) linker_func_t __linkerfunc4 __##x = (linker_func_t)(x);
 
 extern linker_func_t __linkerfunc1start[];
 extern linker_func_t __linkerfunc1end[];

@@ -859,11 +859,12 @@ static struct block *multicastarp(struct Fs *f, struct arpent *a,
 	return NULL;
 }
 
-linker_func_4(ethermediumlink)
+static void __init ethermediumlink(void)
 {
 	addipmedium(&ethermedium);
 	addipmedium(&trexmedium);
 }
+init_func_4(ethermediumlink);
 
 static void etherpref2addr(uint8_t * pref, uint8_t * ea)
 {

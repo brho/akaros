@@ -2297,7 +2297,7 @@ static int i218pnp(struct ether *e)
 	return pnp(e, i218);
 }
 
-linker_func_3(ether82563link)
+static void __init ether82563link(void)
 {
 	/* recognise lots of model numbers for debugging assistance */
 	addethercard("i82563", i82563pnp);
@@ -2312,3 +2312,4 @@ linker_func_3(ether82563link)
 	addethercard("i218", i218pnp);
 	addethercard("igbepcie", anypnp);
 }
+init_func_3(ether82563link);

@@ -451,7 +451,8 @@ static int bnx2x_pnp(struct ether *edev)
 	return 0;
 }
 
-linker_func_3(etherbnx2x_link)
+static void __init etherbnx2x_link(void)
 {
 	addethercard("bnx2x", bnx2x_pnp);
 }
+init_func_3(etherbnx2x_link);

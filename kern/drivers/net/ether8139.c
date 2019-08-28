@@ -801,7 +801,8 @@ static int rtl8139pnp(struct ether *edev)
 	return 0;
 }
 
-linker_func_3(ether8139link)
+static void __init ether8139link(void)
 {
 	addethercard("rtl8139", rtl8139pnp);
 }
+init_func_3(ether8139link);

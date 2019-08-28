@@ -88,7 +88,8 @@ static struct ktest ktests[] = {
 
 static int num_ktests = sizeof(ktests) / sizeof(struct ktest);
 
-linker_func_1(register_net_ktests)
+static void __init register_net_ktests(void)
 {
 	REGISTER_KTESTS(ktests, num_ktests);
 }
+init_func_1(register_net_ktests);

@@ -149,7 +149,8 @@ struct medium loopbackmedium = {
 	.bwrite = loopbackbwrite,
 };
 
-linker_func_4(loopbackmediumlink)
+static void __init loopbackmediumlink(void)
 {
 	addipmedium(&loopbackmedium);
 }
+init_func_4(loopbackmediumlink);

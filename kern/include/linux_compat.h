@@ -312,7 +312,6 @@ enum {
 #define MODULE_DEVICE_TABLE(...)
 #define THIS_MODULE ((void*)0)
 #define EXPORT_SYMBOL(...)
-#define __init
 #define __exit
 #define module_init(...)
 #define module_exit(...)
