@@ -161,6 +161,16 @@ ready:
 	return retval;
 }
 
+void *dma_pool_zalloc(struct dma_pool *pool, int mem_flags, dma_addr_t *handle)
+{
+	void *ret = dma_pool_alloc(pool, mem_flags, handle);
+
+	if (!ret)
+		return NULL;
+	memset(ret, 0, pool->size);
+	return ret;
+}
+
 void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t addr)
 {
 	/* TODO */

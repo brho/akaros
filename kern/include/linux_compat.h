@@ -37,6 +37,14 @@
 //#define CONFIG_INET 1 	// will deal with this manually
 #define CONFIG_PCI_MSI 1
 
+#define IS_ENABLED(x) defined(x)
+
+struct module;
+#define __module_get(x)
+#define module_put(x)
+#define try_module_get(x) true
+#define	kref_get(p)	kref_get(p, 1)
+
 static inline void synchronize_sched(void)
 {
 	synchronize_rcu();
@@ -160,6 +168,11 @@ static inline int __dma_mapping_error(dma_addr_t dma_addr)
 #define dma_mapping_error(dev, handle)                                         \
 	__dma_mapping_error(handle)
 
+static inline void *devm_kzalloc(struct device *dev, size_t amt, int flags)
+{
+	return kzmalloc(amt, flags);
+}
+
 static void *vmalloc(size_t size)
 {
 	void *vaddr = get_cont_pages(LOG2_UP(nr_pages(size)), MEM_WAIT);
@@ -175,6 +188,16 @@ static void vfree(void *vaddr, size_t size)
 {
 	free_cont_pages(vaddr, LOG2_UP(nr_pages(size)));
 }
+
+/* Linux's helper, adapted to Akaros.  Any usage of __flags is likely wrong. */
+#define KMEM_CACHE(__struct, __flags)					\
+({									\
+	static_assert(__flags == 0);					\
+	kmem_cache_create(#__struct, sizeof(struct __struct),		\
+			  __alignof__(struct __struct), 0, NULL, NULL,	\
+			  NULL, NULL);					\
+})
+
 
 typedef int pci_power_t;
 typedef int pm_message_t;
@@ -267,6 +290,18 @@ static void msleep(unsigned int msecs)
 #define dev_alert(dev, fmt, ...) \
 	printk("[dev]: " fmt, ##__VA_ARGS__)
 
+/* Turn it on per-file with #define DEV_DBG */
+#ifdef DEV_DBG
+	#define dev_dbg(dev, fmt, ...) \
+		printk("[dev]: " fmt, ##__VA_ARGS__)
+#else
+	#define dev_dbg(dev, fmt, ...)
+#endif
+
+#define dev_dbg_ratelimited dev_dbg
+#define dev_WARN(dev, fmt, ...) \
+	warn("[dev]: " fmt, ##__VA_ARGS__)
+
 #ifdef DEBUG
 
 #define might_sleep() assert(can_block(&per_cpu_info[core_id()]))
@@ -307,6 +342,7 @@ enum {
 #define MODULE_VERSION(...)
 #define MODULE_FIRMWARE(...)
 #define module_param(...)
+#define module_param_string(...)
 #define module_param_named(...)
 #define MODULE_PARM_DESC(...)
 #define MODULE_DEVICE_TABLE(...)
@@ -315,6 +351,12 @@ enum {
 #define __exit
 #define module_init(...)
 #define module_exit(...)
+
+/* Feel free to add more.  If we get too many of these, we may need to think of
+ * when we are running them.  Right now, they all happen after arch and rcu
+ * init, and before devtab reset/init. */
+#define arch_initcall(x) init_func_2(x)
+#define device_initcall(x) init_func_2(x)
 
 #define is_kdump_kernel() (0)
 
@@ -594,7 +636,7 @@ typedef enum netdev_tx netdev_tx_t;
 #define rtnl_unlock()
 #define ASSERT_RTNL(...)
 
-#define synchronize_irq(x) warn_once("Asked to sync IRQ %d, unsupported", x)
+#define synchronize_irq(x) synchronize_rcu()
 #define HZ 1000
 
 /* Linux has a PCI device id struct.  Drivers make tables of their supported
@@ -640,6 +682,7 @@ srch_linux_pci_tbl(const struct pci_device_id *tbl, struct pci_device *needle)
 #define PCI_VENDOR_ID_AT            0x1259
 #define PCI_VENDOR_ID_LINKSYS       0x1737
 #define PCI_VENDOR_ID_GIGABYTE      0x1458
+#define PCI_VENDOR_ID_INTEL         0x8086
 
 /* I'd like to spatch all of the pci methods, but I don't know how to do the
  * reads.  Since we're not doing the reads, then no sense doing the writes. */
@@ -694,6 +737,32 @@ static inline int pci_enable_device(struct pci_device *dev)
 {
 	pci_set_bus_master(dev);
 	return 0;
+}
+
+static inline int pci_enable_device_mem(struct pci_device *dev)
+{
+	return pci_enable_device(dev);
+}
+
+static inline int pci_save_state(struct pci_device *dev)
+{
+	return 0;
+}
+
+static inline void pci_restore_state(struct pci_device *dev)
+{
+}
+
+static inline void pci_enable_pcie_error_reporting(struct pci_device *dev)
+{
+}
+
+static inline void pci_disable_pcie_error_reporting(struct pci_device *dev)
+{
+}
+
+static inline void pci_wake_from_d3(struct pci_device *dev, bool foo)
+{
 }
 
 static inline uint32_t pci_resource_len(struct pci_device *dev, int bir)

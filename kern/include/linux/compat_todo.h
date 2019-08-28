@@ -241,6 +241,13 @@ static inline void tasklet_disable(struct tasklet_struct *t)
 	// XXX t->state = 2
 }
 
+static inline void tasklet_kill(struct tasklet_struct *t)
+{
+	/* This is some hokey shit.  The one user of this is trying to kill it
+	 * after it already ran too.  This is more of a 'disable' in Linux. */
+	atomic_cas_u32(&t->state, 1, 0);
+}
+
 static inline void tasklet_init(struct tasklet_struct *t,
 				void (*func)(unsigned long), unsigned long data)
 {
@@ -304,6 +311,13 @@ static inline unsigned long round_jiffies_relative(unsigned long j)
 {
 	return round_jiffies(j);
 }
+
+static inline unsigned long msecs_to_jiffies(const unsigned int m)
+{
+	return m;
+}
+
+#define time_after_eq(a, b) ((b) <= (a))
 
 struct timer_list {
 	spinlock_t lock;
@@ -641,12 +655,13 @@ typedef phys_addr_t resource_size_t;
 
 struct dma_pool *dma_pool_create(const char *name, void *dev,
 				 size_t size, size_t align, size_t allocation);
-
 void dma_pool_destroy(struct dma_pool *pool);
-
 void *dma_pool_alloc(struct dma_pool *pool, int mem_flags, dma_addr_t *handle);
-
+void *dma_pool_zalloc(struct dma_pool *pool, int mem_flags, dma_addr_t *handle);
 void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t addr);
+
+/* This leaks memory, but we don't do driver detach yet. */
+#define dmam_pool_create dma_pool_create
 
 #define pci_pool dma_pool
 #define pci_pool_create(name, pdev, size, align, allocation) \
@@ -736,6 +751,7 @@ extern void __bad_unaligned_access_size(void);
 #define vmalloc_node(...) (0 /* XXX */)
 /* needed by icm.c: */
 #define kmalloc_node(size, flags, node) kmalloc(size, flags)
+/* MLX4 icm.c calls this, it fails, and tries something else */
 #define alloc_pages_node(nid, gfp_mask, order) 0
 
 struct scatterlist {
@@ -1069,6 +1085,7 @@ static inline void eth_broadcast_addr(uint8_t *addr)
 #define for_each_online_cpu(x) for_each_core(x)
 
 #define alloc_percpu_gfp(x, f) percpu_alloc(x, f)
+#define alloc_percpu(x) percpu_alloc(x, MEM_WAIT)
 #define free_percpu(x) percpu_free(x)
 
 #define __this_cpu_read(x) PERCPU_VAR(x)
