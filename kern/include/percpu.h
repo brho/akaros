@@ -60,7 +60,7 @@
 #include <arch/topology.h>
 #include <ros/common.h>
 
-#define PERCPU_SECTION __percpu
+#define PERCPU_SECTION __percpu_section
 #define PERCPU_SECTION_STR STRINGIFY(PERCPU_SECTION)
 
 #define PERCPU_START_VAR PASTE(__start_, PERCPU_SECTION)

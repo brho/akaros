@@ -15,11 +15,6 @@
 #include <linux/compiler.h>
 #undef __AKAROS_COMPILER_H
 
-/* Linux uses this as a tag for the __CHECKER__ and either defined it to
- * nothing or to some attribute.  We use it for the name of the pcpu variables
- * .section, so need it to not be #defined yet. */
-#undef __percpu
-
 /* If __VA_ARGS__ is empty, the ## will eat the comma to the left, so we call
  * __MACRO_NARG with 1 + NR_ARGS arguments, then the 6, 5, 4, etc.  __MACRO_NARG
  * will strip the 0 (the _0), then the args (if any), and then return the Nth
