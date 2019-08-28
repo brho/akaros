@@ -636,6 +636,16 @@ try_alloc:
 	return ret;
 }
 
+void *kmem_cache_zalloc(struct kmem_cache *kc, int flags)
+{
+	void *obj = kmem_cache_alloc(kc, flags);
+
+	if (!obj)
+		return NULL;
+	memset(obj, 0, kc->obj_size);
+	return obj;
+}
+
 /* Returns an object to the slab layer.  Caller must deconstruct the objects.
  * Note that objects in the slabs are unconstructed. */
 static void __kmem_free_to_slab(struct kmem_cache *cp, void *buf)
