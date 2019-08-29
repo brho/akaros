@@ -29,7 +29,7 @@ extern int bnx2x_num_queues;
 #define BNX2X_PCI_FREE(x, y, size) \
 	do { \
 		if (x) { \
-			dma_free_coherent(&bp->pdev->dev, size, (void *)x, y); \
+			dma_free_coherent(&bp->pdev->linux_dev, size, (void *)x, y); \
 			x = NULL; \
 			y = 0; \
 		} \
@@ -45,7 +45,7 @@ extern int bnx2x_num_queues;
 
 #define BNX2X_PCI_ALLOC(y, size)					\
 ({									\
-	void *x = dma_zalloc_coherent(&bp->pdev->dev, size, y, MEM_WAIT); \
+	void *x = dma_zalloc_coherent(&bp->pdev->linux_dev, size, y, MEM_WAIT); \
 	if (x)								\
 		DP(NETIF_MSG_HW,					\
 		   "BNX2X_PCI_ALLOC: Physical %p Virtual %p\n",	\
@@ -54,7 +54,7 @@ extern int bnx2x_num_queues;
 })
 #define BNX2X_PCI_FALLOC(y, size)					\
 ({									\
-	void *x = dma_alloc_coherent(&bp->pdev->dev, size, y, MEM_WAIT); \
+	void *x = dma_alloc_coherent(&bp->pdev->linux_dev, size, y, MEM_WAIT); \
 	if (x) {							\
 		memset(x, 0xff, size);					\
 		DP(NETIF_MSG_HW,					\

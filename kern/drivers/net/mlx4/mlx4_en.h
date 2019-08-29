@@ -899,10 +899,10 @@ do {									\
 
 #define mlx4_err(mdev, format, ...)					\
 	pr_err(DRV_NAME " %s: " format,					\
-	       dev_name(&(mdev)->pdev->dev), ##__VA_ARGS__)
+	       dev_name(&(mdev)->pdev->linux_dev), ##__VA_ARGS__)
 #define mlx4_info(mdev, format, ...)					\
 	pr_info(DRV_NAME " %s: " format,				\
-		dev_name(&(mdev)->pdev->dev), ##__VA_ARGS__)
+		dev_name(&(mdev)->pdev->linux_dev), ##__VA_ARGS__)
 #define mlx4_warn(mdev, format, ...)					\
 	pr_warn(DRV_NAME " %s: " format,				\
-		dev_name(&(mdev)->pdev->dev), ##__VA_ARGS__)
+		dev_name(&(mdev)->pdev->linux_dev), ##__VA_ARGS__)

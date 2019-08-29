@@ -972,10 +972,9 @@ static int mlx4_create_eq(struct mlx4_dev *dev, int nent,
 	eq_context = mailbox->buf;
 
 	for (i = 0; i < npages; ++i) {
-		eq->page_list[i].buf = dma_alloc_coherent(&dev->persist->
-							  pdev->dev,
-							  PAGE_SIZE, &t,
-							  MEM_WAIT);
+		eq->page_list[i].buf =
+			dma_alloc_coherent(&dev->persist->pdev->linux_dev,
+					   PAGE_SIZE, &t, MEM_WAIT);
 		if (!eq->page_list[i].buf)
 			goto err_out_free_pages;
 
@@ -1041,8 +1040,8 @@ err_out_free_eq:
 err_out_free_pages:
 	for (i = 0; i < npages; ++i)
 		if (eq->page_list[i].buf)
-			dma_free_coherent(&dev->persist->pdev->dev, PAGE_SIZE,
-					  eq->page_list[i].buf,
+			dma_free_coherent(&dev->persist->pdev->linux_dev,
+					  PAGE_SIZE, eq->page_list[i].buf,
 					  eq->page_list[i].map);
 
 	mlx4_free_cmd_mailbox(dev, mailbox);
@@ -1075,7 +1074,7 @@ static void mlx4_free_eq(struct mlx4_dev *dev,
 
 	mlx4_mtt_cleanup(dev, &eq->mtt);
 	for (i = 0; i < npages; ++i)
-		dma_free_coherent(&dev->persist->pdev->dev, PAGE_SIZE,
+		dma_free_coherent(&dev->persist->pdev->linux_dev, PAGE_SIZE,
 				  eq->page_list[i].buf,
 				  eq->page_list[i].map);
 

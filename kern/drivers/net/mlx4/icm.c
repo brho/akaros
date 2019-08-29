@@ -65,7 +65,7 @@ static void mlx4_free_icm_coherent(struct mlx4_dev *dev, struct mlx4_icm_chunk *
 	int i;
 
 	for (i = 0; i < chunk->npages; ++i)
-		dma_free_coherent(&dev->persist->pdev->dev,
+		dma_free_coherent(&dev->persist->pdev->linux_dev,
 				  chunk->mem[i].length,
 				  lowmem_page_address(sg_page(&chunk->mem[i])),
 				  sg_dma_address(&chunk->mem[i]));

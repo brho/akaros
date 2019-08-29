@@ -1677,7 +1677,7 @@ static void __rtl8169_check_link_status(struct ether *dev,
 		rtl_link_chg_patch(tp);
 		/* This is to cancel a scheduled suspend if there's one. */
 		if (pm)
-			pm_request_resume(&tp->pci_dev->device);
+			pm_request_resume(&tp->pci_dev->linux_dev);
 		netif_carrier_on(dev);
 		if (net_ratelimit())
 			netif_info(tp, ifup, dev, "link up\n");
@@ -1685,7 +1685,7 @@ static void __rtl8169_check_link_status(struct ether *dev,
 		netif_carrier_off(dev);
 		netif_info(tp, ifdown, dev, "link down\n");
 		if (pm)
-			pm_schedule_suspend(&tp->pci_dev->device, 5000);
+			pm_schedule_suspend(&tp->pci_dev->linux_dev, 5000);
 	}
 }
 
@@ -1753,7 +1753,7 @@ static uint32_t __rtl8169_get_wol(struct rtl8169_private *tp)
 static void rtl8169_get_wol(struct ether *dev, struct ethtool_wolinfo *wol)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	struct device *d = &tp->pci_dev->device;
+	struct device *d = &tp->pci_dev->linux_dev;
 
 	pm_runtime_get_noresume(d);
 
@@ -1859,7 +1859,7 @@ static void __rtl8169_set_wol(struct rtl8169_private *tp, uint32_t wolopts)
 static int rtl8169_set_wol(struct ether *dev, struct ethtool_wolinfo *wol)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	struct device *d = &tp->pci_dev->device;
+	struct device *d = &tp->pci_dev->linux_dev;
 
 	pm_runtime_get_noresume(d);
 
@@ -1876,7 +1876,7 @@ static int rtl8169_set_wol(struct ether *dev, struct ethtool_wolinfo *wol)
 
 	rtl_unlock_work(tp);
 
-	device_set_wakeup_enable(&tp->pci_dev->device, wol->wolopts);
+	device_set_wakeup_enable(&tp->pci_dev->linux_dev, wol->wolopts);
 
 	pm_runtime_put_noidle(d);
 
@@ -2345,7 +2345,7 @@ static void rtl8169_get_ethtool_stats(struct ether *dev,
 				      uint64_t *data)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	struct device *d = &tp->pci_dev->device;
+	struct device *d = &tp->pci_dev->linux_dev;
 	struct rtl8169_counters *counters = tp->counters;
 
 	ASSERT_RTNL();
@@ -4530,7 +4530,7 @@ static void rtl_rar_set(struct rtl8169_private *tp, uint8_t *addr)
 static int rtl_set_mac_address(struct ether *dev, void *p)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
-	struct device *d = &tp->pci_dev->device;
+	struct device *d = &tp->pci_dev->linux_dev;
 	struct sockaddr *addr = p;
 
 	if (!is_valid_ether_addr(addr->sa_data))
@@ -5234,7 +5234,7 @@ static void rtl_request_uncached_firmware(struct rtl8169_private *tp)
 	if (!rtl_fw)
 		goto err_warn;
 
-	rc = request_firmware(&rtl_fw->fw, name, &tp->pci_dev->device);
+	rc = request_firmware(&rtl_fw->fw, name, &tp->pci_dev->linux_dev);
 	if (rc < 0)
 		goto err_free;
 
@@ -6756,8 +6756,8 @@ static inline void rtl8169_make_unusable_by_asic(struct RxDesc *desc)
 static void rtl8169_free_rx_databuff(struct rtl8169_private *tp,
 				     void **data_buff, struct RxDesc *desc)
 {
-	dma_unmap_single(&tp->pci_dev->device, le64_to_cpu(desc->addr), rx_buf_sz,
-			 DMA_FROM_DEVICE);
+	dma_unmap_single(&tp->pci_dev->linux_dev, le64_to_cpu(desc->addr),
+			 rx_buf_sz, DMA_FROM_DEVICE);
 
 	kfree(*data_buff);
 	*data_buff = NULL;
@@ -6793,7 +6793,7 @@ static void *rtl8169_alloc_rx_data(struct rtl8169_private *tp,
 {
 	void *data;
 	dma_addr_t mapping;
-	struct device *d = &tp->pci_dev->device;
+	struct device *d = &tp->pci_dev->linux_dev;
 	struct ether *dev = tp->dev;
 #if 0 // AKAROS_PORT
 	int node = dev->dev.parent ? dev_to_node(dev->dev.parent) : -1;
@@ -6909,7 +6909,7 @@ static void rtl8169_tx_clear_range(struct rtl8169_private *tp, uint32_t start,
 		if (len) {
 			struct block *bp = tx_skb->block;
 
-			rtl8169_unmap_tx_skb(&tp->pci_dev->device, tx_skb,
+			rtl8169_unmap_tx_skb(&tp->pci_dev->linux_dev, tx_skb,
 					     tp->TxDescArray + entry);
 			if (bp) {
 				freeb(bp);
@@ -6962,7 +6962,7 @@ static int rtl8169_xmit_frags(struct rtl8169_private *tp, struct block *bp,
 {
 	unsigned int cur_frag, entry;
 	struct TxDesc *uninitialized_var(txd);
-	struct device *d = &tp->pci_dev->device;
+	struct device *d = &tp->pci_dev->linux_dev;
 
 	entry = tp->cur_tx;
 	/* Don't use cur_frag for the loop.  ebd may have holes, but we only
@@ -7217,7 +7217,7 @@ static netdev_tx_t rtl8169_start_xmit(struct block *bp, struct ether *dev)
 	unsigned int entry = tp->cur_tx % NUM_TX_DESC;
 	struct TxDesc *txd = tp->TxDescArray + entry;
 	void __iomem *ioaddr = tp->mmio_addr;
-	struct device *d = &tp->pci_dev->device;
+	struct device *d = &tp->pci_dev->linux_dev;
 	dma_addr_t mapping;
 	uint32_t status, len;
 	uint32_t opts[2];
@@ -7379,7 +7379,7 @@ static void rtl_tx(struct ether *dev, struct rtl8169_private *tp)
 		 */
 		bus_rmb();
 
-		rtl8169_unmap_tx_skb(&tp->pci_dev->device, tx_skb,
+		rtl8169_unmap_tx_skb(&tp->pci_dev->linux_dev, tx_skb,
 				     tp->TxDescArray + entry);
 		if (status & LastFrag) {
 			u64_stats_update_begin(&tp->tx_stats.syncp);
@@ -7444,7 +7444,7 @@ static struct block *rtl8169_try_rx_copy(void *data, struct rtl8169_private *tp,
                                          int pkt_size, dma_addr_t addr)
 {
 	struct block *bp;
-	struct device *d = &tp->pci_dev->device;
+	struct device *d = &tp->pci_dev->linux_dev;
 
 	data = rtl8169_align(data);
 	dma_sync_single_for_cpu(d, addr, pkt_size, DMA_FROM_DEVICE);
@@ -7742,7 +7742,7 @@ static int rtl8169_close(struct ether *dev)
 	struct rtl8169_private *tp = netdev_priv(dev);
 	struct pci_device *pdev = tp->pci_dev;
 
-	pm_runtime_get_sync(&pdev->device);
+	pm_runtime_get_sync(&pdev->linux_dev);
 
 	/* Update counters before going down */
 	rtl8169_update_counters(dev);
@@ -7757,14 +7757,14 @@ static int rtl8169_close(struct ether *dev)
 
 	free_irq(pdev->irqline, dev);
 
-	dma_free_coherent(&pdev->device, R8169_RX_RING_BYTES, tp->RxDescArray,
+	dma_free_coherent(&pdev->linux_dev, R8169_RX_RING_BYTES, tp->RxDescArray,
 			  tp->RxPhyAddr);
-	dma_free_coherent(&pdev->device, R8169_TX_RING_BYTES, tp->TxDescArray,
+	dma_free_coherent(&pdev->linux_dev, R8169_TX_RING_BYTES, tp->TxDescArray,
 			  tp->TxPhyAddr);
 	tp->TxDescArray = NULL;
 	tp->RxDescArray = NULL;
 
-	pm_runtime_put_sync(&pdev->device);
+	pm_runtime_put_sync(&pdev->linux_dev);
 
 	return 0;
 }
@@ -7785,19 +7785,19 @@ static int rtl_open(struct ether *dev)
 	struct pci_device *pdev = tp->pci_dev;
 	int retval = -ENOMEM;
 
-	pm_runtime_get_sync(&pdev->device);
+	pm_runtime_get_sync(&pdev->linux_dev);
 
 	/*
 	 * Rx and Tx descriptors needs 256 bytes alignment.
 	 * dma_alloc_coherent provides more.
 	 */
-	tp->TxDescArray = dma_zalloc_coherent(&pdev->device,
+	tp->TxDescArray = dma_zalloc_coherent(&pdev->linux_dev,
 					      R8169_TX_RING_BYTES,
 					      &tp->TxPhyAddr, MEM_WAIT);
 	if (!tp->TxDescArray)
 		goto err_pm_runtime_put;
 
-	tp->RxDescArray = dma_zalloc_coherent(&pdev->device,
+	tp->RxDescArray = dma_zalloc_coherent(&pdev->linux_dev,
 					      R8169_RX_RING_BYTES,
 					      &tp->RxPhyAddr, MEM_WAIT);
 	if (!tp->RxDescArray)
@@ -7841,7 +7841,7 @@ static int rtl_open(struct ether *dev)
 	rtl_unlock_work(tp);
 
 	tp->saved_wolopts = 0;
-	pm_runtime_put_noidle(&pdev->device);
+	pm_runtime_put_noidle(&pdev->linux_dev);
 
 	rtl8169_check_link_status(dev, tp, ioaddr);
 out:
@@ -7851,15 +7851,15 @@ err_release_fw_2:
 	rtl_release_firmware(tp);
 	rtl8169_rx_clear(tp);
 err_free_rx_1:
-	dma_free_coherent(&pdev->device, R8169_RX_RING_BYTES, tp->RxDescArray,
+	dma_free_coherent(&pdev->linux_dev, R8169_RX_RING_BYTES, tp->RxDescArray,
 			  tp->RxPhyAddr);
 	tp->RxDescArray = NULL;
 err_free_tx_0:
-	dma_free_coherent(&pdev->device, R8169_TX_RING_BYTES, tp->TxDescArray,
+	dma_free_coherent(&pdev->linux_dev, R8169_TX_RING_BYTES, tp->TxDescArray,
 			  tp->TxPhyAddr);
 	tp->TxDescArray = NULL;
 err_pm_runtime_put:
-	pm_runtime_put_noidle(&pdev->device);
+	pm_runtime_put_noidle(&pdev->linux_dev);
 	goto out;
 }
 
@@ -7872,9 +7872,9 @@ rtl8169_get_stats64(struct ether *dev, struct netif_stats *stats)
 	struct rtl8169_counters *counters = tp->counters;
 	unsigned int start;
 
-	pm_runtime_get_noresume(&pdev->device);
+	pm_runtime_get_noresume(&pdev->linux_dev);
 
-	if (netif_running(dev) && pm_runtime_active(&pdev->device))
+	if (netif_running(dev) && pm_runtime_active(&pdev->linux_dev))
 		rtl8169_rx_missed(dev, ioaddr);
 
 	do {
@@ -7902,7 +7902,7 @@ rtl8169_get_stats64(struct ether *dev, struct netif_stats *stats)
 	 * Fetch additonal counter values missing in stats collected by driver
 	 * from tally counters.
 	 */
-	if (pm_runtime_active(&pdev->device))
+	if (pm_runtime_active(&pdev->linux_dev))
 		rtl8169_update_counters(dev);
 
 	/*
@@ -7916,7 +7916,7 @@ rtl8169_get_stats64(struct ether *dev, struct netif_stats *stats)
 	stats->tx_aborted_errors = le16_to_cpu(counters->tx_aborted) -
 		le16_to_cpu(tp->tc_offset.tx_aborted);
 
-	pm_runtime_put_noidle(&pdev->device);
+	pm_runtime_put_noidle(&pdev->linux_dev);
 }
 
 static void rtl8169_net_suspend(struct ether *dev)
@@ -8077,7 +8077,7 @@ static void rtl_shutdown(struct pci_device *pdev)
 {
 	struct ether *dev = pci_get_drvdata(pdev);
 	struct rtl8169_private *tp = netdev_priv(dev);
-	struct device *d = &pdev->device;
+	struct device *d = &pdev->linux_dev;
 
 	pm_runtime_get_sync(d);
 
@@ -8124,13 +8124,13 @@ static void rtl_remove_one(struct pci_device *pdev)
 
 	unregister_netdev(dev);
 
-	dma_free_coherent(&tp->pci_dev->device, sizeof(*tp->counters),
+	dma_free_coherent(&tp->pci_dev->linux_dev, sizeof(*tp->counters),
 			  tp->counters, tp->counters_phys_addr);
 
 	rtl_release_firmware(tp);
 
 	if (pci_dev_run_wake(pdev))
-		pm_runtime_get_noresume(&pdev->device);
+		pm_runtime_get_noresume(&pdev->linux_dev);
 
 #if 0 // AKAROS_PORT
 	/* restore original MAC address */
@@ -8321,7 +8321,7 @@ static int rtl_init_one(struct ether *dev, struct pci_device *pdev,
 		       MODULENAME, RTL8169_VERSION);
 	}
 
-	SET_NETDEV_DEV(dev, &pdev->device);
+	SET_NETDEV_DEV(dev, &pdev->linux_dev);
 	tp = netdev_priv(dev);
 	tp->dev = dev;
 	tp->pci_dev = pdev;
@@ -8580,7 +8580,7 @@ static int rtl_init_one(struct ether *dev, struct pci_device *pdev,
 
 	tp->rtl_fw = RTL_FIRMWARE_UNKNOWN;
 
-	tp->counters = dma_zalloc_coherent(&pdev->device, sizeof(*tp->counters),
+	tp->counters = dma_zalloc_coherent(&pdev->linux_dev, sizeof(*tp->counters),
 					   &tp->counters_phys_addr, MEM_WAIT);
 	if (!tp->counters) {
 		rc = -ENOMEM;
@@ -8613,11 +8613,11 @@ static int rtl_init_one(struct ether *dev, struct pci_device *pdev,
 		rtl8168_driver_start(tp);
 	}
 
-	device_set_wakeup_enable(&pdev->device,
+	device_set_wakeup_enable(&pdev->linux_dev,
 				 tp->features & RTL_FEATURE_WOL);
 
 	if (pci_dev_run_wake(pdev))
-		pm_runtime_put_noidle(&pdev->device);
+		pm_runtime_put_noidle(&pdev->linux_dev);
 
 	netif_carrier_off(dev);
 
@@ -8625,7 +8625,7 @@ out:
 	return rc;
 
 err_out_cnt_6:
-	dma_free_coherent(&pdev->device, sizeof(*tp->counters), tp->counters,
+	dma_free_coherent(&pdev->linux_dev, sizeof(*tp->counters), tp->counters,
 			  tp->counters_phys_addr);
 err_out_msi_5:
 	netif_napi_del(&tp->napi);

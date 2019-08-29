@@ -401,10 +401,9 @@ struct ib_fast_reg_page_list *mlx4_ib_alloc_fast_reg_page_list(struct ib_device 
 	if (!mfrpl->ibfrpl.page_list)
 		goto err_free;
 
-	mfrpl->mapped_page_list = dma_alloc_coherent(&dev->dev->persist->
-						     pdev->dev,
-						     size, &mfrpl->map,
-						     GFP_KERNEL);
+	mfrpl->mapped_page_list =
+		dma_alloc_coherent(&dev->dev->persist->pdev->linux_dev, size,
+				   &mfrpl->map, GFP_KERNEL);
 	if (!mfrpl->mapped_page_list)
 		goto err_free;
 
@@ -424,7 +423,7 @@ void mlx4_ib_free_fast_reg_page_list(struct ib_fast_reg_page_list *page_list)
 	struct mlx4_ib_fast_reg_page_list *mfrpl = to_mfrpl(page_list);
 	int size = page_list->max_page_list_len * sizeof (u64);
 
-	dma_free_coherent(&dev->dev->persist->pdev->dev, size,
+	dma_free_coherent(&dev->dev->persist->pdev->linux_dev, size,
 			  mfrpl->mapped_page_list,
 			  mfrpl->map);
 	kfree(mfrpl->ibfrpl.page_list);

@@ -2469,7 +2469,7 @@ err_comm_admin:
 err_comm:
 	iounmap(priv->mfunc.comm);
 err_vhcr:
-	dma_free_coherent(&dev->persist->pdev->dev, PAGE_SIZE,
+	dma_free_coherent(&dev->persist->pdev->linux_dev, PAGE_SIZE,
 			  priv->mfunc.vhcr,
 			  priv->mfunc.vhcr_dma);
 	priv->mfunc.vhcr = NULL;
@@ -2501,10 +2501,10 @@ int mlx4_cmd_init(struct mlx4_dev *dev)
 	}
 
 	if (mlx4_is_mfunc(dev) && !priv->mfunc.vhcr) {
-		priv->mfunc.vhcr = dma_alloc_coherent(&dev->persist->pdev->dev,
-						      PAGE_SIZE,
-						      &priv->mfunc.vhcr_dma,
-						      MEM_WAIT);
+		priv->mfunc.vhcr =
+			dma_alloc_coherent(&dev->persist->pdev->linux_dev,
+					   PAGE_SIZE, &priv->mfunc.vhcr_dma,
+					   MEM_WAIT);
 		if (!priv->mfunc.vhcr)
 			goto err;
 
@@ -2587,7 +2587,7 @@ void mlx4_cmd_cleanup(struct mlx4_dev *dev, int cleanup_mask)
 	}
 	if (mlx4_is_mfunc(dev) && priv->mfunc.vhcr &&
 	    (cleanup_mask & MLX4_CMD_CLEANUP_VHCR)) {
-		dma_free_coherent(&dev->persist->pdev->dev, PAGE_SIZE,
+		dma_free_coherent(&dev->persist->pdev->linux_dev, PAGE_SIZE,
 				  priv->mfunc.vhcr, priv->mfunc.vhcr_dma);
 		priv->mfunc.vhcr = NULL;
 	}

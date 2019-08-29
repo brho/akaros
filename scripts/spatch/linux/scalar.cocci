@@ -147,7 +147,7 @@ struct pci_device *p;
 struct pci_device *p;
 @@
 -p->dev
-+p->device
++p->linux_dev
 
 @@
 struct ether *p;

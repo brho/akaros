@@ -174,7 +174,7 @@ struct pci_device {
 	uintptr_t			mmio_cfg;
 	void				*dev_data; /* device private pointer */
 	struct iommu			*iommu; /* ptr to controlling iommu */
-	struct device			device;
+	struct device			linux_dev;
 	bool				in_use;	/* prevent double discovery */
 	int				domain; /* legacy size was 16-bits */
 	uint8_t				bus;

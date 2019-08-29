@@ -291,7 +291,7 @@ void mlx4_en_init_timestamp(struct mlx4_en_dev *mdev)
 	snprintf(mdev->ptp_clock_info.name, 16, "mlx4 ptp");
 
 	mdev->ptp_clock = ptp_clock_register(&mdev->ptp_clock_info,
-					     &mdev->pdev->dev);
+					     &mdev->pdev->linux_dev);
 	if (IS_ERR(mdev->ptp_clock)) {
 		mdev->ptp_clock = NULL;
 		mlx4_err(mdev, "ptp_clock_register failed\n");

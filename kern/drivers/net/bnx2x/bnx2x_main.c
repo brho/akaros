@@ -6519,7 +6519,7 @@ void bnx2x_post_irq_nic_init(struct bnx2x *bp, uint32_t load_code)
 /* gzip service functions */
 static int bnx2x_gunzip_init(struct bnx2x *bp)
 {
-	bp->gunzip_buf = dma_alloc_coherent(&bp->pdev->dev, FW_BUF_SIZE,
+	bp->gunzip_buf = dma_alloc_coherent(&bp->pdev->linux_dev, FW_BUF_SIZE,
 					    &bp->gunzip_mapping, MEM_WAIT);
 	if (bp->gunzip_buf  == NULL)
 		goto gunzip_nomem1;
@@ -6539,7 +6539,7 @@ gunzip_nomem3:
 	bp->strm = NULL;
 
 gunzip_nomem2:
-	dma_free_coherent(&bp->pdev->dev, FW_BUF_SIZE, bp->gunzip_buf,
+	dma_free_coherent(&bp->pdev->linux_dev, FW_BUF_SIZE, bp->gunzip_buf,
 			  bp->gunzip_mapping);
 	bp->gunzip_buf = NULL;
 
@@ -6557,8 +6557,8 @@ static void bnx2x_gunzip_end(struct bnx2x *bp)
 	}
 
 	if (bp->gunzip_buf) {
-		dma_free_coherent(&bp->pdev->dev, FW_BUF_SIZE, bp->gunzip_buf,
-				  bp->gunzip_mapping);
+		dma_free_coherent(&bp->pdev->linux_dev, FW_BUF_SIZE,
+				  bp->gunzip_buf, bp->gunzip_mapping);
 		bp->gunzip_buf = NULL;
 	}
 }
@@ -12736,7 +12736,7 @@ static int bnx2x_set_coherency_mask(struct bnx2x *bp)
 {
 	return 0;
 #if 0 // AKAROS_PORT
-	struct device *dev = &bp->pdev->dev;
+	struct device *dev = &bp->pdev->linux_dev;
 
 	if (dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64)) != 0 &&
 	    dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32)) != 0) {
@@ -12768,7 +12768,7 @@ static int bnx2x_init_dev(struct bnx2x *bp, struct pci_device *pdev,
 			    board_type == BCM57711 ||
 			    board_type == BCM57711E);
 
-	SET_NETDEV_DEV(dev, &pdev->dev);
+	SET_NETDEV_DEV(dev, &pdev->linux_dev);
 
 	bp->dev = dev;
 	bp->pdev = pdev;
@@ -13120,7 +13120,8 @@ static int bnx2x_init_firmware(struct bnx2x *bp)
 	}
 	BNX2X_DEV_INFO("Loading %s\n", fw_file_name);
 
-	rc = request_firmware(&bp->firmware, fw_file_name, &bp->pdev->device);
+	rc = request_firmware(&bp->firmware, fw_file_name,
+			      &bp->pdev->linux_dev);
 	if (rc) {
 		BNX2X_ERR("Can't load firmware file %s\n",
 			  fw_file_name);
@@ -13252,7 +13253,7 @@ static int bnx2x_get_num_non_def_sbs(struct pci_device *pdev, int cnic_cnt)
 	 * one fast path queue: one FP queue + SB for CNIC
 	 */
 	if (pci_find_cap(pdev, PCI_CAP_ID_MSIX, &msix_cap)) {
-		dev_info(&pdev->dev, "no msix capability found\n");
+		dev_info(&pdev->linux_dev, "no msix capability found\n");
 		return 1 + cnic_cnt;
 	}
 
@@ -13492,7 +13493,7 @@ int bnx2x_init_one(struct ether *dev, struct bnx2x *bp,
 	 */
 	rc = bnx2x_set_int_mode(bp);
 	if (rc) {
-		dev_err(&pdev->dev, "Cannot set interrupts\n");
+		dev_err(&pdev->linux_dev, "Cannot set interrupts\n");
 		goto init_one_exit;
 	}
 	BNX2X_DEV_INFO("set interrupts successfully\n");

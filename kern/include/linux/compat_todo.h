@@ -680,7 +680,7 @@ void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t addr);
 
 #define pci_pool dma_pool
 #define pci_pool_create(name, pdev, size, align, allocation) \
-		dma_pool_create(name, pdev, size, align, allocation)
+	dma_pool_create(name, &pdev->linux_dev, size, align, allocation)
 #define pci_pool_destroy(pool) dma_pool_destroy(pool)
 #define pci_pool_alloc(pool, flags, handle) dma_pool_alloc(pool, flags, handle)
 #define pci_pool_free(pool, vaddr, addr) dma_pool_free(pool, vaddr, addr)

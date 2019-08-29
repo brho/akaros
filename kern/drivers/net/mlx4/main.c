@@ -2586,7 +2586,8 @@ static int mlx4_init_port_info(struct mlx4_dev *dev, int port)
 	info->port_attr.show      = show_port_type;
 	sysfs_attr_init(&info->port_attr.attr);
 
-	err = device_create_file(&dev->persist->pdev->dev, &info->port_attr);
+	err = device_create_file(&dev->persist->pdev->linux_dev,
+				 &info->port_attr);
 	if (err) {
 		mlx4_err(dev, "Failed to create file for port %d\n", port);
 		info->port = -1;
@@ -2605,11 +2606,11 @@ static int mlx4_init_port_info(struct mlx4_dev *dev, int port)
 	info->port_mtu_attr.show      = show_port_ib_mtu;
 	sysfs_attr_init(&info->port_mtu_attr.attr);
 
-	err = device_create_file(&dev->persist->pdev->dev,
+	err = device_create_file(&dev->persist->pdev->linux_dev,
 				 &info->port_mtu_attr);
 	if (err) {
 		mlx4_err(dev, "Failed to create mtu file for port %d\n", port);
-		device_remove_file(&info->dev->persist->pdev->dev,
+		device_remove_file(&info->dev->persist->pdev->linux_dev,
 				   &info->port_attr);
 		info->port = -1;
 	}
@@ -2625,8 +2626,9 @@ static void mlx4_cleanup_port_info(struct mlx4_port_info *info)
 	if (info->port < 0)
 		return;
 
-	device_remove_file(&info->dev->persist->pdev->dev, &info->port_attr);
-	device_remove_file(&info->dev->persist->pdev->dev,
+	device_remove_file(&info->dev->persist->pdev->linux_dev,
+			   &info->port_attr);
+	device_remove_file(&info->dev->persist->pdev->linux_dev,
 			   &info->port_mtu_attr);
 #endif
 }
@@ -2843,7 +2845,7 @@ static int mlx4_load_one(struct pci_device *pdev, int pci_dev_data,
 #if 0 // AKAROS_PORT
 	dev->rev_id = pdev->revision;
 #endif
-	dev->numa_node = dev_to_node(&pdev->dev);
+	dev->numa_node = dev_to_node(&pdev->linux_dev);
 
 	/* Detect if this device is a virtual function */
 	if (pci_dev_data & MLX4_PCI_DEV_IS_VF) {
@@ -3249,7 +3251,8 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 
 	err = pci_enable_device(pdev);
 	if (err) {
-		dev_err(&pdev->dev, "Cannot enable PCI device, aborting\n");
+		dev_err(&pdev->linux_dev,
+			"Cannot enable PCI device, aborting\n");
 		return err;
 	}
 
@@ -3261,7 +3264,8 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 	     total_vfs += nvfs[param_map[num_vfs_argc - 1][i]], i++) {
 		nvfs[param_map[num_vfs_argc - 1][i]] = num_vfs[i];
 		if (nvfs[i] < 0) {
-			dev_err(&pdev->dev, "num_vfs module parameter cannot be negative\n");
+			dev_err(&pdev->linux_dev,
+				"num_vfs module parameter cannot be negative\n");
 			err = -EINVAL;
 			goto err_disable_pdev;
 		}
@@ -3270,13 +3274,14 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 	     i++) {
 		prb_vf[param_map[probe_vfs_argc - 1][i]] = probe_vf[i];
 		if (prb_vf[i] < 0 || prb_vf[i] > nvfs[i]) {
-			dev_err(&pdev->dev, "probe_vf module parameter cannot be negative or greater than num_vfs\n");
+			dev_err(&pdev->linux_dev,
+				"probe_vf module parameter cannot be negative or greater than num_vfs\n");
 			err = -EINVAL;
 			goto err_disable_pdev;
 		}
 	}
 	if (total_vfs >= MLX4_MAX_NUM_VF) {
-		dev_err(&pdev->dev,
+		dev_err(&pdev->linux_dev,
 			"Requested more VF's (%d) than allowed (%d)\n",
 			total_vfs, MLX4_MAX_NUM_VF - 1);
 		err = -EINVAL;
@@ -3285,7 +3290,7 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 
 	for (i = 0; i < MLX4_MAX_PORTS; i++) {
 		if (nvfs[i] + nvfs[2] >= MLX4_MAX_NUM_VF_P_PORT) {
-			dev_err(&pdev->dev,
+			dev_err(&pdev->linux_dev,
 				"Requested more VF's (%d) for port (%d) than allowed (%d)\n",
 				nvfs[i] + nvfs[2], i + 1,
 				MLX4_MAX_NUM_VF_P_PORT - 1);
@@ -3301,7 +3306,7 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 #else
 	    !pci_get_membar(pdev, 0)) {
 #endif
-		dev_err(&pdev->dev, "Missing DCS, aborting (driver_data: 0x%x, pci_resource_flags(pdev, 0):0x%lx)\n",
+		dev_err(&pdev->linux_dev, "Missing DCS, aborting (driver_data: 0x%x, pci_resource_flags(pdev, 0):0x%lx)\n",
 #if 0 // AKAROS_PORT
 			pci_dev_data, pci_resource_flags(pdev, 0));
 #else
@@ -3315,14 +3320,15 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 #else
 	if (!pci_get_membar(pdev, 2)) {
 #endif
-		dev_err(&pdev->dev, "Missing UAR, aborting\n");
+		dev_err(&pdev->linux_dev, "Missing UAR, aborting\n");
 		err = -ENODEV;
 		goto err_disable_pdev;
 	}
 
 	err = pci_request_regions(pdev, DRV_NAME);
 	if (err) {
-		dev_err(&pdev->dev, "Couldn't get PCI resources, aborting\n");
+		dev_err(&pdev->linux_dev,
+			"Couldn't get PCI resources, aborting\n");
 		goto err_disable_pdev;
 	}
 
@@ -3330,25 +3336,29 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 
 	err = pci_set_dma_mask(pdev, DMA_BIT_MASK(64));
 	if (err) {
-		dev_warn(&pdev->dev, "Warning: couldn't set 64-bit PCI DMA mask\n");
+		dev_warn(&pdev->linux_dev,
+			 "Warning: couldn't set 64-bit PCI DMA mask\n");
 		err = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
 		if (err) {
-			dev_err(&pdev->dev, "Can't set PCI DMA mask, aborting\n");
+			dev_err(&pdev->linux_dev,
+				"Can't set PCI DMA mask, aborting\n");
 			goto err_release_regions;
 		}
 	}
 	err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
 	if (err) {
-		dev_warn(&pdev->dev, "Warning: couldn't set 64-bit consistent PCI DMA mask\n");
+		dev_warn(&pdev->linux_dev,
+			 "Warning: couldn't set 64-bit consistent PCI DMA mask\n");
 		err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
 		if (err) {
-			dev_err(&pdev->dev, "Can't set consistent PCI DMA mask, aborting\n");
+			dev_err(&pdev->linux_dev,
+				"Can't set consistent PCI DMA mask, aborting\n");
 			goto err_release_regions;
 		}
 	}
 
 	/* Allow large DMA segments, up to the firmware limit of 1 GB */
-	dma_set_max_seg_size(&pdev->dev, 1024 * 1024 * 1024);
+	dma_set_max_seg_size(&pdev->linux_dev, 1024 * 1024 * 1024);
 #if 0 // AKAROS_PORT
 	/* Detect if this device is a virtual function */
 	if (pci_dev_data & MLX4_PCI_DEV_IS_VF) {
@@ -3368,7 +3378,7 @@ static int __mlx4_init_one(struct pci_device *pdev, int pci_dev_data,
 			}
 			if ((extended_func_num(pdev) - vfs_offset)
 			    > prb_vf[i]) {
-				dev_warn(&pdev->dev, "Skipping virtual function:%d\n",
+				dev_warn(&pdev->linux_dev, "Skipping virtual function:%d\n",
 					 extended_func_num(pdev));
 				err = -ENODEV;
 				goto err_release_regions;

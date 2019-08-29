@@ -89,7 +89,7 @@ void en_print(const char *level, const struct mlx4_en_priv *priv,
 		       level, DRV_NAME, priv->dev->name, &vaf);
 	else
 		printk("%s%s: %s: Port %d: %pV",
-		       level, DRV_NAME, dev_name(&priv->mdev->pdev->dev),
+		       level, DRV_NAME, dev_name(&priv->mdev->pdev->linux_dev),
 		       priv->port, &vaf);
 	va_end(args);
 #else
@@ -101,7 +101,7 @@ void en_print(const char *level, const struct mlx4_en_priv *priv,
 		printk("%s%s: %s: ", level, DRV_NAME, priv->dev->name);
 	else
 		printk("%s%s: %s: Port %d: ", level, DRV_NAME,
-		       dev_name(&priv->mdev->pdev->dev), priv->port);
+		       dev_name(&priv->mdev->pdev->linux_dev), priv->port);
 	vcprintf(format, args);
 	va_end(args);
 	print_unlock();
