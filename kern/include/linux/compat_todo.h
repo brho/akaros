@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1991-2015, the Linux Kernel authors
+ * Copyright (C) 1991-2019, the Linux Kernel authors
  *
  * This source code is licensed under the GNU General Public License,
  * Version 2. See the file COPYING for more details.
@@ -300,7 +300,7 @@ static inline unsigned long wait_for_completion_timeout(struct completion *x,
 	return timeout;
 }
 
-#define jiffies tsc2msec(read_tsc())
+#define jiffies (unsigned long)tsc2msec(read_tsc())
 
 static inline unsigned long round_jiffies(unsigned long j)
 {
@@ -317,73 +317,88 @@ static inline unsigned long msecs_to_jiffies(const unsigned int m)
 	return m;
 }
 
-#define time_after_eq(a, b) ((b) <= (a))
+/* These time macros are from Linux 5.2 */
+#define time_after(a,b)         \
+        (typecheck(unsigned long, a) && \
+         typecheck(unsigned long, b) && \
+         ((long)((b) - (a)) < 0))
+#define time_before(a,b)        time_after(b,a)
+
+#define time_after_eq(a,b)      \
+        (typecheck(unsigned long, a) && \
+         typecheck(unsigned long, b) && \
+         ((long)((a) - (b)) >= 0))
+#define time_before_eq(a,b)     time_after_eq(b,a)
+
+#define time_is_before_jiffies(a) time_after(jiffies, a)
+#define time_is_after_jiffies(a) time_before(jiffies, a)
+#define time_is_before_eq_jiffies(a) time_after_eq(jiffies, a)
+#define time_is_after_eq_jiffies(a) time_before_eq(jiffies, a)
+
 
 struct timer_list {
-	spinlock_t lock;
-	bool scheduled;
-	unsigned long expires;
-	void (*function)(unsigned long);
+	struct alarm_waiter alarm;
+	unsigned long expires;	// jiffies
+	union {
+		void (*func_a)(unsigned long);
+		void (*func)(struct timer_list*);
+	};
+	bool has_arg;
 	unsigned long data;
 };
 
-static inline void init_timer(struct timer_list *timer)
+/* Intermediate layer that handles setup_timer-style functions with arguments,
+ * until we can change the older Linux drivers. */
+static inline void timer_fired(struct alarm_waiter *waiter)
 {
-	spinlock_init_irqsave(&timer->lock);
-	timer->scheduled = false;
-	timer->expires = -1;
-	timer->function = 0;
-	timer->data = 0;
+	struct timer_list *timer = container_of(waiter, struct timer_list,
+						alarm);
+	if (timer->has_arg)
+		timer->func_a(timer->data);
+	else
+		timer->func(timer);
 }
 
 static inline void setup_timer(struct timer_list *timer,
                                void (*func)(unsigned long), unsigned long data)
 {
-	init_timer(timer);
-	timer->function = func;
+	init_awaiter(&timer->alarm, timer_fired);
+
+	timer->func_a = func;
+	timer->has_arg = true;
 	timer->data = data;
 }
 
-static void __timer_wrapper(uint32_t srcid, long a0, long a1, long a2)
+static inline void timer_setup(struct timer_list *timer,
+			       void (*func)(struct timer_list *), int flags)
 {
-	struct timer_list *timer = (struct timer_list *)a0;
-	unsigned long expires, now_j;
+	init_awaiter(&timer->alarm, timer_fired);
 
-	spin_lock_irqsave(&timer->lock);
-	expires = timer->expires;
-	timer->scheduled = false;
-	spin_unlock_irqsave(&timer->lock);
-
-	now_j = jiffies;
-	if (expires > now_j)
-		kthread_usleep((expires - now_j) * 1000);
-	timer->function(timer->data);
+	timer->func = func;
+	timer->has_arg = false;
 }
 
 static inline void add_timer(struct timer_list *timer)
 {
-	timer->scheduled = true;
-	send_kernel_message(core_id(), __timer_wrapper, (long)timer, 0, 0,
-			    KMSG_ROUTINE);
+	struct timer_chain *tchain = &per_cpu_info[0].tchain;
+	struct alarm_waiter *waiter = &timer->alarm;
+
+	set_awaiter_abs(waiter, msec2tsc(timer->expires));
+	set_alarm(tchain, waiter);
 }
 
 static inline void mod_timer(struct timer_list *timer, unsigned long expires)
 {
-	spin_lock_irqsave(&timer->lock);
+	struct timer_chain *tchain = &per_cpu_info[0].tchain;
+	struct alarm_waiter *waiter = &timer->alarm;
+
 	timer->expires = expires;
-	if (timer->scheduled) {
-		spin_unlock_irqsave(&timer->lock);
-		return;
-	}
-	timer->scheduled = true;
-	spin_unlock_irqsave(&timer->lock);
-	send_kernel_message(core_id(), __timer_wrapper, (long)timer, 0, 0,
-			    KMSG_ROUTINE);
+	reset_alarm_abs(tchain, waiter, msec2tsc(expires));
 }
 
 static inline void del_timer_sync(struct timer_list *timer)
 {
-	panic("del_timer_sync unimplemented");
+	unset_alarm(&per_cpu_info[0].tchain, &timer->alarm);
 }
 
 static inline void setup_timer_on_stack(struct timer_list *timer,
@@ -397,13 +412,13 @@ static inline void destroy_timer_on_stack(struct timer_list *timer)
 {
 }
 
-/* TODO: This is nasty (all of the timer stuff).  We don't know if a timer
- * actually finished or not.  Someone could mod_timer repeatedly and have the
- * same handler running concurrently.  */
 static inline bool timer_pending(struct timer_list *timer)
 {
-	return timer->expires >= jiffies;
+	return !alarm_expired(&timer->alarm);
 }
+
+#define from_timer(var, callback_timer, timer_fieldname) \
+	container_of(callback_timer, typeof(*var), timer_fieldname)
 
 struct cpu_rmap {
 };
