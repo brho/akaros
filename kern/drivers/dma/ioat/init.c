@@ -16,19 +16,9 @@
  *
  */
 
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/slab.h>
-#include <linux/pci.h>
-#include <linux/interrupt.h>
-#include <linux/dmaengine.h>
-#include <linux/delay.h>
-#include <linux/dma-mapping.h>
-#include <linux/workqueue.h>
-#include <linux/prefetch.h>
-#include <linux/dca.h>
-#include <linux/aer.h>
+#include <linux_compat.h>
 #include <linux/sizes.h>
+
 #include "dma.h"
 #include "registers.h"
 #include "hw.h"
@@ -423,6 +413,47 @@ int ioat_dma_setup_interrupts(struct ioatdma_device *ioat_dma)
 	int err = -EINVAL;
 	uint8_t intrctrl = 0;
 
+#if 1 // AKAROS
+	/* Our IRQ setup needs a lot of work.  Let's just assume MSI-X, since
+	 * any platform that has an IOAT should have MSI-X. */
+	if (pci_msix_init(pdev)) {
+		dev_err(dev, "Failed to setup IOAT MSI-X\n");
+		goto err_no_irq;
+	}
+
+	/* The number of MSI-X vectors should equal the number of channels */
+	msixcnt = ioat_dma->dma_dev.chancnt;
+	if (pdev->msix_nr_vec < msixcnt) {
+		dev_err(dev, "Too few msix vec (%d < %d)\n", pdev->msix_nr_vec,
+			msixcnt);
+		goto err_no_irq;
+	}
+	for (i = 0; i < msixcnt; i++) {
+		msix = &ioat_dma->msix_entries[i];
+		ioat_chan = ioat_chan_by_index(ioat_dma, i);
+		/* register_irq is a mess... the IRQ is the line, but isn't used
+		 * for msi/msix.  Passing 0 for now, since -1 doesn't seem like
+		 * a good idea.  This tries to do too much, and you have no
+		 * control / insight into what its doing. */
+		err = register_irq(0 /* ignored for msi(x)! */,
+				   ioat_dma_do_interrupt_msix, ioat_chan,
+				   pci_to_tbdf(pdev));
+		/* TODO: this is a mess - we also don't know if we're actually
+		 * MSIX or not!  We don't even know our vector... */
+		if (err) {
+			warn("MSIX failed (cnt %d), leaking vectors etc!", i);
+			for (j = 0; j < i; j++) {
+				msix = &ioat_dma->msix_entries[j];
+				ioat_chan = ioat_chan_by_index(ioat_dma, j);
+				//devm_free_irq(dev, msix->vector, ioat_chan);
+			}
+			goto err_no_irq;
+		}
+	}
+	intrctrl |= IOAT_INTRCTRL_MSIX_VECTOR_CONTROL;
+	ioat_dma->irq_mode = IOAT_MSIX;
+	goto done;
+#else
 	if (!strcmp(ioat_interrupt_style, "msix"))
 		goto msix;
 	if (!strcmp(ioat_interrupt_style, "msi"))
@@ -482,6 +513,7 @@ intx:
 		goto err_no_irq;
 
 	ioat_dma->irq_mode = IOAT_INTX;
+#endif
 done:
 	if (is_bwd_ioat(pdev))
 		ioat_intr_quirk(ioat_dma);
@@ -566,7 +598,9 @@ static void ioat_dma_remove(struct ioatdma_device *ioat_dma)
 
 	ioat_disable_interrupts(ioat_dma);
 
+#if 0 // AKAROS
 	ioat_kobject_del(ioat_dma);
+#endif
 
 	dma_async_device_unregister(dma);
 
@@ -608,7 +642,7 @@ static void ioat_enumerate_channels(struct ioatdma_device *ioat_dma)
 
 		ioat_init_channel(ioat_dma, ioat_chan, i);
 		ioat_chan->xfercap_log = xfercap_log;
-		spinlock_init_irqsave(&ioat_chan->prep_lock);
+		spinlock_init(&ioat_chan->prep_lock);
 		if (ioat_reset_hw(ioat_chan)) {
 			i = 0;
 			break;
@@ -785,7 +819,7 @@ ioat_init_channel(struct ioatdma_device *ioat_dma,
 
 	ioat_chan->ioat_dma = ioat_dma;
 	ioat_chan->reg_base = ioat_dma->reg_base + (0x80 * (idx + 1));
-	spinlock_init_irqsave(&ioat_chan->cleanup_lock);
+	spinlock_init(&ioat_chan->cleanup_lock);
 	ioat_chan->dma_chan.device = dma;
 	dma_cookie_init(&ioat_chan->dma_chan);
 	list_add_tail(&ioat_chan->dma_chan.device_node, &dma->channels);
@@ -1100,6 +1134,11 @@ static void ioat_intr_quirk(struct ioatdma_device *ioat_dma)
 	}
 }
 
+int system_has_dca_enabled(struct pci_device *p)
+{
+	return 0;
+}
+
 static int ioat3_dma_probe(struct ioatdma_device *ioat_dma, int dca)
 {
 	struct pci_device *pdev = ioat_dma->pdev;
@@ -1201,10 +1240,12 @@ static int ioat3_dma_probe(struct ioatdma_device *ioat_dma, int dca)
 	if (err)
 		return err;
 
+#if 0 // AKAROS
 	ioat_kobject_add(ioat_dma, &ioat_ktype);
 
 	if (dca)
 		ioat_dma->dca = ioat_dca_init(pdev, ioat_dma->reg_base);
+#endif
 
 	/* disable relaxed ordering */
 	err = pcie_capability_read_word(pdev, IOAT_DEVCTRL_OFFSET, &val16);
@@ -1321,6 +1362,7 @@ static void ioat_pcie_error_resume(struct pci_device *pdev)
 	ioat_resume(ioat_dma);
 }
 
+#if 0 // AKAROS
 static const struct pci_error_handlers ioat_err_handler = {
 	.error_detected = ioat_pcie_error_detected,
 	.slot_reset = ioat_pcie_error_slot_reset,
@@ -1335,6 +1377,7 @@ static struct pci_driver ioat_pci_driver = {
 	.shutdown	= ioat_shutdown,
 	.err_handler	= &ioat_err_handler,
 };
+#endif
 
 static struct ioatdma_device *
 alloc_ioatdma(struct pci_device *pdev, void __iomem *iobase)
@@ -1357,6 +1400,7 @@ static int ioat_pci_probe(struct pci_device *pdev,
 	struct ioatdma_device *device;
 	int err;
 
+#if 0 // AKAROS
 	err = pcim_enable_device(pdev);
 	if (err)
 		return err;
@@ -1379,6 +1423,17 @@ static int ioat_pci_probe(struct pci_device *pdev,
 		err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
 	if (err)
 		return err;
+#else
+	/* TODO: Make a bar-mapping helper, similar to Linux.  Given BAR id,
+	 * vmap it, and put it's info in a table. */
+	void *bar;
+
+	bar = (void*)vmap_pmem_nocache(pdev->bar[0].mmio_base32
+				       ? pdev->bar[0].mmio_base32 :
+				        pdev->bar[0].mmio_base64,
+				       pdev->bar[0].mmio_sz);
+	iomap = &bar;
+#endif
 
 	device = alloc_ioatdma(pdev, iomap[IOAT_MMIO_BAR]);
 	if (!device)
@@ -1408,6 +1463,26 @@ static int ioat_pci_probe(struct pci_device *pdev,
 	return 0;
 }
 
+/* In lieu of a decent PCI processing system... */
+static void __init ioat_init(void)
+{
+	struct pci_device *p;
+
+	STAILQ_FOREACH(p, &pci_devices, all_dev) {
+		if (p->ven_id != PCI_VENDOR_ID_INTEL)
+			continue;
+		for (int i = 0; ioat_pci_tbl[i].device; i++) {
+			if (p->dev_id == ioat_pci_tbl[i].device) {
+				ioat_pci_probe(p, &ioat_pci_tbl[i]);
+				break;
+			}
+		}
+	}
+}
+/* The 'arch_initcall' setup functions run at level 2. */
+init_func_3(ioat_init);
+
+#if 0 // AKAROS
 static void ioat_remove(struct pci_device *pdev)
 {
 	struct ioatdma_device *device = pci_get_drvdata(pdev);
@@ -1425,6 +1500,7 @@ static void ioat_remove(struct pci_device *pdev)
 	pci_disable_pcie_error_reporting(pdev);
 	ioat_dma_remove(device);
 }
+#endif
 
 static int __init ioat_init_module(void)
 {
@@ -1434,7 +1510,8 @@ static int __init ioat_init_module(void)
 		DRV_NAME, IOAT_DMA_VERSION);
 
 	ioat_cache = kmem_cache_create("ioat", sizeof(struct ioat_ring_ent),
-					0, SLAB_HWCACHE_ALIGN, NULL);
+					ARCH_CL_SIZE, 0, NULL, NULL, NULL,
+					NULL);
 	if (!ioat_cache)
 		return -ENOMEM;
 
@@ -1442,9 +1519,11 @@ static int __init ioat_init_module(void)
 	if (!ioat_sed_cache)
 		goto err_ioat_cache;
 
+#if 0 // AKAROS
 	err = pci_register_driver(&ioat_pci_driver);
 	if (err)
 		goto err_ioat3_cache;
+#endif
 
 	return 0;
 
@@ -1457,10 +1536,13 @@ static int __init ioat_init_module(void)
 	return err;
 }
 module_init(ioat_init_module);
+init_func_2(ioat_init_module);
 
+#if 0 // AKAROS
 static void __exit ioat_exit_module(void)
 {
 	pci_unregister_driver(&ioat_pci_driver);
 	kmem_cache_destroy(ioat_cache);
 }
 module_exit(ioat_exit_module);
+#endif

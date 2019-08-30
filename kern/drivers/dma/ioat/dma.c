@@ -21,17 +21,9 @@
  * copy operations.
  */
 
-#include <linux/init.h>
-#include <linux/module.h>
-#include <linux/slab.h>
-#include <linux/pci.h>
-#include <linux/interrupt.h>
-#include <linux/dmaengine.h>
-#include <linux/delay.h>
-#include <linux/dma-mapping.h>
-#include <linux/workqueue.h>
-#include <linux/prefetch.h>
+#include <linux_compat.h>
 #include <linux/sizes.h>
+
 #include "dma.h"
 #include "registers.h"
 #include "hw.h"
@@ -701,9 +693,9 @@ static void ioat_restart_channel(struct ioatdma_chan *ioat_chan)
 	uint64_t phys_complete;
 
 	/* set the completion address register again */
-	write32(lower_32_bits(ioat_chan->completion_dma),
+	write32(low32(ioat_chan->completion_dma),
 	       ioat_chan->reg_base + IOAT_CHANCMP_OFFSET_LOW);
-	write32(upper_32_bits(ioat_chan->completion_dma),
+	write32(high32(ioat_chan->completion_dma),
 	       ioat_chan->reg_base + IOAT_CHANCMP_OFFSET_HIGH);
 
 	ioat_quiesce(ioat_chan, 0);

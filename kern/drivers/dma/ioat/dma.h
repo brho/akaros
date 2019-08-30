@@ -17,13 +17,9 @@
 #ifndef IOATDMA_H
 #define IOATDMA_H
 
+#include <linux_compat.h>
 #include <linux/dmaengine.h>
-#include <linux/init.h>
-#include <linux/dmapool.h>
-#include <linux/cache.h>
-#include <linux/pci_ids.h>
 #include <linux/circ_buf.h>
-#include <linux/interrupt.h>
 #include "registers.h"
 #include "hw.h"
 
@@ -32,7 +28,7 @@
 #define IOAT_DMA_DCA_ANY_CPU		~0
 
 #define to_ioatdma_device(dev) container_of(dev, struct ioatdma_device, dma_dev)
-#define to_dev(ioat_chan) (&(ioat_chan)->ioat_dma->pdev->dev)
+#define to_dev(ioat_chan) (&(ioat_chan)->ioat_dma->pdev->linux_dev)
 #define to_pdev(ioat_chan) ((ioat_chan)->ioat_dma->pdev)
 
 #define chan_num(ch) ((int)((ch)->reg_base - (ch)->ioat_dma->reg_base) / 0x80)
@@ -118,7 +114,9 @@ struct ioatdma_chan {
 	dma_addr_t completion_dma;
 	uint64_t *completion;
 	struct tasklet_struct cleanup_task;
+#if 0 // AKAROS
 	struct kobject kobj;
+#endif
 
 /* ioat v2 / v3 channel attributes
  * @xfercap_log; log2 of channel max transfer length (for fast division)
@@ -146,11 +144,13 @@ struct ioatdma_chan {
 	int prev_intr_coalesce;
 };
 
+#if 0 // AKAROS
 struct ioat_sysfs_entry {
 	struct attribute attr;
 	ssize_t (*show)(struct dma_chan *, char *);
 	ssize_t (*store)(struct dma_chan *, const char *, size_t);
 };
+#endif
 
 /**
  * struct ioat_sed_ent - wrapper around super extended hardware descriptor
@@ -202,8 +202,10 @@ struct ioat_ring_ent {
 };
 
 extern const struct sysfs_ops ioat_sysfs_ops;
+#if 0 // AKAROS
 extern struct ioat_sysfs_entry ioat_version_attr;
 extern struct ioat_sysfs_entry ioat_cap_attr;
+#endif
 extern int ioat_pending_level;
 extern int ioat_ring_alloc_order;
 extern struct kobj_type ioat_ktype;

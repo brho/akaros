@@ -1,0 +1,3 @@
+obj-y						+= dma.o
+obj-y						+= init.o
+obj-y						+= prep.o

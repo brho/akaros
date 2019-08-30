@@ -15,12 +15,9 @@
  * the file called "COPYING".
  *
  */
-#include <linux/module.h>
-#include <linux/pci.h>
-#include <linux/gfp.h>
-#include <linux/dmaengine.h>
-#include <linux/dma-mapping.h>
-#include <linux/prefetch.h>
+
+#include <linux_compat.h>
+
 #include "../dmaengine.h"
 #include "registers.h"
 #include "hw.h"
@@ -94,15 +91,15 @@ static struct ioat_sed_ent *
 ioat3_alloc_sed(struct ioatdma_device *ioat_dma, unsigned int hw_pool)
 {
 	struct ioat_sed_ent *sed;
-	gfp_t flags = __GFP_ZERO | 0;
+	gfp_t flags = /* __GFP_ZERO | */ 0;
 
-	sed = kmem_cache_alloc(ioat_sed_cache, flags);
+	sed = kmem_cache_zalloc(ioat_sed_cache, flags);
 	if (!sed)
 		return NULL;
 
 	sed->hw_pool = hw_pool;
-	sed->hw = dma_pool_alloc(ioat_dma->sed_hw_pool[hw_pool],
-				 flags, &sed->dma);
+	sed->hw = dma_pool_zalloc(ioat_dma->sed_hw_pool[hw_pool],
+				  flags, &sed->dma);
 	if (!sed->hw) {
 		kmem_cache_free(ioat_sed_cache, sed);
 		return NULL;
