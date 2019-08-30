@@ -442,8 +442,8 @@ static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 		irq_h->unmask = msi_unmask_irq;
 		irq_h->route_irq = msi_route_irq;
 		irq_h->type = "msi";
-		printk("MSI irq: (%x,%x,%x): enabling %p %s vno %d\n",
-			   p->bus, p->dev, p->func, msivec, irq_h->name, vno);
+		printk("MSI irq: (%02x:%02x.%x): %s vector %d\n",
+			   p->bus, p->dev, p->func, irq_h->name, vno);
 		return vno;
 	}
 	irq_h->check_spurious = lapic_check_spurious;
@@ -452,8 +452,8 @@ static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 	irq_h->unmask = msix_unmask_irq;
 	irq_h->route_irq = msix_route_irq;
 	irq_h->type = "msi-x";
-	printk("MSI-X irq: (%x,%x,%x): enabling %p %s vno %d\n",
-	       p->bus, p->dev, p->func, msivec, irq_h->name, vno);
+	printk("MSI-X irq: (%02x,%02x,%x): %s vector %d\n",
+	       p->bus, p->dev, p->func, irq_h->name, vno);
 	return vno;
 }
 
