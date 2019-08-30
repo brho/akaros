@@ -855,6 +855,9 @@ void cbdmainit(void)
 	int id;
 	struct pci_device *pci_iter;
 
+	printk("cbdma: skipping it\n");
+	return;
+
 	/* assigning global variables */
 	pci             = NULL;
 	mmio            = NULL;
