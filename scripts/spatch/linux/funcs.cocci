@@ -92,13 +92,13 @@ expression E;
 expression E;
 @@
 -spin_lock_bh(E)
-+spin_lock(E)
++spin_lock_irqsave(E)
 
 @@
 expression E;
 @@
 -spin_unlock_bh(E)
-+spin_unlock(E)
++spin_unlock_irqsave(E)
 @@
 
 expression E;
@@ -349,3 +349,15 @@ expression P;
 @@
 -pci_clear_master(P)
 +pci_clr_bus_master(P)
+
+@@
+expression X;
+@@
+-upper_32_bits(X)
++high32(X)
+
+@@
+expression X;
+@@
+-lower_32_bits(X)
++low32(X)

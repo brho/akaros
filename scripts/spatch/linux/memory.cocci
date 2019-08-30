@@ -1,7 +1,7 @@
 @@
 @@
 -GFP_ATOMIC
-+0
++MEM_ATOMIC
 
 @@
 @@
@@ -22,6 +22,11 @@
 @@
 -__GFP_WAIT
 +MEM_WAIT
+
+@@
+@@
+-GFP_NOWAIT
++MEM_ATOMIC
 
 @@
 expression SZ;
@@ -53,6 +58,18 @@ expression ORDER;
 @@
 -alloc_pages(FLAGS, ORDER)
 +kva2page(get_cont_pages(ORDER, FLAGS))
+
+@@
+expression ADDR;
+@@
+-__free_page(ADDR)
++kpages_free(page2kva(ADDR), PGSIZE)
+
+@@
+expression FLAGS;
+@@
+-alloc_page(FLAGS)
++kva2page(kpages_alloc(PGSIZE, FLAGS))
 
 @@
 expression FLAGS;

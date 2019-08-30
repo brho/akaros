@@ -153,6 +153,18 @@ struct pci_device *p;
 +p->linux_dev
 
 @@
+struct pci_device *p;
+@@
+-p->device
++p->dev_id
+
+@@
+struct pci_device *p;
+@@
+-p->vendor
++p->ven_id
+
+@@
 struct ether *p;
 @@
 -p->features
