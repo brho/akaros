@@ -277,12 +277,26 @@ bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter)
 	}
 }
 
+bool unset_alarm_nosync(struct timer_chain *tchain, struct alarm_waiter *waiter)
+{
+	bool ret = false;
+
+	spin_lock_irqsave(&tchain->lock);
+	if (waiter->on_tchain) {
+		if (__remove_awaiter(tchain, waiter))
+			reset_tchain_interrupt(tchain);
+		ret = true;
+	}
+	spin_unlock_irqsave(&tchain->lock);
+	return ret;
+}
+
 bool reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
                      uint64_t abs_time)
 {
 	bool ret;
 
-	ret = unset_alarm(tchain, waiter);
+	ret = unset_alarm_nosync(tchain, waiter);
 	set_awaiter_abs(waiter, abs_time);
 	set_alarm(tchain, waiter);
 	return ret;
@@ -293,7 +307,7 @@ bool reset_alarm_rel(struct timer_chain *tchain, struct alarm_waiter *waiter,
 {
 	bool ret;
 
-	ret = unset_alarm(tchain, waiter);
+	ret = unset_alarm_nosync(tchain, waiter);
 	set_awaiter_rel(waiter, usleep);
 	set_alarm(tchain, waiter);
 	return ret;

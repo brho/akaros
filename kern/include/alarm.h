@@ -103,6 +103,9 @@ void set_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
 /* Unset and reset may block if the alarm is not IRQ.  Do not call from within a
  * handler.  Returns TRUE if you stopped the alarm from firing. */
 bool unset_alarm(struct timer_chain *tchain, struct alarm_waiter *waiter);
+/* Will not block; handler may still be running. */
+bool unset_alarm_nosync(struct timer_chain *tchain,
+			struct alarm_waiter *waiter);
 /* Convenience wrappers for unset, then set.  Slower, but easier than just
  * setting, since you don't need to know if it fired.  Returns TRUE if the alarm
  * did not fire before your reset. */
