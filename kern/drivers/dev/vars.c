@@ -459,10 +459,10 @@ struct dev vars_devtab __devtab = {
 
 static char *s = "string";
 static char c = 'x';
-static uint8_t  u8  = 8;
-static uint16_t u16 = 16;
-static uint32_t u32 = 32;
-static uint64_t u64 = 64;
+static uint8_t  _u8  = 8;
+static uint16_t _u16 = 16;
+static uint32_t _u32 = 32;
+static uint64_t _u64 = 64;
 static uint8_t  d8  = -8;
 static uint16_t d16 = -16;
 static uint32_t d32 = -32;
@@ -481,10 +481,10 @@ char *devvars_foobar = "foobar";
 
 DEVVARS_ENTRY(s, "s");
 DEVVARS_ENTRY(c, "c");
-DEVVARS_ENTRY(u8,  "ub");
-DEVVARS_ENTRY(u16, "uh");
-DEVVARS_ENTRY(u32, "uw");
-DEVVARS_ENTRY(u64, "ug");
+DEVVARS_ENTRY(_u8,  "ub");
+DEVVARS_ENTRY(_u16, "uh");
+DEVVARS_ENTRY(_u32, "uw");
+DEVVARS_ENTRY(_u64, "ug");
 DEVVARS_ENTRY(d8,  "db");
 DEVVARS_ENTRY(d16, "dh");
 DEVVARS_ENTRY(d32, "dw");
