@@ -89,7 +89,7 @@ struct arena *kpages_arena;
 static struct btag *__get_from_freelists(struct arena *arena, int list_idx);
 static bool __account_alloc(struct arena *arena, struct btag *bt, size_t size,
                             struct btag *new);
-static void *__xalloc_nextfit(struct arena *arena, size_t size, size_t align,
+static void *__xalloc_nextfit(struct arena *arena, size_t size, size_t np2sb,
                               size_t phase, size_t nocross);
 static void __try_hash_resize(struct arena *arena, int flags,
                               void **to_free_addr, size_t *to_free_sz);
@@ -808,47 +808,54 @@ void *arena_alloc(struct arena *arena, size_t size, int flags)
 /* Helper: given a BT's start and size, return a starting address within the BT
  * that satisfies the constraints.  Returns 0 on failure.
  *
- * The rough idea is to go from the start, round up to align, add the phase, and
- * see if it's still within the BT.  The 'nocross' boundary (also an alignment)
- * complicates things a little. */
+ * The rough idea is to try the two potential starting alloc locations:
+ * - from the bt_start, round *down* to np2sb, which may be below the bt, then
+ *   add the phase, which may go back in (or overflow).
+ * - add one more np2sb.  this should be > bt_start (mod overflow), since
+ *   ROUNDDOWN is -= less than np2sb.
+ *
+ * * The 'nocross' boundary (also an alignment) complicates things a little. */
 static uintptr_t __find_sufficient(uintptr_t bt_start, size_t bt_size,
-                                   size_t size, size_t align,
+                                   size_t size, size_t np2sb,
                                    size_t phase, size_t nocross)
 {
 	uintptr_t try;
 	size_t try_size;
 
-	try = bt_start;
-	try = ROUNDUP(try, align);
-	try += phase;
-	/* Wraparound due to phase. */
-	if (try < bt_start)
-		return 0;
-	/* Check wraparound */
-	if (try + size < try)
-		return 0;
-	/* Too big for BT, no chance. */
-	if (try + size > bt_start + bt_size)
-		return 0;
-	if (nocross == 0)
-		return try;
-	/* Got to deal with nocross boundaries.  If we round up from our
-	 * potential start and that is beyond our potential finish, we're OK. */
-	if (ROUNDUP(try, nocross) >= try + size)
-		return try;
-	/* The segment still might have a chance.  Perhaps we started right
-	 * before a nocross.  Let's try again, being careful of overflow.  The
-	 * ROUNDUP shouldn't trigger a wraparound. */
-	try = ROUNDUP(bt_start, nocross);
-	try_size = bt_size - (try - bt_start);
-	/* Underflow of bt_size - large_number. */
-	if (try_size > bt_size)
-		return 0;
-	/* The caller has some control over our next invocation's bt_start and
-	 * bt_size.  Let's enforce sanity. */
-	if (try + try_size < try)
-		return 0;
-	return __find_sufficient(try, try_size, size, align, phase, 0);
+	do {
+		try = bt_start;
+		try = ROUNDDOWN(try, np2sb);
+		try += phase;
+		if (try < bt_start)
+			try += np2sb;
+		/* Overflow sanity check.  Ultimately, don't look outside bt. */
+		if (try < bt_start)
+			return 0;
+		/* Check wraparound */
+		if (try + size < try)
+			return 0;
+		/* Too big for BT, no chance. */
+		if (try + size > bt_start + bt_size)
+			return 0;
+		if (nocross == 0)
+			return try;
+		/* Got to deal with nocross boundaries.  If we round up from our
+		 * potential start and that is beyond our potential finish,
+		 * we're OK. */
+		if (ALIGN(try, nocross) >= try + size)
+			return try;
+		/* The segment still might have a chance.  Perhaps we started
+		 * right before a nocross.
+		 *
+		 * All we're doing here is artificially limiting bt to a subset,
+		 * starting at the next nocross, if it is within BT.  And we're
+		 * checking *all* nocross-aligned chunks in this BT */
+		try = ALIGN(bt_start + 1, nocross);
+		if (try - bt_start >= bt_size)
+			return 0;
+		bt_size -= try - bt_start;
+		bt_start = try;
+	} while (1);
 }
 
 /* Helper: splits bt, which is not on any freelist, at @at, and puts the front
@@ -892,7 +899,7 @@ static bool __found_least_upper_btag(struct btag *bt, uintptr_t minaddr)
 
 /* Does the a search in min/max for a segment. */
 static void *__xalloc_min_max(struct arena *arena, size_t size,
-                              size_t align, size_t phase, size_t nocross,
+                              size_t np2sb, size_t phase, size_t nocross,
                               uintptr_t minaddr, uintptr_t maxaddr)
 {
 	struct rb_node *node = arena->all_segs.rb_node;
@@ -913,7 +920,7 @@ static void *__xalloc_min_max(struct arena *arena, size_t size,
 	 * Just scan from here. */
 	for (/* node set */; node; node = rb_next(node)) {
 		bt = container_of(node, struct btag, all_link);
-		try = __find_sufficient(bt->start, bt->size, size, align, phase,
+		try = __find_sufficient(bt->start, bt->size, size, np2sb, phase,
 		                        nocross);
 		if (!try)
 			continue;
@@ -931,7 +938,7 @@ static void *__xalloc_min_max(struct arena *arena, size_t size,
 /* For xalloc, there isn't any real instant fit, due to the nocross issues.  We
  * can still try to get a quicker fit by starting on a higher order list. */
 static void *__xalloc_from_freelists(struct arena *arena, size_t size,
-                                     size_t align, size_t phase, size_t nocross,
+                                     size_t np2sb, size_t phase, size_t nocross,
                                      bool try_instant_fit)
 {
 	int list_idx;
@@ -946,7 +953,7 @@ static void *__xalloc_from_freelists(struct arena *arena, size_t size,
 	for (int i = list_idx; i < ARENA_NR_FREE_LISTS; i++) {
 		BSD_LIST_FOREACH(bt_i, &arena->free_segs[i], misc_link) {
 			try = __find_sufficient(bt_i->start, bt_i->size, size,
-						align, phase, nocross);
+						np2sb, phase, nocross);
 			if (try) {
 				BSD_LIST_REMOVE(bt_i, misc_link);
 				break;
@@ -963,7 +970,7 @@ static void *__xalloc_from_freelists(struct arena *arena, size_t size,
 	return (void*)bt_i->start;
 }
 
-static void *__xalloc_nextfit(struct arena *arena, size_t size, size_t align,
+static void *__xalloc_nextfit(struct arena *arena, size_t size, size_t np2sb,
                               size_t phase, size_t nocross)
 {
 	void *ret;
@@ -972,10 +979,10 @@ static void *__xalloc_nextfit(struct arena *arena, size_t size, size_t align,
 	 * since the implementation of that helper starts a search from minaddr.
 	 * If it fails, we can try again from 1 (quantum, really), skipping 0.
 	 * */
-	ret = __xalloc_min_max(arena, size, align, phase, nocross,
+	ret = __xalloc_min_max(arena, size, np2sb, phase, nocross,
 	                       arena->last_nextfit_alloc + arena->quantum, 0);
 	if (!ret) {
-		ret = __xalloc_min_max(arena, size, align, phase, nocross,
+		ret = __xalloc_min_max(arena, size, np2sb, phase, nocross,
 		                       arena->quantum, 0);
 	}
 	if (!ret)
@@ -985,7 +992,7 @@ static void *__xalloc_nextfit(struct arena *arena, size_t size, size_t align,
 }
 
 static void *xalloc_from_arena(struct arena *arena, size_t size,
-                               size_t align, size_t phase, size_t nocross,
+                               size_t np2sb, size_t phase, size_t nocross,
                                void *minaddr, void *maxaddr, int flags)
 {
 	void *ret;
@@ -999,17 +1006,17 @@ static void *xalloc_from_arena(struct arena *arena, size_t size,
 		return NULL;
 	}
 	if (minaddr || maxaddr) {
-		ret = __xalloc_min_max(arena, size, align, phase, nocross,
+		ret = __xalloc_min_max(arena, size, np2sb, phase, nocross,
 		                       (uintptr_t)minaddr, (uintptr_t)maxaddr);
 	} else {
 		if (flags & ARENA_BESTFIT) {
-			ret = __xalloc_from_freelists(arena, size, align, phase,
+			ret = __xalloc_from_freelists(arena, size, np2sb, phase,
 						      nocross, FALSE);
 		} else if (flags & ARENA_NEXTFIT) {
-			ret = __xalloc_nextfit(arena, size, align, phase,
+			ret = __xalloc_nextfit(arena, size, np2sb, phase,
 					       nocross);
 		} else {
-			ret = __xalloc_from_freelists(arena, size, align, phase,
+			ret = __xalloc_from_freelists(arena, size, np2sb, phase,
 						      nocross, TRUE);
 		}
 	}
@@ -1027,38 +1034,52 @@ void *arena_xalloc(struct arena *arena, size_t size, size_t align, size_t phase,
 {
 	void *ret;
 	size_t req_size;
+	bool ovf = false;
+	size_t np2sb;	/* non-power-of 2 start boundary */
 
 	size = ROUNDUP(size, arena->quantum);
 	if (!size)
 		panic("Arena %s, request for zero", arena->name);
-	if (!IS_PWR2(align))
-		panic("Arena %s, non-power of two align %p", arena->name,
-		      align);
-	if (nocross && !IS_PWR2(nocross))
-		panic("Arena %s, non-power of nocross %p", arena->name,
-		      nocross);
-	if (!ALIGNED(align, arena->quantum))
-		panic("Arena %s, non-aligned align %p", arena->name, align);
-	if (!ALIGNED(nocross, arena->quantum))
-		panic("Arena %s, non-aligned nocross %p", arena->name, nocross);
-	if (!ALIGNED(phase, arena->quantum))
-		panic("Arena %s, non-aligned phase %p", arena->name, phase);
-	if (size + align < size)
-		panic("Arena %s, size %p + align %p overflow%p", arena->name,
-		      size, align);
-	if (size + phase < size)
-		panic("Arena %s, size %p + phase %p overflow%p", arena->name,
-		      size, phase);
-	if (align + phase < align)
-		panic("Arena %s, align %p + phase %p overflow%p", arena->name,
-		      align, phase);
+	/* align == 0 is basically align == 1: "don't care" */
+	if (!align)
+		align = 1;
+	/* If we make quantum a power of two, we can just take the larger, which
+	 * is a multiple of the smaller */
+	np2sb = LCM_PWR2(arena->quantum, align);
+	if (!np2sb)
+		panic("Arena %s, could not find np2sb %p %p",
+		      arena->name, arena->quantum, align);
+
+	if (phase >= align)
+		panic("Arena %s, phase %d >= align %d",
+		      arena->name, phase, align);
+	if (phase % arena->quantum)
+		panic("Arena %s, non-multiple phase %d %d",
+		      arena->name, phase, arena->quantum);
+
+	if (nocross) {
+		if (!IS_PWR2(nocross))
+			panic("Arena %s, non-power of two nocross %p",
+			      arena->name, nocross);
+		/* See the discussion on nocross below.  Paranoia for overflow
+		 * is checked below (our callers are kernel users). */
+		if (size + phase > nocross)
+			panic("Arena %s, unsat size and phase: %p + %p > %p",
+			      arena->name, size, phase, nocross);
+		/* This is a little aggressive.  This arena or its source might
+		 * very well give us something that works.  This check covers
+		 * cases where we might be unable to ask our source via a
+		 * regular alloc for a segment that could satisfy this
+		 * allocation request, and we could lock up. */
+		if (arena->source && !ALIGNED(np2sb, nocross) &&
+		    !(2 * size - 2 < nocross))
+			panic("Arena %s, unsat size: 2 * %p - 2 > %p",
+			      arena->name, size, nocross);
+	}
 	/* Ok, it's a pain to import resources from a source such that we'll be
 	 * able to guarantee we make progress without stranding resources if we
-	 * have nocross or min/maxaddr.  For min/maxaddr, when we ask the
-	 * source, we aren't easily able to xalloc from their (it may depend on
-	 * the afunc).  For nocross, we can't easily ask the source for the
-	 * right span that satisfies the request (again, no real xalloc).  Some
-	 * constraints might not even be possible.
+	 * have min/maxaddr.  We don't have a way to ask the source for a
+	 * particular range: i.e. an xalloc.
 	 *
 	 * If we get a span from the source and never use it, then we run a risk
 	 * of fragmenting and stranding a bunch of spans in our current arena.
@@ -1067,31 +1088,108 @@ void *arena_xalloc(struct arena *arena, size_t size, size_t align, size_t phase,
 	 * we won't give them back to the source until we allocate and then free
 	 * them (barring some sort of reclaim callback).
 	 *
-	 * Besides, I don't know if we even need/want nocross/min/maxaddr. */
-	if (arena->source && (nocross || minaddr || maxaddr))
-		panic("Arena %s, has source, can't xalloc with nocross %p, minaddr %p, or maxaddr %p",
-		      arena->name, nocross, minaddr, maxaddr);
+	 * If we want to support this, we'll need to require an xafunc that gets
+	 * called when xalloc needs to get_more_resources().  This means all
+	 * arenas in the chain need an xafunc, all the way back to the base.
+	 * Otherwise, we don't know that when we ask a source if we get
+	 * something back that is usable.
+	 *
+	 * Note that if we import a segment with xalloc, we need to free it with
+	 * xfree.  That means this arena needs to track its segment types.
+	 * Also, every xalloc call skips the qcache.  That might be a
+	 * performance issue, so it's better to not do those if you can.  */
+	if (arena->source && (minaddr || maxaddr))
+		panic("Arena %s, has source, can't xalloc with minaddr %p or maxaddr %p",
+		      arena->name, minaddr, maxaddr);
 	while (1) {
-		ret = xalloc_from_arena(arena, size, align, phase, nocross,
+		ret = xalloc_from_arena(arena, size, np2sb, phase, nocross,
 					minaddr, maxaddr, flags);
 		if (ret)
 			return ret;
-		/* We checked earlier than no two of these overflow, so I think
-		 * we don't need to worry about multiple overflows. */
-		req_size = size + align + phase;
-		/* Note that this check isn't the same as the one we make when
-		 * finding a sufficient segment.  Here we check overflow on the
-		 * requested size.  Later, we check aligned bt_start + phase.
-		 * The concern is that this check succeeds, but the other fails.
-		 * (Say size = PGSIZE, phase =
-		 * -PGSIZE -1.  req_size is very large.
+		/* Ah, nocross.  We need to make sure the segment we pull from
+		 * the source is sufficient, but we are doing a regular alloc
+		 * (not xalloc).  One conservative way to do this is to request
+		 * space for two of whatever we need, and abort if that block
+		 * could contain more than one nocross boundary.
 		 *
-		 * In this case, we're still fine - if our source is able to
-		 * satisfy the request, our bt_start and bt_size will be able to
-		 * express that size without wrapping. */
-		if (req_size < size)
-			panic("Arena %s, size %p + align %p + phase %p overflw",
-			      arena->name, size, align, phase);
+		 * For starters, if size > nocross, we're completely
+		 * unsatisfiable.  So there are some requests we just can't do.
+		 * Similarly, and slightly stricter: size + phase > nocross is
+		 * unsat too.  Here's why: phase is a shift off from an
+		 * alignment, and nocross is an alignment.  The best case
+		 * scenario for a potential allocation is if it starts right at
+		 * a nocross boundary.  (Starting later makes our potential
+		 * space even smaller).
+		 *
+		 * Let's consider nocross >= align.  So we know the closest the
+		 * boundary could get to the start of the object we want,
+		 * without intersecting is phase bytes above nocross.  That
+		 * leaves us with nocross - phase bytes until the next boundary.
+		 *
+		 * Now consider align > nocross.  Any potential object that
+		 * starts at an unaligned nocross will need to get rounded up to
+		 * align, and then add phase, and then have that last bit of
+		 * space for the object.  That's even less space, though it
+		 * varies based on which object we look at - some of the nocross
+		 * boundaries will be align-aligned.
+		 *
+		 * Next, any allocation >= 2 bytes could have a boundary
+		 * (subject to align and phase).  So we're going to have at
+		 * least a boundary in most all allocations.  (nocross with sz
+		 * == 1 is meaningless).  If we have a boundary, we have limited
+		 * control over where it is in the object - it could be right in
+		 * the middle.  The safest thing to do is grab 2x the space we
+		 * need, and then the one boundary can ruin at most one of the
+		 * two objects.
+		 *
+		 * How many boundaries are there in X bytes?  (where X will be
+		 * 2*size)
+		 * 	FLOOR((x - 2) / nocross) + 1;  (x >= 2)
+		 * To have at most one boundary:
+		 * 	x - 2 < nocross
+		 * size >= 1, so x >=2.  Thus to be sure our alloc will work, we
+		 * check 2*size - 2 < nocross.  That's for a request of 2*size
+		 * from the source arena.  If the original request to our arena
+		 * was greater than that, then there's no guarantee we can use a
+		 * regular alloc from our source and get a result that will be
+		 * nocross-sat.
+		 *
+		 * Oh, and if we have align / phase, we will need to request
+		 * more to make sure our 2x block is in the right place, though
+		 * we don't need to worry about a boundary falling in the
+		 * alignment/phase space.
+		 *
+		 * The minimum we need for that is (align - 1) - phase.  Though
+		 * the xalloc algorithms might be simple/lazy, so previously I
+		 * just added align + phase.  It's actually safe to ask for
+		 * more; it might be a waste or might block, but the main
+		 * concern is that we get something that is guaranteed to work.
+		 *
+		 * And since quantum can be a non-power-of-two, we're aligning
+		 * to "np2sb" (the LCM of quantum and align), so it's really
+		 * np2sb + phase.
+		 *
+		 * At this point, we're requesting 2*size + np2sb + phase.
+		 *
+		 * Now, if we have an align (and/or phase), the align can help
+		 * us with the nocross too!  If np2sb is nocross-aligned, and
+		 * size + phase < nocross, which always must be true, then we
+		 * know the start of the object is on a boundary (minus phase),
+		 * and if it can fit at all, it will certainly fit.  So other
+		 * than the sanity check, we just ignore nocross.  It's somewhat
+		 * meaningless to ask for align >= nocross.
+		 *
+		 * I'm certainly not 100% on any of this. */
+		req_size = size;
+		/* Distilled: need 2x when nocross, and align doesn't help */
+		if (nocross && !ALIGNED(np2sb, nocross))
+			ovf |= check_add_overflow(req_size, size, &req_size);
+		/* TODO: check xalloc internals: could be align - 1 - phase */
+		ovf |= check_add_overflow(req_size, np2sb, &req_size);
+		ovf |= check_add_overflow(req_size, phase, &req_size);
+		if (ovf)
+			panic("Arena %s, size %p + np2sb %p + phase %p overflw",
+			      arena->name, size, np2sb, phase);
 		if (!get_more_resources(arena, req_size, flags))
 			return NULL;
 		/* Our source may have given us a segment that is on the BESTFIT
