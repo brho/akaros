@@ -687,9 +687,14 @@ static bool get_more_resources(struct arena *arena, size_t size, int flags)
 	void *span;
 	size_t import_size;
 
-	/* MAX check, in case size << scale overflows */
-	import_size = MAX(size, size << arena->import_scale);
 	if (arena->source) {
+		/* MAX check, in case size << scale overflows */
+		import_size = MAX(size, size << arena->import_scale);
+		/* The source will roundup to the nearest quantum.  We might as
+		 * well do it now so that we know about the extra space.
+		 * Otherwise we'd just waste the excess. */
+		import_size = MAX(import_size,
+				  ROUNDUP(import_size, arena->source->quantum));
 		span = arena->afunc(arena->source, import_size, flags);
 		if (!span)
 			return FALSE;
