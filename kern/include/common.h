@@ -3,6 +3,11 @@
 #include <ros/common.h>
 #include <compiler.h>
 
+#ifndef __ASSEMBLER__
+#include <sys/types.h>
+#include <linux/overflow.h>
+#endif
+
 /* Force a rebuild of the whole kernel if 64BIT-ness changed */
 #ifdef CONFIG_64BIT
 #endif

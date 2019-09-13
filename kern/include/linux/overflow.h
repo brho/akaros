@@ -2,7 +2,7 @@
 #ifndef __LINUX_OVERFLOW_H
 #define __LINUX_OVERFLOW_H
 
-#include <linux/compiler.h>
+#include <compiler.h>
 
 /*
  * In the fallback code below, we need to compute the minimum and
