@@ -94,6 +94,7 @@ struct kmem_slab {
 	TAILQ_ENTRY(kmem_slab) link;
 	size_t num_busy_obj;
 	size_t num_total_obj;
+	void *source_obj;
 	union {
 		struct kmem_bufctl_list bufctl_freelist;
 		void *free_small_obj;

@@ -293,22 +293,74 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
                          void (*dtor)(void *, void *), void *priv)
 {
 	assert(kc);
-	assert(align);
+	/* Our alignment is independent of our source's quantum.  We pull from
+	 * our source, which gives us quantum-multiple/aligned chunks, but our
+	 * alignment and object size is our own business.  Mostly.
+	 *
+	 * There is one guarantee we must make:
+	 * - If aligned-obj_size (ALIGN(obj_size, align)) is a multiple of our
+	 *   source's quantum, then all objects we return are
+	 *   quantum-multiple-aligned (addresses are multiples of quantum).
+	 *
+	 * The main restriction for us is that when we get a slab from our
+	 * source, we need to hand out objects at the beginning of the slab
+	 * (where we are source quantum-aligned).
+	 *
+	 * As an example, if our source quantum is 15, and we give out 45 byte
+	 * objects, we must give out e.g. [15,60), but not [10,55).  This really
+	 * only comes up for qcaches for arenas that aren't memory, since all
+	 * memory users will be going with power-of-two alignment.  And
+	 * typically the slabs will have their own alignment.  e.g.
+	 * alignof(struct foo), with a PGSIZE-quantum source.
+	 *
+	 * Our objects are always aligned to 'align', regardless of our source's
+	 * alignment/quantum.  Similarly, if our source's quantum is a multiple
+	 * of aligned-obj_size, then all objects we return are
+	 * obj_size-multiple-aligned. */
+	assert(IS_PWR2(align));
+	/* Every allocation is aligned, and every allocation is the same
+	 * size, so we might as well align-up obj_size. */
+	obj_size = ALIGN(obj_size, align);
 	spinlock_init_irqsave(&kc->cache_lock);
 	strlcpy(kc->name, name, KMC_NAME_SZ);
-	kc->obj_size = ROUNDUP(obj_size, align);
+	/* We might want some sort of per-call site NUMA-awareness in the
+	 * future. */
+	source = source ?: kpages_arena;
+	kc->source = source;
+	kc->obj_size = obj_size;
+	kc->align = align;
+	kc->flags = flags;
+	/* No touch must use bufctls, even for small objects, so that it does
+	 * not use the object as memory.  RAM objects need enough space for a
+	 * pointer to form the linked list of objects. */
+	if (obj_size < sizeof(void*) || obj_size > SLAB_LARGE_CUTOFF
+	    || flags & KMC_NOTOUCH) {
+		kc->flags |= __KMC_USE_BUFCTL;
+	} else {
+		/* pro-touch (non-bufctl) slabs must get a page-aligned slab
+		 * from the source.  quantum < PGSIZE won't guarantee that.
+		 * quantum > PGSIZE is a waste and a programmer error. */
+		if (kc->source->quantum != PGSIZE) {
+			warn("KC %s is 'pro-touch', but source arena %s has non-PGSIZE quantum %d",
+			     kc->name, source->name, source->quantum);
+			kc->flags |= __KMC_USE_BUFCTL;
+		}
+	}
+	/* Note that import_amt is only used for bufctls.  The alternative puts
+	 * the slab at the end of a PGSIZE chunk, and fills the page with
+	 * objects.  The reliance on PGSIZE is used when finding a slab for a
+	 * given buffer.
+	 *
+	 * Also note that import_amt can be ignored for qcaches too.  If the
+	 * object is small and pro-touch, we'll still try and get a page from
+	 * the source, even if that is very large.  Consider a source with
+	 * qcache_max = 5, quantum = 1.  It's actually fine - we may waste a
+	 * little (unused allocations), but we save on not having bufctls. */
 	if (flags & KMC_QCACHE)
 		kc->import_amt = ROUNDUPPWR2(3 * source->qcache_max);
 	else
-		kc->import_amt = ROUNDUP(NUM_BUF_PER_SLAB * obj_size, PGSIZE);
-	kc->align = align;
-	if (align > PGSIZE)
-		panic("Cache %s object alignment is actually MIN(PGSIZE, align (%p))",
-		      name, align);
-	kc->flags = flags;
-	/* We might want some sort of per-call site NUMA-awareness in the
-	 * future. */
-	kc->source = source ? source : kpages_arena;
+		kc->import_amt = ROUNDUP(NUM_BUF_PER_SLAB * obj_size,
+					 ROUNDUP(PGSIZE, source->quantum));
 	TAILQ_INIT(&kc->full_slab_list);
 	TAILQ_INIT(&kc->partial_slab_list);
 	TAILQ_INIT(&kc->empty_slab_list);
@@ -321,13 +373,6 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	hash_init_hh(&kc->hh);
 	for (int i = 0; i < kc->hh.nr_hash_lists; i++)
 		BSD_LIST_INIT(&kc->static_hash[i]);
-	/* No touch must use bufctls, even for small objects, so that it does
-	 * not use the object as memory.  Note that if we have an arbitrary
-	 * source, small objects, and we're 'pro-touch', the small allocation
-	 * path will assume we're importing from a PGSIZE-aligned source arena.
-	 */
-	if ((obj_size > SLAB_LARGE_CUTOFF) || (flags & KMC_NOTOUCH))
-		kc->flags |= __KMC_USE_BUFCTL;
 	depot_init(&kc->depot);
 	kmem_trace_ht_init(&kc->trace_ht);
 	/* We do this last, since this will all into the magazine cache - which
@@ -429,20 +474,16 @@ static void depot_destroy(struct kmem_cache *kc)
 static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 {
 	if (!__use_bufctls(cp)) {
-		arena_free(cp->source, ROUNDDOWN(a_slab, PGSIZE), PGSIZE);
+		arena_free(cp->source, a_slab->source_obj, PGSIZE);
 	} else {
 		struct kmem_bufctl *i, *temp;
-		void *buf_start = (void*)SIZE_MAX;
 
 		BSD_LIST_FOREACH_SAFE(i, &a_slab->bufctl_freelist, link, temp) {
-			// Track the lowest buffer address, which is the start
-			// of the buffer
-			buf_start = MIN(buf_start, i->buf_addr);
 			/* This is a little dangerous, but we can skip removing,
 			 * since we init the freelist when we reuse the slab. */
 			kmem_cache_free(kmem_bufctl_cache, i);
 		}
-		arena_free(cp->source, buf_start, cp->import_amt);
+		arena_free(cp->source, a_slab->source_obj, cp->import_amt);
 		kmem_cache_free(kmem_slab_cache, a_slab);
 	}
 }
@@ -768,20 +809,19 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 	if (!__use_bufctls(cp)) {
 		void *a_page;
 
-		/* Careful, this assumes our source is a PGSIZE-aligned
-		 * allocator.  We could use xalloc to enforce the alignment, but
-		 * that'll bypass the qcaches, which we don't want.  Caller
-		 * beware. */
 		a_page = arena_alloc(cp->source, PGSIZE, MEM_ATOMIC);
 		if (!a_page)
 			return FALSE;
-		// the slab struct is stored at the end of the page
+		/* The slab struct is stored at the end of the page.  Keep it
+		 * there, so that our first object is page aligned, and thus
+		 * aligned to all smaller alignments.  If align > PGSIZE,
+		 * obj_size > PGSIZE, and we'd use bufctls. */
 		a_slab = (struct kmem_slab*)(a_page + PGSIZE
 		                             - sizeof(struct kmem_slab));
+		a_slab->source_obj = a_page;
 		a_slab->num_busy_obj = 0;
 		a_slab->num_total_obj = (PGSIZE - sizeof(struct kmem_slab)) /
 		                        cp->obj_size;
-		// TODO: consider staggering this IAW section 4.3
 		a_slab->free_small_obj = a_page;
 		/* Walk and create the free list, which is circular.  Each item
 		 * stores the location of the next one at the beginning of the
@@ -795,17 +835,29 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		*((uintptr_t**)buf) = NULL;
 	} else {
 		void *buf;
+		uintptr_t delta;
 
 		a_slab = kmem_cache_alloc(kmem_slab_cache, 0);
 		if (!a_slab)
 			return FALSE;
 		buf = arena_alloc(cp->source, cp->import_amt, MEM_ATOMIC);
-		if (!buf) {
-			kmem_cache_free(kmem_slab_cache, a_slab);
-			return FALSE;
+		if (!buf)
+			goto err_slab;
+		a_slab->source_obj = buf;
+		buf = ALIGN(buf, cp->align);
+		delta = buf - a_slab->source_obj;
+		if (delta >= cp->import_amt) {
+			/* Shouldn't happen - the import_amt should always be
+			 * enough for at least two objects, with obj_size >=
+			 * align.  Maybe if a qcache had an alignment (which
+			 * they don't). */
+			warn("Delta %p >= import_amt %p! (buf %p align %p)",
+			     delta, cp->import_amt, a_slab->source_obj,
+			     cp->align);
+			goto err_source_obj;
 		}
 		a_slab->num_busy_obj = 0;
-		a_slab->num_total_obj = cp->import_amt / cp->obj_size;
+		a_slab->num_total_obj = (cp->import_amt - delta) / cp->obj_size;
 		BSD_LIST_INIT(&a_slab->bufctl_freelist);
 		/* for each buffer, set up a bufctl and point to the buffer */
 		for (int i = 0; i < a_slab->num_total_obj; i++) {
@@ -821,6 +873,12 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 	TAILQ_INSERT_HEAD(&cp->empty_slab_list, a_slab, link);
 
 	return TRUE;
+
+err_source_obj:
+	arena_free(cp->source, a_slab->source_obj, cp->import_amt);
+err_slab:
+	kmem_cache_free(kmem_slab_cache, a_slab);
+	return FALSE;
 }
 
 /* This deallocs every slab from the empty list.  TODO: think a bit more about

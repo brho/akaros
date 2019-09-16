@@ -127,8 +127,14 @@ static void setup_qcaches(struct arena *arena, size_t quantum,
 	for (int i = 0; i < nr_qcaches; i++) {
 		qc_size = (i + 1) * quantum;
 		snprintf(kc_name, KMC_NAME_SZ, "%s_%d", arena->name, qc_size);
-		__kmem_cache_create(&arena->qcaches[i], kc_name, qc_size,
-				    quantum, KMC_NOTOUCH | KMC_QCACHE, arena,
+		/* Alignment == 1.  These QCs will give out quantum-aligned
+		 * (actually multiples) objects, even without an alignment
+		 * request.  The reason is that the QCs pull their slabs from
+		 * us, and we give out quantum-aligned objects (i.e. the slabs).
+		 * Those slabs are made of up objects that are multiples
+		 * of quantum. */
+		__kmem_cache_create(&arena->qcaches[i], kc_name, qc_size, 1,
+				    KMC_NOTOUCH | KMC_QCACHE, arena,
 				    NULL, NULL, NULL);
 	}
 }
