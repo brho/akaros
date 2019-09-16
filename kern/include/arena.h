@@ -94,7 +94,8 @@ extern struct arena_tailq all_arenas;
  * units of @quantum.  If @source is provided, the arena will alloc new segments
  * from @source, calling @afunc to alloc and @ffunc to free.  Uses a slab
  * allocator for allocations up to @qcache_max (0 = no caching). */
-struct arena *arena_create(char *name, void *base, size_t size, size_t quantum,
+struct arena *arena_create(const char *name, void *base, size_t size,
+			   size_t quantum,
                            void *(*afunc)(struct arena *, size_t, int),
                            void (*ffunc)(struct arena *, void *, size_t),
                            struct arena *source, size_t qcache_max, int flags);
@@ -124,7 +125,7 @@ void del_importing_slab(struct arena *source, struct kmem_cache *importer);
 /* Low-level memory allocator intefaces */
 extern struct arena *base_arena;
 extern struct arena *kpages_arena;
-struct arena *arena_builder(void *pgaddr, char *name, size_t quantum,
+struct arena *arena_builder(void *pgaddr, const char *name, size_t quantum,
                             void *(*afunc)(struct arena *, size_t, int),
                             void (*ffunc)(struct arena *, void *, size_t),
                             struct arena *source, size_t qcache_max);

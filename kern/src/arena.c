@@ -133,8 +133,7 @@ static void setup_qcaches(struct arena *arena, size_t quantum,
 	}
 }
 
-/* Helper to init.  Split out from create so we can bootstrap. */
-static void arena_init(struct arena *arena, char *name, size_t quantum,
+static void arena_init(struct arena *arena, const char *name, size_t quantum,
                        void *(*afunc)(struct arena *, size_t, int),
                        void (*ffunc)(struct arena *, void *, size_t),
                        struct arena *source, size_t qcache_max)
@@ -181,7 +180,8 @@ static void arena_init(struct arena *arena, char *name, size_t quantum,
 	qunlock(&arenas_and_slabs_lock);
 }
 
-struct arena *arena_create(char *name, void *base, size_t size, size_t quantum,
+struct arena *arena_create(const char *name, void *base, size_t size,
+			   size_t quantum,
                            void *(*afunc)(struct arena *, size_t, int),
                            void (*ffunc)(struct arena *, void *, size_t),
                            struct arena *source, size_t qcache_max, int flags)
@@ -1164,7 +1164,7 @@ void arena_xfree(struct arena *arena, void *addr, size_t size)
  * This will be used for each NUMA domain's base arena, kpages_arena, and
  * kmalloc_arena, since the normal arena_create() won't work yet (no kmalloc).
  */
-struct arena *arena_builder(void *pgaddr, char *name, size_t quantum,
+struct arena *arena_builder(void *pgaddr, const char *name, size_t quantum,
                             void *(*afunc)(struct arena *, size_t, int),
                             void (*ffunc)(struct arena *, void *, size_t),
                             struct arena *source, size_t qcache_max)
