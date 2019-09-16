@@ -169,8 +169,22 @@ static void arena_init(struct arena *arena, const char *name, size_t quantum,
 	arena->afunc = afunc;
 	arena->ffunc = ffunc;
 	arena->source = source;
-	if (source)
+	if (source) {
 		assert(afunc && ffunc);
+		/* When we import, there may be a quantum mismatch such that our
+		 * source hands us spans that are not sufficient for our
+		 * quantum.  For instance, s->q == 1, a->q = 4096, and they hand
+		 * us 4096 bytes at 4095.  If any alloc in our source's quantum,
+		 * when rounded up to our quantum would change that alloc, we
+		 * need to import 2x the size to be sure a span would work.
+		 *
+		 * All s allocs are divided (% x == 0) by s->q.  We want to know
+		 * if all s allocs (our spans) are also divided by a->q, in
+		 * which case we don't need to import extra.  This is true when
+		 * a->q divides s->q.  (s->q is a multiple of a->q). */
+		if (source->quantum % arena->quantum)
+			arena->import_scale = 1;
+	}
 	arena->amt_total_segs = 0;
 	arena->amt_alloc_segs = 0;
 	arena->nr_allocs_ever = 0;
@@ -641,31 +655,14 @@ static void *alloc_from_arena(struct arena *arena, size_t size, int flags)
 	return ret;
 }
 
-/* It's probably a kernel bug if we're adding the wrong sized segments, whether
- * via direct add, a source import, or creation. */
-static void assert_quantum_alignment(struct arena *arena, void *base,
-                                     size_t size)
-{
-	if (!ALIGNED(base, arena->quantum))
-		panic("Unaligned base %p for arena %s, quantum %p, source %s",
-		      base, arena->name, arena->quantum,
-		      arena->source ? arena->source->name : "none");
-	if (!ALIGNED(size, arena->quantum))
-		panic("Unaligned size %p for arena %s, quantum %p, source %s",
-		      size, arena->name, arena->quantum,
-		      arena->source ? arena->source->name : "none");
-}
-
 /* Adds segment [@base, @base + @size) to @arena.  We'll add a span tag if the
  * arena had a source. */
 static void *__arena_add(struct arena *arena, void *base, size_t size,
                          int flags)
 {
 	struct btag *bt, *span_bt;
+	uintptr_t limit;
 
-	/* These are just sanity checks.  Our client is the kernel, and it could
-	 * mess with us in other ways, such as adding overlapping spans. */
-	assert_quantum_alignment(arena, base, size);
 	assert(base < base + size);
 	spin_lock_irqsave(&arena->lock);
 	/* Make sure there are two, bt and span. */
@@ -674,18 +671,35 @@ static void *__arena_add(struct arena *arena, void *base, size_t size,
 		return NULL;
 	}
 	bt = __get_btag(arena);
+	/* Our source may have a different (and smaller) quantum than us.
+	 * span_bt will track the source's allocation, and our bt will track a
+	 * subset of those bytes that are multiples our quantum. */
+	limit = (uintptr_t)base + size;
+	bt->start = ROUNDUP((uintptr_t)base, arena->quantum);
+	bt->size = ROUNDDOWN(limit - bt->start, arena->quantum);
+	/* Caller should have been careful about this.  get_more_resources()
+	 * should have a large enough import_amt / import_scale. */
+	if (bt->start >= limit || !bt->size) {
+		warn("Added segment too small! (a: %s, b:%p, s:%p, q:%p)",
+		     arena->name, base, size, arena->quantum);
+		spin_unlock_irqsave(&arena->lock);
+		return NULL;
+	}
 	if (arena->source) {
 		span_bt = __get_btag(arena);
 		span_bt->start = (uintptr_t)base;
 		span_bt->size = size;
 		span_bt->status = BTAG_SPAN;
+		/* This is dirty, but it saves 8 bytes in every BT that would
+		 * only be used by span BTs.  We're not on any list, so
+		 * misc-link is available.  We also need to keep track of the
+		 * size of this arena's BT so we can detect when it is free. */
+		*(uintptr_t *)&span_bt->misc_link = bt->size;
 		/* Note the btag span is not on any list, but it is in all_segs
 		 */
 		__insert_btag(&arena->all_segs, span_bt);
 	}
-	bt->start = (uintptr_t)base;
-	bt->size = size;
-	arena->amt_total_segs += size;
+	arena->amt_total_segs += bt->size;
 	__track_free_seg(arena, bt);
 	__insert_btag(&arena->all_segs, bt);
 	spin_unlock_irqsave(&arena->lock);
@@ -1136,10 +1150,10 @@ static void __coalesce_free_seg(struct arena *arena, struct btag *bt,
 	rb_p = rb_prev(&bt->all_link);
 	if (rb_p) {
 		bt_p = container_of(rb_p, struct btag, all_link);
+		/* If the prev is a span tag, we know it is ours.  We just need
+		 * to know if our bt covers the entire import span size. */
 		if ((bt_p->status == BTAG_SPAN) &&
-		    (bt_p->start == bt->start) &&
-		    (bt_p->size == bt->size)) {
-
+		    (*(uintptr_t *)&bt_p->misc_link == bt->size)) {
 			*to_free_addr = (void*)bt_p->start;
 			*to_free_sz = bt_p->size;
 			/* Note the span was not on a free list */
