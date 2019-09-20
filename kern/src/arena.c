@@ -239,12 +239,12 @@ void arena_destroy(struct arena *arena)
 	 * The BTs that are page aligned are the ones we want.  We can just
 	 * ignore the others (unlink from the list). */
 	BSD_LIST_FOREACH_SAFE(bt_i, &arena->unused_btags, misc_link, temp) {
-		if (PGOFF(bt_i->start))
+		if (PGOFF(bt_i))
 			BSD_LIST_REMOVE(bt_i, misc_link);
 	}
 	/* Now the remaining BTs are the first on their page. */
 	BSD_LIST_FOREACH_SAFE(bt_i, &arena->unused_btags, misc_link, temp)
-		arena_free(find_my_base(arena), (void*)bt_i->start, PGSIZE);
+		arena_free(find_my_base(arena), bt_i, PGSIZE);
 	kfree(arena);
 }
 
