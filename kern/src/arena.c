@@ -1135,12 +1135,16 @@ static void free_from_arena(struct arena *arena, void *addr, size_t size)
 
 	spin_lock_irqsave(&arena->lock);
 	bt = __untrack_alloc_seg(arena, (uintptr_t)addr);
-	if (!bt)
-		panic("Free of unallocated addr %p from arena %s", addr,
-		      arena->name);
-	if (bt->size != size)
-		panic("Free of %p with wrong size %p (%p) from arena %s", addr,
+	if (!bt) {
+		warn("Free of unallocated addr %p size %p from arena %s", addr,
+		     arena->name, size);
+		return;
+	}
+	if (bt->size != size) {
+		warn("Free of %p with wrong size %p (%p) from arena %s", addr,
 		      size, bt->size, arena->name);
+		return;
+	}
 	arena->amt_alloc_segs -= size;
 	__track_free_seg(arena, bt);
 	__coalesce_free_seg(arena, bt, &to_free_addr, &to_free_sz);
