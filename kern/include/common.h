@@ -79,6 +79,29 @@ do {                                                                           \
 
 #ifndef __ASSEMBLER__
 
+/* Returns the least common multiple of x and p2; p2 is a power of 2.  Returns 0
+ * on error, including non-power-of-2, overflow, or a 0 input. */
+static inline unsigned long LCM_PWR2(unsigned long x, unsigned long p2)
+{
+	/* All multiples of p2, which has exactly one bit set, will have zeros
+	 * for the bits below its set bit.  The LCM will be x, shifted left as
+	 * little as possible, such that it has no bits below p2's set bit.
+	 * Each shift is a multiplication by 2, which is the only prime factor
+	 * if p2. */
+	int p2_bit, x_first_bit;
+	unsigned long ret;
+
+	if (!x || !IS_PWR2(p2))
+		return 0;
+	p2_bit = __builtin_ffsl(p2);
+	x_first_bit = __builtin_ffsl(x);
+	if (x_first_bit >= p2_bit)
+		return x;
+	if (check_shl_overflow(x, p2_bit - x_first_bit, &ret))
+		return 0;
+	return ret;
+}
+
 static inline uint32_t low32(uint64_t val)
 {
 	return val & 0xffffffff;
