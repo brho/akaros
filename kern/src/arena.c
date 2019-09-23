@@ -1152,6 +1152,8 @@ static void free_from_arena(struct arena *arena, void *addr, size_t size)
 
 void arena_free(struct arena *arena, void *addr, size_t size)
 {
+	if (!addr)
+		return;
 	size = ROUNDUP(size, arena->quantum);
 	if (size <= arena->qcache_max)
 		return kmem_cache_free(size_to_qcache(arena, size), addr);
@@ -1160,6 +1162,8 @@ void arena_free(struct arena *arena, void *addr, size_t size)
 
 void arena_xfree(struct arena *arena, void *addr, size_t size)
 {
+	if (!addr)
+		return;
 	size = ROUNDUP(size, arena->quantum);
 	free_from_arena(arena, addr, size);
 }
