@@ -899,9 +899,10 @@ static void *__xalloc_from_freelists(struct arena *arena, size_t size,
 	struct btag *bt_i;
 	uintptr_t try = 0;
 
-	if (ROUNDUP(size, align) + phase < size)
-		return NULL;
-	list_idx = LOG2_DOWN(ROUNDUP(size, align) + phase);
+	/* This starting list_idx is an optimization.  We could scan all the
+	 * lists.  You can't round-up size and add phase, because that could
+	 * cross a power-of-two boundary and skip the one list that works. */
+	list_idx = LOG2_DOWN(size);
 	list_idx += try_instant_fit ? 1 : 0;
 	for (int i = list_idx; i < ARENA_NR_FREE_LISTS; i++) {
 		BSD_LIST_FOREACH(bt_i, &arena->free_segs[i], misc_link) {
