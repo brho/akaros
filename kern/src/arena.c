@@ -133,6 +133,24 @@ static void setup_qcaches(struct arena *arena, size_t quantum,
 	}
 }
 
+static void destroy_qcaches(struct arena *arena)
+{
+	int nr_qcaches = arena->qcache_max / arena->quantum;
+	struct kmem_cache *kc;
+
+	if (!nr_qcaches)
+		return;
+
+	for (int i = 0; i < nr_qcaches; i++) {
+		kc = &arena->qcaches[i];
+		kmem_cache_destroy(kc);
+	}
+
+	base_free(arena, arena->qcaches,
+		  nr_qcaches * sizeof(struct kmem_cache));
+	arena->qcaches = NULL;
+}
+
 static void arena_init(struct arena *arena, const char *name, size_t quantum,
                        void *(*afunc)(struct arena *, size_t, int),
                        void (*ffunc)(struct arena *, void *, size_t),
@@ -217,7 +235,7 @@ void arena_destroy(struct arena *arena)
 	qunlock(&arenas_and_slabs_lock);
 	if (arena->source)
 		del_importing_arena(arena->source, arena);
-
+	destroy_qcaches(arena);
 	for (int i = 0; i < arena->hh.nr_hash_lists; i++) {
 		/* Marginal at best.  The qcaches are destroyed already; if
 		 * someone tries to free this later, we're in trouble. */
