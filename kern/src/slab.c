@@ -414,11 +414,15 @@ static void depot_destroy(struct kmem_cache *kc)
 
 	lock_depot(depot);
 	while ((mag_i = SLIST_FIRST(&depot->not_empty))) {
+		SLIST_REMOVE_HEAD(&depot->not_empty, link);
 		drain_mag(kc, mag_i);
 		kmem_cache_free(kmem_magazine_cache, mag_i);
 	}
-	while ((mag_i = SLIST_FIRST(&depot->empty)))
+	while ((mag_i = SLIST_FIRST(&depot->empty))) {
+		SLIST_REMOVE_HEAD(&depot->empty, link);
+		assert(mag_i->nr_rounds == 0);
 		kmem_cache_free(kmem_magazine_cache, mag_i);
+	}
 	unlock_depot(depot);
 }
 
