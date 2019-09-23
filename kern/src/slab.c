@@ -458,8 +458,16 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 	drain_pcpu_caches(cp);
 	depot_destroy(cp);
 	spin_lock_irqsave(&cp->cache_lock);
-	assert(TAILQ_EMPTY(&cp->full_slab_list));
-	assert(TAILQ_EMPTY(&cp->partial_slab_list));
+	/* This is a little debatable.  We leak the cache and whatnot, but even
+	 * worse, someone has the object still, and they might free it, after
+	 * we've already torn down the depot.  At best this is a marginal way to
+	 * continue.  See similar code in arena.c. */
+	if (!TAILQ_EMPTY(&cp->full_slab_list) ||
+	    !TAILQ_EMPTY(&cp->partial_slab_list)) {
+		warn("KMC %s has unfreed items!  Will not destroy.", cp->name);
+		spin_unlock_irqsave(&cp->cache_lock);
+		return;
+	}
 	/* Clean out the empty list.  We can't use a regular FOREACH here, since
 	 * the link element is stored in the slab struct, which is stored on the
 	 * page that we are freeing. */

@@ -218,8 +218,15 @@ void arena_destroy(struct arena *arena)
 	if (arena->source)
 		del_importing_arena(arena->source, arena);
 
-	for (int i = 0; i < arena->hh.nr_hash_lists; i++)
-		assert(BSD_LIST_EMPTY(&arena->alloc_hash[i]));
+	for (int i = 0; i < arena->hh.nr_hash_lists; i++) {
+		/* Marginal at best.  The qcaches are destroyed already; if
+		 * someone tries to free this later, we're in trouble. */
+		if (!BSD_LIST_EMPTY(&arena->alloc_hash[i])) {
+			warn("Arena %s has unfreed items!  Will not destroy.",
+			     arena->name);
+			return;
+		}
+	}
 	if (arena->alloc_hash != arena->static_hash)
 		kfree(arena->alloc_hash);
 	/* We shouldn't have any spans left.  We can tell we messed up if we had
