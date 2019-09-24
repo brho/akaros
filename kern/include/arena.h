@@ -111,6 +111,7 @@ void arena_xfree(struct arena *arena, void *addr, size_t size);
 
 size_t arena_amt_free(struct arena *arena);
 size_t arena_amt_total(struct arena *arena);
+void kmemstat(void);
 
 /* All lists that track the existence of arenas, slabs, and the connections
  * between them are tracked by a global qlock.  For the most part, slabs/arenas

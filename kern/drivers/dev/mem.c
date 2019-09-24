@@ -335,6 +335,13 @@ static struct sized_alloc *build_kmemstat(void)
 	return sza;
 }
 
+void kmemstat(void)
+{
+	struct sized_alloc *sza = build_kmemstat();
+
+	printk("%s", sza->buf);
+}
+
 static struct chan *mem_open(struct chan *c, int omode)
 {
 	if (c->qid.type & QTDIR) {
