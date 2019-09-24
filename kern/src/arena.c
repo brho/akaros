@@ -882,17 +882,24 @@ static void __split_bt_at(struct arena *arena, struct btag *bt, uintptr_t at)
 	 * is not. */
 }
 
-/* Helper.  We want the first bt >= mindaddr, with prev < minaddr. */
+/* Helper.  We want either the BT containing minaddr, or the closest to it
+ * (above).  There might be no BTs containing it, above it, or below it. */
 static bool __found_least_upper_btag(struct btag *bt, uintptr_t minaddr)
 {
 	struct rb_node *prev;
+	struct btag *btp;
 
-	if (bt->start < minaddr)
-		return FALSE;
+	if (bt->start + bt->size <= minaddr)
+		return FALSE;	/* We are strictly below */
+	if (bt->start <= minaddr)
+		return TRUE;	/* We contain it */
 	prev = rb_prev(&bt->all_link);
 	if (!prev)
-		return TRUE;
-	if (container_of(prev, struct btag, all_link)->start < minaddr)
+		return TRUE;	 /* We are above, but no one else below */
+	/* We are above and not containing.  If our prev is below min, then
+	 * we're it. */
+	btp = container_of(prev, struct btag, all_link);
+	if (btp->start + btp->size <= minaddr)
 		return TRUE;
 	return FALSE;
 }
@@ -904,9 +911,9 @@ static void *__xalloc_min_max(struct arena *arena, size_t size,
 {
 	struct rb_node *node = arena->all_segs.rb_node;
 	struct btag *bt;
-	uintptr_t try;
+	uintptr_t try, try_start, try_size;
 
-	/* Find the first bt >= minaddr */
+	/* Find the first BT containing, or >= minaddr */
 	while (node) {
 		bt = container_of(node, struct btag, all_link);
 		if (__found_least_upper_btag(bt, minaddr))
@@ -917,10 +924,20 @@ static void *__xalloc_min_max(struct arena *arena, size_t size,
 			node = node->rb_right;
 	}
 	/* Now we're probably at the first start point (or there's no node).
-	 * Just scan from here. */
+	 * Just scan from here.  The first node could contain minaddr, so we
+	 * need to round up.  Also note that this is *all* segs, including
+	 * non-free ones. */
 	for (/* node set */; node; node = rb_next(node)) {
 		bt = container_of(node, struct btag, all_link);
-		try = __find_sufficient(bt->start, bt->size, size, np2sb, phase,
+		if (bt->status != BTAG_FREE)
+			continue;
+		try_start = bt->start;
+		try_size = bt->size;
+		if (bt->start < minaddr) {
+			try_start = minaddr;
+			try_size = bt->size - (minaddr - bt->start);
+		}
+		try = __find_sufficient(try_start, try_size, size, np2sb, phase,
 		                        nocross);
 		if (!try)
 			continue;
