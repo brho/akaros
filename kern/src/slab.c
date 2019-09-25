@@ -425,7 +425,7 @@ struct kmem_cache *kmem_cache_create(const char *name, size_t obj_size,
                                      void (*dtor)(void *, void *),
                                      void *priv)
 {
-	struct kmem_cache *kc = kmem_cache_alloc(kmem_cache_cache, 0);
+	struct kmem_cache *kc = kmem_cache_alloc(kmem_cache_cache, MEM_WAIT);
 
 	__kmem_cache_create(kc, name, obj_size, align, flags, source, ctor,
 			    dtor, priv);
@@ -837,7 +837,7 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		void *buf;
 		uintptr_t delta;
 
-		a_slab = kmem_cache_alloc(kmem_slab_cache, 0);
+		a_slab = kmem_cache_alloc(kmem_slab_cache, MEM_ATOMIC);
 		if (!a_slab)
 			return FALSE;
 		buf = arena_alloc(cp->source, cp->import_amt, MEM_ATOMIC);
@@ -861,7 +861,18 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		BSD_LIST_INIT(&a_slab->bufctl_freelist);
 		/* for each buffer, set up a bufctl and point to the buffer */
 		for (int i = 0; i < a_slab->num_total_obj; i++) {
-			a_bufctl = kmem_cache_alloc(kmem_bufctl_cache, 0);
+			a_bufctl = kmem_cache_alloc(kmem_bufctl_cache,
+						    MEM_ATOMIC);
+			if (!a_bufctl) {
+				struct kmem_bufctl *i, *temp;
+
+				BSD_LIST_FOREACH_SAFE(i,
+						      &a_slab->bufctl_freelist,
+						      link, temp) {
+					kmem_cache_free(kmem_bufctl_cache, i);
+				}
+				goto err_source_obj;
+			}
 			BSD_LIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl,
 					     link);
 			a_bufctl->buf_addr = buf;
