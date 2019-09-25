@@ -80,11 +80,11 @@ struct kmem_slab;
 
 /* Control block for buffers for large-object slabs */
 struct kmem_bufctl {
-	BSD_LIST_ENTRY(kmem_bufctl) link;
+	SLIST_ENTRY(kmem_bufctl) link;
 	void *buf_addr;
 	struct kmem_slab *my_slab;
 };
-BSD_LIST_HEAD(kmem_bufctl_list, kmem_bufctl);
+SLIST_HEAD(kmem_bufctl_slist, kmem_bufctl);
 
 /* Slabs contain the objects.  Can be either full, partial, or empty,
  * determined by checking the number of objects busy vs total.  For large
@@ -96,7 +96,7 @@ struct kmem_slab {
 	size_t num_total_obj;
 	void *source_obj;
 	union {
-		struct kmem_bufctl_list bufctl_freelist;
+		struct kmem_bufctl_slist bufctl_freelist;
 		void *free_small_obj;
 	};
 };
@@ -137,8 +137,8 @@ struct kmem_cache {
 	unsigned long nr_cur_alloc;
 	unsigned long nr_direct_allocs_ever;
 	struct hash_helper hh;
-	struct kmem_bufctl_list *alloc_hash;
-	struct kmem_bufctl_list static_hash[HASH_INIT_SZ];
+	struct kmem_bufctl_slist *alloc_hash;
+	struct kmem_bufctl_slist static_hash[HASH_INIT_SZ];
 	char name[KMC_NAME_SZ];
 	TAILQ_ENTRY(kmem_cache)	import_link;
 	struct kmem_trace_ht trace_ht;

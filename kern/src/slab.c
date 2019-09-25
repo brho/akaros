@@ -372,7 +372,7 @@ void __kmem_cache_create(struct kmem_cache *kc, const char *name,
 	kc->alloc_hash = kc->static_hash;
 	hash_init_hh(&kc->hh);
 	for (int i = 0; i < kc->hh.nr_hash_lists; i++)
-		BSD_LIST_INIT(&kc->static_hash[i]);
+		SLIST_INIT(&kc->static_hash[i]);
 	depot_init(&kc->depot);
 	kmem_trace_ht_init(&kc->trace_ht);
 	/* We do this last, since this will all into the magazine cache - which
@@ -478,7 +478,7 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 	} else {
 		struct kmem_bufctl *i, *temp;
 
-		BSD_LIST_FOREACH_SAFE(i, &a_slab->bufctl_freelist, link, temp) {
+		SLIST_FOREACH_SAFE(i, &a_slab->bufctl_freelist, link, temp) {
 			/* This is a little dangerous, but we can skip removing,
 			 * since we init the freelist when we reuse the slab. */
 			kmem_cache_free(kmem_bufctl_cache, i);
@@ -525,7 +525,7 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 
 static void __try_hash_resize(struct kmem_cache *cp)
 {
-	struct kmem_bufctl_list *new_tbl, *old_tbl;
+	struct kmem_bufctl_slist *new_tbl, *old_tbl;
 	struct kmem_bufctl *bc_i;
 	unsigned int new_tbl_nr_lists, old_tbl_nr_lists;
 	size_t new_tbl_sz, old_tbl_sz;
@@ -534,7 +534,7 @@ static void __try_hash_resize(struct kmem_cache *cp)
 	if (!hash_needs_more(&cp->hh))
 		return;
 	new_tbl_nr_lists = hash_next_nr_lists(&cp->hh);
-	new_tbl_sz = new_tbl_nr_lists * sizeof(struct kmem_bufctl_list);
+	new_tbl_sz = new_tbl_nr_lists * sizeof(struct kmem_bufctl_slist);
 	/* TODO: we only need to pull from base if our arena is a base or we are
 	 * inside a kpages arena (keep in mind there could be more than one of
 	 * those, depending on how we do NUMA allocs).  This might help with
@@ -545,16 +545,16 @@ static void __try_hash_resize(struct kmem_cache *cp)
 		return;
 	old_tbl = cp->alloc_hash;
 	old_tbl_nr_lists = cp->hh.nr_hash_lists;
-	old_tbl_sz = old_tbl_nr_lists * sizeof(struct kmem_bufctl_list);
+	old_tbl_sz = old_tbl_nr_lists * sizeof(struct kmem_bufctl_slist);
 	cp->alloc_hash = new_tbl;
 	hash_incr_nr_lists(&cp->hh);
 	for (int i = 0; i < old_tbl_nr_lists; i++) {
-		while ((bc_i = BSD_LIST_FIRST(&old_tbl[i]))) {
-			BSD_LIST_REMOVE(bc_i, link);
+		while ((bc_i = SLIST_FIRST(&old_tbl[i]))) {
+			SLIST_REMOVE_HEAD(&old_tbl[i], link);
 			hash_idx = hash_ptr(bc_i->buf_addr,
 					    cp->hh.nr_hash_bits);
-			BSD_LIST_INSERT_HEAD(&cp->alloc_hash[hash_idx], bc_i,
-					     link);
+			SLIST_INSERT_HEAD(&cp->alloc_hash[hash_idx], bc_i,
+					  link);
 		}
 	}
 	hash_reset_load_limit(&cp->hh);
@@ -568,7 +568,7 @@ static void __track_alloc(struct kmem_cache *cp, struct kmem_bufctl *bc)
 	size_t hash_idx;
 
 	hash_idx = hash_ptr(bc->buf_addr, cp->hh.nr_hash_bits);
-	BSD_LIST_INSERT_HEAD(&cp->alloc_hash[hash_idx], bc, link);
+	SLIST_INSERT_HEAD(&cp->alloc_hash[hash_idx], bc, link);
 	cp->hh.nr_items++;
 	__try_hash_resize(cp);
 }
@@ -576,19 +576,19 @@ static void __track_alloc(struct kmem_cache *cp, struct kmem_bufctl *bc)
 /* Helper, looks up and removes the bufctl corresponding to buf. */
 static struct kmem_bufctl *__yank_bufctl(struct kmem_cache *cp, void *buf)
 {
-	struct kmem_bufctl *bc_i;
+	struct kmem_bufctl *bc_i, **pp;
+	struct kmem_bufctl_slist *slist;
 	size_t hash_idx;
 
 	hash_idx = hash_ptr(buf, cp->hh.nr_hash_bits);
-	BSD_LIST_FOREACH(bc_i, &cp->alloc_hash[hash_idx], link) {
-		if (bc_i->buf_addr == buf) {
-			BSD_LIST_REMOVE(bc_i, link);
-			break;
-		}
+	slist = &cp->alloc_hash[hash_idx];
+	SLIST_FOREACH_PREVPTR(bc_i, pp, slist, link) {
+		if (bc_i->buf_addr != buf)
+			continue;
+		*pp = SLIST_NEXT(bc_i, link);	/* Removes bc_i */
+		return bc_i;
 	}
-	if (!bc_i)
-		panic("Could not find buf %p in cache %s!", buf, cp->name);
-	return bc_i;
+	panic("Could not find buf %p in cache %s!", buf, cp->name);
 }
 
 /* Alloc, bypassing the magazines and depot */
@@ -624,9 +624,9 @@ static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags)
 	} else {
 		// rip the first bufctl out of the partial slab's buf list
 		struct kmem_bufctl *a_bufctl =
-			BSD_LIST_FIRST(&a_slab->bufctl_freelist);
+			SLIST_FIRST(&a_slab->bufctl_freelist);
 
-		BSD_LIST_REMOVE(a_bufctl, link);
+		SLIST_REMOVE_HEAD(&a_slab->bufctl_freelist, link);
 		__track_alloc(cp, a_bufctl);
 		retval = a_bufctl->buf_addr;
 	}
@@ -720,7 +720,7 @@ static void __kmem_free_to_slab(struct kmem_cache *cp, void *buf)
 		/* Give the bufctl back to the parent slab */
 		a_bufctl = __yank_bufctl(cp, buf);
 		a_slab = a_bufctl->my_slab;
-		BSD_LIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
+		SLIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl, link);
 	}
 	a_slab->num_busy_obj--;
 	cp->nr_cur_alloc--;
@@ -858,7 +858,7 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 		}
 		a_slab->num_busy_obj = 0;
 		a_slab->num_total_obj = (cp->import_amt - delta) / cp->obj_size;
-		BSD_LIST_INIT(&a_slab->bufctl_freelist);
+		SLIST_INIT(&a_slab->bufctl_freelist);
 		/* for each buffer, set up a bufctl and point to the buffer */
 		for (int i = 0; i < a_slab->num_total_obj; i++) {
 			a_bufctl = kmem_cache_alloc(kmem_bufctl_cache,
@@ -866,15 +866,14 @@ static bool kmem_cache_grow(struct kmem_cache *cp)
 			if (!a_bufctl) {
 				struct kmem_bufctl *i, *temp;
 
-				BSD_LIST_FOREACH_SAFE(i,
-						      &a_slab->bufctl_freelist,
-						      link, temp) {
+				SLIST_FOREACH_SAFE(i, &a_slab->bufctl_freelist,
+						   link, temp) {
 					kmem_cache_free(kmem_bufctl_cache, i);
 				}
 				goto err_source_obj;
 			}
-			BSD_LIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl,
-					     link);
+			SLIST_INSERT_HEAD(&a_slab->bufctl_freelist, a_bufctl,
+					  link);
 			a_bufctl->buf_addr = buf;
 			a_bufctl->my_slab = a_slab;
 			buf += cp->obj_size;

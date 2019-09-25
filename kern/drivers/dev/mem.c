@@ -177,9 +177,9 @@ static void fetch_slab_stats(struct kmem_cache *kc, struct sized_alloc *sza)
 	for (int i = 0; i < kc->hh.nr_hash_lists; i++) {
 		int j = 0;
 
-		if (BSD_LIST_EMPTY(&kc->alloc_hash[i]))
+		if (SLIST_EMPTY(&kc->alloc_hash[i]))
 			empty_hash_chain++;
-		BSD_LIST_FOREACH(bc_i, &kc->alloc_hash[i], link)
+		SLIST_FOREACH(bc_i, &kc->alloc_hash[i], link)
 			j++;
 		longest_hash_chain = MAX(longest_hash_chain, j);
 	}
