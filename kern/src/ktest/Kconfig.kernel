@@ -6,3 +6,10 @@ menuconfig KERNEL_TESTING
 
 source "kern/src/ktest/Kconfig.postboot"
 source "kern/src/ktest/Kconfig.net"
+
+config KTEST_ARENA
+	depends on KERNEL_TESTING
+	bool "Arena kernel test"
+	default y
+	help
+	Run the arena tests

@@ -51,6 +51,9 @@
  *   poke the CV if the first waiter is likely to succeed.
  * - Reclaim: have a ktask that sleeps on a rendez.  We poke it, even from IRQ
  *   context.  It qlocks arenas_and_slabs_lock, then does the reclaim.
+ * - There's an issue with when slab objects get deconstructed, and how that
+ *   interacts with what I wanted to do with kstacks and TLB shootdowns.  I
+ *   think right now (2019-09) there is a problem with it.
  *
  * FAQ:
  * - Does allocating memory from an arena require it to take a btag?  Yes -
@@ -69,6 +72,28 @@
  *   will have their own stats, and it'd be a minor pain to sync up with them
  *   all the time.  Also, the important stat is when the base arena starts to
  *   run out of memory, and base arenas don't have qcaches, so it's moot.
+ * - What's the difference between a kmem_cache (slab / KC) that is used as a
+ *   qcache and one that just sources from the arena?  Two things: qcaches are
+ *   set up to be KMC_NOTOUCH, meaning that the objects we allocate cannot be
+ *   treated as memory at any point.  When the KC is "pro-touch", it can use
+ *   the memory of unallocated objects, meaning allocated from the arena to the
+ *   KC but not allocated to the user, for bookkeeping.  NOTOUCH means we cannot
+ *   do that.  e.g. an integer allocator: don't just write to random addresses!
+ *   In general, all arenas are NOTOUCH by default, to avoid these sorts of
+ *   disasters.  The only time you'd want 'pro-touch' is for small-size KCs that
+ *   are actually backed by memory.  In those cases, you just make slabs that
+ *   source from an arena that are not qcaches.  These are the kmalloc slabs.
+ *   The other difference between a qcache and a KC sourcing is the qcaches have
+ *   a different import_amt.  It's just a performance decision recommended in
+ *   the vmem paper.  import_amt is only used with large or no-touch objects,
+ *   which is always the case with qcaches.  Small, pro-touch KCs just grab a
+ *   page at a time and use that for the slab struct and linked list.  Finally,
+ *   all qcaches, being NOTOUCH, therefore use bufctls in the slab.  These are
+ *   basically the same as the arena btags.  So ultimately, all objects
+ *   allocated from an arena, even those from qcaches, have some sort of btag.
+ *   Each slab has an *additional* BT in the arena, representing the source's
+ *   alloc.  (Actually, that alloc can be from another, larger qcache of the
+ *   arena!).
  */
 
 #include <arena.h>
