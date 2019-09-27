@@ -34,6 +34,7 @@ typedef uint64_t;
 
 @@
 typedef cycle_t;
+typedef uint64_t;
 @@
 -cycle_t
 +uint64_t
@@ -74,12 +75,14 @@ typedef uint;
 
 @@
 typedef __sum16;
+typedef uint16_t;
 @@
 -__sum16
 +uint16_t
 
 @@
 typedef __wsum;
+typedef uint32_t;
 @@
 -__wsum
 +uint32_t
