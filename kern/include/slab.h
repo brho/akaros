@@ -162,12 +162,13 @@ void kmem_cache_free(struct kmem_cache *cp, void *buf);
 void kmem_cache_init(void);
 void kmem_cache_reap(struct kmem_cache *cp);
 unsigned int kmc_nr_pcpu_caches(void);
-/* Low-level interface for initializing a cache. */
+/* Low-level interface for creating/destroying; caller manages kc's memory */
 void __kmem_cache_create(struct kmem_cache *kc, const char *name,
                          size_t obj_size, int align, int flags,
                          struct arena *source,
                          int (*ctor)(void *, void *, int),
                          void (*dtor)(void *, void *), void *priv);
+void __kmem_cache_destroy(struct kmem_cache *cp);
 
 /* Tracing */
 int kmem_trace_start(struct kmem_cache *kc);

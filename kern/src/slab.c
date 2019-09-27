@@ -490,7 +490,7 @@ static void kmem_slab_destroy(struct kmem_cache *cp, struct kmem_slab *a_slab)
 
 /* Once you call destroy, never use this cache again... o/w there may be weird
  * races, and other serious issues.  */
-void kmem_cache_destroy(struct kmem_cache *cp)
+void __kmem_cache_destroy(struct kmem_cache *cp)
 {
 	struct kmem_slab *a_slab, *next;
 
@@ -520,6 +520,11 @@ void kmem_cache_destroy(struct kmem_cache *cp)
 	}
 	spin_unlock_irqsave(&cp->cache_lock);
 	kmem_trace_warn_notempty(cp);
+}
+
+void kmem_cache_destroy(struct kmem_cache *cp)
+{
+	__kmem_cache_destroy(cp);
 	kmem_cache_free(kmem_cache_cache, cp);
 }
 
