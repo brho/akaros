@@ -104,11 +104,6 @@ static void kmc_track(struct kmem_cache *kc)
 	struct kmem_cache *kc_i;
 
 	qlock(&arenas_and_slabs_lock);
-	TAILQ_FOREACH(kc_i, &all_kmem_caches, all_kmc_link) {
-		if (!strcmp(kc->name, kc_i->name))
-			warn("Creatgin KMC %s, but one with that name exists!",
-			     kc->name);
-	}
 	TAILQ_INSERT_TAIL(&all_kmem_caches, kc, all_kmc_link);
 	qunlock(&arenas_and_slabs_lock);
 }

@@ -424,7 +424,7 @@ static void slab_trace_cmd(struct chan *c, struct cmdbuf *cb)
 {
 	ERRSTACK(1);
 	struct sized_alloc *sza, *old_sza;
-	struct kmem_cache *kc;
+	struct kmem_cache *kc = NULL, *kc_i;
 
 	if (cb->nf < 2)
 		error(EFAIL, SLAB_TRACE_USAGE);
@@ -434,9 +434,16 @@ static void slab_trace_cmd(struct chan *c, struct cmdbuf *cb)
 		qunlock(&arenas_and_slabs_lock);
 		nexterror();
 	}
-	TAILQ_FOREACH(kc, &all_kmem_caches, all_kmc_link)
-		if (!strcmp(kc->name, cb->f[1]))
-			break;
+	TAILQ_FOREACH(kc_i, &all_kmem_caches, all_kmc_link) {
+		if (!strcmp(kc_i->name, cb->f[1])) {
+			if (kc) {
+				printk("[kernel] Multiple KC's named %s, tracing the first one\n",
+				       kc->name);
+				break;
+			}
+			kc = kc_i;
+		}
+	}
 	if (!kc)
 		error(ENOENT, "No such slab %s", cb->f[1]);
 	/* Note that the only time we have a real sza is when printing.
