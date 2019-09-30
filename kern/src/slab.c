@@ -594,21 +594,16 @@ static struct kmem_bufctl *__yank_bufctl(struct kmem_cache *cp, void *buf)
 /* Alloc, bypassing the magazines and depot */
 static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags)
 {
-	void *retval = NULL;
+	void *retval;
 
 	spin_lock_irqsave(&cp->cache_lock);
 	// look at partial list
 	struct kmem_slab *a_slab = TAILQ_FIRST(&cp->partial_slab_list);
 	//  if none, go to empty list and get an empty and make it partial
 	if (!a_slab) {
-		// TODO: think about non-sleeping flags
-		if (TAILQ_EMPTY(&cp->empty_slab_list) &&
-			!kmem_cache_grow(cp)) {
+		if (TAILQ_EMPTY(&cp->empty_slab_list) && !kmem_cache_grow(cp)) {
 			spin_unlock_irqsave(&cp->cache_lock);
-			if (flags & MEM_ERROR)
-				error(ENOMEM, ERROR_FIXME);
-			else
-				panic("[German Accent]: OOM for a small slab growth!!!");
+			goto out_oom;
 		}
 		// move to partial list
 		a_slab = TAILQ_FIRST(&cp->empty_slab_list);
@@ -643,10 +638,20 @@ static void *__kmem_alloc_from_slab(struct kmem_cache *cp, int flags)
 		if (cp->ctor(retval, cp->priv, flags)) {
 			warn("Ctor %p failed, probably a bug!");
 			__kmem_free_to_slab(cp, retval);
-			return NULL;
+			goto out_oom;
 		}
 	}
 	return retval;
+out_oom:
+	if (flags & MEM_ATOMIC)
+		return NULL;
+	/* Old code didn't set any MEM_ flag.  Typically '0' for MEM_ATOMIC. */
+	if (!(flags & MEM_FLAGS))
+		return NULL;
+	if (flags & MEM_ERROR)
+		error(ENOMEM, ERROR_FIXME);
+	else
+		panic("[German Accent]: OOM for a small slab growth!!!");
 }
 
 void *kmem_cache_alloc(struct kmem_cache *kc, int flags)
