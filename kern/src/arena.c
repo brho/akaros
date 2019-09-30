@@ -174,7 +174,7 @@ static void destroy_qcaches(struct arena *arena)
 
 	for (int i = 0; i < nr_qcaches; i++) {
 		kc = &arena->qcaches[i];
-		kmem_cache_destroy(kc);
+		__kmem_cache_destroy(kc);
 	}
 
 	base_free(arena, arena->qcaches,
