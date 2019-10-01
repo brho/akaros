@@ -1,7 +1,8 @@
 #include <arena.h>
 #include <slab.h>
 #include <ktest.h>
-#include <linker_func.h>
+#include <dma.h>
+#include <pmap.h>
 
 KTEST_SUITE("ARENA")
 
@@ -472,6 +473,27 @@ static bool test_self_source(void)
 	return true;
 }
 
+static bool test_dma_pool(void)
+{
+	struct dma_pool *dp;
+	#define NR_LOOPS 10
+	void *va[NR_LOOPS];
+	dma_addr_t da[NR_LOOPS];
+
+	dp = dma_pool_create(__func__, NULL, 33, 16, 64);
+	for (int i = 0; i < NR_LOOPS; i++) {
+		va[i] = dma_pool_alloc(dp, MEM_WAIT, &da[i]);
+		KT_ASSERT(ALIGNED(va[i], 16));
+		KT_ASSERT(ROUNDUP(va[i] + 1, 64) >= va[i] + 33);
+		KT_ASSERT(PADDR(va[i]) == da[i]);
+	}
+	for (int i = 0; i < NR_LOOPS; i++)
+		dma_pool_free(dp, va[i], da[i]);
+	dma_pool_destroy(dp);
+
+	return true;
+}
+
 static struct ktest ktests[] = {
 	KTEST_REG(nextfit,		CONFIG_KTEST_ARENA),
 	KTEST_REG(bestfit,		CONFIG_KTEST_ARENA),
@@ -490,6 +512,7 @@ static struct ktest ktests[] = {
 	KTEST_REG(xalloc_minmax,	CONFIG_KTEST_ARENA),
 	KTEST_REG(accounting,		CONFIG_KTEST_ARENA),
 	KTEST_REG(self_source,		CONFIG_KTEST_ARENA),
+	KTEST_REG(dma_pool,		CONFIG_KTEST_ARENA),
 };
 
 static int num_ktests = sizeof(ktests) / sizeof(struct ktest);

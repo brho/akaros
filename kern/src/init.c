@@ -38,6 +38,7 @@
 #include <acpi.h>
 #include <coreboot_tables.h>
 #include <rcu.h>
+#include <dma.h>
 
 #define MAX_BOOT_CMDLINE_SIZE 4096
 
@@ -137,6 +138,7 @@ void kernel_init(multiboot_info_t *mboot_info)
 	vmap_init();
 	hashtable_init();
 	radix_init();
+	dma_arena_init();
 	acpiinit();
 	topology_init();
 	percpu_init();

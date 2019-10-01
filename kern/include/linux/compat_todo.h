@@ -20,6 +20,7 @@
 #include <string.h>
 #include <taskqueue.h>
 #include <rbtree.h>
+#include <linux_compat.h>
 
 #define ETH_ALEN	6		/* Octets in one ethernet addr	 */
 #define ETH_ZLEN	60		/* Min. octets in frame sans FCS */
@@ -667,13 +668,6 @@ enum pci_bus_speed {
 
 typedef uint64_t phys_addr_t;
 typedef phys_addr_t resource_size_t;
-
-struct dma_pool *dma_pool_create(const char *name, void *dev,
-				 size_t size, size_t align, size_t allocation);
-void dma_pool_destroy(struct dma_pool *pool);
-void *dma_pool_alloc(struct dma_pool *pool, int mem_flags, dma_addr_t *handle);
-void *dma_pool_zalloc(struct dma_pool *pool, int mem_flags, dma_addr_t *handle);
-void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t addr);
 
 /* This leaks memory, but we don't do driver detach yet. */
 #define dmam_pool_create dma_pool_create

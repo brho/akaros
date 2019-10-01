@@ -27,6 +27,7 @@
 #include <zlib.h>
 #include <list.h>
 #include <refd_pages.h>
+#include <dma.h>
 #include <linux/errno.h>
 /* temporary dumping ground */
 #include "compat_todo.h"
@@ -71,7 +72,6 @@ static inline void synchronize_sched(void)
 #define CLAMP(val, lo, hi) MIN((typeof(val))MAX(val, lo), hi)
 #define CLAMP_T(t, val, lo, hi) CLAMP(val, lo, hi)
 
-typedef physaddr_t dma_addr_t;
 typedef int gfp_t;
 
 /* these dma funcs are empty in linux with !CONFIG_NEED_DMA_MAP_STATE */
@@ -90,35 +90,6 @@ enum dma_data_direction {
 	DMA_FROM_DEVICE = 2,
 	DMA_NONE = 3,
 };
-
-static inline void *__dma_alloc_coherent(size_t size, dma_addr_t *dma_handle,
-                                         gfp_t flags)
-{
-	void *vaddr = get_cont_pages(LOG2_UP(nr_pages(size)), flags);
-
-	if (!vaddr) {
-		*dma_handle = 0;
-		return 0;
-	}
-	*dma_handle = PADDR(vaddr);
-	return vaddr;
-}
-
-static inline void *__dma_zalloc_coherent(size_t size, dma_addr_t *dma_handle,
-                                          gfp_t flags)
-{
-	void *vaddr = __dma_alloc_coherent(size, dma_handle, flags);
-
-	if (vaddr)
-		memset(vaddr, 0, size);
-	return vaddr;
-}
-
-static inline void __dma_free_coherent(size_t size, void *cpu_addr,
-                                       dma_addr_t dma_handle)
-{
-	free_cont_pages(cpu_addr, LOG2_UP(nr_pages(size)));
-}
 
 static inline dma_addr_t __dma_map_single(void *cpu_addr, size_t size,
                                           int direction)
@@ -146,18 +117,29 @@ static inline int __dma_mapping_error(dma_addr_t dma_addr)
 #define dma_sync_single_for_device(...)
 
 /* Wrappers to avoid struct device.  Might want that one of these days.
+ * We're also pulling from the physical pages DMA arena - most devices will want
+ * that, unless they are running in a user's address space.
  *
  * Note dma_alloc_coherent() does a zalloc.  Some Linux drivers (r8169)
  * accidentally assume the memory is zeroed, which may be what Linux allocators
  * often do. */
-#define dma_alloc_coherent(dev, size, dma_handlep, flag)                       \
-	__dma_zalloc_coherent(size, dma_handlep, flag)
+static inline void *dma_alloc_coherent(struct device *dev, size_t size,
+				       dma_addr_t *dma_handle, int gfp)
+{
+	return dma_arena_zalloc(&dma_phys_pages, size, dma_handle, gfp);
+}
 
-#define dma_zalloc_coherent(dev, size, dma_handlep, flag)                      \
-	__dma_zalloc_coherent(size, dma_handlep, flag)
+static inline void *dma_zalloc_coherent(struct device *dev, size_t size,
+					dma_addr_t *dma_handle, int gfp)
+{
+	return dma_arena_zalloc(&dma_phys_pages, size, dma_handle, gfp);
+}
 
-#define dma_free_coherent(dev, size, dma_handle, flag)                         \
-	__dma_free_coherent(size, dma_handle, flag)
+static inline void dma_free_coherent(struct device *dev, size_t size,
+				     void *cpu_addr, dma_addr_t dma_handle)
+{
+	dma_arena_free(&dma_phys_pages, cpu_addr, dma_handle, size);
+}
 
 #define dma_map_single(dev, addr, size, direction)                             \
 	__dma_map_single(addr, size, direction)
