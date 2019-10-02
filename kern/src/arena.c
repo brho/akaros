@@ -274,11 +274,32 @@ struct arena *arena_create(const char *name, void *base, size_t size,
 	return arena;
 }
 
+static bool __has_importer(struct arena *arena)
+{
+	struct arena *a_i;
+	struct kmem_cache *kc_i;
+
+	TAILQ_FOREACH(a_i, &arena->__importing_arenas, import_link) {
+		if (a_i != arena)
+			return true;
+	}
+	TAILQ_FOREACH(kc_i, &arena->__importing_slabs, import_link) {
+		if (!(kc_i->flags & KMC_QCACHE))
+			return true;
+	}
+	return false;
+}
+
 void arena_destroy(struct arena *arena)
 {
 	struct btag *bt_i, *temp;
 
 	qlock(&arenas_and_slabs_lock);
+	if (__has_importer(arena)) {
+		warn("Arena %s has importers!  Will not destroy.", arena->name);
+		qunlock(&arenas_and_slabs_lock);
+		return;
+	}
 	TAILQ_REMOVE(&all_arenas, arena, next);
 	qunlock(&arenas_and_slabs_lock);
 	if (arena->source)
