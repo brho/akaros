@@ -199,8 +199,11 @@ static void arena_init(struct arena *arena, const char *name, size_t quantum,
 	arena->qcache_max = qcache_max;
 	arena->afunc = afunc;
 	arena->ffunc = ffunc;
-	arena->source = source;
-	if (source) {
+	if (source == ARENA_SELF_SOURCE)
+		arena->source = arena;
+	else
+		arena->source = source;
+	if (arena->source) {
 		assert(afunc && ffunc);
 		/* When we import, there may be a quantum mismatch such that our
 		 * source hands us spans that are not sufficient for our
@@ -213,7 +216,7 @@ static void arena_init(struct arena *arena, const char *name, size_t quantum,
 		 * if all s allocs (our spans) are also divided by a->q, in
 		 * which case we don't need to import extra.  This is true when
 		 * a->q divides s->q.  (s->q is a multiple of a->q). */
-		if (source->quantum % arena->quantum)
+		if (arena->source->quantum % arena->quantum)
 			arena->import_scale = 1;
 	}
 	arena->amt_total_segs = 0;
@@ -236,8 +239,8 @@ static void arena_init(struct arena *arena, const char *name, size_t quantum,
 	strlcpy(arena->name, name, ARENA_NAME_SZ);
 	setup_qcaches(arena, quantum, qcache_max);
 
-	if (source)
-		add_importing_arena(source, arena);
+	if (arena->source)
+		add_importing_arena(arena->source, arena);
 	qlock(&arenas_and_slabs_lock);
 	TAILQ_INSERT_TAIL(&all_arenas, arena, next);
 	qunlock(&arenas_and_slabs_lock);

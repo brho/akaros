@@ -430,6 +430,48 @@ static bool test_accounting(void)
 	return true;
 }
 
+static void *tssaf(struct arena *a, size_t amt, int flags)
+{
+	static uintptr_t store = PGSIZE;
+	void *ret;
+
+	ret = (void*)store;
+	store += ROUNDUP(amt, a->quantum);
+
+	return ret;
+}
+
+static void tssff(struct arena *a, void *obj, size_t amt)
+{
+}
+
+static bool test_self_source(void)
+{
+	struct arena *s, *a;
+	void *o1, *o2;
+
+	s = arena_create(__func__, NULL, 0, PGSIZE, tssaf, tssff,
+			 ARENA_SELF_SOURCE, 0, MEM_WAIT);
+	o1 = arena_alloc(s, 1, MEM_WAIT);
+	o2 = arena_alloc(s, 1, MEM_WAIT);
+	KT_ASSERT(o1 != o2);
+	arena_free(s, o1, 1);
+	arena_free(s, o2, 1);
+
+	a = arena_create("test_self_source-import", NULL, 0, 1,
+			 arena_alloc, arena_free, s, 0, MEM_WAIT);
+	o1 = arena_alloc(a, 1, MEM_WAIT);
+	o2 = arena_alloc(a, 1, MEM_WAIT);
+	KT_ASSERT(o1 != o2);
+	arena_free(a, o1, 1);
+	arena_free(a, o2, 1);
+
+	arena_destroy(a);
+	arena_destroy(s);
+
+	return true;
+}
+
 static struct ktest ktests[] = {
 	KTEST_REG(nextfit,		CONFIG_KTEST_ARENA),
 	KTEST_REG(bestfit,		CONFIG_KTEST_ARENA),
@@ -447,6 +489,7 @@ static struct ktest ktests[] = {
 	KTEST_REG(xalloc,		CONFIG_KTEST_ARENA),
 	KTEST_REG(xalloc_minmax,	CONFIG_KTEST_ARENA),
 	KTEST_REG(accounting,		CONFIG_KTEST_ARENA),
+	KTEST_REG(self_source,		CONFIG_KTEST_ARENA),
 };
 
 static int num_ktests = sizeof(ktests) / sizeof(struct ktest);

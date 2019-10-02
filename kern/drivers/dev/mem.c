@@ -298,8 +298,11 @@ static void fetch_arena_and_kids(struct arena *arena, struct sized_alloc *sza,
 	struct kmem_cache *kc_i;
 
 	fetch_arena_line(arena, sza, indent);
-	TAILQ_FOREACH(a_i, &arena->__importing_arenas, import_link)
+	TAILQ_FOREACH(a_i, &arena->__importing_arenas, import_link) {
+		if (a_i == arena)
+			continue;
 		fetch_arena_and_kids(a_i, sza, indent + 1);
+	}
 	TAILQ_FOREACH(kc_i, &arena->__importing_slabs, import_link)
 		fetch_slab_line(kc_i, sza, indent + 1);
 }
@@ -327,7 +330,7 @@ static struct sized_alloc *build_kmemstat(void)
 		sza_printf(sza, "-");
 	sza_printf(sza, "\n");
 	TAILQ_FOREACH(a_i, &all_arenas, next) {
-		if (a_i->source)
+		if (a_i->source && a_i->source != a_i)
 			continue;
 		fetch_arena_and_kids(a_i, sza, 0);
 	}

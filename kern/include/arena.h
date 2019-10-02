@@ -90,6 +90,8 @@ extern struct arena_tailq all_arenas;
 #define ARENA_NEXTFIT		0x400
 #define ARENA_ALLOC_STYLES (ARENA_BESTFIT | ARENA_INSTANTFIT | ARENA_NEXTFIT)
 
+/* Magic source, for arenas that dynamically generate their contents. */
+#define ARENA_SELF_SOURCE (void*)(-2)
 /* Creates an area, with initial segment [@base, @base + @size).  Allocs are in
  * units of @quantum.  If @source is provided, the arena will alloc new segments
  * from @source, calling @afunc to alloc and @ffunc to free.  Uses a slab
