@@ -104,6 +104,12 @@ struct arena *arena_create(const char *name, void *base, size_t size,
 /* Adds segment [@base, @base + @size) to @arena. */
 void *arena_add(struct arena *arena, void *base, size_t size, int flags);
 void arena_destroy(struct arena *arena);
+/* Lower-level create/destroy interface; caller manages the memory */
+void __arena_create(struct arena *arena, const char *name, size_t quantum,
+		    void *(*afunc)(struct arena *, size_t, int),
+		    void (*ffunc)(struct arena *, void *, size_t),
+		    struct arena *source, size_t qcache_max);
+void __arena_destroy(struct arena *arena);
 
 void *arena_alloc(struct arena *arena, size_t size, int flags);
 void arena_free(struct arena *arena, void *addr, size_t size);

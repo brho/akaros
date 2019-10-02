@@ -182,10 +182,10 @@ static void destroy_qcaches(struct arena *arena)
 	arena->qcaches = NULL;
 }
 
-static void arena_init(struct arena *arena, const char *name, size_t quantum,
-                       void *(*afunc)(struct arena *, size_t, int),
-                       void (*ffunc)(struct arena *, void *, size_t),
-                       struct arena *source, size_t qcache_max)
+void __arena_create(struct arena *arena, const char *name, size_t quantum,
+		    void *(*afunc)(struct arena *, size_t, int),
+		    void (*ffunc)(struct arena *, void *, size_t),
+		    struct arena *source, size_t qcache_max)
 {
 	static_assert((ARENA_ALLOC_STYLES & MEM_FLAGS) == 0);
 
@@ -262,7 +262,7 @@ struct arena *arena_create(const char *name, void *base, size_t size,
 	arena = kmalloc(sizeof(struct arena), flags);
 	if (!arena)
 		return 0;
-	arena_init(arena, name, quantum, afunc, ffunc, source, qcache_max);
+	__arena_create(arena, name, quantum, afunc, ffunc, source, qcache_max);
 	if (base) {
 		if (!arena_add(arena, base, size, flags)) {
 			warn("Failed to add base to arena %s, aborting!",
@@ -290,7 +290,7 @@ static bool __has_importer(struct arena *arena)
 	return false;
 }
 
-void arena_destroy(struct arena *arena)
+void __arena_destroy(struct arena *arena)
 {
 	struct btag *bt_i, *temp;
 
@@ -339,6 +339,11 @@ void arena_destroy(struct arena *arena)
 	/* Now the remaining BTs are the first on their page. */
 	BSD_LIST_FOREACH_SAFE(bt_i, &arena->unused_btags, misc_link, temp)
 		arena_free(find_my_base(arena), bt_i, PGSIZE);
+}
+
+void arena_destroy(struct arena *arena)
+{
+	__arena_destroy(arena);
 	kfree(arena);
 }
 
@@ -1397,7 +1402,7 @@ struct arena *arena_builder(void *pgaddr, const char *name, size_t quantum,
 
 	static_assert(sizeof(struct arena) + 2 * sizeof(struct btag) <= PGSIZE);
 
-	arena_init(a, name, quantum, afunc, ffunc, source, qcache_max);
+	__arena_create(a, name, quantum, afunc, ffunc, source, qcache_max);
 	if (!source)
 		a->is_base = TRUE;
 	BSD_LIST_INSERT_HEAD(&a->unused_btags, &two_tags[0], misc_link);
