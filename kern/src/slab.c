@@ -513,6 +513,10 @@ void __kmem_cache_destroy(struct kmem_cache *cp)
 		kmem_slab_destroy(cp, a_slab);
 		a_slab = next;
 	}
+	if (cp->alloc_hash != cp->static_hash)
+		base_free(NULL, cp->alloc_hash,
+			  array_size(cp->hh.nr_hash_lists,
+				     sizeof(struct kmem_bufctl_slist)));
 	spin_unlock_irqsave(&cp->cache_lock);
 	kmem_trace_warn_notempty(cp);
 }
