@@ -757,11 +757,7 @@ int mlx4_db_alloc(struct mlx4_dev *dev, struct mlx4_db *db, int order, gfp_t gfp
 		if (!mlx4_alloc_db_from_pgdir(pgdir, db, order))
 			goto out;
 
-#if 0 // AKAROS_PORT
-	pgdir = mlx4_alloc_db_pgdir(&dev->persist->pdev->dev, gfp);
-#else
-	pgdir = mlx4_alloc_db_pgdir(0, gfp);
-#endif
+	pgdir = mlx4_alloc_db_pgdir(&dev->persist->pdev->linux_dev, gfp);
 	if (!pgdir) {
 		ret = -ENOMEM;
 		goto out;

@@ -2873,9 +2873,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 
 	priv->dev = dev;
 	priv->mdev = mdev;
-#if 0 // AKAROS_PORT
-	priv->ddev = &mdev->pdev->dev;
-#endif
+	priv->ddev = &mdev->pdev->linux_dev;
 	priv->prof = prof;
 	priv->port = port;
 	priv->port_up = false;

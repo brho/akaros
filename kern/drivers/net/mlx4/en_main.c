@@ -261,11 +261,7 @@ static void *mlx4_en_add(struct mlx4_dev *dev)
 	spinlock_init_irqsave(&mdev->uar_lock);
 
 	mdev->dev = dev;
-#if 0 // AKAROS_PORT
-	mdev->dma_device = &dev->persist->pdev->dev;
-#else
-	mdev->dma_device = 0;
-#endif
+	mdev->dma_device = &dev->persist->pdev->linux_dev;
 	mdev->pdev = dev->persist->pdev;
 	mdev->device_up = false;
 

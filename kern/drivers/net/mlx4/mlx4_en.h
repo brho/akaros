@@ -579,9 +579,7 @@ struct mlx4_en_priv {
 	struct mlx4_en_stat_out_mbox hw_stats;
 	int vids[128];
 	bool wol;
-#if 0 // AKAROS_PORT
 	struct device *ddev;
-#endif
 	int base_tx_qpn;
 	struct hlist_head mac_hash[MLX4_EN_MAC_HASH_SIZE];
 	struct hwtstamp_config hwtstamp_config;
