@@ -412,6 +412,7 @@ int ioat_dma_setup_interrupts(struct ioatdma_device *ioat_dma)
 	int i, j, msixcnt;
 	int err = -EINVAL;
 	uint8_t intrctrl = 0;
+	struct irq_handler *irq_h;
 
 #if 1 // AKAROS
 	/* Our IRQ setup needs a lot of work.  Let's just assume MSI-X, since
@@ -435,12 +436,12 @@ int ioat_dma_setup_interrupts(struct ioatdma_device *ioat_dma)
 		 * for msi/msix.  Passing 0 for now, since -1 doesn't seem like
 		 * a good idea.  This tries to do too much, and you have no
 		 * control / insight into what its doing. */
-		err = register_irq(0 /* ignored for msi(x)! */,
-				   ioat_dma_do_interrupt_msix, ioat_chan,
-				   pci_to_tbdf(pdev));
+		irq_h = register_irq(0 /* ignored for msi(x)! */,
+				     ioat_dma_do_interrupt_msix, ioat_chan,
+				     pci_to_tbdf(pdev));
 		/* TODO: this is a mess - we also don't know if we're actually
 		 * MSIX or not!  We don't even know our vector... */
-		if (err) {
+		if (!irq_h) {
 			warn("MSIX failed (cnt %d), leaking vectors etc!", i);
 			for (j = 0; j < i; j++) {
 				msix = &ioat_dma->msix_entries[j];

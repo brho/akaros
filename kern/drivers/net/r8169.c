@@ -7813,10 +7813,8 @@ static int rtl_open(struct ether *dev)
 
 	rtl_request_firmware(tp);
 
-	retval = register_irq(pdev->irqline, rtl8169_interrupt, dev,
-			      pci_to_tbdf(pdev));
-
-	if (retval < 0)
+	if (!register_irq(pdev->irqline, rtl8169_interrupt, dev,
+			  pci_to_tbdf(pdev)))
 		goto err_release_fw_2;
 
 	rtl_lock_work(tp);

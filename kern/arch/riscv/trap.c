@@ -343,7 +343,8 @@ void send_nmi(uint32_t os_coreid)
 	printk("%s not implemented\n", __FUNCTION);
 }
 
-int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
+struct irq_handler *register_irq(int irq, isr_t handler, void *irq_arg,
+				 uint32_t tbdf)
 {
 	printk("%s not implemented\n", __FUNCTION);
 	return -1;

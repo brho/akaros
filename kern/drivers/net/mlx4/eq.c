@@ -1159,6 +1159,7 @@ void mlx4_free_eq_table(struct mlx4_dev *dev)
 int mlx4_init_eq_table(struct mlx4_dev *dev)
 {
 	struct mlx4_priv *priv = mlx4_priv(dev);
+	struct irq_handler *irq_h;
 	int err;
 	int i;
 
@@ -1261,12 +1262,12 @@ int mlx4_init_eq_table(struct mlx4_dev *dev)
 					   priv->eq_table.eq + i,
 					   pci_to_tbdf(PCIDEV));
 #else
-			err = register_irq(priv->eq_table.eq[i].irq,
-					   mlx4_msi_x_interrupt_akaros,
-					   priv->eq_table.eq + i,
-					   pci_to_tbdf(dev->persist->pdev));
+			irq_h = register_irq(priv->eq_table.eq[i].irq,
+					     mlx4_msi_x_interrupt_akaros,
+					     priv->eq_table.eq + i,
+					     pci_to_tbdf(dev->persist->pdev));
 #endif
-			if (err)
+			if (!irq_h)
 				goto err_out_async;
 
 			priv->eq_table.eq[i].have_irq = 1;

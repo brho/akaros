@@ -780,7 +780,8 @@ void handle_irq(struct hw_trapframe *hw_tf)
 }
 
 /* The irq field may be ignored based on the type of Bus. */
-int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
+struct irq_handler *register_irq(int irq, isr_t handler, void *irq_arg,
+				 uint32_t tbdf)
 {
 	struct irq_handler *irq_h;
 	int vector;
@@ -792,7 +793,7 @@ int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 	vector = bus_irq_setup(irq_h);
 	if (vector == -1) {
 		kfree(irq_h);
-		return -1;
+		return NULL;
 	}
 	printk("IRQ %d, vector %d (0x%x), type %s\n", irq, vector, vector,
 	       irq_h->type);
@@ -811,7 +812,7 @@ int register_irq(int irq, isr_t handler, void *irq_arg, uint32_t tbdf)
 	 * The lapic IRQs need to be unmasked on a per-core basis */
 	if (irq_h->unmask && strcmp(irq_h->type, "lapic"))
 		irq_h->unmask(irq_h, vector);
-	return 0;
+	return irq_h;
 }
 
 /* These routing functions only allow the routing of an irq to a single core.

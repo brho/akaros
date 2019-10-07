@@ -1747,14 +1747,15 @@ static void bullshit_handler(struct hw_trapframe *hw_tf, void *cnic_turd)
 
 static int bnx2x_req_msix_irqs(struct bnx2x *bp)
 {
-	int i, rc, offset = 0;
+	int i, offset = 0;
+	struct irq_handler *irq_h;
 
 	/* no default status block for vf */
 	if (IS_PF(bp)) {
-		rc = register_irq(bp->msix_table[offset++].vector,
-				  bnx2x_msix_sp_int, bp->dev,
-				  pci_to_tbdf(bp->pdev));
-		if (rc) {
+		irq_h = register_irq(bp->msix_table[offset++].vector,
+				     bnx2x_msix_sp_int, bp->dev,
+				     pci_to_tbdf(bp->pdev));
+		if (!irq_h) {
 			BNX2X_ERR("request sp irq failed\n");
 			return -EBUSY;
 		}
@@ -1763,9 +1764,9 @@ static int bnx2x_req_msix_irqs(struct bnx2x *bp)
 	if (CNIC_SUPPORT(bp)) {
 		offset++;
 		// AKAROS_PORT
-		rc = register_irq(0, bullshit_handler, 0,
-				  pci_to_tbdf(bp->pdev));
-		if (rc) {
+		irq_h = register_irq(0, bullshit_handler, 0,
+				     pci_to_tbdf(bp->pdev));
+		if (!irq_h) {
 			BNX2X_ERR("Fucked up getting a CNIC MSIX vector!");
 			return -EBUSY;
 		}
@@ -1776,11 +1777,12 @@ static int bnx2x_req_msix_irqs(struct bnx2x *bp)
 		snprintf(fp->name, sizeof(fp->name), "%s-fp-%d",
 			 bp->dev->name, i);
 
-		rc = register_irq(bp->msix_table[offset].vector,
-				  bnx2x_msix_fp_int, fp, pci_to_tbdf(bp->pdev));
-		if (rc) {
-			BNX2X_ERR("request fp #%d irq (%d) failed  rc %d\n", i,
-			      bp->msix_table[offset].vector, rc);
+		irq_h = register_irq(bp->msix_table[offset].vector,
+				     bnx2x_msix_fp_int, fp,
+				     pci_to_tbdf(bp->pdev));
+		if (!irq_h) {
+			BNX2X_ERR("request fp #%d irq (%d) failed\n", i,
+			      bp->msix_table[offset].vector);
 			bnx2x_free_msix_irqs(bp, offset);
 			return -EBUSY;
 		}
