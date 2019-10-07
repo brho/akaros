@@ -34,7 +34,7 @@ gatedesc_t __attribute__((aligned (16))) idt[256] = { { 0 } };
 pseudodesc_t idt_pd;
 
 /* interrupt handler table, each element is a linked list of handlers for a
- * given IRQ.  Modification requires holding the lock (TODO: RCU) */
+ * given IRQ.  Modification requires holding the lock. */
 struct irq_handler *irq_handlers[NUM_IRQS];
 spinlock_t irq_handler_wlock = SPINLOCK_INITIALIZER_IRQSAVE;
 
@@ -717,8 +717,8 @@ static void irq_dispatch(struct hw_trapframe *hw_tf)
 	if (hw_tf->tf_trapno != 65)	/* qemu serial tends to get this one */
 		printd("Incoming IRQ, ISR: %d on core %d\n", hw_tf->tf_trapno,
 		       core_id());
-	/* TODO: RCU read lock */
-	irq_h = irq_handlers[hw_tf->tf_trapno];
+	rcu_read_lock();
+	irq_h = rcu_dereference(irq_handlers[hw_tf->tf_trapno]);
 	if (!irq_h) {
 		warn_once("Received IRQ %d, had no handler registered!",
 		          hw_tf->tf_trapno);
@@ -735,7 +735,7 @@ static void irq_dispatch(struct hw_trapframe *hw_tf)
 	enable_irq();
 	while (irq_h) {
 		irq_h->isr(hw_tf, irq_h->data);
-		irq_h = irq_h->next;
+		irq_h = rcu_dereference(irq_h->next);
 	}
 	// if we're a general purpose IPI function call, down the cpu_list
 	extern handler_wrapper_t handler_wrappers[NUM_HANDLER_WRAPPERS];
@@ -745,9 +745,11 @@ static void irq_dispatch(struct hw_trapframe *hw_tf)
 			       .cpu_list);
 	disable_irq();
 	/* Keep in sync with ipi_is_pending */
-	irq_handlers[hw_tf->tf_trapno]->eoi(hw_tf->tf_trapno);
+	irq_h = rcu_dereference(irq_handlers[hw_tf->tf_trapno]);
+	irq_h->eoi(hw_tf->tf_trapno);
 	/* Fall-through */
 out_no_eoi:
+	rcu_read_unlock();
 	dec_irq_depth(pcpui);
 	if (!in_irq_ctx(pcpui))
 		__set_cpu_state(pcpui, CPU_STATE_KERNEL);
@@ -801,11 +803,9 @@ struct irq_handler *register_irq(int irq, isr_t handler, void *irq_arg,
 	irq_h->isr = handler;
 	irq_h->data = irq_arg;
 	irq_h->apic_vector = vector;
-	/* RCU write lock */
 	spin_lock_irqsave(&irq_handler_wlock);
 	irq_h->next = irq_handlers[vector];
-	wmb();	/* make sure irq_h is done before publishing to readers */
-	irq_handlers[vector] = irq_h;
+	rcu_assign_pointer(irq_handlers[vector], irq_h);
 	spin_unlock_irqsave(&irq_handler_wlock);
 	/* Most IRQs other than the BusIPI should need their irq unmasked.
 	 * Might need to pass the irq_h, in case unmask needs more info.
