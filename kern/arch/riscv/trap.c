@@ -350,6 +350,12 @@ struct irq_handler *register_irq(int irq, isr_t handler, void *irq_arg,
 	return -1;
 }
 
+int deregister_irq(int vector, uint32_t tbdf)
+{
+	printk("%s not implemented\n", __FUNCTION);
+	return -1;
+}
+
 int route_irqs(int cpu_vec, int coreid)
 {
 	printk("%s not implemented\n", __FUNCTION);

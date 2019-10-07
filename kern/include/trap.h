@@ -16,6 +16,7 @@ typedef void (*isr_t)(struct hw_trapframe *hw_tf, void *data);
 void idt_init(void);
 struct irq_handler *register_irq(int irq, isr_t handler, void *irq_arg,
 				 uint32_t tbdf);
+int deregister_irq(int vector, uint32_t tbdf);
 int route_irqs(int cpu_vec, int coreid);
 void print_trapframe(struct hw_trapframe *hw_tf);
 void print_swtrapframe(struct sw_trapframe *sw_tf);

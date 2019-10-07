@@ -815,6 +815,29 @@ struct irq_handler *register_irq(int irq, isr_t handler, void *irq_arg,
 	return irq_h;
 }
 
+int deregister_irq(int vector, uint32_t tbdf)
+{
+	struct irq_handler *irq_h, **pp;
+
+	pp = &irq_handlers[vector];
+	spin_lock_irqsave(&irq_handler_wlock);
+	while ((irq_h = *pp)) {
+		if (irq_h->tbdf == tbdf) {
+			rcu_assign_pointer(*pp, irq_h->next);
+			break;
+		}
+		pp = &irq_h->next;
+	}
+	spin_unlock_irqsave(&irq_handler_wlock);
+	if (!irq_h) {
+		warn("No IRQ V: %d TBDF: %x to unregister!", vector, tbdf);
+		return -1;
+	}
+	synchronize_rcu();
+	kfree(irq_h);
+	return 0;
+}
+
 /* These routing functions only allow the routing of an irq to a single core.
  * If we want to route to multiple cores, we'll probably need to set up logical
  * groups or something and take some additional parameters. */
