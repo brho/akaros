@@ -362,6 +362,17 @@ int route_irqs(int cpu_vec, int coreid)
 	return -1;
 }
 
+int get_irq_vector(void)
+{
+	printk("%s not implemented\n", __FUNCTION);
+	return -1;
+}
+
+void put_irq_vector(int vec)
+{
+	printk("%s not implemented\n", __FUNCTION);
+}
+
 void __arch_reflect_trap_hwtf(struct hw_trapframe *hw_tf, unsigned int trap_nr,
                               unsigned int err, unsigned long aux)
 {

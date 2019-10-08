@@ -38,6 +38,8 @@ pseudodesc_t idt_pd;
 struct irq_handler *irq_handlers[NUM_IRQS];
 spinlock_t irq_handler_wlock = SPINLOCK_INITIALIZER_IRQSAVE;
 
+static struct arena *irq_vectors;
+
 static bool try_handle_exception_fixup(struct hw_trapframe *hw_tf)
 {
 	if (in_kernel(hw_tf)) {
@@ -180,6 +182,11 @@ void idt_init(void)
 	ltr(GD_TSS);
 
 	asm volatile("lidt %0" : : "m"(idt_pd));
+
+	irq_vectors = arena_create("irq_vectors", (void*)IdtIOAPIC,
+				   MaxIdtIOAPIC - IdtIOAPIC, 1,
+				   NULL, NULL, NULL, 0, MEM_ATOMIC);
+	assert(irq_vectors);
 
 	pic_remap();
 	pic_mask_all();
@@ -836,6 +843,18 @@ int deregister_irq(int vector, uint32_t tbdf)
 	synchronize_rcu();
 	kfree(irq_h);
 	return 0;
+}
+
+/* 0 is an error.  It's not a valid IRQ vector for Akaros, even if
+ * divide-by-zero has trap/irq vector 0 (T_DIVIDE). */
+int get_irq_vector(void)
+{
+	return (int)(long)arena_alloc(irq_vectors, 1, MEM_ATOMIC);
+}
+
+void put_irq_vector(int vec)
+{
+	arena_free(irq_vectors, (void*)(long)vec, 1);
 }
 
 /* These routing functions only allow the routing of an irq to a single core.

@@ -59,9 +59,6 @@ static struct Rbus *rdtbus[Nbus];
 /* reverse mapping of IDT vector to the RDT/IOAPIC entry triggering vector */
 static struct Rdt *rdtvecno[IdtMAX + 1];
 
-static spinlock_t idtnolock;
-static int idtno = IdtIOAPIC;
-
 struct apic xioapic[Napic];
 
 static bool ioapic_exists(void)
@@ -372,21 +369,6 @@ void ioapiconline(void)
 	}
 }
 
-int nextvec(void)
-{
-	unsigned int vecno;
-
-	/* TODO: half-way decent integer service (vmem) */
-	spin_lock(&idtnolock);
-	vecno = idtno;
-	idtno = (idtno + 1) % IdtMAX;
-	if (idtno < IdtIOAPIC)
-		idtno += IdtIOAPIC;
-	spin_unlock(&idtnolock);
-
-	return vecno;
-}
-
 static void msi_mask_irq(struct irq_handler *irq_h, int apic_vector)
 {
 	pci_msi_mask(irq_h->dev_private);
@@ -423,7 +405,11 @@ static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 	uint64_t msivec;
 	struct msix_irq_vector *linkage;
 
-	vno = nextvec();
+	vno = get_irq_vector();
+	if (!vno) {
+		printk("[kernel] Unable to get a vector for MSI(X)!\n");
+		return -1;
+	}
 
 	/* routing the IRQ to core 0 (hi = 0) in physical mode (Pm) */
 	lo = IPlow | TMedge | Pm | vno;
@@ -432,7 +418,7 @@ static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 	irq_h->dev_private = pci_msix_enable(p, msivec);
 	if (!irq_h->dev_private) {
 		if (pci_msi_enable(p, msivec) == -1) {
-			/* TODO: should free vno here */
+			put_irq_vector(vno);
 			return -1;
 		}
 		irq_h->dev_private = p;
@@ -657,7 +643,12 @@ int bus_irq_setup(struct irq_handler *irq_h)
 	 * this stays around regardless of enabled/disabled, since we don't reap
 	 * vectors yet.  nor do we really mess with enabled... */
 	if ((rdt->lo & 0xff) == 0) {
-		vecno = nextvec();
+		vecno = get_irq_vector();
+		if (!vecno) {
+			printk("[kernel] unable to get an IOAPIC vector\n");
+			spin_unlock(&rdt->apic->lock);
+			return -1;
+		}
 		rdt->lo |= vecno;
 		rdtvecno[vecno] = rdt;
 	} else {
