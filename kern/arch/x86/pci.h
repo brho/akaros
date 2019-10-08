@@ -276,9 +276,11 @@ struct msix_irq_vector *pci_msix_enable(struct pci_device *p, uint64_t vec);
 void pci_msi_mask(struct pci_device *p);
 void pci_msi_unmask(struct pci_device *p);
 void pci_msi_route(struct pci_device *p, int dest);
+void pci_msi_reset_vector(struct pci_device *p);
 void pci_msix_mask_vector(struct msix_irq_vector *linkage);
 void pci_msix_unmask_vector(struct msix_irq_vector *linkage);
 void pci_msix_route_vector(struct msix_irq_vector *linkage, int dest);
+void pci_msix_reset_vector(struct msix_irq_vector *linkage);
 
 /* TODO: this is quite the Hacke */
 #define explode_tbdf(tbdf) {pcidev.bus = tbdf >> 16;\

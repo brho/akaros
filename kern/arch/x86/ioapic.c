@@ -384,6 +384,12 @@ static void msi_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
 	pci_msi_route(irq_h->dev_private, dest);
 }
 
+static void msi_cleanup_irq(struct irq_handler *irq_h)
+{
+	pci_msi_reset_vector(irq_h->dev_private);
+	put_irq_vector(irq_h->apic_vector);
+}
+
 static void msix_mask_irq(struct irq_handler *irq_h, int apic_vector)
 {
 	pci_msix_mask_vector(irq_h->dev_private);
@@ -397,6 +403,13 @@ static void msix_unmask_irq(struct irq_handler *irq_h, int apic_vector)
 static void msix_route_irq(struct irq_handler *irq_h, int apic_vector, int dest)
 {
 	pci_msix_route_vector(irq_h->dev_private, dest);
+}
+
+static void msix_cleanup_irq(struct irq_handler *irq_h)
+{
+	pci_msix_reset_vector(irq_h->dev_private);
+	kfree(irq_h->dev_private);
+	put_irq_vector(irq_h->apic_vector);
 }
 
 static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
@@ -427,6 +440,7 @@ static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 		irq_h->mask = msi_mask_irq;
 		irq_h->unmask = msi_unmask_irq;
 		irq_h->route_irq = msi_route_irq;
+		irq_h->cleanup = msi_cleanup_irq;
 		irq_h->type = "msi";
 		printk("MSI irq: (%02x:%02x.%x): %s vector %d\n",
 			   p->bus, p->dev, p->func, irq_h->name, vno);
@@ -437,6 +451,7 @@ static int msi_irq_enable(struct irq_handler *irq_h, struct pci_device *p)
 	irq_h->mask = msix_mask_irq;
 	irq_h->unmask = msix_unmask_irq;
 	irq_h->route_irq = msix_route_irq;
+	irq_h->cleanup = msix_cleanup_irq;
 	irq_h->type = "msi-x";
 	printk("MSI-X irq: (%02x,%02x,%x): %s vector %d\n",
 	       p->bus, p->dev, p->func, irq_h->name, vno);

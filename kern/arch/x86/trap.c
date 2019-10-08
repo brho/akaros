@@ -840,7 +840,13 @@ int deregister_irq(int vector, uint32_t tbdf)
 		warn("No IRQ V: %d TBDF: %x to unregister!", vector, tbdf);
 		return -1;
 	}
+	/* Ideally, the driver should have told the device to not fire the IRQ
+	 * anymore.  If they do, we may get a warn_once.  This could be on
+	 * another core, etc. */
+	irq_h->mask(irq_h, irq_h->apic_vector);
 	synchronize_rcu();
+	if (irq_h->cleanup)
+		irq_h->cleanup(irq_h);
 	kfree(irq_h);
 	return 0;
 }

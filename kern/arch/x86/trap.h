@@ -140,6 +140,7 @@ struct irq_handler {
 	void (*mask)(struct irq_handler *irq_h, int vec);
 	void (*unmask)(struct irq_handler *irq_h, int vec);
 	void (*route_irq)(struct irq_handler *irq_h, int vec, int dest);
+	void (*cleanup)(struct irq_handler *irq_h);
 
 	int tbdf;
 	int dev_irq;

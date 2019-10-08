@@ -256,6 +256,12 @@ static uintptr_t msix_get_capbar_paddr(struct pci_device *p, int offset)
 	return membar;
 }
 
+static void __msix_reset_entry(struct msix_entry *entry)
+{
+	__msix_mask_entry(entry);
+	write_mmreg32((uintptr_t)&entry->data, 0);
+}
+
 /* One time initialization of MSI-X for a PCI device.  -1 on error.  Otherwise,
  * the device will be ready to assign/route MSI-X entries/vectors.  All vectors
  * are masked, but the overall MSI-X function is unmasked.
@@ -315,10 +321,8 @@ static int __pci_msix_init(struct pci_device *p)
 	 * likewise, we need to 0 out the data, since we'll use the lower byte
 	 * later when determining if an msix vector is free or not. */
 	entry = (struct msix_entry*)p->msix_tbl_vaddr;
-	for (int i = 0; i < p->msix_nr_vec; i++, entry++) {
-		__msix_mask_entry(entry);
-		write_mmreg32((uintptr_t)&entry->data, 0);
-	}
+	for (int i = 0; i < p->msix_nr_vec; i++, entry++)
+		__msix_reset_entry(entry);
 	/* unmask the device, now that all the vectors are masked */
 	f &= ~Msixmask;
 	pcidev_write16(p, c + 2, f);
@@ -434,6 +438,19 @@ void pci_msi_route(struct pci_device *p, int dest)
 	spin_unlock_irqsave(&p->lock);
 }
 
+void pci_msi_reset_vector(struct pci_device *p)
+{
+	/* Might be overly paranoid.  We're clearing out any old vector set in
+	 * the device. */
+	spin_lock_irqsave(&p->lock);
+	p->msi_msg_addr_lo = 0;
+	p->msi_msg_addr_hi = 0;
+	p->msi_msg_data = 0;
+	__msi_set_addr_data(p, msicap(p));
+	p->msi_ready = false;
+	spin_unlock_irqsave(&p->lock);
+}
+
 void pci_msix_mask_vector(struct msix_irq_vector *linkage)
 {
 	spin_lock_irqsave(&linkage->pcidev->lock);
@@ -455,5 +472,12 @@ void pci_msix_route_vector(struct msix_irq_vector *linkage, int dest)
 	linkage->addr_lo &= ~(((1 << 8) - 1) << 12);
 	linkage->addr_lo |= (dest & 0xff) << 12;
 	write_mmreg32((uintptr_t)&linkage->entry->addr_lo, linkage->addr_lo);
+	spin_unlock_irqsave(&linkage->pcidev->lock);
+}
+
+void pci_msix_reset_vector(struct msix_irq_vector *linkage)
+{
+	spin_lock_irqsave(&linkage->pcidev->lock);
+	__msix_reset_entry(linkage->entry);
 	spin_unlock_irqsave(&linkage->pcidev->lock);
 }
