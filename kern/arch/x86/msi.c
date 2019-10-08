@@ -140,6 +140,47 @@ static uint32_t msi_make_data(uint64_t vec)
 	return Msidmode * deliv_mode | ((unsigned int)vec & 0xff);
 }
 
+/* TODO: do we need to be careful of reserved bits?  SDM says to preserve those
+ * fields on write. */
+static void __msi_set_addr_data(struct pci_device *p, int cap)
+{
+	unsigned int f, datao;
+
+	/* read it, clear out the Mmesgmsk bits.
+	 * This means that there will be no multiple
+	 * messages enabled.
+	 */
+	f = pcidev_read16(p, cap + 2) & ~Mmesgmsk;
+
+	/* Data begins at 8 bytes in. */
+	datao = 8;
+	pcidev_write32(p, cap + 4, p->msi_msg_addr_lo);
+
+	/* And even if it's 64-bit capable, we do nothing with
+	 * the high order bits. If it is 64-bit we need to offset
+	 * datao (data offset) by 4 (i.e. another 32 bits)
+	 */
+	if (f & Cap64) {
+		datao += 4;
+		pcidev_write32(p, cap + 8, 0);
+	}
+
+	pcidev_write16(p, cap + datao, p->msi_msg_data);
+
+	/* If we have the option of masking the vectors,
+	 * blow all the masks to 0. It's a 32-bit mask.
+	 */
+	if (f & Vmask)
+		pcidev_write32(p, cap + datao + 4, 0);
+
+	/* Now write the control bits back, with the Mmesg mask (which is a
+	 * power of 2) set to 0 (meaning one vector only).  Note we still
+	 * haven't enabled MSI.  Will do that when we unmask.  According to the
+	 * spec, we're not supposed to use the Msienable bit to mask the IRQ,
+	 * though I don't see how we can mask on non-Vmask-supported HW. */
+	pcidev_write16(p, cap + 2, f);
+}
+
 /* see section 6.8.1 of the pci spec. */
 /* Set up a single function on a single device.
  * We need to take the vec, bust it up into bits,
@@ -148,7 +189,7 @@ static uint32_t msi_make_data(uint64_t vec)
  */
 int pci_msi_enable(struct pci_device *p, uint64_t vec)
 {
-	unsigned int c, f, datao;
+	unsigned int c;
 
 	spin_lock_irqsave(&p->lock);
 	if (p->msix_ready) {
@@ -156,15 +197,15 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 		spin_unlock_irqsave(&p->lock);
 		return -1;
 	}
+	/* msi_ready means "has an IRQ vector assigned, loaded, and masked".
+	 * We're only allowing one MSI vector per device.  In comparison,
+	 * msix_ready means "has all the stuff set up for MSI-X so you can get
+	 * some IRQ vector, load the msix_entry, and go." */
 	if (p->msi_ready) {
-		/* only allowing one enable of MSI per device (not supporting
-		 * multiple vectors) */
 		printk("MSI: MSI is already enabled, aborting\n");
 		spin_unlock_irqsave(&p->lock);
 		return -1;
 	}
-	p->msi_ready = TRUE;
-
 	/* Get the offset of the MSI capability in the function's config space.
 	 */
 	c = msicap(p);
@@ -172,51 +213,15 @@ int pci_msi_enable(struct pci_device *p, uint64_t vec)
 		spin_unlock_irqsave(&p->lock);
 		return -1;
 	}
-
-	/* read it, clear out the Mmesgmsk bits.
-	 * This means that there will be no multiple
-	 * messages enabled.
-	 */
-	f = pcidev_read16(p, c + 2) & ~Mmesgmsk;
-
 	if (msi_blacklist(p) != 0) {
 		spin_unlock_irqsave(&p->lock);
 		return -1;
 	}
-
-	/* Data begins at 8 bytes in. */
-	datao = 8;
 	p->msi_msg_addr_lo = msi_make_addr_lo(vec);
-	printd("Write to %d %08lx \n",c + 4, p->msi_msg_addr_lo);
-	pcidev_write32(p, c + 4, p->msi_msg_addr_lo);
-
-	/* And even if it's 64-bit capable, we do nothing with
-	 * the high order bits. If it is 64-bit we need to offset
-	 * datao (data offset) by 4 (i.e. another 32 bits)
-	 */
-	if(f & Cap64){
-		datao += 4;
-		pcidev_write32(p, c + 8, 0);
-	}
 	p->msi_msg_addr_hi = 0;
-
 	p->msi_msg_data = msi_make_data(vec);
-	printd("Write data %d %04x\n", c + datao, p->msi_msg_data);
-	pcidev_write16(p, c + datao, p->msi_msg_data);
-
-	/* If we have the option of masking the vectors,
-	 * blow all the masks to 0. It's a 32-bit mask.
-	 */
-	if(f & Vmask)
-		pcidev_write32(p, c + datao + 4, 0);
-
-	/* Now write the control bits back, with the Mmesg mask (which is a
-	 * power of 2) set to 0 (meaning one vector only).  Note we still
-	 * haven't enabled MSI.  Will do that when we unmask.  According to the
-	 * spec, we're not supposed to use the Msienable bit to mask the IRQ,
-	 * though I don't see how we can mask on non-Vmask-supported HW. */
-	printd("write @ %d %04lx\n",c + 2, f);
-	pcidev_write16(p, c + 2, f);
+	__msi_set_addr_data(p, c);
+	p->msi_ready = true;
 	spin_unlock_irqsave(&p->lock);
 	return 0;
 }
