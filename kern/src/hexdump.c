@@ -70,7 +70,8 @@ void hexdump(void *v, int length)
 /* easier in monitor */
 void pahexdump(uintptr_t pa, int len)
 {
-	void *v = KADDR(pa);
+	void *v = KADDR_NOCHECK(pa);
+
 	hexdump(v, len);
 }
 
