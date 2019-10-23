@@ -122,40 +122,17 @@ static bool handle_cpuid(struct guest_thread *gth)
 	return true;
 }
 
-static bool handle_ept_fault(struct guest_thread *gth)
+static int ept_mem_access(struct guest_thread *gth, uintptr_t gpa,
+			  unsigned long *regp, size_t size, bool store)
 {
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 	struct virtual_machine *vm = gth_to_vm(gth);
-	uint64_t gpa, *regp;
-	uint8_t regx;
-	int store, size;
-	int advance;
-	int ret;
 
-	if (vm_tf->tf_flags & VMCTX_FL_EPT_VMR_BACKED) {
-		ret = ros_syscall(SYS_populate_va, vm_tf->tf_guest_pa, 1, 0, 0,
-				  0, 0);
-		if (ret <= 0)
-			panic("[user] handle_ept_fault: populate_va failed: ret = %d\n",
-			      ret);
-		return TRUE;
-	}
-	ret = decode(gth, &gpa, &regx, &regp, &store, &size, &advance);
-
-	if (ret < 0)
-		return FALSE;
-	if (ret == VM_PAGE_FAULT) {
-		/* We were unable to translate RIP due to an ept fault */
-		vm_tf->tf_trap_inject = VM_TRAP_VALID
-		                      | VM_TRAP_ERROR_CODE
-		                      | VM_TRAP_HARDWARE
-		                      | HW_TRAP_PAGE_FAULT;
-		return TRUE;
-	}
-
-	assert(size >= 0);
 	/* TODO use helpers for some of these addr checks.  the fee/fec ones
-	 * might be wrong too. */
+	 * might be wrong too.
+	 *
+	 * Also consider adding checks to make sure the entire access (gpa +
+	 * size) is within the page / segment / region. */
 	for (int i = 0; i < VIRTIO_MMIO_MAX_NUM_DEV; i++) {
 		if (vm->virtio_mmio_devices[i] == NULL)
 			continue;
@@ -163,17 +140,19 @@ static bool handle_ept_fault(struct guest_thread *gth)
 			continue;
 		/* TODO: can the guest cause us to spawn off infinite threads?
 		 */
+		/* TODO: regp often gets cast in virtio_mmio_wr, but not always.
+		 * We probably don't need this assert or the u32* cast below. */
+		assert(size <= 4);
 		if (store)
 			virtio_mmio_wr(vm, vm->virtio_mmio_devices[i], gpa,
 				       size, (uint32_t *)regp);
 		else
 			*regp = virtio_mmio_rd(vm, vm->virtio_mmio_devices[i],
 					       gpa, size);
-		vm_tf->tf_rip += advance;
-		return TRUE;
+		return 0;
 	}
 	if (PG_ADDR(gpa) == 0xfec00000) {
-		do_ioapic(gth, gpa, regx, regp, store);
+		do_ioapic(gth, gpa, regp, store);
 	} else if (PG_ADDR(gpa) == 0) {
 		memmove(regp, &vm->low4k[gpa], size);
 	} else {
@@ -184,10 +163,51 @@ static bool handle_ept_fault(struct guest_thread *gth)
 		showstatus(stderr, gth);
 		/* Just fill the whole register for now. */
 		*regp = (uint64_t) -1;
-		return FALSE;
+		return -1;
 	}
+	return 0;
+}
+
+
+static bool handle_ept_fault(struct guest_thread *gth)
+{
+	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
+	struct virtual_machine *vm = gth_to_vm(gth);
+	uint64_t gpa, *regp;
+	uint8_t regx;
+	bool store;
+	int size;
+	int advance;
+	int ret;
+	uint8_t insn[VMM_MAX_INSN_SZ];
+
+	if (vm_tf->tf_flags & VMCTX_FL_EPT_VMR_BACKED) {
+		ret = ros_syscall(SYS_populate_va, vm_tf->tf_guest_pa, 1, 0, 0,
+				  0, 0);
+		if (ret <= 0)
+			panic("[user] handle_ept_fault: populate_va failed: ret = %d\n",
+			      ret);
+		return TRUE;
+	}
+	/* TODO: consider pushing the PF stuff into fetch, since rippa has a
+	 * bunch of callers.  Though we'll still need to know to return true to
+	 * restart the guest, instead of killing them with e.g. a failed emu. */
+	if (fetch_insn(gth, insn)) {
+		/* We were unable to translate RIP due to an ept fault */
+		vm_tf->tf_trap_inject = VM_TRAP_VALID
+		                      | VM_TRAP_ERROR_CODE
+		                      | VM_TRAP_HARDWARE
+		                      | HW_TRAP_PAGE_FAULT;
+		return true;
+	}
+	ret = emulate_mem_insn(gth, insn, ept_mem_access, &advance);
+	if (ret < 0) {
+		fprintf(stderr, "emulate failed!\n");
+		return false;
+	}
+
 	vm_tf->tf_rip += advance;
-	return TRUE;
+	return true;
 }
 
 static bool handle_vmcall_printc(struct guest_thread *gth)
@@ -353,13 +373,20 @@ static bool handle_apic_access(struct guest_thread *gth)
 {
 	uint64_t gpa, *regp;
 	uint8_t regx;
-	int store, size;
+	bool store;
+	int size;
 	int advance;
+	uint8_t insn[VMM_MAX_INSN_SZ];
 	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 
-	if (decode(gth, &gpa, &regx, &regp, &store, &size, &advance))
-		return FALSE;
-	if (__apic_access(gth, gpa, regx, regp, store))
+	if (fetch_insn(gth, insn)) {
+		vm_tf->tf_trap_inject = VM_TRAP_VALID
+		                      | VM_TRAP_ERROR_CODE
+		                      | VM_TRAP_HARDWARE
+		                      | HW_TRAP_PAGE_FAULT;
+		return true;
+	}
+	if (emulate_mem_insn(gth, insn, __apic_access, &advance))
 		return FALSE;
 	vm_tf->tf_rip += advance;
 	return TRUE;

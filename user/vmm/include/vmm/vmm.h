@@ -87,20 +87,25 @@ struct elf_aux {
 	unsigned long v[2];
 };
 
-char *regname(uint8_t reg);
-int decode(struct guest_thread *vm_thread, uint64_t *gpa, uint8_t *destreg,
-           uint64_t **regp, int *store, int *size, int *advance);
+/* TODO: x86-specific */
+#define VMM_MAX_INSN_SZ 15
+typedef int (*emu_mem_access)(struct guest_thread *gth, uintptr_t gpa,
+			      unsigned long *regp, size_t size,
+			      bool store);
+int emulate_mem_insn(struct guest_thread *gth, uint8_t *insn,
+		     emu_mem_access access, int *advance);
 int io(struct guest_thread *vm_thread);
 void showstatus(FILE *f, struct guest_thread *vm_thread);
 int gva2gpa(struct guest_thread *vm_thread, uint64_t va, uint64_t *pa);
 int rippa(struct guest_thread *vm_thread, uint64_t *pa);
+int fetch_insn(struct guest_thread *gth, uint8_t *insn);
 int msrio(struct guest_thread *vm_thread, struct vmm_gpcore_init *gpci,
           uint32_t opcode);
-int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa,
-              int destreg, uint64_t *regp, int store);
+int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa, uint64_t *regp,
+	      bool store);
 bool handle_vmexit(struct guest_thread *gth);
-int __apic_access(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
-                  uint64_t *regp, int store);
+int __apic_access(struct guest_thread *gth, uint64_t gpa, uint64_t *regp,
+		  size_t size, bool store);
 int vmm_interrupt_guest(struct virtual_machine *vm, unsigned int gpcoreid,
                         unsigned int vector);
 uintptr_t load_elf(char *filename, uint64_t offset, uint64_t *highest,

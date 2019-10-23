@@ -141,14 +141,14 @@ static void ioapic_write(struct guest_thread *vm_thread, int ix,
 
 }
 
-int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
-              uint64_t *regp, int store)
+int do_ioapic(struct guest_thread *vm_thread, uint64_t gpa,
+	      uint64_t *regp, bool store)
 {
 	/* TODO(ganshun): compute an index for the ioapic array. */
 	int ix = 0;
 	uint32_t offset = gpa & 0xfffff;
 	/* basic sanity tests. */
-	DPRINTF("%s: %p 0x%x %p %s\n", __func__, (void *)gpa, destreg, regp,
+	DPRINTF("%s: %p %p %s\n", __func__, (void *)gpa, regp,
 		store ? "write" : "read");
 
 	if ((offset != 0) && (offset != 0x10)) {

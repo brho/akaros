@@ -168,8 +168,8 @@ static void apic_write(uint64_t offset, uint32_t value)
 
 }
 
-int __apic_access(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
-                  uint64_t *regp, int store)
+int __apic_access(struct guest_thread *gth, uint64_t gpa, uint64_t *regp,
+		  size_t size, bool store)
 {
 	uint32_t offset = gpa & 0xfffff;
 	/* basic sanity tests. */
@@ -192,12 +192,8 @@ int __apic_access(struct guest_thread *vm_thread, uint64_t gpa, int destreg,
 
 	if (store) {
 		apic_write(offset, *regp);
-		DPRINTF("Write: mov %s to %s @%p val %p\n", regname(destreg),
-			apicregs[offset].name, gpa, *regp);
 	} else {
 		*regp = apic_read(offset);
-		DPRINTF("Read: Set %s from %s @%p to %p\n", regname(destreg),
-			apicregs[offset].name, gpa, *regp);
 	}
 	return 0;
 }

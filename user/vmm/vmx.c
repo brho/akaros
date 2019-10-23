@@ -80,3 +80,16 @@ int rippa(struct guest_thread *vm_thread, uint64_t *pa)
 	assert(vm_thread != NULL);
 	return gva2gpa(vm_thread, gth_to_vmtf(vm_thread)->tf_rip, pa);
 }
+
+int fetch_insn(struct guest_thread *gth, uint8_t *insn)
+{
+	uint64_t rip_gpa;
+
+	/* TODO: this will break if an instruction crosses a page boundary where
+	 * the adjacent pages do not map to guest-physically contiguous pages.
+	 * All callers of rippa() have this problem. */
+	if (rippa(gth, &rip_gpa))
+		return -1;
+	memcpy(insn, (void*)rip_gpa, VMM_MAX_INSN_SZ);
+	return 0;
+}
