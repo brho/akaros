@@ -248,7 +248,8 @@ void pci_init(void)
 						break;
 					continue;
 				}
-				pcidev = kzmalloc(sizeof(struct pci_device), 0);
+				pcidev = kzmalloc(sizeof(struct pci_device),
+						  MEM_WAIT);
 				/* we don't need to lock it til we post the
 				 * pcidev to the list*/
 				spinlock_init_irqsave(&pcidev->lock);
