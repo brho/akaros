@@ -137,6 +137,10 @@ static void __pci_handle_bars(struct pci_device *pcidev)
 					bar_val & PCI_BAR_MEM_MASK;
 				pcidev->bar[i].mmio_sz =
 					__pci_membar_get_sz(pcidev, i);
+				pcidev->bar[i].mmio_kva =
+					(void*)vmap_pmem_nocache(
+						pcidev->bar[i].mmio_base32,
+						pcidev->bar[i].mmio_sz);
 			} else if (pci_is_membar64(bar_val)) {
 				/* 64 bit, the lower 32 are in this bar, the
 				 * upper are in the next bar */
@@ -152,6 +156,10 @@ static void __pci_handle_bars(struct pci_device *pcidev)
 					(uint64_t)bar_val << 32;
 				pcidev->bar[i].mmio_sz =
 					__pci_membar_get_sz(pcidev, i);
+				pcidev->bar[i].mmio_kva =
+					(void*)vmap_pmem_nocache(
+						pcidev->bar[i].mmio_base64,
+						pcidev->bar[i].mmio_sz);
 				i++;
 			}
 		}

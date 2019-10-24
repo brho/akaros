@@ -574,7 +574,6 @@ static struct ctlrtype ctlrtab[Nctlrtype] = {
 };
 
 struct ctlr {
-	uintptr_t mmio_paddr;
 	struct pci_device *pcidev;
 	struct ctlr *next;
 	struct ether *edev;
@@ -1901,13 +1900,10 @@ static int fload(struct ctlr *ctlr)
 {
 	uint32_t data, r, adr;
 	uint16_t sum;
-	uintptr_t mmio_paddr;
 	struct pci_device *pcidev = ctlr->pcidev;
 	struct flash f;
 
-	mmio_paddr = pcidev->bar[1].mmio_base32 ? pcidev->bar[1].mmio_base32
-	                                        : pcidev->bar[1].mmio_base64;
-	f.reg = (void *)vmap_pmem(mmio_paddr, pcidev->bar[1].mmio_sz);
+	f.reg = pci_get_mmio_bar_kva(pcidev, 1);
 	if (f.reg == NULL)
 		return -1;
 	f.reg32 = (void *)f.reg;
@@ -1925,7 +1921,6 @@ static int fload(struct ctlr *ctlr)
 		ctlr->eeprom[adr] = data;
 		sum += data;
 	}
-	vunmap_vmem((uintptr_t)f.reg, pcidev->bar[1].mmio_sz);
 	return sum;
 }
 
@@ -2015,7 +2010,6 @@ macset:
 static void i82563pci(void)
 {
 	int type;
-	uintptr_t io;
 	void *mem;
 	struct pci_device *p;
 	struct ctlr *ctlr;
@@ -2140,19 +2134,14 @@ static void i82563pci(void)
 			break;
 		}
 
-		io = p->bar[0].mmio_base32 ? p->bar[0].mmio_base32
-		                           : p->bar[0].mmio_base64;
-		mem = (void *)vmap_pmem(io, p->bar[0].mmio_sz);
+		mem = pci_get_mmio_bar_kva(p, 0);
 		if (mem == NULL) {
-			printd("%s: can't map %.8lux\n", tname[type], io);
+			printd("%s: can't map bar 0!\n", tname[type]);
 			continue;
 		}
 		ctlr = kzmalloc(sizeof(struct ctlr), 0);
-		if (ctlr == NULL) {
-			vunmap_vmem((uintptr_t)mem, p->bar[0].mmio_sz);
+		if (ctlr == NULL)
 			error(ENOMEM, "i82563pci: alloc for ctlr failed");
-		}
-		ctlr->mmio_paddr = io;
 		ctlr->rbsz = ctlrtab[type].mtu;
 		ctlr->pcidev = p;
 		ctlr->type = type;
@@ -2169,7 +2158,6 @@ static void i82563pci(void)
 
 		pci_set_bus_master(p);
 		if (i82563reset(ctlr)) {
-			vunmap_vmem((uintptr_t)mem, p->bar[0].mmio_sz);
 			kfree(ctlr);
 			continue;
 		}
@@ -2194,14 +2182,15 @@ static int pnp(struct ether *edev, int type)
 
 	/*
 	 * Any adapter matches if no edev->port is supplied,
-	 * otherwise the ports must match.
+	 * otherwise the ports must match.  Using the 'NIC', which is BAR0's
+	 * unique KVA, for identification.
 	 */
 	for (ctlr = i82563ctlrhead; ctlr != NULL; ctlr = ctlr->next) {
 		if (ctlr->active)
 			continue;
 		if (type != Iany && ctlr->type != type)
 			continue;
-		if (edev->port == 0 || edev->port == ctlr->mmio_paddr) {
+		if (edev->port == 0 || edev->port == (uintptr_t)ctlr->nic) {
 			ctlr->active = 1;
 			break;
 		}
@@ -2212,7 +2201,7 @@ static int pnp(struct ether *edev, int type)
 	edev->ctlr = ctlr;
 	strlcpy(edev->drv_name, "i82563", KNAMELEN);
 	ctlr->edev = edev; /* point back to Ether* */
-	edev->port = ctlr->mmio_paddr;
+	edev->port = (uintptr_t)ctlr->nic;
 	edev->irq = ctlr->pcidev->irqline;
 	edev->tbdf = pci_to_tbdf(ctlr->pcidev);
 	edev->mbps = 1000;

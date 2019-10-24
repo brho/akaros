@@ -176,9 +176,6 @@ struct ctlr {
 	void *mmio;
 	void *hba;
 
-	/* phyical register address */
-	uintptr_t physio;
-
 	struct drive *rawdrive;
 	struct drive *drive[NCtlrdrv];
 	int ndrive;
@@ -2180,9 +2177,8 @@ static int newctlr(struct ctlr *ctlr, struct sdev *sdev, int nunit)
 	ctlr->mport = h_cap & ((1 << 5) - 1);
 
 	i = (h_cap >> 20) & ((1 << 4) - 1); /* iss */
-	printk("#S/sd%c: %s: %#p %s, %d ports, irq %d\n", sdev->idno,
-	       Tname(ctlr), ctlr->physio, descmode[i], nunit,
-	       ctlr->pci->irqline);
+	printk("#S/sd%c: %s: %s, %d ports, irq %d\n", sdev->idno,
+	       Tname(ctlr), descmode[i], nunit, ctlr->pci->irqline);
 	/* map the drives -- they don't all need to be enabled. */
 	n = 0;
 	ctlr->rawdrive = kzmalloc(NCtlrdrv * sizeof(struct drive), 0);
@@ -2246,6 +2242,8 @@ static struct sdev *iapnp(void)
 			continue;
 		printd("ahci: %s: ven_id=0x%04x, dev_id=0x%04x, didtype=%d\n",
 		       __func__, p->ven_id, p->dev_id, type);
+		/* TODO: hokey - can this not handle a 64 bit BAR, but the
+		 * device might provide one?  Or it just hokey code? */
 		if (p->bar[Abar].mmio_base32 == 0)
 			continue;
 		if (niactlr == NCtlr) {
@@ -2260,17 +2258,13 @@ static struct sdev *iapnp(void)
 		kref_init(&s->r, releasedrive, 1);
 		qlock_init(&s->ql);
 		qlock_init(&s->unitlock);
-		c->physio = p->bar[Abar].mmio_base32 & ~0xf;
-		c->mmio =
-		    (void *)vmap_pmem_nocache(c->physio, p->bar[Abar].mmio_sz);
 		spinlock_init_irqsave(&c->Lock);
+		c->mmio = pci_get_mmio_bar_kva(p, Abar);
 		if (c->mmio == 0) {
-			printk("ahci: %s: address %#lX in use did=%#x\n",
-			       Tname(c), c->physio, p->dev_id);
+			printk("ahci: %s: could not map bar %d did=%#x\n",
+			       Tname(c), Abar, p->dev_id);
 			continue;
 		}
-		printk("sdiahci %s: Mapped %p/%d to %p\n", tname[type],
-		       c->physio, p->bar[Abar].mmio_sz, c->mmio);
 		c->pci = p;
 		c->type = type;
 
@@ -2285,10 +2279,8 @@ static struct sdev *iapnp(void)
 		// ahcihbareset((void *)c->mmio);
 		if (Intel(c) && iaahcimode(p) == -1)
 			break;
-		if (nunit < 1) {
-			vunmap_vmem((uintptr_t)c->mmio, p->bar[Abar].mmio_sz);
+		if (nunit < 1)
 			continue;
-		}
 		n = newctlr(c, s, nunit);
 		if (n < 0)
 			continue;
@@ -2543,7 +2535,7 @@ static char *iartopctl(struct sdev *sdev, char *p, char *e)
 
 	ctlr = sdev->ctlr;
 	hba = ctlr->hba;
-	p = seprintf(p, e, "sd%c ahci port %#p: ", sdev->idno, ctlr->physio);
+	p = seprintf(p, e, "sd%c ahci: ", sdev->idno);
 	cap = ahci_hba_read32(hba, HBA_CAP);
 	has(Hs64a, "64a");
 	has(Hsalp, "alp");

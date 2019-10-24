@@ -164,6 +164,7 @@ struct pci_bar {
 	uint32_t			mmio_base32;
 	uint64_t			mmio_base64;
 	uint32_t			mmio_sz;
+	void				*mmio_kva;
 };
 
 struct pci_device {
@@ -268,6 +269,7 @@ int pci_set_mwi(struct pci_device *dev);
 void pci_clear_mwi(struct pci_device *dev);
 static inline void pci_set_drvdata(struct pci_device *pcidev, void *data);
 static inline void *pci_get_drvdata(struct pci_device *pcidev);
+static inline void *pci_get_mmio_bar_kva(struct pci_device *pdev, int bar);
 
 /* MSI functions, msi.c */
 int pci_msi_enable(struct pci_device *p, uint64_t vec);
@@ -295,4 +297,9 @@ static inline void pci_set_drvdata(struct pci_device *pcidev, void *data)
 static inline void *pci_get_drvdata(struct pci_device *pcidev)
 {
 	return pcidev->dev_data;
+}
+
+static inline void *pci_get_mmio_bar_kva(struct pci_device *pdev, int bir)
+{
+	return pdev->bar[bir].mmio_kva;
 }

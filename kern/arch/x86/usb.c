@@ -29,11 +29,12 @@ static void ehci_disable_leg(struct pci_device *pcidev)
 	int i, ptr, cap, sem;
 
 	//ptr = (ctlr->capio->capparms >> Ceecpshift) & Ceecpmask;
-	uintptr_t bar0 = pci_get_membar(pcidev, 0);
-	assert(bar0);
-	uintptr_t ehci_hcc_regs = vmap_pmem_nocache(bar0,
-						    pcidev->bar[0].mmio_sz);
-	uint32_t hccparams = read_mmreg32(ehci_hcc_regs + 0x08);
+	uintptr_t ehci_hcc_regs;
+	uint32_t hccparams;
+
+	ehci_hcc_regs = (uintptr_t)pci_get_mmio_bar_kva(pcidev, 0);
+	assert(ehci_hcc_regs);
+	hccparams = read_mmreg32(ehci_hcc_regs + 0x08);
 
 	ptr = (hccparams >> 8) & ((1 << 8) - 1);
 
@@ -71,13 +72,12 @@ static void ehci_disable_leg(struct pci_device *pcidev)
 
 static void xhci_disable_leg(struct pci_device *pcidev)
 {
-	uintptr_t bar0, xhci_hcc_regs, xecp;
+	uintptr_t xhci_hcc_regs, xecp;
 	uint32_t hccparams, val;
 	int i;
 
-	bar0 = pci_get_membar(pcidev, 0);
-	assert(bar0);
-	xhci_hcc_regs = vmap_pmem_nocache(bar0, pcidev->bar[0].mmio_sz);
+	xhci_hcc_regs = (uintptr_t)pci_get_mmio_bar_kva(pcidev, 0);
+	assert(xhci_hcc_regs);
 	hccparams = read_mmreg32(xhci_hcc_regs + 0x10);
 	xecp = (hccparams >> 16) & 0xffff;
 

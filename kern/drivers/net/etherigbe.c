@@ -1912,7 +1912,6 @@ static void igbepci(void)
 	struct pci_device *pcidev;
 	struct ctlr *ctlr;
 	void *mem;
-	uintptr_t mmio_paddr;
 
 	STAILQ_FOREACH (pcidev, &pci_devices, all_dev) {
 		/* This checks that pcidev is a Network Controller for Ethernet
@@ -1945,22 +1944,15 @@ static void igbepci(void)
 		       pcidev->ven_id, pcidev->dev_id, pcidev->bus, pcidev->dev,
 		       pcidev->func);
 
-		mmio_paddr = pcidev->bar[0].mmio_base32
-		                 ? pcidev->bar[0].mmio_base32
-		                 : pcidev->bar[0].mmio_base64;
-		mem = (void *)vmap_pmem_nocache(mmio_paddr,
-		                                pcidev->bar[0].mmio_sz);
+		mem = pci_get_mmio_bar_kva(pcidev, 0);
 		if (mem == NULL) {
-			printd("igbe: can't map %p\n",
-			       pcidev->bar[0].mmio_base32);
+			printd("igbe: can't map BAR 0!\n");
 			continue;
 		}
 		pci_set_cacheline_size(pcidev);
 		ctlr = kzmalloc(sizeof(struct ctlr), 0);
-		if (ctlr == NULL) {
-			vunmap_vmem((uintptr_t)mem, pcidev->bar[0].mmio_sz);
+		if (ctlr == NULL)
 			error(ENOMEM, ERROR_FIXME);
-		}
 		spinlock_init_irqsave(&ctlr->imlock);
 		spinlock_init_irqsave(&ctlr->tlock);
 		qlock_init(&ctlr->alock);
@@ -1978,7 +1970,6 @@ static void igbepci(void)
 
 		if (igbereset(ctlr)) {
 			kfree(ctlr);
-			vunmap_vmem((uintptr_t)mem, pcidev->bar[0].mmio_sz);
 			continue;
 		}
 		pci_set_bus_master(pcidev);

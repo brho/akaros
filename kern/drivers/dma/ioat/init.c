@@ -1425,14 +1425,9 @@ static int ioat_pci_probe(struct pci_device *pdev,
 	if (err)
 		return err;
 #else
-	/* TODO: Make a bar-mapping helper, similar to Linux.  Given BAR id,
-	 * vmap it, and put it's info in a table. */
 	void *bar;
 
-	bar = (void*)vmap_pmem_nocache(pdev->bar[0].mmio_base32
-				       ? pdev->bar[0].mmio_base32 :
-				        pdev->bar[0].mmio_base64,
-				       pdev->bar[0].mmio_sz);
+	bar = pci_get_mmio_bar_kva(pdev, 0);
 	iomap = &bar;
 #endif
 

@@ -63,8 +63,6 @@
 struct dev                cbdmadevtab;
 static struct pci_device  *pci;
 static void               *mmio;
-static uint64_t           mmio_phy; /* physical addr */
-static uint32_t           mmio_sz;
 static uint8_t            chancnt; /* Total number of channels per function */
 static bool               iommu_enabled;
 static bool               cbdma_break_loop; /* toggle_foo functionality */
@@ -494,8 +492,6 @@ static struct sized_alloc *open_stats(void)
 	sza_printf(sza, "    Driver Information:\n");
 	sza_printf(sza,
 		"\tmmio: %p\n"
-		"\tmmio_phy: 0x%x\n"
-		"\tmmio_sz: %lu\n"
 		"\ttotal_channels: %d\n"
 		"\tdesc_kaddr: %p\n"
 		"\tdesc_paddr: %p\n"
@@ -504,7 +500,7 @@ static struct sized_alloc *open_stats(void)
 		"\tstatus_kaddr: %p\n"
 		"\tstatus_paddr: %p\n"
 		"\tstatus_value: 0x%x\n",
-		mmio, mmio_phy, mmio_sz, chancnt,
+		mmio, chancnt,
 		channel0.pdesc, PADDR(channel0.pdesc), channel0.ndesc,
 		channel0.ver, channel0.status, PADDR(channel0.status),
 		*(uint64_t *)channel0.status);
@@ -861,7 +857,6 @@ void cbdmainit(void)
 	/* assigning global variables */
 	pci             = NULL;
 	mmio            = NULL;
-	mmio_sz         = -1;
 
 	/* initialize cbdmadev */
 	memset(&cbdmadev, 0x0, sizeof(cbdmadev));
@@ -890,24 +885,14 @@ void cbdmainit(void)
 
 	/* search and find the mapped mmio region */
 	for (i = 0; i < COUNT_OF(pci->bar); i++) {
-		if (pci->bar[i].mmio_sz == 0)
+		mmio = pci_get_mmio_bar_kva(pci, i);
+		if (!mmio)
 			continue;
-		mmio_phy = (pci->bar[0].mmio_base32
-			 ? pci->bar[0].mmio_base32
-			 : pci->bar[0].mmio_base64);
-		mmio_sz  = pci->bar[i].mmio_sz;
-		mmio     = (void *) vmap_pmem_nocache(mmio_phy, mmio_sz);
 		break;
 	}
 
-	/* handle any errors */
-	if (mmio_sz == -1) {
-		printk("cbdma: invalid mmio_sz\n");
-		return;
-	}
-
 	if (mmio == NULL) {
-		printk("cbdma: cannot map %p\n", mmio_phy);
+		printk("cbdma: cannot map any bars!\n");
 		return;
 	}
 
@@ -919,9 +904,9 @@ void cbdmainit(void)
 
 	/* initialization successful; print stats */
 	printk("cbdma: registered [%x:%x] at %02x:%02x.%x // "
-	       "mmio:%p mmio_sz:%lu\n",
+	       "mmio:%p\n",
 	       pci->ven_id, pci->dev_id, pci->bus, pci->dev, pci->func,
-	       mmio, mmio_sz);
+	       mmio);
 
 	tbdf = MKBUS(BusPCI, pci->bus, pci->dev, pci->func);
 	register_irq(pci->irqline, cbdma_interrupt, NULL, tbdf);
