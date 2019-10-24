@@ -255,6 +255,7 @@ void pci_clr_bus_master(struct pci_device *pcidev);
 struct pci_device *pci_match_tbdf(int tbdf);
 uintptr_t pci_get_membar(struct pci_device *pcidev, int bir);
 uintptr_t pci_get_iobar(struct pci_device *pcidev, int bir);
+bool pci_bar_is_mem32(struct pci_device *pdev, int bar);
 uint32_t pci_get_membar_sz(struct pci_device *pcidev, int bir);
 uint16_t pci_get_vendor(struct pci_device *pcidev);
 uint16_t pci_get_device(struct pci_device *pcidev);

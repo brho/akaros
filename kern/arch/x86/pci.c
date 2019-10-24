@@ -678,6 +678,13 @@ uintptr_t pci_get_iobar(struct pci_device *pcidev, int bir)
 	return 0;
 }
 
+bool pci_bar_is_mem32(struct pci_device *pdev, int bir)
+{
+	if (bir >= pdev->nr_bars)
+		return false;
+	return pci_is_membar32(pdev->bar[bir].raw_bar);
+}
+
 uint32_t pci_get_membar_sz(struct pci_device *pcidev, int bir)
 {
 	if (bir >= pcidev->nr_bars)

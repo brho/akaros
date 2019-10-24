@@ -2242,10 +2242,13 @@ static struct sdev *iapnp(void)
 			continue;
 		printd("ahci: %s: ven_id=0x%04x, dev_id=0x%04x, didtype=%d\n",
 		       __func__, p->ven_id, p->dev_id, type);
-		/* TODO: hokey - can this not handle a 64 bit BAR, but the
-		 * device might provide one?  Or it just hokey code? */
-		if (p->bar[Abar].mmio_base32 == 0)
+		/* Not sure if this check matters, or if it was code cruft.
+		 * Why wouldn't a 64 bit BAR work? */
+		if (!pci_bar_is_mem32(p, Abar)) {
+			printk("ahci: bar %d was not 'mem32' - aborting\n",
+			       Abar);
 			continue;
+		}
 		if (niactlr == NCtlr) {
 			printk("ahci: iapnp: %s: too many controllers\n",
 			       tname[type]);
