@@ -439,17 +439,24 @@ int ioat_dma_setup_interrupts(struct ioatdma_device *ioat_dma)
 		irq_h = register_irq(0 /* ignored for msi(x)! */,
 				     ioat_dma_do_interrupt_msix, ioat_chan,
 				     pci_to_tbdf(pdev));
-		/* TODO: this is a mess - we also don't know if we're actually
-		 * MSIX or not!  We don't even know our vector... */
 		if (!irq_h) {
-			warn("MSIX failed (cnt %d), leaking vectors etc!", i);
+			warn("MSIX setup failed (cnt %d)!", i);
 			for (j = 0; j < i; j++) {
 				msix = &ioat_dma->msix_entries[j];
 				ioat_chan = ioat_chan_by_index(ioat_dma, j);
-				//devm_free_irq(dev, msix->vector, ioat_chan);
+				deregister_irq(msix->vector, pci_to_tbdf(pdev));
 			}
 			goto err_no_irq;
 		}
+		/* TODO: this is ugly.  Though really we need register_irq() to
+		 * not fallback on its own here.  This case here is when we did
+		 * get an irq_h, but it wasn't the type we wanted, and this
+		 * driver has different IRQ handlers for different types. */
+		if (strcmp("msi-x", irq_h->type)) {
+			warn("IRQ setup didn't get an MSIX!");
+			goto err_no_irq;
+		}
+		msix->vector = irq_h->apic_vector;
 	}
 	intrctrl |= IOAT_INTRCTRL_MSIX_VECTOR_CONTROL;
 	ioat_dma->irq_mode = IOAT_MSIX;
@@ -1459,26 +1466,6 @@ static int ioat_pci_probe(struct pci_device *pdev,
 	return 0;
 }
 
-/* In lieu of a decent PCI processing system... */
-static void __init ioat_init(void)
-{
-	struct pci_device *p;
-
-	STAILQ_FOREACH(p, &pci_devices, all_dev) {
-		if (p->ven_id != PCI_VENDOR_ID_INTEL)
-			continue;
-		for (int i = 0; ioat_pci_tbl[i].device; i++) {
-			if (p->dev_id == ioat_pci_tbl[i].device) {
-				ioat_pci_probe(p, &ioat_pci_tbl[i]);
-				break;
-			}
-		}
-	}
-}
-/* The 'arch_initcall' setup functions run at level 2. */
-init_func_3(ioat_init);
-
-#if 0 // AKAROS
 static void ioat_remove(struct pci_device *pdev)
 {
 	struct ioatdma_device *device = pci_get_drvdata(pdev);
@@ -1488,15 +1475,133 @@ static void ioat_remove(struct pci_device *pdev)
 
 	dev_err(&pdev->linux_dev, "Removing dma and dca services\n");
 	if (device->dca) {
+#if 0 // AKAROS
 		unregister_dca_provider(device->dca, &pdev->linux_dev);
 		free_dca_provider(device->dca);
+#else
+		warn("Unexpected dca on PCI %x:%x.%x", pdev->bus, pdev->dev,
+		     pdev->func);
+#endif
 		device->dca = NULL;
 	}
 
 	pci_disable_pcie_error_reporting(pdev);
 	ioat_dma_remove(device);
 }
-#endif
+
+/* TODO (DEVM): Akaros doesn't do the 'managed' part of devm_kzalloc and
+ * friends.  This helper will cleanup the things I noticed that were alloced
+ * in this manner.  This was made manually, so YMMV.
+ *
+ * Note that dmaengine.c has a dmam_device_release set up that calls
+ * dma_async_device_unregister, but this driver doesn't use the 'managed'
+ * dmaenginem_async_device_register(). */
+static void devm_cleanup(struct pci_device *pdev)
+{
+	struct ioatdma_device *ioat_dma = pci_get_drvdata(pdev);
+	struct ioatdma_chan *ioat_chan;
+
+	if (!ioat_dma)
+		return;
+	pci_set_drvdata(pdev, NULL);
+	for (int i = 0; i < IOAT_MAX_CHANS; i++) {
+		ioat_chan = ioat_dma->idx[i];
+		if (!ioat_chan)
+			continue;
+		kfree(ioat_chan);
+	}
+	kfree(ioat_dma);
+}
+
+/* TODO (DEVM): Akaros doesn't do any of the 'managed' pci/dev stuff, so we'll
+ * have to free things if probe fails. */
+static int ioat_pci_probe_wrapper(struct pci_device *pdev,
+				  const struct pci_device_id *id)
+{
+	int ret;
+
+	ret = ioat_pci_probe(pdev, id);
+	if (ret < 0) {
+		devm_cleanup(pdev);
+		/* Might be a bug in the linux driver, but there are error paths
+		 * that happen after BME is set. */
+		pci_clr_bus_master(pdev);
+	}
+	return ret;
+}
+
+/* In lieu of a decent PCI processing system... */
+static bool ioat_pci_init(struct pci_device *pdev)
+{
+	const struct pci_device_id *pci_id;
+
+	pci_id = srch_linux_pci_tbl(ioat_pci_tbl, pdev);
+	if (!pci_id)
+		return false;
+	if (ioat_pci_probe_wrapper(pdev, pci_id) < 0)
+		return false;
+	return true;
+}
+
+/* We have support to stop individual IRQs, but the device is still somewhat
+ * initialized from a PCI perspective.  It's not torn down completely:
+ *
+ * We do:
+ * - Turn off and free specific MSI-X vectors.
+ * - Deregister and free the IRQ handler
+ * - Clear bus master enabled
+ * We do not:
+ * - Tear down pci_msi stuff, which is managed by the PCI layer.  Like the msix
+ *   table, or the msix_ready flag
+ * - Tear down the BAR mmio mappings.  Those are managed by the PCI layer.
+ */
+static bool ioat_pci_reset(struct pci_device *pdev)
+{
+	struct ioatdma_device *ioat_dma = pci_get_drvdata(pdev);
+	int msixcnt = ioat_dma->dma_dev.chancnt;
+	struct msix_entry *msix;
+
+	ioat_shutdown(pdev);
+	ioat_remove(pdev);
+
+	/* Assuming MSIX, which is enforced elsewhere.
+	 *
+	 * In Linux, devm resources are freed in reverse order, so the IRQs are
+	 * freed before the channels are freed.
+	 *
+	 * I'm a little reluctant to do this in devm_cleanup, since probe
+	 * failures clean up their own IRQs already.  (Or at least warn if they
+	 * need to. */
+	for (int i = 0; i < msixcnt; i++) {
+		msix = &ioat_dma->msix_entries[i];
+		deregister_irq(msix->vector, pci_to_tbdf(pdev));
+	}
+	devm_cleanup(pdev);
+	pci_clr_bus_master(pdev);
+	return true;
+}
+
+static struct pci_ops ioat_pci_ops = {
+	.driver_name	= "ioat",
+	.init		= ioat_pci_init,
+	.reset		= ioat_pci_reset,
+};
+
+static void __init ioat_init(void)
+{
+	struct pci_device *p;
+	const struct pci_device_id *pci_id;
+
+	STAILQ_FOREACH(p, &pci_devices, all_dev) {
+		if (p->ven_id != PCI_VENDOR_ID_INTEL)
+			continue;
+		if (ioat_pci_init(p))
+			pci_set_ops(p, &ioat_pci_ops,
+				    DEV_STATE_ASSIGNED_KERNEL);
+	}
+}
+/* The 'arch_initcall' setup functions run at level 2. */
+init_func_3(ioat_init);
 
 static int __init ioat_init_module(void)
 {
