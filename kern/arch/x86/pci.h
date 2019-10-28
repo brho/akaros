@@ -9,6 +9,7 @@
 #include <ros/common.h>
 #include <sys/queue.h>
 #include <atomic.h>
+#include <kthread.h>
 #include <arch/pci_regs.h>
 
 #define pci_debug(...)  printk(__VA_ARGS__)
@@ -167,15 +168,62 @@ struct pci_bar {
 	void				*mmio_kva;
 };
 
+/* Half-baked and optional PCI ops.  These are purposefully not Linux's
+ * pci_driver, since our driver init is different.  For now.  Our drivers all
+ * scan the PCI list looking for their devices.  Some do it in init_func_3
+ * (IOAT).  The NICs do it by devether with its pnp registration mechanism.
+ *
+ * Furthermore, this device state / init business is really only used for
+ * devices that can get assigned to userspace and need some methods run before
+ * and after that assignment.
+ *
+ * So most devices still auto-init themselves, around the same time that they
+ * post their pci_ops (if they support runtime reset & init).  Then later, we
+ * can reset the device, then init again.  So the usual pattern is Boot ->
+ * {Reset -> Init}*.  Now this is up to the driver - drivers don't have to
+ * pre-init.  They can leave it in an unassigned state if they want.  Again,
+ * this is only used for the hokey user assignment with a kernel driver.
+ *
+ * And only make these transitions with one caller at a time, particularly after
+ * boot.  These drivers are no set up for concurrent changes.  YMMV.
+ *
+ * And it's up to the caller to make sure no one is using the device anymore
+ * before resetting.  For proc-assigned devices, this won't be too hard - wait
+ * until proc_free() (refcnt is 0, all syscalls are done, etc).  For
+ * kernel-assigned devices, YMMV.  The IOAT driver / DMA engine prints a warning
+ * if there was a concurrent user.
+ *
+ * Bus mastering needs some thought, esp w.r.t. assigning/unassigning a device.
+ * All PCI devices currently manage this on their own.  Probe is done on their
+ * own too - PCI doesn't call a device probe method, so we don't know it failed,
+ * and thus don't know to clear BME.
+ */
+struct pci_device;
+struct pci_ops {
+	const char *driver_name;
+	bool (*init)(struct pci_device *);
+	bool (*reset)(struct pci_device *);
+};
+
+enum {
+	DEV_STATE_UNKNOWN = 0,
+	DEV_STATE_BROKEN = 1,
+	DEV_STATE_UNASSIGNED = 2,
+	DEV_STATE_ASSIGNED_KERNEL = 3,
+	DEV_STATE_ASSIGNED_PROC = 4,
+};
+
 struct pci_device {
 	STAILQ_ENTRY(pci_device)	all_dev; /* list of all devices */
 	char				name[9];
 	spinlock_t			lock;
+	qlock_t				qlock;
+	struct pci_ops			*_ops;	/* don't access directly */
+	int				state;
 	uintptr_t			mmio_cfg;
 	void				*dev_data; /* device private pointer */
 	struct iommu			*iommu; /* ptr to controlling iommu */
 	struct device			linux_dev;
-	bool				in_use;	/* prevent double discovery */
 	int				domain; /* legacy size was 16-bits */
 	uint8_t				bus;
 	uint8_t				dev;
@@ -267,6 +315,10 @@ uintptr_t pci_map_membar(struct pci_device *dev, int bir);
 int pci_set_cacheline_size(struct pci_device *dev);
 int pci_set_mwi(struct pci_device *dev);
 void pci_clear_mwi(struct pci_device *dev);
+void pci_set_ops(struct pci_device *pdev, struct pci_ops *ops, int pci_state);
+void pci_device_assign(struct pci_device *pdev, struct proc *proc);
+void pci_device_unassign(struct pci_device *pdev, struct proc *proc);
+
 static inline void pci_set_drvdata(struct pci_device *pcidev, void *data);
 static inline void *pci_get_drvdata(struct pci_device *pcidev);
 static inline void *pci_get_mmio_bar_kva(struct pci_device *pdev, int bar);

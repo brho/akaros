@@ -250,9 +250,11 @@ void pci_init(void)
 				}
 				pcidev = kzmalloc(sizeof(struct pci_device),
 						  MEM_WAIT);
+				pcidev->state = DEV_STATE_UNKNOWN;
 				/* we don't need to lock it til we post the
 				 * pcidev to the list*/
 				spinlock_init_irqsave(&pcidev->lock);
+				qlock_init(&pcidev->qlock);
 				/* we only discover domain 0 during legacy
 				 * PCI enumeration */
 				pcidev->domain = 0;
@@ -826,4 +828,73 @@ void pci_clear_mwi(struct pci_device *dev)
 		cmd &= ~PCI_COMMAND_INVALIDATE;
 		pcidev_write16(dev, PCI_COMMAND, cmd);
 	}
+}
+
+void pci_set_ops(struct pci_device *pdev, struct pci_ops *ops, int pci_state)
+{
+	pdev->_ops = ops;
+	assert(pdev->state == DEV_STATE_UNKNOWN);
+	pdev->state = pci_state;
+}
+
+void pci_device_assign(struct pci_device *pdev, struct proc *proc)
+{
+	ERRSTACK(1);
+
+	qlock(&pdev->qlock);
+	if (waserror()) {
+		qunlock(&pdev->qlock);
+		nexterror();
+	}
+	if (pdev->state != DEV_STATE_UNASSIGNED)
+		error(EBUSY, "Dev %s was not unassigned (%d))", pdev->name,
+		      pdev->state);
+	assert(pdev->_ops);	/* state-aware drivers need to provide ops */
+
+	/* TODO: actually assign to a process.  Consider throwers and refcnts
+	 * too. */
+	assert(!proc);
+
+	if (!pdev->_ops->init(pdev)) {
+		pdev->state = DEV_STATE_BROKEN;
+		error(EFAIL, "Dev %s driver %s init failed", pdev->name,
+		      pdev->_ops->driver_name);
+	}
+	if (proc)
+		pdev->state = DEV_STATE_ASSIGNED_PROC;
+	else
+		pdev->state = DEV_STATE_ASSIGNED_KERNEL;
+	qunlock(&pdev->qlock);
+	poperror();
+}
+
+void pci_device_unassign(struct pci_device *pdev, struct proc *proc)
+{
+	ERRSTACK(1);
+
+	qlock(&pdev->qlock);
+	if (waserror()) {
+		qunlock(&pdev->qlock);
+		nexterror();
+	}
+	if (!(pdev->state == DEV_STATE_ASSIGNED_PROC ||
+	      pdev->state == DEV_STATE_ASSIGNED_KERNEL))
+		error(EBUSY, "Dev %s was not assigned (%u)", pdev->name,
+		      pdev->state);
+
+	if (!pdev->_ops->reset(pdev)) {
+		pdev->state = DEV_STATE_BROKEN;
+		error(EFAIL, "Dev %s driver %s reset failed", pdev->name,
+		      pdev->_ops->driver_name);
+	}
+	/* TODO: actually assign to a process.  Consider throwers and refcnts
+	 * too. */
+	if (pdev->state == DEV_STATE_ASSIGNED_PROC)
+		assert(proc);
+	else
+		assert(!proc);
+	pdev->state = DEV_STATE_UNASSIGNED;
+
+	qunlock(&pdev->qlock);
+	poperror();
 }

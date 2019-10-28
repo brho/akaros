@@ -10,7 +10,6 @@
 
 #include <ros/common.h>
 #include <ros/syscall.h>
-#include <trap.h>
 #include <sys/queue.h>
 #include <atomic.h>
 #include <setjmp.h>

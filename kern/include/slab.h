@@ -32,6 +32,7 @@
 #include <atomic.h>
 #include <hash_helper.h>
 #include <arena.h>
+#include <trap.h>
 
 /* Back in the day, their cutoff for "large objects" was 512B, based on
  * measurements and on not wanting more than 1/8 of internal fragmentation. */
