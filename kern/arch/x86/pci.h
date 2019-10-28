@@ -169,7 +169,6 @@ struct pci_bar {
 
 struct pci_device {
 	STAILQ_ENTRY(pci_device)	all_dev; /* list of all devices */
-	SLIST_ENTRY(pci_device)		irq_dev; /* list of all devs on irq */
 	char				name[9];
 	spinlock_t			lock;
 	uintptr_t			mmio_cfg;
