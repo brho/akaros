@@ -1910,7 +1910,9 @@ void clear_owning_proc(uint32_t coreid)
 }
 
 /* Switches to the address space/context of new_p, doing nothing if we are
- * already in new_p.  This won't add extra refcnts or anything, and needs to be
+ * already in new_p.  You can pass NULL for a noop.
+ *
+ * This won't add extra refcnts or anything, and needs to be
  * paired with switch_back() at the end of whatever function you are in.
  * Specifically, the uncounted refs are one for the old_proc, which is passed
  * back to the caller, and new_p is getting placed in cur_proc. */
@@ -1921,14 +1923,13 @@ uintptr_t switch_to(struct proc *new_p)
 	struct proc *old_proc;
 	uintptr_t ret;
 
+	if (!new_p)
+		return -1;
 	old_proc = pcpui->cur_proc;		/* uncounted ref */
 	/* If we aren't the proc already, then switch to it */
 	if (old_proc != new_p) {
 		pcpui->cur_proc = new_p;	/* uncounted ref */
-		if (new_p)
-			lcr3(new_p->env_cr3);
-		else
-			lcr3(boot_cr3);
+		lcr3(new_p->env_cr3);
 	}
 	ret = (uintptr_t)old_proc;
 	if (is_ktask(kth)) {
@@ -1950,6 +1951,8 @@ void switch_back(struct proc *new_p, uintptr_t old_ret)
 	struct kthread *kth = pcpui->cur_kthread;
 	struct proc *old_proc;
 
+	if (!new_p)
+		return;
 	if (is_ktask(kth)) {
 		if (old_ret & 0x1) {
 			kth->flags &= ~KTH_SAVE_ADDR_SPACE;
