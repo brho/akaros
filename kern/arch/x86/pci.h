@@ -300,6 +300,7 @@ void pcidev_write8(struct pci_device *pcidev, uint32_t offset, uint8_t value);
 void pci_set_bus_master(struct pci_device *pcidev);
 void pci_clr_bus_master(struct pci_device *pcidev);
 struct pci_device *pci_match_tbdf(int tbdf);
+struct pci_device *pci_match_string(const char *bdf);
 uintptr_t pci_get_membar(struct pci_device *pcidev, int bir);
 uintptr_t pci_get_iobar(struct pci_device *pcidev, int bir);
 bool pci_bar_is_mem32(struct pci_device *pdev, int bar);

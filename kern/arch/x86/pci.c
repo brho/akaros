@@ -632,14 +632,9 @@ void pci_clr_bus_master(struct pci_device *pcidev)
 	spin_unlock_irqsave(&pcidev->lock);
 }
 
-struct pci_device *pci_match_tbdf(int tbdf)
+static struct pci_device *pci_match_bus_dev_func(int bus, int dev, int func)
 {
 	struct pci_device *search;
-	int bus, dev, func;
-
-	bus = BUSBNO(tbdf);
-	dev = BUSDNO(tbdf);
-	func = BUSFNO(tbdf);
 
 	STAILQ_FOREACH(search, &pci_devices, all_dev) {
 		if ((search->bus == bus) &&
@@ -648,6 +643,30 @@ struct pci_device *pci_match_tbdf(int tbdf)
 			return search;
 	}
 	return NULL;
+}
+
+struct pci_device *pci_match_tbdf(int tbdf)
+{
+	return pci_match_bus_dev_func(BUSBNO(tbdf), BUSDNO(tbdf), BUSFNO(tbdf));
+}
+
+/* Throws on error */
+struct pci_device *pci_match_string(const char *bdf)
+{
+	struct pci_device *pdev;
+	int bus, dev, func, ret;
+
+	ret = sscanf(bdf, "%x:%x.%x", &bus, &dev, &func);
+	if (ret != 3)
+		error(EINVAL, "Bad BDF format %s", bdf);
+	if ((bus != (bus & 0xff)) ||
+	    (dev != (dev & 0x1f)) ||
+	    (func != (func & 0x07)))
+		error(EINVAL, "BDF %s out of range", bdf);
+	pdev = pci_match_tbdf(MKBUS(BusPCI, bus, dev, func));
+	if (!pdev)
+		error(ENOENT, "No BDF %s", bdf);
+	return pdev;
 }
 
 /* Helper to get the membar value for BAR index bir */
