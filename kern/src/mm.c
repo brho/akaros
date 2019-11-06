@@ -573,6 +573,15 @@ static int fill_vmr(struct proc *p, struct proc *new_p, struct vm_region *vmr)
 			foc_decref(vmr->__vm_foc);
 		}
 	}
+	if (ret < 0) {
+		/* Need to undo any mappings we left behind.  We don't know
+		 * where we died, but we can just blast the entire region */
+		spin_lock(&new_p->pte_lock);
+		env_user_mem_walk(new_p, (void*)vmr->vm_base,
+				  vmr->vm_end - vmr->vm_base,
+				  __vmr_free_pgs, NULL);
+		spin_unlock(&new_p->pte_lock);
+	}
 	return ret;
 }
 
