@@ -895,8 +895,10 @@ static ssize_t sys_fork(env_t* e)
 	env_t* env;
 
 	ret = proc_alloc(&env, current, PROC_DUP_FGRP);
-	assert(!ret);
-	assert(env != NULL);
+	if (ret < 0) {
+		set_errno(-ret);
+		return -1;
+	}
 	proc_set_progname(env, e->progname);
 
 	/* Can't really fork if we don't have a current_ctx to fork */
