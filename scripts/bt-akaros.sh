@@ -24,11 +24,27 @@ kernel_line() {
 	line=$1
 
 	addr=`echo $line | cut -c 7-25`
+	frame_num=`echo $line | cut -f 1 -d ' '`
 
-	echo -n $line " "
-	# sed cleans out build paths.  All kernel files have 'kern', unlike
-	# arbitrary user binaries.
-	addr2line -e $KERNEL_BINARY $addr | sed 's/^.*kern\//at kern\//'
+	IFS=' '
+	addr2line -afip -e $KERNEL_BINARY $addr | while read -ra RET
+	do
+		if [ "${RET[0]}" == "(inlined" ]; then
+			# (inlined by) with spaces to line up with a 64 bit addr
+			addr="   ${RET[0]} ${RET[1]}   "
+			func="${RET[2]}"
+			srcl="${RET[4]}"
+		else
+			addr="${RET[0]}"
+			addr="${addr%?}"	# drop the trailing ':'
+			func="${RET[1]}"
+			srcl="${RET[3]}"
+		fi
+		# sed cleans out build paths.  All kernel files start with
+		# '/kern', unlike arbitrary user binaries.
+		srcl=`echo $srcl | sed 's/^.*\/kern\//kern\//'`
+		echo "$frame_num [<$addr>] in ${func}() at $srcl"
+	done
 }
 
 user_line() {
