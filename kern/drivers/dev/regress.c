@@ -138,6 +138,129 @@ static size_t regressread(struct chan *c, void *va, size_t n, off64_t off)
 	return n;
 }
 
+int __tlb_bench_x;
+
+static void __tlb_s(void)
+{
+	tlbflush();
+	cmb();	/* tlbflush is asm volatile, but it can still be reordered. */
+	WRITE_ONCE(__tlb_bench_x, 1);
+}
+
+static void __tlb_s_ipi(struct hw_trapframe *hw_tf, void *data)
+{
+	__tlb_s();
+}
+
+static void __tlb_s_kmsg(uint32_t srcid, long a0, long a1, long a2)
+{
+	__tlb_s();
+}
+
+/* This runs the test from the calling core, which is typically core 0 if you
+ * are running from the shell.  If you run from another core, note that
+ * deregister_irq() will synchronize_rcu, which moves this thread to core 0 at
+ * the end of the function. */
+static void __tlb_shootdown_bench(int target_core, int mode)
+{
+	ERRSTACK(1);
+	uint64_t s, *d;
+	const char *str = NULL;
+	struct irq_handler *irqh;
+	int tbdf = MKBUS(BusIPI, 0, 0, 0);
+	#define ITERS 10
+
+	if (target_core == core_id())
+		error(EINVAL, "TLB bench: Aborting, we are core %d",
+		      target_core);
+	if (target_core < 0 || target_core >= num_cores)
+		error(EINVAL,
+		      "TLB bench: Aborting, target_core %d out of range",
+		      target_core);
+	irqh = register_irq(I_TESTING, __tlb_s_ipi, NULL, tbdf);
+	if (!irqh)
+		error(EFAIL,
+		      "TLB bench: Oh crap, we couldn't register the IRQ!");
+	d = kmalloc(sizeof(uint64_t) * ITERS, MEM_WAIT);
+	if (waserror()) {
+		deregister_irq(irqh->apic_vector, tbdf);
+		kfree(d);
+		nexterror();
+	}
+	for (int i = 0; i < ITERS; i++) {
+		__tlb_bench_x = 0;
+		s = start_timing();
+		switch (mode) {
+		case 1:
+			str = "NOOP";
+			__tlb_bench_x = 1;
+			break;
+		case 2:
+			tlbflush();
+			str = "LOCAL";
+			__tlb_bench_x = 1;
+			break;
+		case 3:
+			/* To run this test, you need to hacked this into
+			 * POKE_HANDLER.  If not, you'll wedge the machine.
+				mov %cr3,%rax;\
+				mov %rax,%cr3;\
+				incl __tlb_bench_x;\
+			* And comment out the error(). */
+			error(EFAIL, "TLB bench: hack the POKE_HANDLER");
+
+			send_ipi(target_core, I_POKE_CORE);
+			str = "POKE";
+			while (!READ_ONCE(__tlb_bench_x))
+				cpu_relax();
+			break;
+		case 4:
+			send_ipi(target_core, I_TESTING);
+			str = "IPI";
+			while (!READ_ONCE(__tlb_bench_x))
+				cpu_relax();
+			break;
+		case 5:
+			send_kernel_message(target_core, __tlb_s_kmsg, 0, 0, 0,
+					    KMSG_IMMEDIATE);
+			str = "KMSG";
+			while (!READ_ONCE(__tlb_bench_x))
+				cpu_relax();
+			break;
+		case 6:
+			send_kernel_message(target_core, __tlb_s_kmsg, 0, 0, 0,
+					    KMSG_IMMEDIATE);
+			str = "NOACK-KMSG";
+			break;
+		case 7:
+			send_ipi(target_core, I_TESTING);
+			str = "NOACK-IPI";
+			break;
+		default:
+			error(EINVAL, "TLB bench: bad mode %d", mode);
+		}
+		d[i] = stop_timing(s);
+		/* The NOACKs still need to wait, so we don't race with the
+		 * remote core and our *next* loop. */
+		while (!READ_ONCE(__tlb_bench_x))
+			cpu_relax();
+		/* The remote core has signalled it did the TLB flush, but it
+		 * takes a little while for it to halt or otherwise get back to
+		 * idle.  Wait a little to get a more stable measurement.
+		 * Without this delay (or something similar), I've seen extra
+		 * delays of close to 400ns.  Note that in real usage, the
+		 * remote core won't always be ready to handle the IRQ, so this
+		 * test is best case. */
+		udelay(1000);
+	}
+	for (int i = 0; i < ITERS; i++)
+		printk("%02d: TLB %s shootdown: %llu ns\n", i, str,
+		       tsc2nsec(d[i]));
+	deregister_irq(irqh->apic_vector, tbdf);
+	kfree(d);
+	poperror();
+}
+
 static size_t regresswrite(struct chan *c, void *a, size_t n, off64_t unused)
 {
 	ERRSTACK(1);
@@ -157,6 +280,12 @@ static size_t regresswrite(struct chan *c, void *a, size_t n, off64_t unused)
 			      ctlcommands);
 		if (!strcmp(cb->f[0], "ktest")) {
 			run_registered_ktest_suites();
+		} else if (!strcmp(cb->f[0], "tlb")) {
+			if (cb->nf < 3)
+				error(EFAIL,
+				      "TLB bench: need core and mode (ints)");
+			__tlb_shootdown_bench(strtol(cb->f[1], NULL, 10),
+					      strtol(cb->f[2], NULL, 10));
 		} else {
 			error(EFAIL, "regresswrite: only commands are %s",
 			      ctlcommands);
