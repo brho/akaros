@@ -141,6 +141,8 @@ void print_cpuinfo(void)
 	printk("\n");
 	cpuid(0x80000008, 0x0, &eax, &ebx, &ecx, &edx);
 	cprintf("Physical Address Bits: %d\n", eax & 0x000000FF);
+	printk("Guest Physical Address Bits: %d\n",
+	       eax & 0x00ff0000 ?: eax & 0xff);
 	msr_val = read_msr(IA32_APIC_BASE);
 	if (!(msr_val & MSR_APIC_ENABLE))
 		panic("Local APIC Disabled!!");
