@@ -126,19 +126,19 @@ static inline int __dma_mapping_error(dma_addr_t dma_addr)
 static inline void *dma_alloc_coherent(struct device *dev, size_t size,
 				       dma_addr_t *dma_handle, int gfp)
 {
-	return dma_arena_zalloc(&dma_phys_pages, size, dma_handle, gfp);
+	return dma_arena_zalloc(dev_to_dma_arena(dev), size, dma_handle, gfp);
 }
 
 static inline void *dma_zalloc_coherent(struct device *dev, size_t size,
 					dma_addr_t *dma_handle, int gfp)
 {
-	return dma_arena_zalloc(&dma_phys_pages, size, dma_handle, gfp);
+	return dma_arena_zalloc(dev_to_dma_arena(dev), size, dma_handle, gfp);
 }
 
 static inline void dma_free_coherent(struct device *dev, size_t size,
 				     void *cpu_addr, dma_addr_t dma_handle)
 {
-	dma_arena_free(&dma_phys_pages, cpu_addr, dma_handle, size);
+	dma_arena_free(dev_to_dma_arena(dev), cpu_addr, dma_handle, size);
 }
 
 #define dma_map_single(dev, addr, size, direction)                             \

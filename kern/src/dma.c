@@ -54,6 +54,23 @@
  * xalloc, and maybe more flexibility. */
 struct dma_arena dma_phys_pages;
 
+struct dma_arena *dev_to_dma_arena(struct device *d)
+{
+	struct pci_device *pdev;
+
+	if (!d)
+		return &dma_phys_pages;
+	pdev = container_of(d, struct pci_device, linux_dev);
+	if (!pdev->proc_owner)
+		return &dma_phys_pages;
+	if (!pdev->proc_owner->user_pages) {
+		warn("Proc %d owns a device, but has no user_pages!",
+		     pdev->proc_owner->pid);
+		return &dma_phys_pages;
+	}
+	return pdev->proc_owner->user_pages;
+}
+
 static void *dma_phys_a(struct arena *a, size_t amt, int flags)
 {
 	return (void*)PADDR(arena_alloc(a, amt, flags));
@@ -147,7 +164,7 @@ struct dma_pool {
 	struct dma_arena	*source;
 };
 
-struct dma_pool *dma_pool_create(const char *name, void *dev,
+struct dma_pool *dma_pool_create(const char *name, struct device *dev,
 				 size_t size, size_t align, size_t boundary)
 {
 	struct dma_pool *dp;
@@ -164,8 +181,7 @@ struct dma_pool *dma_pool_create(const char *name, void *dev,
 		align = size;
 	}
 	dp = kzmalloc(sizeof(struct dma_pool), MEM_WAIT);
-	/* TODO: this will be device specific.  Assuming the default. */
-	dp->source = &dma_phys_pages;
+	dp->source = dev_to_dma_arena(dev);
 	/* We're sourcing directly from the dma_arena's arena. */
 	__kmem_cache_create(&dp->kc, name, size, align, KMC_NOTOUCH,
 			    &dp->source->arena, NULL, NULL, NULL);
