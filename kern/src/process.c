@@ -2019,6 +2019,7 @@ void proc_tlbshootdown(struct proc *p, uintptr_t start, uintptr_t end)
 			tlbflush();
 	}
 	spin_unlock(&p->proc_lock);
+	proc_iotlb_flush(p);
 }
 
 /* Helper, used by __startcore and __set_curctx, which sets up cur_ctx to run a

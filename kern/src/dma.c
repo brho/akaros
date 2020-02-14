@@ -245,10 +245,6 @@ static void user_pages_f(struct arena *a, void *obj, size_t amt)
 	struct proc *p = da->data;
 
 	munmap(p, (uintptr_t)obj, amt);
-
-	/* TODO: move this to munmap */
-	extern void proc_iotlb_flush(struct proc *p);
-	proc_iotlb_flush(p);
 }
 
 static void *user_addr_to_kaddr(struct dma_arena *da, physaddr_t uaddr)

@@ -77,6 +77,7 @@ bool iommu_status(void); /* returns true if any iommu is turned on */
 void iommu_unassign_all_devices(struct proc *p);
 void __iommu_device_assign(struct pci_device *pdev, struct proc *proc);
 void __iommu_device_unassign(struct pci_device *pdev, struct proc *proc);
+void proc_iotlb_flush(struct proc *p);
 
 /*
  * VT-d hardware uses 4KiB page size regardless of host page size.
