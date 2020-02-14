@@ -574,6 +574,19 @@ static int ioat_probe(struct ioatdma_device *ioat_dma)
 	if (err)
 		goto err_setup_interrupts;
 
+	/* We need to skip the dma_self_test when we are in a user's address
+	 * space.  The test calls dma_map_page(), which maps an arbitrary kernel
+	 * address in the driver.  We could try to hook up something where we
+	 * remap that page in userspace, but it doesn't seem worth it.
+	 *
+	 * We are called via pci_ops->init, with the pdev qlock held, so
+	 * proc_owner will not change */
+	if (pdev->proc_owner) {
+		dev_info(dev, "skipping self-test: assigned to %d\n",
+			 pdev->proc_owner->pid);
+		return 0;
+	}
+
 	err = ioat3_dma_self_test(ioat_dma);
 	if (err)
 		goto err_self_test;
@@ -816,6 +829,32 @@ static int ioat_alloc_chan_resources(struct dma_chan *c)
 	return -EFAULT;
 }
 
+/* These wrappers switch the driver into the process's address space.  Any time
+ * the driver wants to access DMA mapped memory, it needs to be in the user's
+ * address space.  That memory came from the user's DMA arena, and the 'driver'
+ * address for that memory is also a user virtual address, not a kernel one. */
+static void ioat_timer_event_wrapper(struct timer_list *t)
+{
+	struct ioatdma_chan *ioat_chan = from_timer(ioat_chan, t, timer);
+	struct pci_device *pdev = to_pdev(ioat_chan);
+	uintptr_t prev = switch_to(pdev->proc_owner);
+
+	ioat_timer_event(t);
+
+	switch_back(pdev->proc_owner, prev);
+}
+
+static void ioat_cleanup_event_wrapper(unsigned long data)
+{
+	struct ioatdma_chan *ioat_chan = to_ioat_chan((void *)data);
+	struct pci_device *pdev = to_pdev(ioat_chan);
+	uintptr_t prev = switch_to(pdev->proc_owner);
+
+	ioat_cleanup_event(data);
+
+	switch_back(pdev->proc_owner, prev);
+}
+
 /* common channel initialization */
 static void
 ioat_init_channel(struct ioatdma_device *ioat_dma,
@@ -832,8 +871,9 @@ ioat_init_channel(struct ioatdma_device *ioat_dma,
 	dma_cookie_init(&ioat_chan->dma_chan);
 	list_add_tail(&ioat_chan->dma_chan.device_node, &dma->channels);
 	ioat_dma->idx[idx] = ioat_chan;
-	timer_setup(&ioat_chan->timer, ioat_timer_event, 0);
-	tasklet_init(&ioat_chan->cleanup_task, ioat_cleanup_event, data);
+	timer_setup(&ioat_chan->timer, ioat_timer_event_wrapper, 0);
+	tasklet_init(&ioat_chan->cleanup_task, ioat_cleanup_event_wrapper,
+		     data);
 }
 
 #define IOAT_NUM_SRC_TEST 6 /* must be <= 8 */
