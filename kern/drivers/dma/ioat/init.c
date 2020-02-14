@@ -1596,8 +1596,7 @@ static void __init ioat_init(void)
 		if (p->ven_id != PCI_VENDOR_ID_INTEL)
 			continue;
 		if (ioat_pci_init(p))
-			pci_set_ops(p, &ioat_pci_ops,
-				    DEV_STATE_ASSIGNED_KERNEL);
+			pci_set_ops(p, &ioat_pci_ops);
 	}
 }
 /* The 'arch_initcall' setup functions run at level 2. */

@@ -850,11 +850,10 @@ void pci_clear_mwi(struct pci_device *dev)
 	}
 }
 
-void pci_set_ops(struct pci_device *pdev, struct pci_ops *ops, int pci_state)
+void pci_set_ops(struct pci_device *pdev, struct pci_ops *ops)
 {
 	pdev->_ops = ops;
-	assert(pdev->state == DEV_STATE_UNKNOWN);
-	pdev->state = pci_state;
+	pdev->state = DEV_STATE_ASSIGNED_KERNEL;
 }
 
 static void __pci_device_assign_check(struct pci_device *pdev)

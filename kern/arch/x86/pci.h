@@ -317,7 +317,7 @@ uintptr_t pci_map_membar(struct pci_device *dev, int bir);
 int pci_set_cacheline_size(struct pci_device *dev);
 int pci_set_mwi(struct pci_device *dev);
 void pci_clear_mwi(struct pci_device *dev);
-void pci_set_ops(struct pci_device *pdev, struct pci_ops *ops, int pci_state);
+void pci_set_ops(struct pci_device *pdev, struct pci_ops *ops);
 void pci_device_assign(struct pci_device *pdev, struct proc *proc);
 void pci_device_unassign_known(struct pci_device *pdev, struct proc *proc);
 void pci_device_unassign(struct pci_device *pdev, struct proc *proc);
