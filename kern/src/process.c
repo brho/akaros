@@ -525,6 +525,7 @@ static void __proc_free(struct kref *kref)
 		kref_put(&p->strace->procs);
 		kref_put(&p->strace->users);
 	}
+	teardown_dma_arena(p);
 	__vmm_struct_cleanup(p);
 	p->progname[0] = 0;
 	free_path(p, p->binary_path);

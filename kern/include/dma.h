@@ -39,3 +39,10 @@ void dma_pool_destroy(struct dma_pool *pool);
 void *dma_pool_alloc(struct dma_pool *pool, int mem_flags, dma_addr_t *handle);
 void *dma_pool_zalloc(struct dma_pool *pool, int mem_flags, dma_addr_t *handle);
 void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t addr);
+
+/* Proc DMA arenas: mmapped user addresses, added and removed by the kernel.
+ * When you attach this to a process, that arena can be used for a driver's DMA
+ * arena. */
+struct proc;
+void setup_dma_arena(struct proc *p);
+void teardown_dma_arena(struct proc *p);

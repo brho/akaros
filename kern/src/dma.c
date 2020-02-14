@@ -47,6 +47,9 @@
 #include <dma.h>
 #include <pmap.h>
 #include <kmalloc.h>
+#include <process.h>
+#include <mm.h>
+#include <umem.h>
 
 /* This arena is largely a wrapper around kpages.  The arena does impose some
  * overhead: btags and function pointers for every allocation.  In return, we
@@ -217,4 +220,90 @@ void *dma_pool_zalloc(struct dma_pool *dp, int mem_flags, dma_addr_t *handle)
 void dma_pool_free(struct dma_pool *dp, void *cpu_addr, dma_addr_t addr)
 {
 	kmem_cache_free(&dp->kc, (void*)addr);
+}
+
+static void *user_pages_a(struct arena *a, size_t amt, int flags)
+{
+	struct dma_arena *da = container_of(a, struct dma_arena, arena);
+	struct proc *p = da->data;
+	void *uaddr;
+
+	uaddr = mmap(p, 0, amt, PROT_READ | PROT_WRITE,
+		     MAP_ANONYMOUS | MAP_POPULATE | MAP_PRIVATE, -1, 0);
+
+	/* TODO: think about OOM for user dma arenas, and MEM_ flags. */
+	if (uaddr == MAP_FAILED) {
+		warn("couldn't mmap %d bytes, will probably panic", amt);
+		return NULL;
+	}
+	return uaddr;
+}
+
+static void user_pages_f(struct arena *a, void *obj, size_t amt)
+{
+	struct dma_arena *da = container_of(a, struct dma_arena, arena);
+	struct proc *p = da->data;
+
+	munmap(p, (uintptr_t)obj, amt);
+
+	/* TODO: move this to munmap */
+	extern void proc_iotlb_flush(struct proc *p);
+	proc_iotlb_flush(p);
+}
+
+static void *user_addr_to_kaddr(struct dma_arena *da, physaddr_t uaddr)
+{
+	/* Our caller needs to be running in the user's address space.  We
+	 * either need to pin the pages or handle page faults.  We could use
+	 * uva2kva(), but that only works for single pages.  Handling contiguous
+	 * pages would require mmapping a KVA-contig chunk or other acrobatics.
+	 */
+	return (void*)uaddr;
+}
+
+/* Ensures a DMA arena exists for the proc.  No-op if it already exists. */
+void setup_dma_arena(struct proc *p)
+{
+	struct dma_arena *da;
+	char name[32];
+	bool exists = false;
+
+	/* lockless peek */
+	if (READ_ONCE(p->user_pages))
+		return;
+	da = kzmalloc(sizeof(struct dma_arena), MEM_WAIT);
+	snprintf(name, ARRAY_SIZE(name), "proc-%d", p->pid);
+
+	__arena_create(&da->arena, name, PGSIZE,
+		       user_pages_a, user_pages_f, ARENA_SELF_SOURCE, 0);
+
+	da->to_cpu_addr = user_addr_to_kaddr;
+	da->data = p;
+
+	spin_lock_irqsave(&p->proc_lock);
+	if (p->user_pages)
+		exists = true;
+	else
+		WRITE_ONCE(p->user_pages, da);
+	spin_unlock_irqsave(&p->proc_lock);
+
+	if (exists) {
+		__arena_destroy(&da->arena);
+		kfree(da);
+	}
+}
+
+/* Must be called only when all users (slabs, allocs) are done and freed.
+ * Basically during __proc_free(). */
+void teardown_dma_arena(struct proc *p)
+{
+	struct dma_arena *da;
+
+	da = p->user_pages;
+	if (!da)
+		return;
+	p->user_pages = NULL;
+
+	__arena_destroy(&da->arena);
+	kfree(da);
 }
