@@ -347,6 +347,11 @@ static bool __handle_page_fault(struct hw_trapframe *hw_tf, unsigned long *aux)
 static void do_nmi_work(struct hw_trapframe *hw_tf)
 {
 	assert(!irq_is_enabled());
+
+	extern void __watchdog_nmi_handler(struct hw_trapframe *hw_tf);
+
+	__watchdog_nmi_handler(hw_tf);
+
 	/* It's mostly harmless to snapshot the TF, and we can send a spurious
 	 * PCINT interrupt.  perfmon.c just uses the interrupt to tell it to
 	 * check its counters for overflow.  Note that the PCINT interrupt is
