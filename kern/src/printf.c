@@ -15,9 +15,13 @@
 static spinlock_t output_lock = SPINLOCK_INITIALIZER_IRQSAVE;
 static int output_lock_holder = -1;	/* core_id. */
 static int output_lock_count;
+bool panic_skip_print_lock;
 
 void print_lock(void)
 {
+	if (panic_skip_print_lock)
+		return;
+
 	if (output_lock_holder == core_id_early()) {
 		output_lock_count++;
 		return;
@@ -30,6 +34,9 @@ void print_lock(void)
 
 void print_unlock(void)
 {
+	if (panic_skip_print_lock)
+		return;
+
 	output_lock_count--;
 	if (output_lock_count)
 		return;

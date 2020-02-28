@@ -252,6 +252,7 @@ static void lpt_putc(int c)
 #define SCROLLING_CRT_SIZE	(MAX_SCROLL_LENGTH * CRT_SIZE)
 
 static spinlock_t console_lock = SPINLOCK_INITIALIZER_IRQSAVE;
+bool panic_skip_console_lock;
 
 static unsigned addr_6845;
 static uint16_t *crt_buf;
@@ -655,7 +656,8 @@ void cons_putc(int c)
 {
 	void logbuf(int c);
 
-	spin_lock_irqsave(&console_lock);
+	if (!panic_skip_console_lock)
+		spin_lock_irqsave(&console_lock);
 
 	#ifndef CONFIG_SERIAL_IO
 		serial_spam_char(c);
@@ -664,7 +666,8 @@ void cons_putc(int c)
 	cga_putc(c);
 	logbuf(c);
 
-	spin_unlock_irqsave(&console_lock);
+	if (!panic_skip_console_lock)
+		spin_unlock_irqsave(&console_lock);
 }
 
 // `High'-level console I/O.  Used by readline and cprintf.

@@ -26,6 +26,9 @@ struct cons_dev {
 SLIST_HEAD(cons_dev_slist, cons_dev);
 extern struct cons_dev_slist cdev_list;
 
+/* Set this to turn off console locking.  (debugging/panic/NMI) */
+extern bool panic_skip_console_lock;
+
 void cons_init(void);
 /* Returns 0 on success, with the char in *data */
 int cons_get_char(struct cons_dev *cdev, uint8_t *data);

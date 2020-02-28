@@ -35,6 +35,7 @@ void	printfmt(void (*putch)(int, void**), void **putdat, const char *fmt, ...);
 void	vprintfmt(void (*putch)(int, void**), void **putdat, const char *fmt, va_list);
 
 // lib/printf.c
+extern bool panic_skip_print_lock;
 void print_lock(void);
 void print_unlock(void);
 void print_unlock_force(void);
