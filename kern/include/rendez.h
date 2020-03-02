@@ -26,7 +26,9 @@
  * - Wakers should set the condition, then trigger the wakeup to ensure the
  *   sleeper has awakened.  (internal locks provide the needed barriers).
  * - Timeout sleep is like regular sleep, with the addition that it will return
- *   after some milliseconds, regardless of the condition.
+ *   after some milliseconds, regardless of the condition.  Returns 'false' if
+ *   it timedout and wasn't rendezvoused.  Note that even if we timed out, the
+ *   condition may be true, due to races.
  * - The only locking/protection is done internally.  In plan9, they expect to
  *   only have one sleeper and one waker.  So your code around the rendez needs
  *   to take that into account.  The old plan9 code should already do this.
@@ -49,7 +51,7 @@ typedef int (*rendez_cond_t)(void *arg);
 
 void rendez_init(struct rendez *rv);
 void rendez_sleep(struct rendez *rv, int (*cond)(void*), void *arg);
-void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
+bool rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
                           uint64_t usec);
 bool rendez_wakeup(struct rendez *rv);
 void rendez_debug_waiter(struct alarm_waiter *awaiter);

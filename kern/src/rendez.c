@@ -80,23 +80,24 @@ void rendez_debug_waiter(struct alarm_waiter *awaiter)
 }
 
 /* Like sleep, but it will timeout in 'usec' microseconds. */
-void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
+bool rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
                           uint64_t usec)
 {
 	int8_t irq_state = 0;
 	struct alarm_waiter awaiter;
 	struct cv_lookup_elm cle;
 	struct timer_chain *pcpui_tchain = &per_cpu_info[core_id()].tchain;
+	bool ret;
 
 	assert(can_block(this_pcpui_ptr()));
 	if (!usec)
-		return;
+		return false;
 	/* Doing this cond check early, but then unlocking again.  Mostly just
 	 * to avoid weird issues with the CV lock and the alarm tchain lock. */
 	cv_lock_irqsave(&rv->cv, &irq_state);
 	if (cond(arg)) {
 		cv_unlock_irqsave(&rv->cv, &irq_state);
-		return;
+		return true;
 	}
 	cv_unlock_irqsave(&rv->cv, &irq_state);
 	/* The handler will call rendez_wake, but won't mess with the condition
@@ -115,7 +116,15 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	 * condition (and we should exit), other alarms with different timeouts
 	 * (and we should go back to sleep), etc.  Note it is possible for our
 	 * alarm to fire immediately upon setting it: before we even cv_lock. */
-	while (!cond(arg) && !alarm_expired(&awaiter)) {
+	while (1) {
+		if (alarm_expired(&awaiter)) {
+			ret = false;
+			break;
+		}
+		if (cond(arg)) {
+			ret = true;
+			break;
+		}
 		if (should_abort(&cle)) {
 			cv_unlock_irqsave(&rv->cv, &irq_state);
 			unset_alarm(pcpui_tchain, &awaiter);
@@ -130,6 +139,7 @@ void rendez_sleep_timeout(struct rendez *rv, int (*cond)(void*), void *arg,
 	/* Turn off our alarm.  If it already fired, this is a no-op.  Note this
 	 * could be cross-core. */
 	unset_alarm(pcpui_tchain, &awaiter);
+	return ret;
 }
 
 /* plan9 rendez returned a pointer to the proc woken up.  we return "true" if we
