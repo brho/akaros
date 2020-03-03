@@ -133,6 +133,8 @@ void kernel_init(multiboot_info_t *mboot_info)
 
 	exception_table_init();
 	num_cores = get_early_num_cores();
+	// XXX
+	printk("EARLY NUM CORES %d\n", num_cores);
 	pmem_init(multiboot_kaddr);
 	kmalloc_init();
 	vmap_init();

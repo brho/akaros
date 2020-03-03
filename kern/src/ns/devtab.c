@@ -27,10 +27,12 @@ void devtabreset(void)
 		return;
 	}
 	for (i = 0; &devtab[i] < __devtabend; i++) {
+		printk("%s: #%s\n", __func__, devtab[i].name);
 		if (devtab[i].reset)
 			devtab[i].reset();
 	}
 	poperror();
+	printk("%s complete\n", __func__);
 }
 
 void devtabinit(void)
@@ -48,10 +50,12 @@ void devtabinit(void)
 		 */
 		printd("i %d, '%s', dev %p, init %p\n", i, devtab[i].name,
 		       &devtab[i], devtab[i].init);
+		printk("%s: #%s\n", __func__, devtab[i].name);
 		if (devtab[i].init)
 			devtab[i].init();
 	}
 	poperror();
+	printk("%s complete\n", __func__);
 }
 
 void devtabshutdown(void)

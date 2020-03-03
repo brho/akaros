@@ -110,11 +110,16 @@ static void set_num_cores(void)
 	for (int i = 0; i < apics->nchildren; i++) {
 		struct Apicst *temp = apics->children[i]->tbl;
 
-		if (temp != NULL && temp->type == ASlapic)
+		// XXX
+		if (temp != NULL && (temp->type == ASlapic || temp->type == ASlx2apic))
 			num_cores++;
 	}
-	if (num_cores < old_num_cores)
-		warn("Topology found less cores than early MADT parsing!");
+	if (num_cores < old_num_cores) {
+		warn("Topology found less cores (%d) than early MADT parsing! (%d)", num_cores, old_num_cores);
+		// XXX fucked
+		if (!num_cores)
+			num_cores = 2;
+	}
 	/* Too many cores will be a problem for some data structures. */
 	if (num_cores > old_num_cores)
 		panic("Topology found more cores than early MADT parsing!");
@@ -174,9 +179,15 @@ static void set_max_apic_id(void)
 	for (int i = 0; i < apics->nchildren; i++) {
 		struct Apicst *temp = apics->children[i]->tbl;
 
-		if (temp->type == ASlapic) {
+		switch (temp->type) {
+		case ASlapic:
 			if (temp->lapic.id > max_apic_id)
 				max_apic_id = temp->lapic.id;
+			break;
+		case ASlx2apic:
+			if (temp->lx2apic.id > max_apic_id)
+				max_apic_id = temp->lx2apic.id;
+			break;
 		}
 	}
 }
@@ -201,8 +212,14 @@ static void init_os_coreid_lookup(void)
 	for (int i = 0; i < apics->nchildren; i++) {
 		struct Apicst *temp = apics->children[i]->tbl;
 
-		if (temp->type == ASlapic)
+		switch (temp->type) {
+		case ASlapic:
 			os_coreid_lookup[temp->lapic.id] = 0;
+			break;
+		case ASlx2apic:
+			os_coreid_lookup[temp->lx2apic.id] = 0;
+			break;
+		}
 	}
 	int os_coreid = 0;
 
@@ -380,6 +397,7 @@ void topology_init(void)
 		build_flat_topology();
 }
 
+// XXX busted on cta9.  should be 2 sockets.  probably ACPI vs cpuid?
 void print_cpu_topology(void)
 {
 	printk("num_numa: %d, num_sockets: %d, num_cpus: %d, num_cores: %d\n",

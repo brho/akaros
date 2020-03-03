@@ -142,6 +142,15 @@ void lapic_set_timer(uint32_t usec, bool periodic)
 	 * the desired time. */
 	uint64_t ticks64 = (usec * __proc_global_info.bus_freq)
 	                   / LAPIC_TIMER_DIVISOR_VAL / 1000000;
+
+	// XXX had a bus_freq that was too small.  we used
+	// LAPIC_TIMER_DIVISOR_VAL and whatnot for the highest granularity or
+	// whatever, but this is really supposed to be based on bus freq. 
+	// 	actually, 32 was supposed to be reasonable
+	// 	12505216 = 12 MHz.  that is probably wrong... (computed)
+	if (!ticks64)
+		ticks64 = 1;
+
 	uint32_t ticks32 = ((ticks64 >> 32) ? 0xffffffff : ticks64);
 
 	assert(ticks32 > 0);

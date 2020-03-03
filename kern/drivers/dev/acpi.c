@@ -1672,6 +1672,7 @@ static struct Sdthdr *xsdt_find_tbl(struct Sdthdr *xsdt, const char *sig,
 	return NULL;
 }
 
+// XXX wrong comment
 /* This may be an overestimate, if some LAPICS are present but disabled */
 static int madt_get_nr_cores(struct Sdthdr *madt)
 {
@@ -1684,7 +1685,15 @@ static int madt_get_nr_cores(struct Sdthdr *madt)
 	for (p += 44; p < madt_end; p += entry_len) {
 		entry_len = p[1];
 		switch (p[0]) {
+			// XXX NASTY
 		case ASlapic:
+			if (l32get(p + 4) == 0)
+				break;
+			nr_cores++;
+			break;
+		case ASlx2apic:
+			if (l32get(p + 8) == 0)
+				break;
 			nr_cores++;
 			break;
 		default:

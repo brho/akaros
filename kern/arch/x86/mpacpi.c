@@ -69,6 +69,28 @@ int mpacpi(int ncleft)
 			printd("apic proc %d/%d apicid %d %s\n", np - 1,
 			       apic->machno, st->lapic.id, already);
 			break;
+		case ASlx2apic:
+			// XXX hacked version of above
+			printd("ASlx2apic %d\n", st->lx2apic.id);
+			/* this table is supposed to have all of them if it
+			 * exists */
+			if (st->lx2apic.id > MaxAPICNO)
+				break;
+			apic = xlapic + st->lx2apic.id;
+			bp = (np++ == 0);
+			if (apic->useable) {
+				already = "(mp)";
+			} else if (ncleft != 0) {
+				ncleft--;
+				apicinit(st->lx2apic.id, mt->lapicpa, bp);
+			} else
+				already = "(off)";
+
+			// XXX machno is 0.  looks like an old plan9 thing
+			printd("apic proc %d/%d apicid %d %s\n", np - 1,
+			       apic->machno, st->lx2apic.id, already);
+			break;
+
 		case ASioapic:
 			printd("ASioapic %d\n", st->ioapic.id);
 			if (st->ioapic.id > Napic)

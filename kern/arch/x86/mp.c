@@ -455,6 +455,7 @@ static void *sigsearch(char *signature)
 		return r;
 #endif
 	r = sigscan(KADDR(0xe0000), 0x20000, signature);
+	// XXX found at 0
 	printk("Found MP table at %p\n", r);
 	if (r != NULL)
 		return r;

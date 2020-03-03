@@ -172,6 +172,7 @@ void apicinit(int apicno, uintptr_t pa, int isbp)
 		printd("apicinit%d: already initialised\n", apicno);
 		return;
 	}
+	// XXX we don't even use the old LAPIC_BASE anymore...?
 	assert(pa == LAPIC_PBASE);
 	apic->useable = 1;
 
@@ -181,6 +182,14 @@ void apicinit(int apicno, uintptr_t pa, int isbp)
 	 * akaros does its own remapping of hw <-> os coreid during smp_boot */
 
 	//X2APIC INIT
+	//XXX i think this is useless and wrong
+	//uh  which core are we running on?  this is core 0...  and all this
+	//function does is mark the apic usable if it wasn't before?
+	//also, this is the first time we jhaven't had an mp table, right?
+	//which might fuck up all of the shit
+	//	i.e. first time called from mpacpi or whatever
+	//	looks OK
+	//apiconline does this too, which is the real one
 	msr_val = read_msr(IA32_APIC_BASE);
 	write_msr(IA32_APIC_BASE, msr_val | (3<<10));
 }
@@ -248,11 +257,14 @@ int apiconline(void)
 		printk("Bad apicno %d on HW core %d!!\n", apicno, hw_core_id());
 		return 0;
 	}
+	// XXX if we don't get this, we're fucked.  how are we even running?
+	// 	leftover turds from pre-x2apic?
+	// 	(do we need the lapic again, for AMD?
 	apic = &xlapic[apicno];
 	/* The addr check tells us if it is an IOAPIC or not... */
 	if (!apic->useable || apic->addr) {
-		printk("Unsuitable apicno %d on HW core %d!!\n", apicno,
-		       hw_core_id());
+		printk("Bad apic struct for apicno %d on HW core %d!! (useable %d, addr %p)\n",
+		       apicno, hw_core_id(), apic->useable, apic->addr);
 		return 0;
 	}
 	/* Things that can only be done when on the processor owning the APIC,
