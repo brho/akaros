@@ -74,6 +74,7 @@ pid_t create_child(const char *exe, int argc, char *const argv[],
 pid_t create_child_with_stdfds(const char *exe, int argc, char *const argv[],
                                char *const envp[]);
 int provision_core_set(pid_t pid, const struct core_set *cores);
+int run_and_wait(const char *exe, int argc, char *const argv[]);
 
 /* Debugging */
 void set_notify_9(void (*handler)(struct event_msg *ev_msg,

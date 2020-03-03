@@ -7,6 +7,7 @@
 #include <parlib/ros_debug.h>
 #include <parlib/event.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 
 /* Control variables */
 bool parlib_wants_to_be_mcp = TRUE;
@@ -91,6 +92,23 @@ pid_t create_child_with_stdfds(const char *exe, int argc, char *const argv[],
 		return -1;
 	}
 	return kid;
+}
+
+/* Helper for kicking off a process, but with little specific error handling */
+int run_and_wait(const char *exe, int argc, char *const argv[])
+{
+	extern char **environ;
+
+	pid_t kid;
+
+	kid = create_child_with_stdfds(exe, argc, argv, environ);
+	if (kid < 0)
+		return -1;
+	if (sys_proc_run(kid) < 0)
+		return -1;
+	if (waitpid(kid, NULL, 0) != kid)
+		return -1;
+	return 0;
 }
 
 /* Provisions the CG cores to PID.  Returns -1 if any of them fail. */
