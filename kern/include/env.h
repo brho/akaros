@@ -34,6 +34,14 @@ struct username {
 void __set_username(struct username *u, char *name);
 void set_username(struct username *u, char *name);
 
+struct iommu_proc_link {
+	struct list_head link;
+	struct rcu_head rcu;
+	struct iommu *i;
+	struct proc *p;
+	unsigned int nr_devices;
+};
+
 #define PROC_PROGNAME_SZ 20
 // TODO: clean this up.
 struct proc {
@@ -120,8 +128,10 @@ struct proc {
 	struct vmm vmm;
 
 	struct strace		*strace;
-	struct pcidev_tq	pci_devices; /* for device passthru */
-	TAILQ_ENTRY(proc)	iommu_link;
+
+	qlock_t			dev_qlock;
+	struct list_head	iommus;
+	struct pcidev_tq	pci_devs;
 	struct dma_arena	*user_pages;
 };
 

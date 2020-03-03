@@ -16,6 +16,7 @@
 #include <arch/pci_defs.h>
 #include <ros/errno.h>
 #include <acpi.h>
+#include <process.h>
 
 /* List of all discovered devices */
 struct pcidev_stailq pci_devices = STAILQ_HEAD_INITIALIZER(pci_devices);
@@ -856,7 +857,63 @@ void pci_set_ops(struct pci_device *pdev, struct pci_ops *ops, int pci_state)
 	pdev->state = pci_state;
 }
 
-void pci_device_assign(struct pci_device *pdev, struct proc *proc)
+static void __pci_device_assign_check(struct pci_device *pdev)
+{
+	if (pdev->state != DEV_STATE_UNASSIGNED)
+		error(EBUSY, "Dev %s was not unassigned (%d, %d))", pdev->name,
+		      pdev->state,
+		      pdev->proc_owner ? pdev->proc_owner->pid : 0);
+	if (!pdev->iommu)
+		error(ENODEV, "Dev %s does not have an iommu!", pdev->name);
+	if (!pdev->_ops)
+		error(ENODEV, "Dev %s does not have pci_ops!", pdev->name);
+
+	if (pdev->proc_owner) {
+		warn("Unassigned pdev %s has owner %d, aborting", pdev->name,
+		     pdev->proc_owner->pid);
+		error(EINVAL, ERROR_FIXME);
+	}
+}
+
+static void __pci_device_assign_user(struct pci_device *pdev, struct proc *proc)
+{
+	ERRSTACK(1);
+	uintptr_t prev = switch_to(proc);
+
+	setup_dma_arena(proc);
+
+	qlock(&proc->dev_qlock);
+	qlock(&pdev->qlock);
+	if (waserror()) {
+		qunlock(&pdev->qlock);
+		qunlock(&proc->dev_qlock);
+		switch_back(proc, prev);
+		nexterror();
+	}
+	__pci_device_assign_check(pdev);
+
+	/* Ordering is important: iommu_device_assign() can throw */
+	__iommu_device_assign(pdev, proc);
+	/* Weak ref, devices get torn down synchronously during proc_destroy. */
+	pdev->proc_owner = proc;
+
+	if (!pdev->_ops->init(pdev)) {
+		__iommu_device_unassign(pdev, proc);
+		pdev->proc_owner = NULL;
+		pdev->state = DEV_STATE_BROKEN;
+		error(EFAIL, "Dev %s driver %s init failed", pdev->name,
+		      pdev->_ops->driver_name);
+	}
+
+	pdev->state = DEV_STATE_ASSIGNED_USER;
+
+	qunlock(&pdev->qlock);
+	qunlock(&proc->dev_qlock);
+	switch_back(proc, prev);
+	poperror();
+}
+
+static void __pci_device_assign_kernel(struct pci_device *pdev)
 {
 	ERRSTACK(1);
 
@@ -865,55 +922,108 @@ void pci_device_assign(struct pci_device *pdev, struct proc *proc)
 		qunlock(&pdev->qlock);
 		nexterror();
 	}
-	if (pdev->state != DEV_STATE_UNASSIGNED)
-		error(EBUSY, "Dev %s was not unassigned (%d))", pdev->name,
-		      pdev->state);
-	assert(pdev->_ops);	/* state-aware drivers need to provide ops */
 
-	/* TODO: actually assign to a process.  Consider throwers and refcnts
-	 * too. */
-	assert(!proc);
+	__pci_device_assign_check(pdev);
+
+	__iommu_device_assign(pdev, NULL);
 
 	if (!pdev->_ops->init(pdev)) {
+		__iommu_device_unassign(pdev, NULL);
 		pdev->state = DEV_STATE_BROKEN;
 		error(EFAIL, "Dev %s driver %s init failed", pdev->name,
 		      pdev->_ops->driver_name);
 	}
+
+	pdev->state = DEV_STATE_ASSIGNED_KERNEL;
+
+	qunlock(&pdev->qlock);
+	poperror();
+}
+
+void pci_device_assign(struct pci_device *pdev, struct proc *proc)
+{
 	if (proc)
-		pdev->state = DEV_STATE_ASSIGNED_PROC;
+		__pci_device_assign_user(pdev, proc);
 	else
-		pdev->state = DEV_STATE_ASSIGNED_KERNEL;
+		__pci_device_assign_kernel(pdev);
+}
+
+/* Unassigns a device we know is owned by proc.  Caller holds both locks and
+ * handles the IOMMU. */
+void pci_device_unassign_known(struct pci_device *pdev, struct proc *proc)
+{
+	uintptr_t prev;
+
+	assert(proc && pdev->proc_owner == proc);
+
+	prev = switch_to(proc);
+	if (!pdev->_ops->reset(pdev))
+		pdev->state = DEV_STATE_BROKEN;
+	else
+		pdev->state = DEV_STATE_UNASSIGNED;
+	switch_back(proc, prev);
+
+	pdev->proc_owner = NULL;
+
+	__iommu_device_unassign(pdev, proc);
+}
+
+static void __pci_device_unassign_user(struct pci_device *pdev,
+				       struct proc *proc)
+{
+	ERRSTACK(1);
+
+	qlock(&proc->dev_qlock);
+	qlock(&pdev->qlock);
+	if (waserror()) {
+		qunlock(&pdev->qlock);
+		qunlock(&proc->dev_qlock);
+		nexterror();
+	}
+	if (pdev->state != DEV_STATE_ASSIGNED_USER)
+		error(EBUSY, "Dev %s was not ASSIGNED_USER (%u)", pdev->name,
+		      pdev->state);
+	if (pdev->proc_owner != proc)
+		error(EBUSY, "Dev %s was not assigned to pid %d (%d)",
+		      pdev->name, proc->pid,
+		      pdev->proc_owner ? pdev->proc_owner->pid : 0);
+
+	pci_device_unassign_known(pdev, proc);
+
+	qunlock(&pdev->qlock);
+	qunlock(&proc->dev_qlock);
+	poperror();
+}
+
+static void __pci_device_unassign_kernel(struct pci_device *pdev)
+{
+	ERRSTACK(1);
+
+	qlock(&pdev->qlock);
+	if (waserror()) {
+		qunlock(&pdev->qlock);
+		nexterror();
+	}
+	if (pdev->state != DEV_STATE_ASSIGNED_KERNEL)
+		error(EBUSY, "Dev %s was not ASSIGNED_KERNEL (%u)", pdev->name,
+		      pdev->state);
+	assert(!pdev->proc_owner);
+
+	if (!pdev->_ops->reset(pdev))
+		pdev->state = DEV_STATE_BROKEN;
+	else
+		pdev->state = DEV_STATE_UNASSIGNED;
+
+	__iommu_device_unassign(pdev, NULL);
+
 	qunlock(&pdev->qlock);
 	poperror();
 }
 
 void pci_device_unassign(struct pci_device *pdev, struct proc *proc)
 {
-	ERRSTACK(1);
-
-	qlock(&pdev->qlock);
-	if (waserror()) {
-		qunlock(&pdev->qlock);
-		nexterror();
-	}
-	if (!(pdev->state == DEV_STATE_ASSIGNED_PROC ||
-	      pdev->state == DEV_STATE_ASSIGNED_KERNEL))
-		error(EBUSY, "Dev %s was not assigned (%u)", pdev->name,
-		      pdev->state);
-
-	if (!pdev->_ops->reset(pdev)) {
-		pdev->state = DEV_STATE_BROKEN;
-		error(EFAIL, "Dev %s driver %s reset failed", pdev->name,
-		      pdev->_ops->driver_name);
-	}
-	/* TODO: actually assign to a process.  Consider throwers and refcnts
-	 * too. */
-	if (pdev->state == DEV_STATE_ASSIGNED_PROC)
-		assert(proc);
+	if (proc)
+		__pci_device_unassign_user(pdev, proc);
 	else
-		assert(!proc);
-	pdev->state = DEV_STATE_UNASSIGNED;
-
-	qunlock(&pdev->qlock);
-	poperror();
+		__pci_device_unassign_kernel(pdev);
 }

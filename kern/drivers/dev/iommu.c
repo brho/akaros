@@ -1,21 +1,27 @@
-/*
- * File: iommu.c - Driver for accessing Intel iommu
- * Author: Aditya Basu <mitthu@google.com>
+/* Copyright (c) 2019, 2020 Google, Inc.x
  *
- * (1) proc->proc_lock => (2) iommu->iommu_lock
+ * Driver for accessing Intel iommu
+ *
+ * Aditya Basu <mitthu@google.com>
+ * Barret Rhoden <brho@cs.berkeley.edu>
+ *
+ * (1) proc->dev_qlock => (2) iommu->iommu_lock
+ * (1) proc->dev_qlock => (2) pdev->qlock
  *
  * TODO
  * ====
- *  - iommu_process_cleanup() is untested.
  *  - In iommu_map_pci_devices() assign the correct iommu for scoped DRHD. Right
  *    now the default iommu is assigned to all devices.
- *  - In assign_device() make sure the process in not in DYING or DYING_ABORT
- *    state.
- *  - Assigning processes across multiple IOMMUs / DRHDs will result in
- *    corruption of iommu->procs. This is because the tailq relies on
- *    proc->iommu_link.
  *  - IOMMU_DID_DEFAULT = 1; this means pid = 1 cannot have a device passthru
  *    because we use the pid as "did" or domain ID.
+ *
+ * lifecycle of CTE entries:
+ * - at boot, every CTE (per pdev on an iommu) is set to non-translating.  In
+ *   essence, an identity map.
+ * - pci devices are initially assigned to the kernel.
+ * - when devices are unassigned, their cte mapping is destroyed.
+ * - when they are reassigned, their mapping is set to either an identity map
+ *   (kernel) or a process's page table.
  */
 
 #include <stdio.h>
@@ -34,7 +40,8 @@
 #define BUFFERSZ 8192
 
 struct dev iommudevtab;
-struct iommu_list_tq iommu_list = TAILQ_HEAD_INITIALIZER(iommu_list);
+
+static struct iommu_list_tq iommu_list = TAILQ_HEAD_INITIALIZER(iommu_list);
 static bool is_initialized; /* to detect absence of IOMMU */
 
 /* QID Path */
@@ -44,6 +51,7 @@ enum {
 	Qadddev      = 2,
 	Qremovedev   = 3,
 	Qinfo        = 4,
+	// XXX  this doesn't work either...
 	Qpower       = 5,
 };
 
@@ -56,6 +64,7 @@ static struct dirtab iommudir[] = {
 	{"power",               {Qpower, 0, QTFILE}, 0, 0755},
 };
 
+// XXX might be?
 /* this is might be necessary when updating mapping structures: context-cache,
  * IOTLB or IEC. */
 static inline void write_buffer_flush(struct iommu *iommu)
@@ -75,12 +84,23 @@ static inline void write_buffer_flush(struct iommu *iommu)
 }
 
 /* this is necessary when caching mode is supported.
+ * 	CM=1.  it's also necessary when CM=0....
+ *
+ * XXX assumes? 
+ * 	sounds like a synchronization thing, since we spin on status
+ * 	also, how to do a global shootdown?  (can we just do that?)
+ * 	this is not the queue invalidation stuff
+ * 	also, iotlb vs context cache
+ * 		context-cache entries are the cr3
+ * 		what is the 'IPT entry changed' command?
+ *
  * ASSUMES: No pending flush requests. This is a problem only if other function
  * is used to perform the flush. */
 static inline void iotlb_flush(struct iommu *iommu, uint16_t did)
 {
 	uint64_t cmd, status;
 
+	// XXX style
 	cmd = 0x0
 	| DMA_TLB_IVT        /* issue the flush command */
 	| DMA_TLB_DSI_FLUSH  /* DID specific shootdown */
@@ -106,33 +126,50 @@ static inline struct context_entry *get_context_entry(physaddr_t paddr)
 	return (struct context_entry *) KADDR(paddr);
 }
 
-/* iommu is not modified by this function or its callees. */
-static physaddr_t ct_init(struct iommu *iommu, uint16_t did)
+static void __cte_set_identity_pgtbl(struct context_entry *cte)
+{
+	cte->hi = 0
+		| (IOMMU_DID_DEFAULT << CTX_HI_DID_SHIFT) // DID bit: 72 to 87
+		| (CTX_AW_L4 << CTX_HI_AW_SHIFT); // AW
+
+	cte->lo = 0 /* assumes page alignment */
+		| (0x2 << CTX_LO_TRANS_SHIFT)
+		| (0x1 << CTX_LO_FPD_SHIFT) // disable faults
+		| (0x1 << CTX_LO_PRESENT_SHIFT); /* mark present */
+}
+
+static void __cte_set_proc_pgtbl(struct context_entry *cte, struct proc *p)
+{
+	/* TODO: need to limit PID to 16 bits or come up with an alternative */
+	warn_on(p->pid & ~0xffff);
+
+	cte->hi = 0
+		| ((uint16_t)p->pid << CTX_HI_DID_SHIFT) // DID bit: 72 to 87
+		| (CTX_AW_L4 << CTX_HI_AW_SHIFT); // AW
+
+	/* The only difference here is PGDIR and the LO_TRANS_SHIFT */
+	cte->lo = PTE_ADDR(p->env_pgdir.eptp)
+		| (0x0 << CTX_LO_TRANS_SHIFT)
+		| (0x1 << CTX_LO_FPD_SHIFT) // disable faults
+		| (0x1 << CTX_LO_PRESENT_SHIFT); /* mark present */
+}
+
+static physaddr_t ct_init(void)
 {
 	struct context_entry *cte;
 	physaddr_t ct;
-	uint8_t ctx_aw = CTX_AW_L4;
 
 	cte = (struct context_entry *) kpage_zalloc_addr();
 	ct = PADDR(cte);
 
-	for (int i = 0; i < 32 * 8; i++, cte++) { // device * func
-		/* initializations such as the domain */
-		cte->hi = 0
-			| (did << CTX_HI_DID_SHIFT) // DID bit: 72 to 87
-			| (ctx_aw << CTX_HI_AW_SHIFT); // AW
-		cte->lo = 0
-			| (0x2 << CTX_LO_TRANS_SHIFT) // 0x2: pass through
-			| (0x1 << CTX_LO_FPD_SHIFT) // disable faults
-			| (0x1 << CTX_LO_PRESENT_SHIFT); // is present
-	}
+	for (int i = 0; i < 32 * 8; i++, cte++) // device * func
+		__cte_set_identity_pgtbl(cte);
 
 	return ct;
 }
 
-/* Get a new root_entry table. Allocates all context entries.
- * iommu is not modified by this function or its callees. */
-static physaddr_t rt_init(struct iommu *iommu, uint16_t did)
+/* Get a new root_entry table.  Allocates all context entries. */
+static physaddr_t rt_init(void)
 {
 	struct root_entry *rte;
 	physaddr_t rt;
@@ -144,82 +181,150 @@ static physaddr_t rt_init(struct iommu *iommu, uint16_t did)
 
 	/* create context table */
 	for (int i = 0; i < 256; i++, rte++) {
-		ct = ct_init(iommu, did);
+		ct = ct_init();
 		rte->hi = 0;
 		rte->lo = 0
 			| ct
 			| (0x1 << RT_LO_PRESENT_SHIFT);
+		// XXX shitty macros
 	}
 
 	return rt;
 }
 
-static struct context_entry *get_ctx_for(int bus, int dev, int func,
-	physaddr_t roottable)
+static struct context_entry *get_ctx_for(struct iommu *iommu,
+					 struct pci_device *pdev)
 {
 	struct root_entry *rte;
 	physaddr_t cte_phy;
 	struct context_entry *cte;
 	uint32_t offset = 0;
 
-	rte = get_root_entry(roottable) + bus;
+	rte = get_root_entry(iommu->roottable) + pdev->bus;
 
 	cte_phy = rte->lo & 0xFFFFFFFFFFFFF000;
 	cte = get_context_entry(cte_phy);
 
-	offset = (dev * 8) + func;
+	offset = (pdev->dev * 8) + pdev->func;
 	cte += offset;
 
 	return cte;
 }
 
-/* The process pid is used as the Domain ID (DID) */
-static void setup_page_tables(struct proc *p, struct pci_device *d)
+static void __iommu_clear_pgtbl(struct pci_device *pdev, uint16_t did)
 {
-	uint32_t cmd, status;
-	uint16_t did = p->pid; /* casts down to 16-bit */
-	struct iommu *iommu = d->iommu;
-	struct context_entry *cte =
-		get_ctx_for(d->bus, d->dev, d->func, iommu->roottable);
+	struct iommu *iommu = pdev->iommu;
+	struct context_entry *cte = get_ctx_for(iommu, pdev);
 
-	/* Mark the entry as not present */
 	cte->lo &= ~0x1;
+
+	spin_lock_irqsave(&iommu->iommu_lock);
 	write_buffer_flush(iommu);
-	iotlb_flush(iommu, IOMMU_DID_DEFAULT);
-
-	cte->hi = 0
-		| (did << CTX_HI_DID_SHIFT) // DID bit: 72 to 87
-		| (CTX_AW_L4 << CTX_HI_AW_SHIFT); // AW
-
-	cte->lo = PTE_ADDR(p->env_pgdir.eptp)
-		| (0x0 << CTX_LO_TRANS_SHIFT)
-		| (0x1 << CTX_LO_FPD_SHIFT) // disable faults
-		| (0x1 << CTX_LO_PRESENT_SHIFT); /* mark present */
+	iotlb_flush(iommu, did);
+	spin_unlock_irqsave(&iommu->iommu_lock);
 }
 
-/* TODO: We should mark the entry as not present to block any stray DMAs from
- * reaching the kernel. To force a re-attach the device to the kernel, we can
- * use pid 0. */
-static void teardown_page_tables(struct proc *p, struct pci_device *d)
+/* Hold the proc's dev_qlock.  This returns the linkage for p and i, and inserts
+ * if it it didn't exist. */
+static struct iommu_proc_link *__get_linkage(struct proc *p, struct iommu *i)
 {
-	uint16_t did = IOMMU_DID_DEFAULT;
-	struct iommu *iommu = d->iommu;
-	struct context_entry *cte =
-		get_ctx_for(d->bus, d->dev, d->func, iommu->roottable);
+	struct iommu_proc_link *l;
 
-	/* Mark the entry as not present */
-	cte->lo &= ~0x1;
-	write_buffer_flush(iommu);
-	iotlb_flush(iommu, p->pid);
+	list_for_each_entry(l, &p->iommus, link) {
+		if (l->i == i)
+			return l;
+	}
+	l = kmalloc(sizeof(struct iommu_proc_link), MEM_WAIT);
+	l->i = i;
+	l->p = p;
+	l->nr_devices = 0;
+	list_add_rcu(&l->link, &p->iommus);
+	return l;
+}
 
-	cte->hi = 0
-		| (did << CTX_HI_DID_SHIFT) // DID bit: 72 to 87
-		| (CTX_AW_L4 << CTX_HI_AW_SHIFT); // AW
+/* Caller holds the pdev->qlock and if proc, the proc->dev_qlock.
+ * Careful, this can throw. */
+void __iommu_device_assign(struct pci_device *pdev, struct proc *proc)
+{
+	struct iommu *iommu = pdev->iommu;
+	struct iommu_proc_link *l;
 
-	cte->lo = 0 /* assumes page alignment */
-		| (0x2 << CTX_LO_TRANS_SHIFT)
-		| (0x1 << CTX_LO_FPD_SHIFT) // disable faults
-		| (0x1 << CTX_LO_PRESENT_SHIFT); /* mark present */
+	if (!proc) {
+		__cte_set_identity_pgtbl(get_ctx_for(pdev->iommu, pdev));
+		return;
+	}
+
+	/* Lockless peek.  We hold the dev_qlock, so if we are concurrently
+	 * dying, proc_destroy() will come behind us and undo this.  If
+	 * proc_destroy() already removed all devices, we would see DYING. */
+	if (proc_is_dying(proc))
+		error(EINVAL, "process is dying");
+	l = __get_linkage(proc, iommu);
+
+	l->nr_devices++;
+	TAILQ_INSERT_TAIL(&proc->pci_devs, pdev, proc_link);
+
+	__cte_set_proc_pgtbl(get_ctx_for(pdev->iommu, pdev), proc);
+}
+
+/* Caller holds the pdev->qlock and if proc, the proc->dev_qlock. */
+void __iommu_device_unassign(struct pci_device *pdev, struct proc *proc)
+{
+	struct iommu *iommu = pdev->iommu;
+	struct iommu_proc_link *l;
+
+	assert(iommu == pdev->iommu);
+
+	if (!proc) {
+		__iommu_clear_pgtbl(pdev, IOMMU_DID_DEFAULT);
+		return;
+	}
+
+	l = __get_linkage(proc, iommu);
+
+	__iommu_clear_pgtbl(pdev, proc->pid);
+
+	l->nr_devices--;
+	if (!l->nr_devices) {
+		list_del_rcu(&l->link);
+		kfree_rcu(l, rcu);
+	}
+
+	TAILQ_REMOVE(&proc->pci_devs, pdev, proc_link);
+}
+
+void iommu_unassign_all_devices(struct proc *p)
+{
+	struct pci_device *pdev, *tp;
+
+	qlock(&p->dev_qlock);
+	/* If you want to get clever and try to batch up the iotlb flushes, it's
+	 * probably not worth it.  The big concern is that the moment you unlock
+	 * the pdev, it can be reassigned.  If you didn't flush the iotlb yet,
+	 * it might have old entries.  Note that when we flush, we pass the DID
+	 * (p->pid), which the next user of the pdev won't know.  I don't know
+	 * if you need to flush the old DID entry or not before reusing a CTE,
+	 * though probably. */
+	TAILQ_FOREACH_SAFE(pdev, &p->pci_devs, proc_link, tp) {
+		qlock(&pdev->qlock);
+		pci_device_unassign_known(pdev, p);
+		qunlock(&pdev->qlock);
+	}
+	qunlock(&p->dev_qlock);
+}
+
+void proc_iotlb_flush(struct proc *p)
+{
+	struct iommu_proc_link *l;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(l, &p->iommus, link) {
+		spin_lock_irqsave(&l->i->iommu_lock);
+		write_buffer_flush(l->i);
+		iotlb_flush(l->i, p->pid);
+		spin_unlock_irqsave(&l->i->iommu_lock);
+	}
+	rcu_read_unlock();
 }
 
 static bool _iommu_enable(struct iommu *iommu)
@@ -296,13 +401,16 @@ void iommu_disable(void)
 		_iommu_disable(iommu);
 }
 
+// XXX wtf is this?
 static bool _iommu_status(struct iommu *iommu)
 {
 	uint32_t status = 0;
 
+	// XXX what does this protect?
 	spin_lock_irqsave(&iommu->iommu_lock);
 
-	/* read status */
+	// XXX meaningless comment
+	/* read status */ 
 	status = read32(iommu->regio + DMAR_GSTS_REG);
 
 	spin_unlock_irqsave(&iommu->iommu_lock);
@@ -321,121 +429,60 @@ bool iommu_status(void)
 	return false;
 }
 
-/* Helpers for set/get/init PCI device (BDF) <=> Process map */
-static bool proc_already_in_iommu_list(struct iommu *iommu, struct proc *p)
+static void assign_device(int bus, int dev, int func, pid_t pid)
 {
-	struct proc *proc_iter;
-
-	TAILQ_FOREACH(proc_iter, &iommu->procs, iommu_link)
-		if (proc_iter == p)
-			return true;
-
-	return false;
-}
-
-/* this function retains a KREF to struct proc for each assigned PCI device */
-static bool assign_device(int bus, int dev, int func, pid_t pid)
-{
+	ERRSTACK(1);
 	int tbdf = MKBUS(BusPCI, bus, dev, func);
-	struct pci_device *d = pci_match_tbdf(tbdf);
-	struct proc *p = pid2proc(pid);
-
-	if (!p)
-		error(EIO, "cannot find pid %d\n", pid);
-
-	if (pid == 1) {
-		proc_decref(p);
-		error(EIO, "device passthru not supported for pid = 1");
-	}
-
-	if (!d) {
-		proc_decref(p);
-		error(EIO, "cannot find dev %x:%x.%x\n", bus, dev, func);
-	}
-
-	/* grab locks */
-	spin_lock_irqsave(&p->proc_lock);
-	spin_lock_irqsave(&d->iommu->iommu_lock);
-
-	if (d->proc_owner) {
-		spin_unlock_irqsave(&d->iommu->iommu_lock);
-		spin_unlock_irqsave(&p->proc_lock);
-		proc_decref(p);
-		error(EIO, "dev already assigned to pid = %d\n", p->pid);
-	}
-
-	d->proc_owner = p; /* protected by iommu_lock */
-	d->iommu->num_assigned_devs += 1; /* protected by iommu_lock */
-
-	/* add device to list in struct proc */
-	TAILQ_INSERT_TAIL(&p->pci_devices, d, proc_link);
-
-	/* add proc to list in struct iommu */
-	if (!proc_already_in_iommu_list(d->iommu, p))
-		TAILQ_INSERT_TAIL(&d->iommu->procs, p, iommu_link);
-
-	/* setup the actual page tables */
-	setup_page_tables(p, d);
-
-	/* release locks */
-	spin_unlock_irqsave(&d->iommu->iommu_lock);
-	spin_unlock_irqsave(&p->proc_lock);
-
-	return true;
-}
-
-static bool unassign_device(int bus, int dev, int func)
-{
-	int tbdf = MKBUS(BusPCI, bus, dev, func);
-	struct pci_device *d = pci_match_tbdf(tbdf);
+	struct pci_device *pdev = pci_match_tbdf(tbdf);
 	struct proc *p;
 
-	if (!d)
-		error(EIO, "cannot find dev %x:%x.%x", bus, dev, func);
-
-	/* TODO: this will break if there are multiple threads calling unassign.
-	 * Might require rethinking the lock ordering and synchronization */
-	p = d->proc_owner;
+	if (!pdev)
+		error(EIO, "cannot find dev %x:%x.%x\n", bus, dev, func);
+	if (!pid) {
+		pci_device_assign(pdev, NULL);
+		return;
+	}
+	if (pid == 1)
+		error(EIO, "device passthru not supported for pid = 1");
+	p = pid2proc(pid);
 	if (!p)
-		error(EIO, "%x:%x.%x is not assigned to any process",
-			bus, dev, func);
-
-	/* grab locks */
-	spin_lock_irqsave(&p->proc_lock);
-	spin_lock_irqsave(&d->iommu->iommu_lock);
-
-	/* teardown page table association */
-	teardown_page_tables(p, d);
-
-	d->proc_owner = NULL; /* protected by iommu_lock */
-	d->iommu->num_assigned_devs -= 1; /* protected by iommu_lock */
-
-	/* remove device from list in struct proc */
-	TAILQ_REMOVE(&p->pci_devices, d, proc_link);
-
-	/* remove proc from list in struct iommu, if active device passthru */
-	if (TAILQ_EMPTY(&p->pci_devices))
-		TAILQ_REMOVE(&d->iommu->procs, p, iommu_link);
-
-	/* release locks */
-	spin_unlock_irqsave(&d->iommu->iommu_lock);
-	spin_unlock_irqsave(&p->proc_lock);
-
-	/* decrement KREF for this PCI device */
+		error(EIO, "cannot find pid %d\n", pid);
+	if (waserror()) {
+		proc_decref(p);
+		nexterror();
+	}
+	pci_device_assign(pdev, p);
 	proc_decref(p);
-
-	return true;
+	poperror();
 }
 
-void iommu_process_cleanup(struct proc *p)
+static void unassign_device(int bus, int dev, int func, pid_t pid)
 {
-	struct pci_device *pcidev;
+	ERRSTACK(1);
+	int tbdf = MKBUS(BusPCI, bus, dev, func);
+	struct pci_device *pdev = pci_match_tbdf(tbdf);
+	struct proc *p;
 
-	// TODO: grab proc_lock
-	TAILQ_FOREACH(pcidev, &p->pci_devices, proc_link)
-		unassign_device(pcidev->bus, pcidev->dev, pcidev->func);
+	if (!pdev)
+		error(EIO, "cannot find dev %x:%x.%x\n", bus, dev, func);
+	if (!pid) {
+		pci_device_unassign(pdev, NULL);
+		return;
+	}
+	p = pid2proc(pid);
+	if (!p)
+		error(EIO, "cannot find pid %d\n", pid);
+	if (waserror()) {
+		proc_decref(p);
+		nexterror();
+	}
+	pci_device_unassign(pdev, p);
+	proc_decref(p);
+	poperror();
 }
 
+
+// XXX user pointer, parsecmd, \n
 static int write_add_dev(char *va, size_t n)
 {
 	int bus, dev, func, err;
@@ -450,8 +497,7 @@ static int write_add_dev(char *va, size_t n)
 	if (pid == 1)
 		error(EIO, IOMMU "device passthru not supported for pid = 1");
 
-	if (!assign_device(bus, dev, func, pid))
-		error(EIO, "passthru failed");
+	assign_device(bus, dev, func, pid);
 
 	return n;
 }
@@ -459,14 +505,15 @@ static int write_add_dev(char *va, size_t n)
 static int write_remove_dev(char *va, size_t n)
 {
 	int bus, dev, func, err;
+	pid_t pid;
 
-	err = sscanf(va, "%x:%x.%x\n", &bus, &dev, &func);
+	err = sscanf(va, "%x:%x.%x %d\n", &bus, &dev, &func, &pid);
 
-	if (err != 3)
+	if (err != 4)
 		error(EIO,
 		  IOMMU "error parsing #iommu/detach; items parsed: %d", err);
 
-	unassign_device(bus, dev, func);
+	unassign_device(bus, dev, func, pid);
 
 	return n;
 }
@@ -475,6 +522,8 @@ static int write_power(char *va, size_t n)
 {
 	int err;
 
+	// XXX strcmp, but what if size < n?
+	// XXX use parsecmd
 	if (!strcmp(va, "enable") || !strcmp(va, "on")) {
 		iommu_enable();
 		return n;
@@ -482,37 +531,30 @@ static int write_power(char *va, size_t n)
 		iommu_disable();
 		return n;
 	} else
-		return n;
-}
-
-static void _open_mappings(struct sized_alloc *sza, struct proc *proc)
-{
-	struct pci_device *pcidev;
-
-	sza_printf(sza, "\tpid = %d\n", proc->pid);
-	TAILQ_FOREACH(pcidev, &proc->pci_devices, proc_link) {
-		sza_printf(sza, "\t\tdevice = %x:%x.%x\n", pcidev->bus,
-				pcidev->dev, pcidev->func);
-	}
+		return n;// XXX error?
 }
 
 static struct sized_alloc *open_mappings(void)
 {
 	struct iommu *iommu;
-	struct proc *proc;
+	bool has_dev = false;
+	struct pci_device *pdev;
 	struct sized_alloc *sza = sized_kzmalloc(BUFFERSZ, MEM_WAIT);
 
 	TAILQ_FOREACH(iommu, &iommu_list, iommu_link) {
-		spin_lock_irqsave(&iommu->iommu_lock);
-
 		sza_printf(sza, "Mappings for iommu@%p\n", iommu);
-		if (TAILQ_EMPTY(&iommu->procs))
-			sza_printf(sza, "\t<empty>\n");
-		else
-			TAILQ_FOREACH(proc, &iommu->procs, iommu_link)
-				_open_mappings(sza, proc);
-
+		spin_lock_irqsave(&iommu->iommu_lock);
+		TAILQ_FOREACH(pdev, &iommu->pci_devs, iommu_link) {
+			if (!pdev->proc_owner)
+				continue;
+			has_dev = true;
+			sza_printf(sza, "\tdevice %02x:%02x.%x, PID %u\n",
+				   pdev->bus, pdev->dev, pdev->func,
+				   pdev->proc_owner->pid);
+		}
 		spin_unlock_irqsave(&iommu->iommu_lock);
+		if (!has_dev)
+			sza_printf(sza, "\t<empty>\n");
 	}
 
 	return sza;
@@ -525,7 +567,6 @@ static void _open_info(struct iommu *iommu, struct sized_alloc *sza)
 	sza_printf(sza, "\niommu@%p\n", iommu);
 	sza_printf(sza, "\trba = %p\n", iommu->rba);
 	sza_printf(sza, "\tsupported = %s\n", iommu->supported ? "yes" : "no");
-	sza_printf(sza, "\tnum_assigned_devs = %d\n", iommu->num_assigned_devs);
 	sza_printf(sza, "\tregspace = %p\n", iommu->regio);
 	sza_printf(sza, "\thost addr width (dmar) = %d\n", iommu->haw_dmar);
 	sza_printf(sza, "\thost addr width (cap[mgaw]) = %d\n",
@@ -731,6 +772,7 @@ static size_t iommuwrite(struct chan *c, void *va, size_t n, off64_t offset)
 		err = write_remove_dev(va, n);
 		break;
 	case Qpower:
+		// XXX no check for supported?
 		err = write_power(va, n);
 		break;
 	case Qmappings:
@@ -821,15 +863,40 @@ static void iommu_assert_all(void)
 		iommu_assert_required_capabilities(iommu);
 }
 
+/* IOMMU entries are set to non-translating identity maps */
 static void iommu_populate_fields(void)
 {
 	struct iommu *iommu;
+        uint64_t cap, ecap;
 
-	TAILQ_FOREACH(iommu, &iommu_list, iommu_link)
-		iommu->roottable = rt_init(iommu, IOMMU_DID_DEFAULT);
+	TAILQ_FOREACH(iommu, &iommu_list, iommu_link) {
+		iommu->roottable = rt_init();
+
+                cap = read64(iommu->regio + DMAR_CAP_REG);
+                ecap = read64(iommu->regio + DMAR_ECAP_REG);
+
+                iommu->roottable = rt_init();
+                iommu->iotlb_cmd_offset = ecap_iotlb_offset(ecap) + 8;
+                iommu->iotlb_addr_offset = ecap_iotlb_offset(ecap);
+
+		// XXX style
+                if (cap_rwbf(cap))
+                        iommu->rwbf = true;
+                else
+                        iommu->rwbf = false;
+
+		// XXX style
+                if (ecap_dev_iotlb_support(ecap))
+                        iommu->device_iotlb = true;
+		else
+                        iommu->device_iotlb = false;
+
+        }
 }
 
 /* Run this function after all individual IOMMUs are initialized. */
+// XXX is this called more than once?
+// 	do we need this?  can be done on the fly with each one?
 void iommu_initialize_global(void)
 {
 	if (!is_initialized)
@@ -842,6 +909,8 @@ void iommu_initialize_global(void)
 	iommu_enable();
 }
 
+// XXX probably set a global - this never changes...
+// 	worth returning a char *reason?
 /* should only be called after all iommus are initialized */
 bool iommu_supported(void)
 {
@@ -859,6 +928,7 @@ bool iommu_supported(void)
 }
 
 /* grabs the iommu of the first DRHD with INCLUDE_PCI_ALL */
+	// XXX can there be more than one?
 struct iommu *get_default_iommu(void)
 {
 	struct Dmar *dt;
@@ -888,25 +958,27 @@ void iommu_map_pci_devices(void)
 		return;
 
 	/* set the default iommu */
-	STAILQ_FOREACH(pci_iter, &pci_devices, all_dev)
+	STAILQ_FOREACH(pci_iter, &pci_devices, all_dev) {
 		pci_iter->iommu = iommu;
+		TAILQ_INSERT_TAIL(&iommu->pci_devs, pci_iter, iommu_link);
+	}
 
 	// TODO: parse devscope and assign scoped iommus
 }
 
 /* This is called from acpi.c to initialize struct iommu.
  * The actual IOMMU hardware is not touch or configured in any way. */
+	// XXX why not?  or change the name
 void iommu_initialize(struct iommu *iommu, uint8_t haw, uint64_t rba)
 {
 	is_initialized = true;
 
-	/* initialize the struct */
-	TAILQ_INIT(&iommu->procs);
+	TAILQ_INIT(&iommu->pci_devs);
 	spinlock_init_irqsave(&iommu->iommu_lock);
 	iommu->rba = rba;
 	iommu->regio = (void __iomem *) vmap_pmem_nocache(rba, VTD_PAGE_SIZE);
+	// XXX why not run it then?  or false initially?
 	iommu->supported = true; /* this gets updated by iommu_supported() */
-	iommu->num_assigned_devs = 0;
 	iommu->haw_dmar = haw;
 
 	/* add the iommu to the list of all discovered iommu */

@@ -210,7 +210,7 @@ enum {
 	DEV_STATE_BROKEN = 1,
 	DEV_STATE_UNASSIGNED = 2,
 	DEV_STATE_ASSIGNED_KERNEL = 3,
-	DEV_STATE_ASSIGNED_PROC = 4,
+	DEV_STATE_ASSIGNED_USER = 4,
 };
 
 struct pci_device {
@@ -249,7 +249,8 @@ struct pci_device {
 	uintptr_t			msix_pba_vaddr;
 	unsigned int			msix_nr_vec;
 	bool				msix_ready;
-	TAILQ_ENTRY(pci_device)		proc_link; /* for device passthru */
+	TAILQ_ENTRY(pci_device)		iommu_link;
+	TAILQ_ENTRY(pci_device)		proc_link;
 	struct proc			*proc_owner;
 };
 
@@ -318,6 +319,7 @@ int pci_set_mwi(struct pci_device *dev);
 void pci_clear_mwi(struct pci_device *dev);
 void pci_set_ops(struct pci_device *pdev, struct pci_ops *ops, int pci_state);
 void pci_device_assign(struct pci_device *pdev, struct proc *proc);
+void pci_device_unassign_known(struct pci_device *pdev, struct proc *proc);
 void pci_device_unassign(struct pci_device *pdev, struct proc *proc);
 
 static inline void pci_set_drvdata(struct pci_device *pcidev, void *data);

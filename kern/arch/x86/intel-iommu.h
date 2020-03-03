@@ -51,21 +51,19 @@
 struct iommu {
 	spinlock_t iommu_lock;
 	TAILQ_ENTRY(iommu) iommu_link;
-	struct proc_list procs; // unused
 	bool supported;
 	bool device_iotlb;
 	bool rwbf;
-
 	uint16_t iotlb_cmd_offset;
 	uint16_t iotlb_addr_offset;
 	void __iomem *regio;
 	uint64_t rba; /* for unique assertion */
-	uint64_t num_assigned_devs;
 	physaddr_t roottable;
 	uint8_t haw_dmar; /* (=N+1) haw reported by DMAR */
 	uint8_t haw_cap; /* (=N+1) haw reported by CAP[MGAW] of iommu */
+	struct pcidev_tq pci_devs;
 };
-extern TAILQ_HEAD(iommu_list_tq, iommu) iommu_list;
+TAILQ_HEAD(iommu_list_tq, iommu);
 
 void iommu_initialize(struct iommu *iommu, uint8_t haw, uint64_t rba);
 void iommu_initialize_global(void);
@@ -75,8 +73,10 @@ struct iommu *get_default_iommu(void); /* IOMMU of DRHD with INCLUDE_PCI_ALL */
 void iommu_enable(void); /* enable all iommus */
 void iommu_disable(void); /* disable all iommus */
 bool iommu_status(void); /* returns true if any iommu is turned on */
-/* remove all pci devices associated with proc */
-void iommu_process_cleanup(struct proc *p);
+
+void iommu_unassign_all_devices(struct proc *p);
+void __iommu_device_assign(struct pci_device *pdev, struct proc *proc);
+void __iommu_device_unassign(struct pci_device *pdev, struct proc *proc);
 
 /*
  * VT-d hardware uses 4KiB page size regardless of host page size.

@@ -26,6 +26,7 @@
 #include <ros/procinfo.h>
 #include <init.h>
 #include <rcu.h>
+#include <arch/intel-iommu.h>
 
 struct kmem_cache *proc_cache;
 
@@ -460,7 +461,9 @@ error_t proc_alloc(struct proc **pp, struct proc *parent, int flags)
 	memset(&p->vmm, 0, sizeof(struct vmm));
 	spinlock_init(&p->vmm.lock);
 	qlock_init(&p->vmm.qlock);
-	TAILQ_INIT(&p->pci_devices);
+	qlock_init(&p->dev_qlock);
+	TAILQ_INIT(&p->pci_devs);
+	INIT_LIST_HEAD(&p->iommus);
 	printd("[%08x] new process %08x\n", current ? current->pid : 0, p->pid);
 	*pp = p;
 	return 0;
@@ -950,6 +953,7 @@ void proc_destroy(struct proc *p)
 	 * we wake all old sleepers). */
 	__proc_set_state(p, PROC_DYING_ABORT);
 	abort_all_sysc(p);
+	iommu_unassign_all_devices(p);
 	/* Tell the ksched about our death, and which cores we freed up */
 	__sched_proc_destroy(p, pc_arr, nr_cores_revoked);
 	/* Tell our parent about our state change (to DYING) */
