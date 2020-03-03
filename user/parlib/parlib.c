@@ -5,6 +5,7 @@
 #include <parlib/parlib.h>
 #include <parlib/core_set.h>
 #include <parlib/ros_debug.h>
+#include <parlib/event.h>
 #include <stdlib.h>
 
 /* Control variables */
@@ -108,4 +109,41 @@ int provision_core_set(pid_t pid, const struct core_set *cores)
 		}
 	}
 	return 0;
+}
+
+/* This sets up 'handler' to be run when the process receives EV_FREE_APPLE_PIE
+ * (9).  You can send this event with the notify utility:
+ *
+ *	notify PID 9 [Arg1 Arg2 0xArg3 Arg4]
+ *
+ * A simple debug handler can switch on an arg:
+
+	static void notify_ipi(struct event_msg *ev_msg, unsigned int ev_type,
+	                       void *data)
+	{
+		switch (ev_msg->ev_arg1) {
+		case 1:
+			// do something
+			break;
+		case 2:
+			// do something else
+			break;
+		default:
+			printf("Unknown arg %d\n", ev_msg->ev_arg1);
+			break;
+		}
+	}
+
+ */
+void set_notify_9(void (*handler)(struct event_msg *ev_msg,
+				  unsigned int ev_type, void *data),
+		  void *data)
+{
+	struct event_queue *evq;
+
+	register_ev_handler(EV_FREE_APPLE_PIE, handler, data);
+	evq = get_eventq(EV_MBOX_UCQ);
+	evq->ev_flags = EVENT_IPI | EVENT_INDIR | EVENT_SPAM_INDIR |
+		        EVENT_WAKEUP;
+	register_kevent_q(evq, EV_FREE_APPLE_PIE);
 }

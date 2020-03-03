@@ -75,6 +75,11 @@ pid_t create_child_with_stdfds(const char *exe, int argc, char *const argv[],
                                char *const envp[]);
 int provision_core_set(pid_t pid, const struct core_set *cores);
 
+/* Debugging */
+void set_notify_9(void (*handler)(struct event_msg *ev_msg,
+				  unsigned int ev_type, void *data),
+		  void *data);
+
 /* Once */
 typedef struct {
 	bool ran_once;
