@@ -3,6 +3,7 @@
 #include <ros/common.h>
 #include <ros/time.h>
 #include <arch/time.h>
+#include <arch/arch.h>
 #include <ros/procinfo.h>
 
 /* Conversion factors */
@@ -100,6 +101,37 @@ uint64_t nsec(void)
 {
 	return tsc2nsec(read_tsc());
 }
+
+/* Repeatedly runs 'command' until it succeeds or usec time passes.  Returns
+ * true on success, false on timeout.
+ *
+ * 'command' must fit on the right hand side of an assignment and return
+ * non-zero on success, or o/w cast to a bool.
+ *
+ * We don't compute the deadline immediately so as to avoid read_tsc's overhead
+ * for cases where we don't have to wait at all.
+ *
+ * The cpu_relax() is for code that wants to check memory that isn't marked
+ * volatile. */
+#define retry_until(command, usec)					\
+({									\
+	uint64_t __dl = 0;						\
+	bool __ret;							\
+									\
+	for (;;) {							\
+		__ret = (command);					\
+		if (__ret)						\
+			break;						\
+		if (!__dl)						\
+			__dl = usec2tsc(usec) + read_tsc();		\
+		if (read_tsc() > __dl) {				\
+			__ret = false;					\
+			break;						\
+		}							\
+		cpu_relax();						\
+	}								\
+	__ret;								\
+})
 
 
 /* Ancient measurement crap below.  TODO: use or lose it */
