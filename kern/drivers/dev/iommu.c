@@ -22,6 +22,17 @@
  * - when devices are unassigned, their cte mapping is destroyed.
  * - when they are reassigned, their mapping is set to either an identity map
  *   (kernel) or a process's page table.
+ *
+ * - On the topic of disabling the IOMMU, we used to have an option to just
+ *   unset it completely.  Disable TE, clear the root pointer.  Though the code
+ *   we had was hokey and broken.  Even then, if we have a device behind an
+ *   IOMMU and disable the IOMMU, that would just fuck everything up.  Maybe if
+ *   we had identity mapped pages in the IPT, so that when translation turned
+ *   off, the device would still work.  Seems like a mess.
+ *
+ * - We ought to do a domain-selective, context-cache invalidation whenever we
+ *   reuse DIDs.  aka, whenever there is a new IPT for a pid, which is every 65k
+ *   processes.  Or maybe every 16k, depending on how many pids we have.
  */
 
 #include <stdio.h>
@@ -42,7 +53,7 @@
 struct dev iommudevtab;
 
 static struct iommu_list_tq iommu_list = TAILQ_HEAD_INITIALIZER(iommu_list);
-static bool is_initialized; /* to detect absence of IOMMU */
+static bool iommu_is_supported;
 
 /* QID Path */
 enum {
@@ -51,8 +62,6 @@ enum {
 	Qadddev      = 2,
 	Qremovedev   = 3,
 	Qinfo        = 4,
-	// XXX  this doesn't work either...
-	Qpower       = 5,
 };
 
 static struct dirtab iommudir[] = {
@@ -61,12 +70,28 @@ static struct dirtab iommudir[] = {
 	{"attach",              {Qadddev, 0, QTFILE}, 0, 0755},
 	{"detach",              {Qremovedev, 0, QTFILE}, 0, 0755},
 	{"info",                {Qinfo, 0, QTFILE}, 0, 0755},
-	{"power",               {Qpower, 0, QTFILE}, 0, 0755},
 };
 
-// XXX might be?
-/* this is might be necessary when updating mapping structures: context-cache,
- * IOTLB or IEC. */
+/* OK, we never actually use these, since we won't support any IOMMU that
+ * requires RWBF (Required Write Buffer Flushing).
+ *
+ * On older hardware, if we updated data structures from software, the IOMMU
+ * wouldn't necessarily see it.  The software write would get held up at various
+ * write buffers.  See 6.8.
+ *
+ * Certain operations, such as ctx cache and iotlb flushes, were OK.  The HW
+ * would implicitly do a write buffer flush.  Other operations, like changing an
+ * IPT PTE, which do not necessarily require a command flush, would need the
+ * WBF.
+ *
+ * This is different than caching mode (CM).  In CM, hardware (or more often a
+ * virtual IOMMU) caches negative PTEs, and you need to poke the IOMMU whenever
+ * changing any PTE.  This RWBF isn't about caching old values; it's about not
+ * seeing new values due to buffering.
+ *
+ * Just about any time you want to do a CM operation, you'd also want to check
+ * for RWBF.  Though note that we do not use the IOMMU if it requires either CM
+ * or RWBF. */
 static inline void write_buffer_flush(struct iommu *iommu)
 {
 	uint32_t cmd, status;
@@ -77,43 +102,37 @@ static inline void write_buffer_flush(struct iommu *iommu)
 	cmd = read32(iommu->regio + DMAR_GCMD_REG) | DMA_GCMD_WBF;
 	write32(cmd, iommu->regio + DMAR_GCMD_REG);
 
-	/* read status */
 	do {
 		status = read32(iommu->regio + DMAR_GSTS_REG);
 	} while (status & DMA_GSTS_WBFS);
 }
 
-/* this is necessary when caching mode is supported.
- * 	CM=1.  it's also necessary when CM=0....
- *
- * XXX assumes? 
- * 	sounds like a synchronization thing, since we spin on status
- * 	also, how to do a global shootdown?  (can we just do that?)
- * 	this is not the queue invalidation stuff
- * 	also, iotlb vs context cache
- * 		context-cache entries are the cr3
- * 		what is the 'IPT entry changed' command?
- *
- * ASSUMES: No pending flush requests. This is a problem only if other function
- * is used to perform the flush. */
-static inline void iotlb_flush(struct iommu *iommu, uint16_t did)
+/* OK, read and write draining on flush.  At first I thought this was about
+ * ops that queued up, but hadn't gone through the IOMMU yet.  Instead, this is
+ * about ops that made it through the IOMMU, but have not made it to main
+ * memory.  i.e., the IOMMU translated to a physical address, but the write to
+ * that paddr hasn't made it to RAM.  The reason we ask for a TLB flush is
+ * typically to make sure the PTE / translation is no longer in use.  Undrained
+ * operations that made it past the IOMMU are still using the old translation.
+ * Thus we should always read/write drain. */
+static void __iotlb_flush_global(struct iommu *iommu)
 {
-	uint64_t cmd, status;
+	write64(DMA_TLB_IVT | DMA_TLB_READ_DRAIN | DMA_TLB_WRITE_DRAIN |
+		DMA_TLB_GLOBAL_FLUSH,
+		iommu->regio + iommu->iotlb_cmd_offset);
 
-	// XXX style
-	cmd = 0x0
-	| DMA_TLB_IVT        /* issue the flush command */
-	| DMA_TLB_DSI_FLUSH  /* DID specific shootdown */
-	| DMA_TLB_READ_DRAIN
-	| DMA_TLB_WRITE_DRAIN
-	| DMA_TLB_DID(did);
-	write64(cmd, iommu->regio + iommu->iotlb_cmd_offset);
+	while (read64(iommu->regio + iommu->iotlb_cmd_offset) & DMA_TLB_IVT)
+		cpu_relax();
+}
 
-	/* read status */
-	do {
-		status = read64(iommu->regio + iommu->iotlb_cmd_offset);
-		status >>= 63; /* bit 64 (IVT): gets cleared on completion */
-	} while (status);
+static void iotlb_flush(struct iommu *iommu, uint16_t did)
+{
+	write64(DMA_TLB_IVT | DMA_TLB_READ_DRAIN | DMA_TLB_WRITE_DRAIN |
+		DMA_TLB_DSI_FLUSH | DMA_TLB_DID(did),
+		iommu->regio + iommu->iotlb_cmd_offset);
+
+	while (read64(iommu->regio + iommu->iotlb_cmd_offset) & DMA_TLB_IVT)
+		cpu_relax();
 }
 
 static inline struct root_entry *get_root_entry(physaddr_t paddr)
@@ -186,7 +205,6 @@ static physaddr_t rt_init(void)
 		rte->lo = 0
 			| ct
 			| (0x1 << RT_LO_PRESENT_SHIFT);
-		// XXX shitty macros
 	}
 
 	return rt;
@@ -219,7 +237,6 @@ static void __iommu_clear_pgtbl(struct pci_device *pdev, uint16_t did)
 	cte->lo &= ~0x1;
 
 	spin_lock_irqsave(&iommu->iommu_lock);
-	write_buffer_flush(iommu);
 	iotlb_flush(iommu, did);
 	spin_unlock_irqsave(&iommu->iommu_lock);
 }
@@ -320,113 +337,250 @@ void proc_iotlb_flush(struct proc *p)
 	rcu_read_lock();
 	list_for_each_entry_rcu(l, &p->iommus, link) {
 		spin_lock_irqsave(&l->i->iommu_lock);
-		write_buffer_flush(l->i);
 		iotlb_flush(l->i, p->pid);
 		spin_unlock_irqsave(&l->i->iommu_lock);
 	}
 	rcu_read_unlock();
 }
 
-static bool _iommu_enable(struct iommu *iommu)
+static void __set_root_table(struct iommu *iommu, physaddr_t roottable)
 {
-	uint32_t cmd, status;
-
-	spin_lock_irqsave(&iommu->iommu_lock);
-
-	/* write the root table address */
-	write64(iommu->roottable, iommu->regio + DMAR_RTADDR_REG);
-
-	// TODO: flush IOTLB if reported as necessary by cap register
-	// TODO: issue TE only once
-
-	/* set root table - needs to be done first */
-	cmd = DMA_GCMD_SRTP;
-	write32(cmd, iommu->regio + DMAR_GCMD_REG);
-
-	/* enable translation */
-	cmd = DMA_GCMD_TE;
-	write32(cmd, iommu->regio + DMAR_GCMD_REG);
-
-	/* read status */
-	status = read32(iommu->regio + DMAR_GSTS_REG);
-
-	spin_unlock_irqsave(&iommu->iommu_lock);
-
-	return status & DMA_GSTS_TES;
+	write64(roottable, iommu->regio + DMAR_RTADDR_REG);
+	write32(DMA_GCMD_SRTP, iommu->regio + DMAR_GCMD_REG);
+	/* Unlike the write-buffer-flush status and ICC completion check,
+	 * hardware *sets* the bit to 1 when it is done */
+	while (!(read32(iommu->regio + DMAR_GSTS_REG) & DMA_GSTS_RTPS))
+		cpu_relax();
 }
 
-void iommu_enable(void)
+static void __inval_ctx_cache_global(struct iommu *iommu)
+{
+	write64(DMA_CCMD_ICC | DMA_CCMD_GLOBAL_INVL,
+		iommu->regio + DMAR_CCMD_REG);
+	while (read64(iommu->regio + DMAR_CCMD_REG) & DMA_CCMD_ICC)
+		cpu_relax();
+}
+
+static void __enable_translation(struct iommu *iommu)
+{
+	/* see 10.4.4 for some concerns if we want to update multiple fields.
+	 * (read status, mask the one-shot commands we don't want on, then set
+	 * the ones we do want). */
+	write32(DMA_GCMD_TE, iommu->regio + DMAR_GCMD_REG);
+	while (!(read32(iommu->regio + DMAR_GSTS_REG) & DMA_GSTS_TES))
+		cpu_relax();
+}
+
+/* Given an iommu with a root table, enable translation.  The default root table
+ * (from rt_init()) is set up to not translate.  i.e. IOVA == PA. */
+static void iommu_enable_translation(struct iommu *iommu)
+{
+	spin_lock_irqsave(&iommu->iommu_lock);
+	__set_root_table(iommu, iommu->roottable);
+	__inval_ctx_cache_global(iommu);
+	__iotlb_flush_global(iommu);
+	__enable_translation(iommu);
+	spin_unlock_irqsave(&iommu->iommu_lock);
+}
+
+/* Iterate over all IOMMUs and make sure the "rba" present in DRHD are unique */
+static bool iommu_asset_unique_regio(void)
+{
+	struct iommu *outer, *inner;
+	uint64_t rba;
+	bool result = true;
+
+	TAILQ_FOREACH(outer, &iommu_list, iommu_link) {
+		rba = outer->rba;
+
+		TAILQ_FOREACH(inner, &iommu_list, iommu_link) {
+			if (outer != inner && rba == inner->rba) {
+				outer->supported = false;
+				result = false;
+			}
+		}
+	}
+
+	return result;
+}
+
+static bool iommu_has_required_capabilities(struct iommu *iommu)
+{
+	uint64_t cap, ecap;
+	bool support, result = true;
+
+	cap = read64(iommu->regio + DMAR_CAP_REG);
+	ecap = read64(iommu->regio + DMAR_ECAP_REG);
+
+	support = (cap_sagaw(cap) & 0x4) >> 2;
+	if (!support) {
+		printk(IOMMU "%p: unsupported paging level: 0x%x\n",
+			iommu, cap_sagaw(cap));
+		result = false;
+	}
+
+	support = cap_super_page_val(cap) & 0x1;
+	if (!support) {
+		printk(IOMMU "%p: 1GB super pages not supported\n", iommu);
+		result = false;
+	}
+
+	if (cap_rwbf(cap)) {
+		printk(IOMMU "%p: HW requires RWBF, will abort\n", iommu);
+		result = false;
+	}
+
+	if (cap_caching_mode(cap)) {
+		printk(IOMMU "%p: HW requires caching_mode, will abort\n",
+		       iommu);
+		result = false;
+	}
+
+	support = ecap_pass_through(ecap);
+	if (!support) {
+		printk(IOMMU "%p: pass-through translation type in context entries not supported\n", iommu);
+		result = false;
+	}
+
+	/* max gaw/haw reported by iommu.  It's fine if these differ.  Spec says
+	 * MGAW must be at least the HAW.  It's OK to be more. */
+	iommu->haw_cap = cap_mgaw(cap);
+	if (iommu->haw_cap < iommu->haw_dmar) {
+		printk(IOMMU "%p: HAW mismatch; DMAR reports %d, CAP reports %d, check CPUID\n",
+			iommu, iommu->haw_dmar, iommu->haw_cap);
+	}
+
+	return result;
+}
+
+/* All or nothing */
+static bool have_iommu_support(void)
 {
 	struct iommu *iommu;
 
-	/* races are possible; add a global lock? */
-	if (iommu_status())
-		return;
+	if (TAILQ_EMPTY(&iommu_list))
+		return false;
 
-	TAILQ_FOREACH(iommu, &iommu_list, iommu_link)
-		_iommu_enable(iommu);
+	TAILQ_FOREACH(iommu, &iommu_list, iommu_link) {
+		if (!iommu->supported)
+			return false;
+	}
+	return true;
 }
 
-static bool _iommu_disable(struct iommu *iommu)
-{
-	uint32_t cmd, status;
-
-	spin_lock_irqsave(&iommu->iommu_lock);
-
-	/* write the root table address */
-	write64(iommu->roottable, iommu->regio + DMAR_RTADDR_REG);
-
-	// TODO: flush IOTLB if reported as necessary by cap register
-	/* disable translation */
-	cmd = 0;
-	write32(cmd, iommu->regio + DMAR_GCMD_REG);
-
-	/* read status */
-	status = read32(iommu->regio + DMAR_GSTS_REG);
-
-	spin_unlock_irqsave(&iommu->iommu_lock);
-
-	return status & DMA_GSTS_TES;
-}
-
-void iommu_disable(void)
+/* Run this function after all individual IOMMUs are initialized. */
+void iommu_enable_all(void)
 {
 	struct iommu *iommu;
+	static bool once = false;
 
-	/* races are possible; add a global lock? */
-	if (!iommu_status())
+	if (once)
+		warn(IOMMU "Called twice, aborting!");
+	once = true;
+
+	if (!iommu_asset_unique_regio())
+		warn(IOMMU "same register base addresses detected");
+
+	iommu_is_supported = have_iommu_support();
+	if (!iommu_is_supported) {
+		printk("No supported IOMMUs detected\n");
 		return;
+	}
 
-	TAILQ_FOREACH(iommu, &iommu_list, iommu_link)
-		_iommu_disable(iommu);
+	TAILQ_FOREACH(iommu, &iommu_list, iommu_link) {
+		printk("IOMMU: enabling translation on %p\n", iommu);
+		iommu_enable_translation(iommu);
+	}
 }
 
-// XXX wtf is this?
-static bool _iommu_status(struct iommu *iommu)
+static bool _iommu_is_enabled(struct iommu *iommu)
 {
 	uint32_t status = 0;
 
-	// XXX what does this protect?
+	/* Arguably we don't need the lock when reading. */
 	spin_lock_irqsave(&iommu->iommu_lock);
-
-	// XXX meaningless comment
-	/* read status */ 
 	status = read32(iommu->regio + DMAR_GSTS_REG);
-
 	spin_unlock_irqsave(&iommu->iommu_lock);
 
 	return status & DMA_GSTS_TES;
 }
 
-bool iommu_status(void)
+static bool iommu_some_is_enabled(void)
 {
 	struct iommu *iommu;
 
 	TAILQ_FOREACH(iommu, &iommu_list, iommu_link)
-		if (_iommu_status(iommu))
+		if (_iommu_is_enabled(iommu))
 			return true;
 
 	return false;
+}
+
+/* grabs the iommu of the first DRHD with INCLUDE_PCI_ALL */
+struct iommu *get_default_iommu(void)
+{
+	struct Dmar *dt;
+
+	/* dmar is a global variable; see acpi.h */
+	if (dmar == NULL)
+		return NULL;
+
+	dt = dmar->tbl;
+	for (int i = 0; i < dmar->nchildren; i++) {
+		struct Atable *at = dmar->children[i];
+		struct Drhd *drhd = at->tbl;
+
+		if (drhd->all & 1)
+			return &drhd->iommu;
+	}
+
+	return NULL;
+}
+
+void iommu_map_pci_devices(void)
+{
+	struct pci_device *pci_iter;
+	struct iommu *iommu = get_default_iommu();
+
+	if (!iommu)
+		return;
+
+	/* set the default iommu */
+	STAILQ_FOREACH(pci_iter, &pci_devices, all_dev) {
+		pci_iter->iommu = iommu;
+		TAILQ_INSERT_TAIL(&iommu->pci_devs, pci_iter, iommu_link);
+	}
+}
+
+/* This is called from acpi.c to initialize an iommu. */
+void iommu_acpi_init(struct iommu *iommu, uint8_t haw, uint64_t rba)
+{
+	uint64_t cap, ecap;
+
+	TAILQ_INIT(&iommu->pci_devs);
+	spinlock_init_irqsave(&iommu->iommu_lock);
+	iommu->rba = rba;
+	iommu->regio = (void __iomem *) vmap_pmem_nocache(rba, VTD_PAGE_SIZE);
+	if (!iommu->regio)
+		warn("Unable to map the iommu, aborting!");
+	iommu->haw_dmar = haw;
+
+	iommu->supported = iommu_has_required_capabilities(iommu);
+
+	cap = read64(iommu->regio + DMAR_CAP_REG);
+	ecap = read64(iommu->regio + DMAR_ECAP_REG);
+
+	/* Creates a root table for non-translating identity maps, but it is not
+	 * enabled / turned on yet. */
+	iommu->roottable = rt_init();
+	iommu->iotlb_cmd_offset = ecap_iotlb_offset(ecap) + 8;
+	iommu->iotlb_addr_offset = ecap_iotlb_offset(ecap);
+
+	iommu->rwbf = cap_rwbf(cap);
+	iommu->device_iotlb = ecap_dev_iotlb_support(ecap);
+
+	/* add the iommu to the list of all discovered iommu */
+	TAILQ_INSERT_TAIL(&iommu_list, iommu, iommu_link);
 }
 
 static void assign_device(int bus, int dev, int func, pid_t pid)
@@ -516,22 +670,6 @@ static int write_remove_dev(char *va, size_t n)
 	unassign_device(bus, dev, func, pid);
 
 	return n;
-}
-
-static int write_power(char *va, size_t n)
-{
-	int err;
-
-	// XXX strcmp, but what if size < n?
-	// XXX use parsecmd
-	if (!strcmp(va, "enable") || !strcmp(va, "on")) {
-		iommu_enable();
-		return n;
-	} else if (!strcmp(va, "disable") || !strcmp(va, "off")) {
-		iommu_disable();
-		return n;
-	} else
-		return n;// XXX error?
 }
 
 static struct sized_alloc *open_mappings(void)
@@ -631,26 +769,11 @@ static struct sized_alloc *open_info(void)
 	value = IOMMU_DID_DEFAULT;
 	sza_printf(sza, "\tdefault did = %d\n", value);
 	sza_printf(sza, "\tstatus = %s\n",
-		iommu_status() ? "enabled" : "disabled");
+		iommu_some_is_enabled() ? "enabled" : "disabled");
 
 	TAILQ_FOREACH(iommu, &iommu_list, iommu_link) {
 		_open_info(iommu, sza);
 	}
-
-	return sza;
-}
-
-static struct sized_alloc *open_power(void)
-{
-	struct sized_alloc *sza = sized_kzmalloc(BUFFERSZ, MEM_WAIT);
-	uint64_t value;
-	struct iommu *iommu;
-
-	sza_printf(sza, "IOMMU status: %s\n\n",
-		iommu_status() ? "enabled" : "disabled");
-
-	sza_printf(sza,
-	     "Write 'enable' or 'disable' OR 'on' or 'off' to change status\n");
 
 	return sza;
 }
@@ -686,9 +809,6 @@ static struct chan *iommuopen(struct chan *c, int omode)
 	case Qinfo:
 		c->synth_buf = open_info();
 		break;
-	case Qpower:
-		c->synth_buf = open_power();
-		break;
 	case Qadddev:
 	case Qremovedev:
 	case Qdir:
@@ -708,7 +828,6 @@ static void iommuclose(struct chan *c)
 	switch (c->qid.path) {
 	case Qmappings:
 	case Qinfo:
-	case Qpower:
 		kfree(c->synth_buf);
 		c->synth_buf = NULL;
 		break;
@@ -747,7 +866,6 @@ static size_t iommuread(struct chan *c, void *va, size_t n, off64_t offset)
 		    "$ echo 00:1f.2 >\\#iommu/detach\n");
 	case Qmappings:
 	case Qinfo:
-	case Qpower:
 		return readstr(offset, va, n, sza->buf);
 	default:
 		error(EIO, "read: qid %d is impossible", c->qid.path);
@@ -762,18 +880,14 @@ static size_t iommuwrite(struct chan *c, void *va, size_t n, off64_t offset)
 
 	switch (c->qid.path) {
 	case Qadddev:
-		if (!iommu_supported())
+		if (!iommu_is_supported)
 			error(EROFS, IOMMU "not supported");
 		err = write_add_dev(va, n);
 		break;
 	case Qremovedev:
-		if (!iommu_supported())
+		if (!iommu_is_supported)
 			error(EROFS, IOMMU "not supported");
 		err = write_remove_dev(va, n);
-		break;
-	case Qpower:
-		// XXX no check for supported?
-		err = write_power(va, n);
 		break;
 	case Qmappings:
 	case Qinfo:
@@ -786,217 +900,10 @@ static size_t iommuwrite(struct chan *c, void *va, size_t n, off64_t offset)
 	return err;
 }
 
-/* Iterate over all IOMMUs and make sure the "rba" present in DRHD are unique */
-static bool iommu_asset_unique_regio(void)
-{
-	struct iommu *outer, *inner;
-	uint64_t rba;
-	bool result = true;
-
-	TAILQ_FOREACH(outer, &iommu_list, iommu_link) {
-		rba = outer->rba;
-
-		TAILQ_FOREACH(inner, &iommu_list, iommu_link) {
-			if (outer != inner && rba == inner->rba) {
-				outer->supported = false;
-				result = false;
-			}
-		}
-	}
-
-	return result;
-}
-
-static bool iommu_assert_required_capabilities(struct iommu *iommu)
-{
-	uint64_t cap, ecap;
-	bool support, result;
-
-	if (!iommu || !iommu->regio)
-		return false;
-
-	cap = read64(iommu->regio + DMAR_CAP_REG);
-	ecap = read64(iommu->regio + DMAR_ECAP_REG);
-	result = true; /* default */
-
-	support = (cap_sagaw(cap) & 0x4) >> 2;
-	if (!support) {
-		printk(IOMMU "%p: unsupported paging level: 0x%x\n",
-			iommu, cap_sagaw(cap));
-		result = false;
-	}
-
-	support = cap_super_page_val(cap) & 0x1;
-	if (!support) {
-		printk(IOMMU "%p: 1GB super pages not supported\n", iommu);
-		result = false;
-	}
-
-	support = ecap_pass_through(ecap);
-	if (!support) {
-		printk(IOMMU "%p: pass-through translation type in context entries not supported\n", iommu);
-		result = false;
-	}
-
-	/* max haw reported by iommu */
-	iommu->haw_cap = cap_mgaw(cap);
-	if (iommu->haw_cap != iommu->haw_dmar) {
-		printk(IOMMU "%p: HAW mismatch; DAMR reports %d, CAP reports %d\n",
-			iommu, iommu->haw_dmar, iommu->haw_cap);
-	}
-
-	/* mark the iommu as not supported, if any required cap is present */
-	if (!result)
-		iommu->supported = false;
-
-	return result;
-}
-
-static void iommu_assert_all(void)
-{
-	struct iommu *iommu;
-
-	if (!iommu_asset_unique_regio())
-		warn(IOMMU "same register base addresses detected");
-
-	TAILQ_FOREACH(iommu, &iommu_list, iommu_link)
-		iommu_assert_required_capabilities(iommu);
-}
-
-/* IOMMU entries are set to non-translating identity maps */
-static void iommu_populate_fields(void)
-{
-	struct iommu *iommu;
-        uint64_t cap, ecap;
-
-	TAILQ_FOREACH(iommu, &iommu_list, iommu_link) {
-		iommu->roottable = rt_init();
-
-                cap = read64(iommu->regio + DMAR_CAP_REG);
-                ecap = read64(iommu->regio + DMAR_ECAP_REG);
-
-                iommu->roottable = rt_init();
-                iommu->iotlb_cmd_offset = ecap_iotlb_offset(ecap) + 8;
-                iommu->iotlb_addr_offset = ecap_iotlb_offset(ecap);
-
-		// XXX style
-                if (cap_rwbf(cap))
-                        iommu->rwbf = true;
-                else
-                        iommu->rwbf = false;
-
-		// XXX style
-                if (ecap_dev_iotlb_support(ecap))
-                        iommu->device_iotlb = true;
-		else
-                        iommu->device_iotlb = false;
-
-        }
-}
-
-/* Run this function after all individual IOMMUs are initialized. */
-// XXX is this called more than once?
-// 	do we need this?  can be done on the fly with each one?
-void iommu_initialize_global(void)
-{
-	if (!is_initialized)
-		return;
-
-	/* fill the supported field in struct iommu */
-	run_once(iommu_assert_all());
-	run_once(iommu_populate_fields());
-
-	iommu_enable();
-}
-
-// XXX probably set a global - this never changes...
-// 	worth returning a char *reason?
-/* should only be called after all iommus are initialized */
-bool iommu_supported(void)
-{
-	struct iommu *iommu;
-
-	if (!is_initialized)
-		return false;
-
-	/* return false if any of the iommus isn't supported  */
-	TAILQ_FOREACH(iommu, &iommu_list, iommu_link)
-		if (!iommu->supported)
-			return false;
-
-	return true;
-}
-
-/* grabs the iommu of the first DRHD with INCLUDE_PCI_ALL */
-	// XXX can there be more than one?
-struct iommu *get_default_iommu(void)
-{
-	struct Dmar *dt;
-
-	/* dmar is a global variable; see acpi.h */
-	if (dmar == NULL)
-		return NULL;
-
-	dt = dmar->tbl;
-	for (int i = 0; i < dmar->nchildren; i++) {
-		struct Atable *at = dmar->children[i];
-		struct Drhd *drhd = at->tbl;
-
-		if (drhd->all & 1)
-			return &drhd->iommu;
-	}
-
-	return NULL;
-}
-
-void iommu_map_pci_devices(void)
-{
-	struct pci_device *pci_iter;
-	struct iommu *iommu = get_default_iommu();
-
-	if (!iommu)
-		return;
-
-	/* set the default iommu */
-	STAILQ_FOREACH(pci_iter, &pci_devices, all_dev) {
-		pci_iter->iommu = iommu;
-		TAILQ_INSERT_TAIL(&iommu->pci_devs, pci_iter, iommu_link);
-	}
-
-	// TODO: parse devscope and assign scoped iommus
-}
-
-/* This is called from acpi.c to initialize struct iommu.
- * The actual IOMMU hardware is not touch or configured in any way. */
-	// XXX why not?  or change the name
-void iommu_initialize(struct iommu *iommu, uint8_t haw, uint64_t rba)
-{
-	is_initialized = true;
-
-	TAILQ_INIT(&iommu->pci_devs);
-	spinlock_init_irqsave(&iommu->iommu_lock);
-	iommu->rba = rba;
-	iommu->regio = (void __iomem *) vmap_pmem_nocache(rba, VTD_PAGE_SIZE);
-	// XXX why not run it then?  or false initially?
-	iommu->supported = true; /* this gets updated by iommu_supported() */
-	iommu->haw_dmar = haw;
-
-	/* add the iommu to the list of all discovered iommu */
-	TAILQ_INSERT_TAIL(&iommu_list, iommu, iommu_link);
-}
-
-static void iommuinit(void)
-{
-	if (iommu_supported())
-		printk(IOMMU "initialized\n");
-	else
-		printk(IOMMU "not supported\n");
-}
-
 struct dev iommudevtab __devtab = {
 	.name       = "iommu",
 	.reset      = devreset,
-	.init       = iommuinit,
+	.init       = devinit,
 	.shutdown   = devshutdown,
 	.attach     = iommuattach,
 	.walk       = iommuwalk,

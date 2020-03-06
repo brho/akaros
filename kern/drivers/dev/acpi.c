@@ -1300,7 +1300,7 @@ static struct Atable *parsedmar(struct Atable *parent, char *name, uint8_t *raw,
 			o += dhlen;
 		}
 
-		iommu_initialize(&drhd->iommu, dt->haw, drhd->rba);
+		iommu_acpi_init(&drhd->iommu, dt->haw, drhd->rba);
 
 		/*
 		 * NOTE: if all is set, there should be no scopes of type
@@ -1311,7 +1311,7 @@ static struct Atable *parsedmar(struct Atable *parent, char *name, uint8_t *raw,
 		finatable_nochildren(tt);
 		slice_append(&drhds, tt);
 	}
-	iommu_initialize_global();
+	iommu_enable_all();
 	dmar = finatable(t, &drhds);
 
 	return dmar;

@@ -65,14 +65,9 @@ struct iommu {
 };
 TAILQ_HEAD(iommu_list_tq, iommu);
 
-void iommu_initialize(struct iommu *iommu, uint8_t haw, uint64_t rba);
-void iommu_initialize_global(void);
+void iommu_acpi_init(struct iommu *iommu, uint8_t haw, uint64_t rba);
+void iommu_enable_all(void);
 void iommu_map_pci_devices(void); /* associate pci devices with correct iommu */
-bool iommu_supported(void);
-struct iommu *get_default_iommu(void); /* IOMMU of DRHD with INCLUDE_PCI_ALL */
-void iommu_enable(void); /* enable all iommus */
-void iommu_disable(void); /* disable all iommus */
-bool iommu_status(void); /* returns true if any iommu is turned on */
 
 void iommu_unassign_all_devices(struct proc *p);
 void __iommu_device_assign(struct pci_device *pdev, struct proc *proc);
