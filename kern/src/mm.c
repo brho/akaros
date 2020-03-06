@@ -629,6 +629,7 @@ int duplicate_vmrs(struct proc *p, struct proc *new_p)
 	return 0;
 }
 
+// XXX pip hook / debug level for this (for when /proc/PID/maps is busted)
 void print_vmrs(struct proc *p)
 {
 	int count = 0;

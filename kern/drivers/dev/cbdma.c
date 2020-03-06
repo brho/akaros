@@ -145,6 +145,8 @@ static void issue_dma(struct pci_device *pdev, physaddr_t dst, physaddr_t src,
 	/* You can poke this.  dma_sync_wait() also calls this. */
 	dma_async_issue_pending(dc);
 
+	// XXX cat cbd/ktest doesn't work when assigned to another process
+	// HERE NEXT 
 	if (async) {
 		/* Giant warning: the polling methods, like
 		 * dmaengine_tx_status(), might actually trigger the

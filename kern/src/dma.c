@@ -228,6 +228,9 @@ static void *user_pages_a(struct arena *a, size_t amt, int flags)
 	struct proc *p = da->data;
 	void *uaddr;
 
+	/* XXX need a 'can't be munmapped by userspace' flag?  what was the deal
+	 * with that?  can make the kernel driver PF if they trash the mapping
+	 */
 	uaddr = mmap(p, 0, amt, PROT_READ | PROT_WRITE,
 		     MAP_ANONYMOUS | MAP_POPULATE | MAP_PRIVATE, -1, 0);
 

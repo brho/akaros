@@ -174,15 +174,40 @@ static uintptr_t alloc_stacktop(struct virtual_machine *vm)
 	int ret;
 	uintptr_t *stack, *tos;
 
+#if 0
 	ret = posix_memalign((void **)&stack, PGSIZE, DEFAULT_STACK_SIZE);
 	if (ret)
 		return 0;
+#else
+
+	// this works fine...  does/did it not work on some machines?
+	stack = mmap(0, DEFAULT_STACK_SIZE, PROT_READ | PROT_WRITE,
+		     MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+	if (stack == MAP_FAILED)
+		return 0;
+#endif
+
+
 	add_pte_entries(vm, (uintptr_t)stack,
 	                (uintptr_t)stack + DEFAULT_STACK_SIZE);
+	// XXX why did i get here?  checking if IPT was mapped, since i thought
+	// that might be a UCBDMA bug?
+// XXX this is fucked up - we can PF later on, but don't have a handler.
+// so we're just as fucked.  we just avoid it since we touch the top.
+// so might as well make the stacks as big as you want.
+//
+// wait, why are we PFing?  if we touch it here, we bring it in to the EPT.
+// might be that old bug that zach ran into?
+//
+// 	yeah, that is unnecessary.  the only reason to do it is for faster perf,
+// 	not for correctness
+//
+// also, we never free these.  though we also never free vthrs.  reuse,
+// etc.
 	/* touch the top word on the stack so we don't page fault
 	 * on that in the VM. */
 	tos = &stack[DEFAULT_STACK_SIZE / sizeof(uint64_t) - 1];
-	*tos = 0;
+	//*tos = 0;
 	return (uintptr_t)tos;
 }
 

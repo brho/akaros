@@ -16,6 +16,8 @@
  *
  */
 
+#define DEV_DBG 1
+
 #include <linux_compat.h>
 #include <linux/sizes.h>
 

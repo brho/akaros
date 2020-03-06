@@ -550,6 +550,10 @@ void iommu_map_pci_devices(void)
 		pci_iter->iommu = iommu;
 		TAILQ_INSERT_TAIL(&iommu->pci_devs, pci_iter, iommu_link);
 	}
+
+	// XXX this means that we have some devices on the default IOMMU that
+	// shouldn't be...
+	// TODO: parse devscope and assign scoped iommus
 }
 
 /* This is called from acpi.c to initialize an iommu. */
@@ -642,6 +646,7 @@ static struct sized_alloc *open_mappings(void)
 	struct pci_device *pdev;
 	struct sized_alloc *sza = sized_kzmalloc(BUFFERSZ, MEM_WAIT);
 
+	// XXX consider listing all PCI devices
 	TAILQ_FOREACH(iommu, &iommu_list, iommu_link) {
 		sza_printf(sza, "Mappings for iommu@%p\n", iommu);
 		spin_lock_irqsave(&iommu->iommu_lock);

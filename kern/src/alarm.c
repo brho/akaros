@@ -291,6 +291,24 @@ bool unset_alarm_nosync(struct timer_chain *tchain, struct alarm_waiter *waiter)
 	return ret;
 }
 
+// XXX these aren't threadsafe...  two people try to reset at the same time,
+// both unset, then both set.
+//
+// since they were racy before, might as well make them nosync too, since anyone
+// using them must have thought they were the only one using them.
+//
+// this (regardless of the race fix) does mean we'll have the alarm set again
+// while it is still running. 
+//
+// which means it might be able to go off again, concurrently. 
+//
+// which is a problem, since alarm handlers assume they are not
+// running concurrently with themselves.
+//
+// which means tchain->running could == an alarm on another core!
+//
+// if you knew you were submitting to the same tchain, then it'd be OK
+// 	and it is the same tchain.
 bool reset_alarm_abs(struct timer_chain *tchain, struct alarm_waiter *waiter,
                      uint64_t abs_time)
 {

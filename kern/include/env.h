@@ -22,6 +22,7 @@
 #include <ns.h>
 #include <arch/vmm/vmm.h>
 #include <arch/pci.h>
+// XXX pci.h couldn't include.  pulled in too much via arena->rb->rcu->cv
 #include <dma.h>
 
 TAILQ_HEAD(vcore_tailq, vcore);
@@ -129,6 +130,7 @@ struct proc {
 
 	struct strace		*strace;
 
+	// XXX
 	qlock_t			dev_qlock;
 	struct list_head	iommus;
 	struct pcidev_tq	pci_devs;

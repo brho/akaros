@@ -107,6 +107,7 @@ static inline bool atomic_add_not_zero(atomic_t *number, long val)
 static inline bool atomic_sub_and_test(atomic_t *number, long val)
 {
 	bool b;
+	// XXX this this OK?
 	asm volatile("lock sub %2,%1; setz %0" : "=q"(b), "=m"(*number)
 	                                       : "r"(val), "m"(*number)
 	                                       : "cc" );
