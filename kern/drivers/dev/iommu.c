@@ -635,43 +635,6 @@ static void unassign_device(int bus, int dev, int func, pid_t pid)
 	poperror();
 }
 
-
-// XXX user pointer, parsecmd, \n
-static int write_add_dev(char *va, size_t n)
-{
-	int bus, dev, func, err;
-	pid_t pid;
-
-	err = sscanf(va, "%x:%x.%x %d\n", &bus, &dev, &func, &pid);
-
-	if (err != 4)
-		error(EIO,
-		  IOMMU "error parsing #iommu/attach; items parsed: %d", err);
-
-	if (pid == 1)
-		error(EIO, IOMMU "device passthru not supported for pid = 1");
-
-	assign_device(bus, dev, func, pid);
-
-	return n;
-}
-
-static int write_remove_dev(char *va, size_t n)
-{
-	int bus, dev, func, err;
-	pid_t pid;
-
-	err = sscanf(va, "%x:%x.%x %d\n", &bus, &dev, &func, &pid);
-
-	if (err != 4)
-		error(EIO,
-		  IOMMU "error parsing #iommu/detach; items parsed: %d", err);
-
-	unassign_device(bus, dev, func, pid);
-
-	return n;
-}
-
 static struct sized_alloc *open_mappings(void)
 {
 	struct iommu *iommu;
@@ -874,20 +837,64 @@ static size_t iommuread(struct chan *c, void *va, size_t n, off64_t offset)
 	return -1; /* not reached */
 }
 
+static void get_bdf_pid(struct cmdbuf *cb, int *bus, int *dev, int *func,
+			pid_t *pid)
+{
+	int err;
+
+	if (cb->nf < 2)
+		error(EFAIL, "bb:dd.f pid");
+
+	err = sscanf(cb->f[0], "%x:%x.%x", bus, dev, func);
+	if (err != 3)
+		error(EIO,
+		  IOMMU "error parsing bdf %s; nr parsed: %d", cb->f[0], err);
+
+	*pid = strtoul(cb->f[1], 0, 0);
+}
+
+static void write_add_dev(struct chan *c, struct cmdbuf *cb)
+{
+	int bus, dev, func;
+	pid_t pid;
+
+	get_bdf_pid(cb, &bus, &dev, &func, &pid);
+
+	if (pid == 1)
+		error(EIO, IOMMU "device passthru not supported for pid = 1");
+
+	assign_device(bus, dev, func, pid);
+}
+
+static void write_remove_dev(struct chan *c, struct cmdbuf *cb)
+{
+	int bus, dev, func;
+	pid_t pid;
+
+	get_bdf_pid(cb, &bus, &dev, &func, &pid);
+
+	unassign_device(bus, dev, func, pid);
+}
+
 static size_t iommuwrite(struct chan *c, void *va, size_t n, off64_t offset)
 {
-	int err = -1;
+	ERRSTACK(1);
+	struct cmdbuf *cb = parsecmd(va, n);
 
+	if (waserror()) {
+		kfree(cb);
+		nexterror();
+	}
 	switch (c->qid.path) {
 	case Qadddev:
 		if (!iommu_is_supported)
 			error(EROFS, IOMMU "not supported");
-		err = write_add_dev(va, n);
+		write_add_dev(c, cb);
 		break;
 	case Qremovedev:
 		if (!iommu_is_supported)
 			error(EROFS, IOMMU "not supported");
-		err = write_remove_dev(va, n);
+		write_remove_dev(c, cb);
 		break;
 	case Qmappings:
 	case Qinfo:
@@ -896,8 +903,9 @@ static size_t iommuwrite(struct chan *c, void *va, size_t n, off64_t offset)
 	default:
 		error(EIO, "write: qid %d is impossible", c->qid.path);
 	}
-
-	return err;
+	kfree(cb);
+	poperror();
+	return n;
 }
 
 struct dev iommudevtab __devtab = {
