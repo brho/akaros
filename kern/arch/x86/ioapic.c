@@ -271,6 +271,13 @@ void ioapicinit(int id, int ibase, uintptr_t pa)
 	struct apic *apic;
 	static int base;
 
+	// XXX machines with multiple IOAPICs can have one outside the default
+	// area...  goddamn
+	if (!((IOAPIC_PBASE <= pa) &&
+	       (pa + PGSIZE <= IOAPIC_PBASE + APIC_SIZE))) {
+		printk("Got an IOAPIC at %p, ignoring...\n", pa);
+		return;
+	}
 	assert((IOAPIC_PBASE <= pa) &&
 	       (pa + PGSIZE <= IOAPIC_PBASE + APIC_SIZE));
 	/*

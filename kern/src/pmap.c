@@ -105,8 +105,21 @@ static void set_largest_freezone(struct multiboot_mmap_entry *entry, void *data)
 
 	if (entry->type != MULTIBOOT_MEMORY_AVAILABLE)
 		return;
-	if (!*boot_zone || (sizeof_mboot_mmentry(entry) >
-	                   sizeof_mboot_mmentry(*boot_zone)))
+
+	if (!*boot_zone)
+		*boot_zone = entry;
+
+	// XXX we need the bootzone to be in the temporary mapping set from
+	// assembly.  i.e < 512 GB for KERNBASE.  usually is this one...
+	#define MAGIC_REGION 0x100000000
+	if ((*boot_zone)->addr == MAGIC_REGION)
+		return;
+	if (entry->addr == MAGIC_REGION) {
+		*boot_zone = entry;
+		return;
+	}
+
+	if ((sizeof_mboot_mmentry(entry) > sizeof_mboot_mmentry(*boot_zone)))
 		*boot_zone = entry;
 }
 

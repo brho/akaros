@@ -54,9 +54,6 @@
 /* CPUID */
 #define CPUID_PSE_SUPPORT	0x00000008
 
-/* Arch Constants */
-#define MAX_NUM_CORES		255
-
 #define X86_REG_BP		"rbp"
 #define X86_REG_SP		"rsp"
 #define X86_REG_IP		"rip"

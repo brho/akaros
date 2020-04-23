@@ -225,7 +225,7 @@ struct apic {
 
 enum {
 	Nbus = 256,
-	Napic = 254,	/* xAPIC architectural limit */
+	Napic = 256,	// XXX /* xAPIC architectural limit */
 	Nrdt = 64,
 };
 

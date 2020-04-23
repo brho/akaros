@@ -203,6 +203,12 @@ void smp_boot(void)
 		     num_cores, x86_num_cores_booted, x86_num_cores_booted);
 		num_cores = x86_num_cores_booted;
 	}
+
+	if (num_cores > 255) {
+		warn("XXX %d cores booted, limiting to 254\n", num_cores);
+		num_cores = 254;
+	}
+
 	// Dealloc the temp shared stack
 	page_decref(smp_stack);
 
