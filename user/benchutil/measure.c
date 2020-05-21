@@ -10,10 +10,15 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/param.h>
+
 #ifdef __ros__
-#include <parlib/tsc-compat.h>
-#include <benchutil/measure.h>
+ #include <parlib/tsc-compat.h>
+ #include <benchutil/measure.h>
+#else
+ /* you'll need to do find this manually on linux */
+ #include "measure.h"
 #endif /* __ros__ */
 
 /* Basic stats computation and printing.
@@ -83,7 +88,11 @@ void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
 		for (int j = 0; j < nr_j; j++) {
 			if (stats->get_sample(data, i, j, &sample_time))
 				continue;
-			/* var: (sum_i=1..n { (x_i - xbar)^2 }) / (n - 1) */
+			/* var: (sum_i=1..n { (x_i - xbar)^2 }) / (n - 1)
+			 *
+			 * for info on n vs n-1:
+			 * https://stats.stackexchange.com/questions/17890/what-is-the-difference-between-n-and-n-1-in-calculating-population-variance
+			 */
 			stats->var_time += (sample_time - stats->avg_time) *
 			                   (sample_time - stats->avg_time);
 		}

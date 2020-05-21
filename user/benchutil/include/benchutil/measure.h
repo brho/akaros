@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 __BEGIN_DECLS
 
 struct sample_stats {
