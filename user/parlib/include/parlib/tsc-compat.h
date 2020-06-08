@@ -91,9 +91,16 @@ static inline uint64_t read_tsc_serialized(void)
 
 static inline uint64_t get_tsc_freq(void)
 {
+	static uint64_t freq;
+
 	struct timeval prev;
 	struct timeval curr;
-	uint64_t beg = read_tsc_serialized();
+	uint64_t beg, end;
+
+	if (freq)
+		return freq;
+
+	beg = read_tsc_serialized();
 
 	gettimeofday(&prev, 0);
 	while (1) {
@@ -103,9 +110,10 @@ static inline uint64_t get_tsc_freq(void)
 			 prev.tv_usec))
 			break;
 	}
-	uint64_t end = read_tsc_serialized();
+	end = read_tsc_serialized();
 
-	return end - beg;
+	freq = end - beg;
+	return freq;
 }
 
 /* Don't have a good way to get the overhead on Linux in userspace. */
