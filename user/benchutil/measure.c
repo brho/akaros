@@ -17,8 +17,7 @@
  #include <parlib/tsc-compat.h>
  #include <benchutil/measure.h>
 #else
- /* you'll need to do find this manually on linux */
- #include "measure.h"
+ #include "include/benchutil/measure.h"
 #endif /* __ros__ */
 
 /* Basic stats computation and printing.

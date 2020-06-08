@@ -3,10 +3,7 @@
  * See LICENSE for details.
  *
  * lock_test: microbenchmark to measure different styles of spinlocks.
- *
- * to build on linux: (hacky)
- * $ gcc -O2 -std=gnu99 -fno-stack-protector -g tests/lock_test.c -lpthread \
- *    -lm -o linux_lock_test */
+ */
 
 #define _GNU_SOURCE /* pthread_yield */
 
@@ -41,11 +38,9 @@
 #else
 
 #include "../user/parlib/include/parlib/tsc-compat.h"
-#include "misc-compat.h"
-#include "linux-lock-hacks.h" /* TODO: have a build system and lib / C file */
-
 #include "../user/benchutil/include/benchutil/measure.h"
-#include "../user/benchutil/measure.c"
+#include "linux/misc-compat.h"
+#include "linux/linux-lock-hacks.h"
 
 static void os_prep_work(pthread_t *worker_threads, int nr_threads)
 {

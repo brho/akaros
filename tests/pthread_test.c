@@ -4,9 +4,6 @@
  *
  * Basic test for pthreading.  Spawns a bunch of threads that yield.
  *
- * To build on linux, cd into tests and run:
- * $ gcc -O2 -std=gnu99 -fno-stack-protector -g pthread_test.c -lpthread
- *
  * Make sure you run it with taskset to fix the number of vcores/cpus. */
 
 #define _GNU_SOURCE /* for pth_yield on linux */
@@ -16,7 +13,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/time.h>
-#include "misc-compat.h" /* OS dependent #incs */
+
+#ifndef __akaros__
+#include "linux/misc-compat.h"
+#endif
 
 /* These are here just to have the compiler test the _INITIALIZERS */
 pthread_cond_t dummy_cond = PTHREAD_COND_INITIALIZER;

@@ -8,6 +8,13 @@
 #CFLAGS_TESTS += -fno-optimize-sibling-calls
 export CFLAGS_USER CFLAGS_TESTS
 
+# For building linux modules, used by some tests on linux, set LINUX_KDIR
+#LINUX_KDIR := /path/to/linux/source
+export LINUX_KDIR
+# You can change the CC too, used for Linux apps and modules.
+# (and Kbuild, a little).  Default is just gcc.
+#HOSTCC := gcc-8
+
 # The default is num_cpus.  Use whatever you want.
 # MAKE_JOBS := 100
 

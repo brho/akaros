@@ -1,12 +1,7 @@
 #pragma once
 
-#ifdef __ros__
-
-#include <parlib/timing.h>
-
-#define pthread_id() (pthread_self()->id)
-
-#else
+/* All of these should be in other Akaros headers */
+#ifndef __akaros__
 
 #include <stdbool.h>
 #ifndef TRUE

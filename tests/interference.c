@@ -22,31 +22,10 @@ static void os_init(void)
 
 #else
 
-/* Build on linux from $AKAROS_ROOT:
- * gcc -static --std=gnu99 tests/interference.c -o lin-interference
- */
-
 #include <stdio.h>
 #include "../user/parlib/include/parlib/tsc-compat.h"
-#include "misc-compat.h"
-
-struct sample_stats {
-	int (*get_sample)(void **data, int i, int j, uint64_t *sample);
-	uint64_t		avg_time;
-	uint64_t		var_time;
-	uint64_t		max_time;
-	uint64_t		min_time;
-	unsigned int		lat_50;
-	unsigned int		lat_75;
-	unsigned int		lat_90;
-	unsigned int		lat_99;
-	uint64_t		total_samples;
-};
-
-void compute_stats(void **data, int nr_i, int nr_j, struct sample_stats *stats)
-{
-	/* TODO: could try to link against benchutil. */
-}
+#include "../user/benchutil/include/benchutil/measure.h"
+#include "linux/misc-compat.h"
 
 static void os_init(void)
 {

@@ -24,6 +24,8 @@ TESTS_EXECS_CPP  = $(patsubst $(TESTS_DIR)/%.cc, \
                               $(OBJDIR)/$(TESTS_DIR)/%, \
                               $(TESTS_SRCS_CPP))
 
+export TESTS_DIR OBJDIR
+
 include $(TESTS_DIR)/openmp/Makefrag
 include $(TESTS_DIR)/vmm/Makefrag
 include $(TESTS_DIR)/dune/Makefrag
@@ -48,7 +50,7 @@ $(OBJDIR)/$(TESTS_DIR)/%: $(TESTS_LDDEPENDS_CPP)
 	$(Q)$(CPP) $(TESTS_CXXFLAGS) -o $@ $< $(TESTS_LDLIBS)
 
 all: $(TESTS_EXECS)
-	@:
+	@cd $(TESTS_DIR)/linux && $(MAKE)
 
 install: $(TESTS_EXECS)
 	@mkdir -p $(FIRST_KFS_PATH)/bin
@@ -60,5 +62,6 @@ uninstall:
 clean:
 	@echo + clean [TESTS]
 	@rm -rf $(OBJDIR)/tests/
+	@cd $(TESTS_DIR)/linux && $(MAKE) clean
 
 .PHONY: $(PHONY)

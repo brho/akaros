@@ -49,6 +49,7 @@ struct pthread_tcb {
 	struct pthread_cleanup_stack cr_stack;
 };
 typedef struct pthread_tcb* pthread_t;
+#define pthread_id() (pthread_self()->id)
 TAILQ_HEAD(pthread_queue, pthread_tcb);
 
 /* Per-vcore data structures to manage syscalls.  The ev_q is where we tell the

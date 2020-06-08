@@ -21,13 +21,13 @@ bool __attribute__((noinline)) spinlock_trylock(spinlock_t *lock)
 	return !__sync_lock_test_and_set(&lock->locked, TRUE);
 }
 
-void __attribute__((noinline)) spinlock_lock(spinlock_t *lock) 
+void __attribute__((noinline)) spinlock_lock(spinlock_t *lock)
 {
 	while (!spinlock_trylock(lock))
 		cpu_relax();
 }
 
-void __attribute__((noinline)) spinlock_unlock(spinlock_t *lock) 
+void __attribute__((noinline)) spinlock_unlock(spinlock_t *lock)
 {
 	__sync_lock_release(&lock->locked, FALSE);
 }

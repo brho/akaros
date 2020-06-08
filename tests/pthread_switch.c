@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/time.h>
-#include "misc-compat.h"
 
 pthread_t th1, th2;
 int nr_switch_loops = 100;

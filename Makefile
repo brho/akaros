@@ -195,8 +195,9 @@ HOSTCXX      = g++
 HOSTCFLAGS   = -Wall -Wno-char-subscripts -Wmissing-prototypes \
                -Wstrict-prototypes -O2 -fomit-frame-pointer
 HOSTCXXFLAGS = -O2
+HOSTLD       = ld
 
-export CONFIG_SHELL HOSTCC HOSTCXX HOSTCFLAGS HOSTCXXFLAGS
+export CONFIG_SHELL HOSTCC HOSTCXX HOSTCFLAGS HOSTCXXFLAGS HOSTLD
 
 # Beautify output
 # ---------------------------------------------------------------------------
