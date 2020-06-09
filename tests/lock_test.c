@@ -38,6 +38,12 @@
 #include <parlib/tsc-compat.h>
 #include <benchutil/measure.h>
 
+// os_prep_work is down below.
+
+static void os_pthread_prep_work(int thread_id)
+{
+}
+
 static const char *os_name(void)
 {
 	return "Akaros";
@@ -57,18 +63,17 @@ static void os_prep_work(pthread_t *worker_threads, int nr_threads)
 		       nr_threads, max_vcores());
 }
 
-static void os_post_work(pthread_t *worker_threads, int nr_threads)
+static void os_pthread_prep_work(int thread_id)
 {
-	if (nr_threads > max_vcores())
+	cpu_set_t cpuset;
+
+	if (thread_id > max_vcores())
 		return;
-	/* assuming we're taking cores 0..nr_threads, and we never move. */
-	for (int i = 0; i < nr_threads; i++) {
-		cpu_set_t cpuset;
-		CPU_ZERO(&cpuset);
-		CPU_SET(i, &cpuset);
-		pthread_setaffinity_np(worker_threads[i], sizeof(cpu_set_t),
-				       &cpuset);
-	}
+	CPU_ZERO(&cpuset);
+	CPU_SET(thread_id, &cpuset);
+	if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t),
+				   &cpuset) < 0)
+		printf("thread_id %d failed to bind to core!\n", thread_id);
 }
 
 static const char *os_name(void)
@@ -526,7 +531,7 @@ pthread_barrier_t start_test;
 #define lock_func(lock_name, lock_cmd, unlock_cmd)                             \
 void *lock_name##_thread(void *arg)                                            \
 {                                                                              \
-	long thread_id = (long)arg;                                            \
+	int thread_id = (long)arg;                                             \
 	int hold_time = ACCESS_ONCE(pargs.hold_time);                          \
 	int delay_time = ACCESS_ONCE(pargs.delay_time);                        \
 	int nr_loops = ACCESS_ONCE(pargs.nr_loops);                            \
@@ -537,6 +542,8 @@ void *lock_name##_thread(void *arg)                                            \
 	struct mcs_lock_qnode mcs_qnode = MCS_QNODE_INIT;                      \
 	struct mcs_pdro_qnode pdro_qnode = MCSPDRO_QNODE_INIT;                 \
 	int i;                                                                 \
+	                                                                       \
+	os_pthread_prep_work(thread_id);                                       \
 	/* guessing a unique vcoreid for vcoreid for the __mcspdr test.  if the
 	 * program gets preempted for that test, things may go nuts */         \
 	pdro_qnode.vcoreid = thread_id + 1 % pargs.nr_threads;                 \
@@ -777,10 +784,6 @@ static void os_prep_work(pthread_t *worker_threads, int nr_threads)
 	}
 }
 
-static void os_post_work(pthread_t *worker_threads, int nr_threads)
-{
-}
-
 #endif
 
 static void print_lock_types(void)
@@ -915,11 +918,6 @@ static struct results run_test(void)
 		                   (void*)i))
 			handle_error("pth_create failed");
 	}
-
-	/* TODO: this affinity shuffling happens after the threads were created,
-	 * but the test might have started already.  Ultimately, we need an
-	 * atomic {kick-barrier, sleep}. */
-	os_post_work(worker_threads, pargs.nr_threads);
 
 	for (int i = 0; i < pargs.nr_threads; i++)
 		pthread_join(worker_threads[i], &loops_done[i]);
