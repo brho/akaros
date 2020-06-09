@@ -653,6 +653,7 @@ static struct lock_test tests[] = {
 static struct lock_test tests[] = {
 	{"mcs", mcs_thread},
 	{"mcscas", mcscas_thread},
+	{"mcs-kernel", NULL},
 	{"spin", spin_thread},
 	{}
 };
@@ -881,7 +882,7 @@ struct results {
 	struct lock_sample **thread_samples;
 };
 
-static struct results run_test(void)
+static struct results run_pthreads_test(void)
 {
 	struct results results;
 	void **loops_done;
@@ -925,6 +926,81 @@ static struct results run_test(void)
 	results.loops_done = loops_done;
 	results.thread_samples = times;
 	return results;
+}
+
+#ifdef __akaros__
+
+static struct results run_kernel_mod_test(void)
+{
+	printf("Unsupported on Akaros\n");
+	exit(-1);
+}
+
+#else
+
+/* Works with tests/linux/modules/mcs.ko.  Write commands in, read results back.
+ * The test runs on a pread(off==0).  The return format is all N of the
+ * loops_done void*, followed by a 2D array of samples for threads then loops.
+ * (t0_l0, t0_l1, t0_l2..., t1_l0, t1_l1, t1_l2...). */
+static struct results run_kernel_mod_test(void)
+{
+	struct results results;
+	int fd;
+	void *kresults;
+	size_t sz_rets, sz_times_per, results_sz;
+	ssize_t ret, amt = 0;
+	struct lock_sample **thread_samples;
+	struct lock_sample *base;
+
+	fd = open("/sys/kernel/mcs", O_WRONLY);
+	if (fd < 0)
+		handle_error("open write");
+	if (dprintf(fd, "%u %u %u %u", pargs.nr_threads, pargs.nr_loops,
+		    pargs.hold_time, pargs.delay_time) < 0)
+		handle_error("setting opts.  too many threads?");
+	/* For the change in parameters (notably the file size, due to
+	 * threads * loops) to take effect, you need to close and reopen. */
+	close(fd);
+	fd = open("/sys/kernel/mcs", O_RDONLY);
+	if (fd < 0)
+		handle_error("open read");
+
+	sz_rets = pargs.nr_threads * sizeof(void*);
+	sz_times_per = pargs.nr_loops * sizeof(struct lock_sample);
+	results_sz = sz_rets + pargs.nr_threads * sz_times_per;
+	kresults = malloc(results_sz);
+	if (!kresults)
+		handle_error("alloc");
+
+	do {
+		ret = read(fd, kresults + amt, results_sz - amt);
+		if (ret < 0)
+			handle_error("read");
+		amt += ret;
+	} while (ret != 0);
+
+	if (amt != results_sz)
+		printf("\n\nfucked, got %ld wanted %ld\n\n", amt, results_sz);
+
+	thread_samples = malloc(pargs.nr_threads * sizeof(struct lock_sample*));
+	if (!thread_samples)
+		handle_error("alloc");
+	base = kresults + pargs.nr_threads * sizeof(void*);
+	for (int i = 0; i < pargs.nr_threads; i++)
+		thread_samples[i] = base + i * pargs.nr_loops;
+
+	results.loops_done = kresults;
+	results.thread_samples = thread_samples;
+	return results;
+}
+
+#endif
+
+static struct results run_test(void)
+{
+	if (!strcmp(pargs.test->name, "mcs-kernel"))
+		return run_kernel_mod_test();
+	return run_pthreads_test();
 }
 
 static void analyze(struct results *results)
