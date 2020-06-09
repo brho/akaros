@@ -20,8 +20,11 @@
 #include <assert.h>
 #include <string.h>
 
+#define handle_error(msg) \
+	do { perror(msg); exit(EXIT_FAILURE); } while (0)
+
 /* OS dependent #incs */
-#ifdef __ros__
+#ifdef __akaros__
 
 #include <parlib/parlib.h>
 #include <parlib/stdio.h>
@@ -35,6 +38,11 @@
 #include <parlib/tsc-compat.h>
 #include <benchutil/measure.h>
 
+static const char *os_name(void)
+{
+	return "Akaros";
+}
+
 #else
 
 #include "../user/parlib/include/parlib/tsc-compat.h"
@@ -44,14 +52,14 @@
 
 static void os_prep_work(pthread_t *worker_threads, int nr_threads)
 {
-	if (nr_threads > num_vcores())
+	if (nr_threads > max_vcores())
 		printf("WARNING: %d threads requested, but only %d cores available\n",
-		       nr_threads, num_vcores());
+		       nr_threads, max_vcores());
 }
 
 static void os_post_work(pthread_t *worker_threads, int nr_threads)
 {
-	if (nr_threads > num_vcores())
+	if (nr_threads > max_vcores())
 		return;
 	/* assuming we're taking cores 0..nr_threads, and we never move. */
 	for (int i = 0; i < nr_threads; i++) {
@@ -61,6 +69,11 @@ static void os_post_work(pthread_t *worker_threads, int nr_threads)
 		pthread_setaffinity_np(worker_threads[i], sizeof(cpu_set_t),
 				       &cpuset);
 	}
+}
+
+static const char *os_name(void)
+{
+	return "Linux";
 }
 
 #define print_preempt_trace(args...) {}
@@ -449,8 +462,8 @@ __thread int __vcore_context = 0;
  *
  */
 
-const char *argp_program_version = "lock_test v0.1475263";
-const char *argp_program_bug_address = "<akaros+subscribe@googlegroups.com>";
+const char *argp_program_version = "lock_test v0.1475264";
+const char *argp_program_bug_address = "<akaros@googlegroups.com>";
 
 static char doc[] = "lock_test -- spinlock benchmarking";
 static char args_doc[] = "-w NUM -l NUM -t LOCK";
@@ -459,19 +472,11 @@ static char args_doc[] = "-w NUM -l NUM -t LOCK";
 #define OPT_ADJ_WORKERS 2
 
 static struct argp_option options[] = {
-	{"workers",	'w', "NUM",	OPTION_NO_USAGE, "Number of threads/cores"},
+	{"workers",	'w', "NUM",	OPTION_NO_USAGE, "Number of threads/cores (max possible)"},
 	{0, 0, 0, 0, ""},
-	{"loops",	'l', "NUM",	OPTION_NO_USAGE, "Number of loops per worker"},
+	{"loops",	'l', "NUM",	OPTION_NO_USAGE, "Number of loops per worker (10000)"},
 	{0, 0, 0, 0, ""},
-	{"type",	't', "LOCK",OPTION_NO_USAGE, "Type of lock to use.  "
-	                                             "Options:\n"
-	                                             "\tmcs\n"
-	                                             "\tmcscas\n"
-	                                             "\tmcspdr\n"
-	                                             "\tmcspdro\n"
-	                                             "\t__mcspdro\n"
-	                                             "\tspin\n"
-	                                             "\tspinpdr"},
+	{"type",	't', "LOCK",OPTION_NO_USAGE, "Type of lock to use" },
 	{0, 0, 0, 0, "Other options (not mandatory):"},
 	{"adj_workers",	OPT_ADJ_WORKERS, 0,	0,
 	                                       "Adjust workers such that the "
@@ -486,27 +491,32 @@ static struct argp_option options[] = {
 	{ 0 }
 };
 
+struct lock_test {
+	const char *name;
+	void *(*func)(void *arg);
+};
+
 struct prog_args {
-	int			nr_threads;
-	int			nr_loops;
-	int			hold_time;
-	int			delay_time;
-	int			nr_print_rows;
+	unsigned int		nr_threads;
+	unsigned int		nr_loops;
+	unsigned int		hold_time;
+	unsigned int		delay_time;
+	unsigned int		nr_print_rows;
 	bool			fake_vc_ctx;
 	bool			adj_workers;
 	char			*outfile_path;
-	void *(*lock_type)(void *arg);
+	struct lock_test	*test;
 };
 struct prog_args pargs = {0};
 
 /* Globals */
-struct time_stamp {
+struct lock_sample {
 	uint64_t pre;
 	uint64_t acq;
 	uint64_t un;
 	bool valid;
 };
-struct time_stamp **times;
+struct lock_sample **times;
 bool run_locktest = TRUE;
 pthread_barrier_t start_test;
 
@@ -523,7 +533,7 @@ void *lock_name##_thread(void *arg)                                            \
 	bool fake_vc_ctx = ACCESS_ONCE(pargs.fake_vc_ctx);                     \
 	bool adj_workers = ACCESS_ONCE(pargs.adj_workers);                     \
 	uint64_t pre_lock, acq_lock, un_lock;                                  \
-	struct time_stamp *this_time;                                          \
+	struct lock_sample *this_time;                                         \
 	struct mcs_lock_qnode mcs_qnode = MCS_QNODE_INIT;                      \
 	struct mcs_pdro_qnode pdro_qnode = MCSPDRO_QNODE_INIT;                 \
 	int i;                                                                 \
@@ -588,13 +598,6 @@ void *lock_name##_thread(void *arg)                                            \
 	return (void*)(long)i;                                                 \
 }
 
-#define fake_lock_func(lock_name, x1, x2)                                      \
-void *lock_name##_thread(void *arg)                                            \
-{                                                                              \
-	printf("Lock " #lock_name " not supported!\n");                        \
-	exit(-1);                                                              \
-}
-
 spinlock_t spin_lock = SPINLOCK_INITIALIZER;
 struct mcs_lock mcs_lock = MCS_LOCK_INIT;
 
@@ -609,7 +612,7 @@ lock_func(spin,
           spinlock_lock(&spin_lock);,
           spinlock_unlock(&spin_lock);)
 
-#ifdef __ros__
+#ifdef __akaros__
 struct spin_pdr_lock spdr_lock = SPINPDR_INITIALIZER;
 struct mcs_pdr_lock mcspdr_lock;
 struct mcs_pdro_lock mcspdro_lock = MCSPDRO_LOCK_INIT;
@@ -626,18 +629,32 @@ lock_func(__mcspdro,
 lock_func(spinpdr,
           spin_pdr_lock(&spdr_lock);,
           spin_pdr_unlock(&spdr_lock);)
+
+static struct lock_test tests[] = {
+	{"mcs", mcs_thread},
+	{"mcscas", mcscas_thread},
+	{"mcspdr", mcspdr_thread},
+	{"mcspdro", mcspdro_thread},
+	{"__mcspdro", __mcspdro_thread},
+	{"spin", spin_thread},
+	{"spinpdr", spinpdr_thread},
+	{}
+};
+
 #else
 
-fake_lock_func(mcspdr, 0, 0);
-fake_lock_func(mcspdro, 0, 0);
-fake_lock_func(__mcspdro, 0, 0);
-fake_lock_func(spinpdr, 0, 0);
+static struct lock_test tests[] = {
+	{"mcs", mcs_thread},
+	{"mcscas", mcscas_thread},
+	{"spin", spin_thread},
+	{}
+};
 
 #endif
 
 static int get_acq_latency(void **data, int i, int j, uint64_t *sample)
 {
-	struct time_stamp **times = (struct time_stamp**)data;
+	struct lock_sample **times = (struct lock_sample**)data;
 	/* 0 for initial time means we didn't measure */
 	if (times[i][j].pre == 0)
 		return -1;
@@ -653,7 +670,7 @@ static int get_acq_latency(void **data, int i, int j, uint64_t *sample)
 
 static int get_hld_latency(void **data, int i, int j, uint64_t *sample)
 {
-	struct time_stamp **times = (struct time_stamp**)data;
+	struct lock_sample **times = (struct lock_sample**)data;
 	/* 0 for initial time means we didn't measure */
 	if (times[i][j].pre == 0)
 		return -1;
@@ -663,7 +680,7 @@ static int get_hld_latency(void **data, int i, int j, uint64_t *sample)
 
 static int get_acq_timestamp(void **data, int i, int j, uint64_t *sample)
 {
-	struct time_stamp **times = (struct time_stamp**)data;
+	struct lock_sample **times = (struct lock_sample**)data;
 	/* 0 for initial time means we didn't measure */
 	if (times[i][j].pre == 0)
 		return -1;
@@ -671,7 +688,7 @@ static int get_acq_timestamp(void **data, int i, int j, uint64_t *sample)
 	return 0;
 }
 
-#ifdef __ros__
+#ifdef __akaros__
 
 /* Lousy event intercept.  build something similar in the event library? */
 #define MAX_NR_EVENT_TRACES 1000
@@ -766,6 +783,14 @@ static void os_post_work(pthread_t *worker_threads, int nr_threads)
 
 #endif
 
+static void print_lock_types(void)
+{
+	printf("Available lock types:\n");
+	for (struct lock_test *t = tests; t->name; t++)
+		printf("\t%s\n", t->name);
+	printf("\n");
+}
+
 /* Argument parsing */
 static error_t parse_opt (int key, char *arg, struct argp_state *state)
 {
@@ -817,53 +842,25 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
 		}
 		break;
 	case 't':
-		if (!strcmp("mcs", arg)) {
-			pargs->lock_type = mcs_thread;
-			break;
+		for (struct lock_test *t = tests; t->name; t++) {
+			if (!strcmp(t->name, arg)) {
+				pargs->test = t;
+				break;
+			}
 		}
-		if (!strcmp("mcscas", arg)) {
-			pargs->lock_type = mcscas_thread;
-			break;
+		if (!pargs->test) {
+			printf("Unknown locktype %s\n\n", arg);
+			print_lock_types();
+			argp_usage(state);
 		}
-		if (!strcmp("mcspdr", arg)) {
-			pargs->lock_type = mcspdr_thread;
-			break;
-		}
-		if (!strcmp("mcspdro", arg)) {
-			pargs->lock_type = mcspdro_thread;
-			break;
-		}
-		if (!strcmp("__mcspdro", arg)) {
-			pargs->lock_type = __mcspdro_thread;
-			break;
-		}
-		if (!strcmp("spin", arg)) {
-			pargs->lock_type = spin_thread;
-			break;
-		}
-		if (!strcmp("spinpdr", arg)) {
-			pargs->lock_type = spinpdr_thread;
-			break;
-		}
-		printf("Unknown locktype %s\n\n", arg);
-		argp_usage(state);
 		break;
 	case ARGP_KEY_ARG:
 		printf("Warning, extra argument %s ignored\n\n", arg);
 		break;
 	case ARGP_KEY_END:
-		if (!pargs->nr_threads) {
-			printf("Must select a number of threads.\n\n");
-			argp_usage(state);
-			break;
-		}
-		if (!pargs->nr_loops) {
-			printf("Must select a number of loops.\n\n");
-			argp_usage(state);
-			break;
-		}
-		if (!pargs->lock_type) {
+		if (!pargs->test) {
 			printf("Must select a type of lock.\n\n");
+			print_lock_types();
 			argp_usage(state);
 			break;
 		}
@@ -876,115 +873,146 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
 
 static struct argp argp = {options, parse_opt, args_doc, doc};
 
-int main(int argc, char** argv)
-{
-	pthread_t *worker_threads;
+struct results {
 	void **loops_done;
-	struct timeval start_tv = {0};
-	struct timeval end_tv = {0};
-	long usec_diff, total_loops = 0;
-	uint64_t starttsc;
-	int nr_threads, nr_loops;
-	FILE *outfile;
+	struct lock_sample **thread_samples;
+};
+
+static struct results run_test(void)
+{
+	struct results results;
+	void **loops_done;
+	struct lock_sample **thread_samples;
+	pthread_t *worker_threads;
+
+	mcs_pdr_init(&mcspdr_lock);
+
+	worker_threads = malloc(sizeof(pthread_t) * pargs.nr_threads);
+	if (!worker_threads)
+		handle_error("pthread_t malloc failed:");
+	loops_done = malloc(sizeof(void*) * pargs.nr_threads);
+	if (!loops_done)
+		handle_error("loops_done malloc failed");
+	pthread_barrier_init(&start_test, NULL, pargs.nr_threads);
+
+	times = malloc(sizeof(struct lock_sample *) * pargs.nr_threads);
+	assert(times);
+	for (int i = 0; i < pargs.nr_threads; i++) {
+		times[i] = malloc(sizeof(struct lock_sample) * pargs.nr_loops);
+		if (!times[i])
+			handle_error("Record keeping malloc");
+		memset(times[i], 0,
+		       sizeof(struct lock_sample) * pargs.nr_loops);
+	}
+	printd("Record tracking takes %ld bytes of memory\n",
+	       pargs.nr_threads * pargs.nr_loops * sizeof(struct lock_sample));
+
+	/* ensure we have enough VCs */
+	os_prep_work(worker_threads, pargs.nr_threads);
+
+	for (long i = 0; i < pargs.nr_threads; i++) {
+		if (pthread_create(&worker_threads[i], NULL, pargs.test->func,
+		                   (void*)i))
+			handle_error("pth_create failed");
+	}
+
+	/* TODO: this affinity shuffling happens after the threads were created,
+	 * but the test might have started already.  Ultimately, we need an
+	 * atomic {kick-barrier, sleep}. */
+	os_post_work(worker_threads, pargs.nr_threads);
+
+	for (int i = 0; i < pargs.nr_threads; i++)
+		pthread_join(worker_threads[i], &loops_done[i]);
+
+	results.loops_done = loops_done;
+	results.thread_samples = times;
+	return results;
+}
+
+static void analyze(struct results *results)
+{
+	void **loops_done = results->loops_done;
+	struct lock_sample **thread_samples = results->thread_samples;
+
+	uint64_t max_tsc = 0;
+	uint64_t min_tsc = UINT64_MAX;
+	unsigned long total_loops = 0;
 	struct sample_stats acq_stats, hld_stats;
 
-	argp_parse(&argp, argc, argv, 0, 0, &pargs);
-	nr_threads = pargs.nr_threads;
-	nr_loops = pargs.nr_loops;
-	mcs_pdr_init(&mcspdr_lock);
+	printf("Acquire times (TSC Ticks)\n---------------------------\n");
+	acq_stats.get_sample = get_acq_latency;
+	compute_stats((void**)thread_samples, pargs.nr_threads, pargs.nr_loops,
+		      &acq_stats);
+
+	printf("Held times (from acq til rel done) (TSC Ticks)\n------\n");
+	hld_stats.get_sample = get_hld_latency;
+	compute_stats((void**)thread_samples, pargs.nr_threads, pargs.nr_loops,
+		      &hld_stats);
+
+	/* compute start and end based off the data set */
+	for (int i = 0; i < pargs.nr_threads; i++) {
+		for (int j = 0; j < pargs.nr_loops; j++) {
+			if (thread_samples[i][j].pre == 0)
+				continue;
+			printd("T %d L %03d p %lu a %lu u %lu v %u\n", i, j,
+			       thread_samples[i][j].pre,
+			       thread_samples[i][j].acq,
+			       thread_samples[i][j].un,
+			       thread_samples[i][j].valid);
+			min_tsc = MIN(min_tsc, thread_samples[i][j].pre);
+			max_tsc = MAX(max_tsc, thread_samples[i][j].un);
+		}
+	}
+	printf("Time to run: %ld usec\n", tsc2usec(max_tsc - min_tsc));
+
+	/* throughput for the entire duration (in ms), 1ms steps.  print as many
+	 * steps as they ask for (up to the end of the run). */
+	printf("\nLock throughput:\n-----------------\n");
+	print_throughput((void**)thread_samples,
+			 tsc2msec(max_tsc - min_tsc),
+			 msec2tsc(1),
+			 pargs.nr_print_rows,
+			 min_tsc,
+			 pargs.nr_threads, pargs.nr_loops, get_acq_timestamp);
+
+	print_preempt_trace(min_tsc, pargs.nr_print_rows);
+
+	for (int i = 0; i < pargs.nr_threads; i++) {
+		total_loops += (unsigned long)loops_done[i];
+		if (!loops_done[i])
+			printf("WARNING: thread %d performed 0 loops!\n", i);
+	}
+	printd("Average number of loops done, per thread: %ld\n",
+	       total_loops / pargs.nr_threads);
+	for (int i = 0; i < pargs.nr_threads; i++)
+		printd("\tThread %d performed %lu loops\n",
+		       i, (long)loops_done[i]);
+}
+
+static void save_results(struct results *results, int argc, char **argv)
+{
+	struct lock_sample **thread_samples = results->thread_samples;
+	FILE *outfile;
 
 	if (pargs.outfile_path) {
 		/* RDWR, CREAT, TRUNC, O666 */
 		outfile = fopen(pargs.outfile_path, "w+");
-		if (!outfile) {
-			perror("outfile");
-			exit(-1);
-		}
-	}
-	worker_threads = malloc(sizeof(pthread_t) * nr_threads);
-	if (!worker_threads) {
-		perror("pthread_t malloc failed:");
-		exit(-1);
-	}
-	loops_done = malloc(sizeof(void*) * nr_threads);
-	if (!loops_done) {
-		perror("loops_done malloc failed");
-		exit(-1);
-	}
-	printf("Making %d workers, %d loops each, %sadapting workers to vcores, and %sfaking vcore context\n",
-	       nr_threads, nr_loops,
-	       pargs.adj_workers ? "" : "not ",
-	       pargs.fake_vc_ctx ? "" : "not ");
-	pthread_barrier_init(&start_test, NULL, nr_threads);
+		if (!outfile)
+			handle_error("outfile");
 
-	times = malloc(sizeof(struct time_stamp *) * nr_threads);
-	assert(times);
-	for (int i = 0; i < nr_threads; i++) {
-		times[i] = malloc(sizeof(struct time_stamp) * nr_loops);
-		if (!times[i]) {
-			perror("Record keeping malloc");
-			exit(-1);
-		}
-		memset(times[i], 0, sizeof(struct time_stamp) * nr_loops);
-	}
-	printf("Record tracking takes %ld bytes of memory\n",
-	       nr_threads * nr_loops * sizeof(struct time_stamp));
-	os_prep_work(worker_threads, nr_threads);/* ensure we have enough VCs */
-	/* Doing this in MCP ctx, so we might have been getting a few preempts
-	 * already.  Want to read start before the threads pass their barrier */
-	starttsc = read_tsc();
-	/* create and join on yield */
-	for (long i = 0; i < nr_threads; i++) {
-		if (pthread_create(&worker_threads[i], NULL, pargs.lock_type,
-		                   (void*)i))
-			perror("pth_create failed");
-	}
-	os_post_work(worker_threads, nr_threads);
-	if (gettimeofday(&start_tv, 0))
-		perror("Start time error...");
-	for (int i = 0; i < nr_threads; i++) {
-		pthread_join(worker_threads[i], &loops_done[i]);
-	}
-	if (gettimeofday(&end_tv, 0))
-		perror("End time error...");
-
-	printf("Acquire times (TSC Ticks)\n---------------------------\n");
-	acq_stats.get_sample = get_acq_latency;
-	compute_stats((void**)times, nr_threads, nr_loops, &acq_stats);
-
-	printf("Held times (from acq til rel done) (TSC Ticks)\n------\n");
-	hld_stats.get_sample = get_hld_latency;
-	compute_stats((void**)times, nr_threads, nr_loops, &hld_stats);
-
-	usec_diff = (end_tv.tv_sec - start_tv.tv_sec) * 1000000 +
-	            (end_tv.tv_usec - start_tv.tv_usec);
-	printf("Time to run: %ld usec\n", usec_diff);
-
-	printf("\nLock throughput:\n-----------------\n");
-	/* throughput for the entire duration (in ms), 1ms steps.  print as many
-	 * steps as they ask for (up to the end of the run). */
-	print_throughput((void**)times, usec_diff / 1000 + 1, msec2tsc(1),
-	                 pargs.nr_print_rows,
-	                 starttsc, nr_threads,
-	                 nr_loops, get_acq_timestamp);
-	print_preempt_trace(starttsc, pargs.nr_print_rows);
-
-	for (int i = 0; i < nr_threads; i++) {
-		total_loops += (long)loops_done[i];
-		if (!loops_done[i])
-			printf("WARNING: thread %d performed 0 loops!\n", i);
-	}
-	printf("Average number of loops done, per thread: %ld\n",
-	       total_loops / nr_threads);
-	for (int i = 0; i < nr_threads; i++)
-		printf("\tThread %d performed %lu loops\n",
-		       i, (long)loops_done[i]);
-
-	if (pargs.outfile_path) {
 		fprintf(outfile, "#");
 		for (char **arg = argv; *arg; arg++)
 			fprintf(outfile, " %s", *arg);
 		fprintf(outfile, "\n");
+
+		fprintf(outfile, "# test '%s', %u host cores, %u workers\n",
+			pargs.test->name, max_vcores(), pargs.nr_threads);
+		fprintf(outfile, "# %lu loops, %sadaptive, %sfaking vc ctx\n",
+			pargs.nr_loops,
+			pargs.adj_workers ? "" : "not ",
+			pargs.fake_vc_ctx ? "" : "not ");
+		fprintf(outfile, "# %s\n", os_name());
+
 		fprintf(outfile, "# thread_id attempt pre acq(uire) un(lock) "
 		                 "tsc_overhead\n");
 		fprintf(outfile,
@@ -993,9 +1021,9 @@ int main(int argc, char** argv)
 		fprintf(outfile, "# tsc_frequency %llu\n", get_tsc_freq());
 		fprintf(outfile,
 			"# tsc_overhead is 0 on linux, hard code it with a value from akaros\n");
-		for (int i = 0; i < nr_threads; i++) {
-			for (int j = 0; j < nr_loops; j++) {
-				struct time_stamp *ts = &times[i][j];
+		for (int i = 0; i < pargs.nr_threads; i++) {
+			for (int j = 0; j < pargs.nr_loops; j++) {
+				struct lock_sample *ts = &thread_samples[i][j];
 				if (!ts->pre)
 					break; /* empty record */
 				fprintf(outfile, "%d %d %llu %llu %llu %llu\n",
@@ -1005,5 +1033,29 @@ int main(int argc, char** argv)
 		}
 		fclose(outfile);
 	}
-	printf("Done, exiting\n");
+}
+
+int main(int argc, char **argv)
+{
+	struct results results;
+
+	pargs.nr_threads = max_vcores();
+	pargs.nr_loops = 10000;
+	pargs.nr_print_rows = 10;
+	argp_parse(&argp, argc, argv, 0, 0, &pargs);
+
+	printf("Detected %u cores, running test '%s' on %d cores\n",
+	       max_vcores(), pargs.test->name, pargs.nr_threads);
+	printf("%lu loops, %sadapting workers to vcores, %sfaking vcore context\n",
+	       pargs.nr_loops,
+	       pargs.adj_workers ? "" : "not ",
+	       pargs.fake_vc_ctx ? "" : "not ");
+	printf("All times in TSC ticks, freq: %llu\n", get_tsc_freq());
+	printf("\n\n");
+
+	results = run_test();
+	analyze(&results);
+	save_results(&results, argc, argv);
+
+	return 0;
 }
