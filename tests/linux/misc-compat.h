@@ -34,7 +34,10 @@ static inline void cpu_relax(void)
 
 #define vcore_id() (-1)
 
+/* This isn't num_vcores, but it's all Linux has */
 #define num_vcores() ((int)sysconf(_SC_NPROCESSORS_ONLN))
+
+#define max_vcores() ((int)sysconf(_SC_NPROCESSORS_ONLN))
 
 #define ACCESS_ONCE(x) (*(volatile typeof(x) *)&(x))
 
