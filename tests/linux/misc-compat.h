@@ -14,21 +14,28 @@
 
 #include <sys/param.h> /* MIN/MAX */
 #include <unistd.h>
+#include "../../user/parlib/include/parlib/tsc-compat.h"
 
-/* not quite, since akaros udelay is a busy wait */
-#define udelay(usec) usleep(usec)
-#define ndelay(nsec)                                                           \
-{                                                                              \
-	struct timespec ts = {0, 0};                                           \
-	ts.tv_nsec = (nsec);                                                   \
-	nanosleep(&ts, 0);                                                     \
-}
-
-/* not quite a normal relax, which also pauses, but this works for all archs */
+/* arch-specific... */
 static inline void cpu_relax(void)
 {
-	asm volatile("" : : : "memory");
+	asm volatile("pause" : : : "memory");
 }
+
+static inline uint64_t ndelay(uint64_t nsec)
+{
+	uint64_t start, end, now;
+
+	start = read_tsc();
+	end = start + (get_tsc_freq() * nsec) / 1000000000;
+	do {
+		cpu_relax();
+		now = read_tsc();
+	} while (now < end || (now > start && end < start));
+	return tsc2nsec(now);
+}
+
+#define udelay(usec) ndelay(usec * 1000)
 
 #define pthread_id() (pthread_self())
 

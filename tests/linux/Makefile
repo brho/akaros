@@ -10,10 +10,42 @@
 # overridden.  Also these are used if we were called directly instead of from
 # the top-level makefile.
 HOSTCC ?= gcc
-HOSTCFLAGS ?= -Wall -Wno-char-subscripts -Wmissing-prototypes \
-              -Wstrict-prototypes -O2 -fomit-frame-pointer
 HOSTLD ?= ld
 
+# Rough attempt to match Akaros's userspace flags, plus turn off the annoying
+# warnings from more recent GCCs.  Note that akaros's CFLAGS_USER has
+# omit-frame-pointer, but the libraries (parlib) don't.
+HOSTCFLAGS = -Wall -Werror -Wreturn-type \
+	     -Wno-format -Wno-char-subscripts -Wno-unused -Wno-comment \
+	     -std=gnu99 -fno-stack-protector -fgnu89-inline \
+	     -O2 -fno-omit-frame-pointer -g
+
+# These are the flags Linux uses for modules that are applicable to userspace.
+# Note that this overloads the CFLAGS above.  Just pick one based on whichever
+# comparison you're doing
+HOSTCFLAGS =  \
+  -fno-strict-aliasing \
+  -fno-common \
+  -fshort-wchar \
+  -std=gnu99 \
+  -fno-PIE \
+  -m64 \
+  -falign-jumps=1 \
+  -falign-loops=1 \
+  -mskip-rax-setup \
+  -mtune=generic \
+  -mno-red-zone \
+  -funit-at-a-time \
+  -pipe \
+  -fno-asynchronous-unwind-tables \
+  -fno-delete-null-pointer-checks \
+  -O2 \
+  --param=allow-store-data-races=0 \
+  -fstack-protector-strong \
+  -fno-omit-frame-pointer \
+  -fno-optimize-sibling-calls \
+  -fno-var-tracking-assignments \
+  -g
 
 USERDIR = ../../user
 # override to our local obj/
@@ -71,12 +103,12 @@ tests_ldlibs := -lpthread -lm
 $(OBJDIR)/%: $(tests_lddepends_c)
 	@echo + cc [LINUX_TESTS] $<
 	@mkdir -p $(@D)
-	$(Q)$(HOSTCC) -static -O2 $< $(tests_c_deps) -o $@ $(tests_ldlibs)
+	$(Q)$(HOSTCC) -static -O2 $(HOSTCFLAGS) $< $(tests_c_deps) -o $@ $(tests_ldlibs)
 
 $(OBJDIR)/%: $(sel_progs_lddepends_c)
 	@echo + cc [LINUX_TESTS] $<
 	@mkdir -p $(@D)
-	$(Q)$(HOSTCC) -static -O2 $< $(tests_c_deps) -o $@ $(tests_ldlibs)
+	$(Q)$(HOSTCC) -static -O2 $(HOSTCFLAGS) $< $(tests_c_deps) -o $@ $(tests_ldlibs)
 
 all: mods $(progs)
 	@:

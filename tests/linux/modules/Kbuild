@@ -1,1 +1,2 @@
+#CFLAGS_mcs.o += -fno-stack-protector
 obj-m += mcs.o
