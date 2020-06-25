@@ -21,7 +21,7 @@
 #include <string.h>
 
 #define handle_error(msg) \
-	do { perror(msg); exit(EXIT_FAILURE); } while (0)
+	do { perror("Error, aborting: " msg); exit(EXIT_FAILURE); } while (0)
 
 /* OS dependent #incs */
 #ifdef __akaros__
@@ -499,6 +499,7 @@ static struct argp_option options[] = {
 struct lock_test {
 	const char *name;
 	void *(*func)(void *arg);
+	int id;
 };
 
 struct prog_args {
@@ -650,11 +651,17 @@ static struct lock_test tests[] = {
 
 #else
 
+#define LOCKTEST_MCS 		1
+#define LOCKTEST_QUEUE 		2
+#define LOCKTEST_SPIN 		3
+
 static struct lock_test tests[] = {
 	{"mcs", mcs_thread},
 	{"mcscas", mcscas_thread},
-	{"mcs-kernel", NULL},
 	{"spin", spin_thread},
+	{"mcs-kernel", NULL, LOCKTEST_MCS},
+	{"queue-kernel", NULL, LOCKTEST_QUEUE},
+	{"spin-kernel", NULL, LOCKTEST_SPIN},
 	{}
 };
 
@@ -930,7 +937,7 @@ static struct results run_pthreads_test(void)
 
 #ifdef __akaros__
 
-static struct results run_kernel_mod_test(void)
+static struct results run_kernel_mod_test(struct lock_test *t)
 {
 	printf("Unsupported on Akaros\n");
 	exit(-1);
@@ -942,7 +949,7 @@ static struct results run_kernel_mod_test(void)
  * The test runs on a pread(off==0).  The return format is all N of the
  * loops_done void*, followed by a 2D array of samples for threads then loops.
  * (t0_l0, t0_l1, t0_l2..., t1_l0, t1_l1, t1_l2...). */
-static struct results run_kernel_mod_test(void)
+static struct results run_kernel_mod_test(struct lock_test *t)
 {
 	struct results results;
 	int fd;
@@ -955,8 +962,8 @@ static struct results run_kernel_mod_test(void)
 	fd = open("/sys/kernel/mcs", O_WRONLY);
 	if (fd < 0)
 		handle_error("open write");
-	if (dprintf(fd, "%u %u %u %u", pargs.nr_threads, pargs.nr_loops,
-		    pargs.hold_time, pargs.delay_time) < 0)
+	if (dprintf(fd, "%u %u %u %u %u", pargs.test->id, pargs.nr_threads,
+		    pargs.nr_loops, pargs.hold_time, pargs.delay_time) < 0)
 		handle_error("setting opts.  too many threads?");
 	/* For the change in parameters (notably the file size, due to
 	 * threads * loops) to take effect, you need to close and reopen. */
@@ -998,8 +1005,8 @@ static struct results run_kernel_mod_test(void)
 
 static struct results run_test(void)
 {
-	if (!strcmp(pargs.test->name, "mcs-kernel"))
-		return run_kernel_mod_test();
+	if (pargs.test->id)
+		return run_kernel_mod_test(pargs.test);
 	return run_pthreads_test();
 }
 
