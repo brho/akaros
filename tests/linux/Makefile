@@ -23,7 +23,7 @@ HOSTCFLAGS = -Wall -Werror -Wreturn-type \
 # These are the flags Linux uses for modules that are applicable to userspace.
 # Note that this overloads the CFLAGS above.  Just pick one based on whichever
 # comparison you're doing
-HOSTCFLAGS =  \
+#HOSTCFLAGS =  \
   -fno-strict-aliasing \
   -fno-common \
   -fshort-wchar \
