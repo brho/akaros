@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 	int dfd, ret;
 	char buf[256];
 	char addr[256];
-	host = "146.148.59.222";
+	host = "185.199.109.153";
 	page = "files/test.html";
 	port = "80";
 
@@ -48,7 +48,8 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 	/* short get style */
-	snprintf(buf, sizeof(buf), "GET /%s\r\nConnection: close\r\n\r\n",
+	snprintf(buf, sizeof(buf),
+		 "GET /%s HTTP/1.1\r\nHost: akaros.org\r\nConnection: close\r\n\r\n",
 		 page);
 	ret = write(dfd, buf, strlen(buf));
 	if (ret < 0) {
