@@ -1,5 +1,4 @@
 earlyprintk=akaros
  console=hvc0
- lapic=notscdeadline
- nortc
+ mitigations=off
  nozswap
