@@ -378,11 +378,18 @@ static bool emsr_lapic_icr_write(struct emmsr *msr, struct vm_trapframe *tf)
 {
 	uint32_t destination = tf->tf_rdx & 0xffffffff;
 	uint8_t vector = tf->tf_rax & 0xff;
-	uint8_t type = (tf->tf_rax >> 8) & 0x7;
+	uint8_t del_mode = (tf->tf_rax >> 8) & 0x7;
+	uint8_t dst_mode = (tf->tf_rax >> 11) & 0x1;
 	struct guest_pcore *gpc;
 	int target_coreid;
+	uint8_t dst_shorthand = (tf->tf_rax >> 18) & 0x3;
 
-	if (type != 0 || destination == 0xffffffff)
+	if (dst_mode || del_mode != 0 /* Fixed */)
+		return false;
+	/* dst_shorthand includes broadcasts, but also includes a self-ipi.  the
+	 * guest ought to be using the self-ipi register instead of the
+	 * shorthand. */
+	if (dst_shorthand || destination == 0xffffffff)
 		return false;
 	gpc = lookup_guest_pcore(current, destination);
 	if (!gpc)

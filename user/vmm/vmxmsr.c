@@ -147,34 +147,93 @@ static int emsr_fakewrite(struct guest_thread *vm_thread, struct emmsr *msr,
 	return 0;
 }
 
-static int apic_icr_write(struct guest_thread *vm_thread,
+static int irq_guest_core_verbose(struct virtual_machine *vm,
+				  unsigned int gpcoreid, unsigned int vector)
+{
+	if (!vmm_interrupt_guest(vm, gpcoreid, vector))
+		return 0;
+	fprintf(stderr, "Failed to send IRQ %d to cpu %d: %s\n", vector,
+		gpcoreid, errstr());
+	return -1;
+}
+
+/* Note that the kernel has first dibs on handling ICR writes, and it'll try to
+ * send an IPI if there is a single target.  emsr_lapic_icr_write() */
+static int apic_icr_write(struct guest_thread *gth,
                           struct vmm_gpcore_init *gpci)
 {
-	/* We currently only handle physical destinations.
-	 * TODO(ganshun): Support logical destinations if needed. */
-	struct virtual_machine *vm = gth_to_vm(vm_thread);
-	struct vm_trapframe *vm_tf = gth_to_vmtf(vm_thread);
+	struct virtual_machine *vm = gth_to_vm(gth);
+	struct vm_trapframe *vm_tf = gth_to_vmtf(gth);
 	uint32_t destination = vm_tf->tf_rdx & 0xffffffff;
 	uint8_t vector = vm_tf->tf_rax & 0xff;
-	uint8_t type = (vm_tf->tf_rax >> 8) & 0x7;
+	uint8_t del_mode = (vm_tf->tf_rax >> 8) & 0x7;
+	uint8_t dst_mode = (vm_tf->tf_rax >> 11) & 0x1;
 	int apic_offset = vm_tf->tf_rcx & 0xff;
+	uint8_t dst_shorthand = (vm_tf->tf_rax >> 18) & 0x3;
 
-	if (destination >= vm->nr_gpcs && destination != 0xffffffff) {
-		fprintf(stderr, "UNSUPPORTED DESTINATION 0x%02x!\n",
-				destination);
+	bool broadcast = false;
+	bool self = false;
+	int not_ok = 0;
+
+	/* We currently only handle physical destinations. */
+	if (dst_mode) {
+		fprintf(stderr,
+			"x2APIC ICR unsupported logical destination mode\n");
 		return SHUTDOWN_UNHANDLED_EXIT_REASON;
 	}
-	switch (type) {
-	case 0:
-		/* Send IPI */
-		if (destination == 0xffffffff) {
-			/* Broadcast */
-			for (int i = 0; i < vm->nr_gpcs; i++)
-				vmm_interrupt_guest(vm, i, vector);
+
+	/* You'd think they'd just say "bit 0 is self, bit 1 is broadcast", but
+	 * it's inverted... */
+	switch (dst_shorthand) {
+	case 0x0:
+		broadcast = false;
+		self = false;
+		break;
+	case 0x1:
+		broadcast = false;
+		self = true;
+		break;
+	case 0x2:
+		broadcast = true;
+		self = true;
+		break;
+	case 0x3:
+		broadcast = true;
+		self = false;
+		break;
+	}
+
+	/* Let them override the shorthand with the old eight Fs */
+	if (destination == 0xffffffff) {
+		broadcast = true;
+		self = true;
+	}
+
+	if (destination >= vm->nr_gpcs && !(self && broadcast)) {
+		fprintf(stderr, "Bad APIC dest 0x%02x, shorthand 0x%x!\n",
+				destination, dst_shorthand);
+		return SHUTDOWN_UNHANDLED_EXIT_REASON;
+	}
+
+	switch (del_mode) {
+	case 0:		/* Fixed */
+		if (broadcast) {
+			for (int i = 0; i < vm->nr_gpcs; i++) {
+				if (i == gth->gpc_id && !self)
+					continue;
+				not_ok |= irq_guest_core_verbose(vm, i, vector);
+			}
 		} else {
-			/* Send individual IPI */
-			vmm_interrupt_guest(vm, destination, vector);
+			if (self)
+				not_ok = irq_guest_core_verbose(vm, gth->gpc_id,
+								vector);
+			else
+				not_ok = irq_guest_core_verbose(vm, destination,
+								vector);
 		}
+		if (not_ok)
+			return SHUTDOWN_UNHANDLED_EXIT_REASON;
+
 		break;
 	case 0x5:	/* INIT */
 	case 0x6:	/* SIPI */
@@ -182,7 +241,7 @@ static int apic_icr_write(struct guest_thread *vm_thread,
 		 * allowed to try to make them for now. */
 		break;
 	default:
-		fprintf(stderr, "Unsupported IPI type %d!\n", type);
+		fprintf(stderr, "Unsupported IPI del_mode %d!\n", del_mode);
 		break;
 	}
 
