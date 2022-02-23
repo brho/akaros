@@ -656,9 +656,8 @@ int main(int argc, char **argv)
 
 		/* Append all the virtio mmio base addresses. */
 
-		/* Since the lower number irqs are no longer being used, the
-		 * irqs can now be assigned starting from 0.  */
-		vm->virtio_mmio_devices[i]->irq = i;
+		/* Linux barfs if you give it IRQ 0 */
+		vm->virtio_mmio_devices[i]->irq = i + 1;
 		len = snprintf(cmdlinep, cmdlinesz,
 		               "\n virtio_mmio.device=1K@0x%llx:%lld",
 		               vm->virtio_mmio_devices[i]->addr,
